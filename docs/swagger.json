@@ -424,6 +424,211 @@
                 }
             }
         },
+        "/api/v1/assets": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "assets"
+                ],
+                "summary": "List assets",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Size",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.AssetPage"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "assets"
+                ],
+                "summary": "Create assets",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.CreateAssetRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/dto.AssetResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/assets/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "assets"
+                ],
+                "summary": "Get assets",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.AssetResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "assets"
+                ],
+                "summary": "Update assets",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.UpdateAssetRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.AssetResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "assets"
+                ],
+                "summary": "Delete assets",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/catalog-options": {
             "get": {
                 "security": [
@@ -1453,6 +1658,279 @@
                 }
             }
         },
+        "dto.AssetPage": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.AssetResponse"
+                    }
+                },
+                "has_next": {
+                    "type": "boolean"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.AssetResponse": {
+            "type": "object",
+            "properties": {
+                "acquisition_date": {
+                    "type": "string"
+                },
+                "acquisition_type": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "annual_percentage_rate": {
+                    "type": "number"
+                },
+                "archived_at": {
+                    "type": "string"
+                },
+                "asset_type_id": {
+                    "type": "integer"
+                },
+                "body_subtype": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "body_type": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "capitalized_cost": {
+                    "type": "number"
+                },
+                "color": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "company_id": {
+                    "type": "integer"
+                },
+                "current_meter": {
+                    "type": "number"
+                },
+                "current_meter_date": {
+                    "type": "string"
+                },
+                "custom_fields": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "down_payment": {
+                    "type": "number"
+                },
+                "estimated_replacement_mileage": {
+                    "type": "integer"
+                },
+                "estimated_resale_price": {
+                    "type": "number"
+                },
+                "estimated_service_months": {
+                    "type": "integer"
+                },
+                "excess_mileage_charge": {
+                    "type": "number"
+                },
+                "external_id": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "first_payment_date": {
+                    "type": "string"
+                },
+                "fuel_type": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "fuel_volume_units": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "generate_expenses": {
+                    "type": "boolean"
+                },
+                "group": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "in_service_date": {
+                    "type": "string"
+                },
+                "in_service_meter": {
+                    "type": "number"
+                },
+                "labels": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "lease_end_date": {
+                    "type": "string"
+                },
+                "lease_number": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "lease_start_date": {
+                    "type": "string"
+                },
+                "lease_vendor_id": {
+                    "type": "integer"
+                },
+                "license_plate": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "linked_vehicles": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "loan_account_number": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "loan_amount": {
+                    "type": "number"
+                },
+                "loan_end_date": {
+                    "type": "string"
+                },
+                "loan_ended_at": {
+                    "type": "string"
+                },
+                "loan_notes": {
+                    "type": "string"
+                },
+                "loan_start_date": {
+                    "type": "string"
+                },
+                "loan_started_at": {
+                    "type": "string"
+                },
+                "loan_vendor_id": {
+                    "type": "integer"
+                },
+                "make": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "meter_unit": {
+                    "type": "string",
+                    "maxLength": 5
+                },
+                "mileage_cap": {
+                    "type": "integer"
+                },
+                "model": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "monthly_cost": {
+                    "type": "number"
+                },
+                "monthly_payment": {
+                    "type": "number"
+                },
+                "msrp": {
+                    "type": "number"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "notes": {
+                    "type": "string"
+                },
+                "number_of_payments": {
+                    "type": "integer"
+                },
+                "out_of_service_date": {
+                    "type": "string"
+                },
+                "out_of_service_meter": {
+                    "type": "number"
+                },
+                "owner_company_id": {
+                    "type": "integer"
+                },
+                "ownership_type": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "photo": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "purchase_date": {
+                    "type": "string"
+                },
+                "purchase_meter": {
+                    "type": "number"
+                },
+                "purchase_price": {
+                    "type": "number"
+                },
+                "purchase_vendor": {
+                    "type": "string",
+                    "maxLength": 200
+                },
+                "registration_state": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "residual_value": {
+                    "type": "number"
+                },
+                "secondary_meter_unit": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "secondary_meter_value": {
+                    "type": "number"
+                },
+                "status_id": {
+                    "type": "integer"
+                },
+                "trim": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "vehicle_type": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "vin_sn": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "year": {
+                    "type": "integer"
+                }
+            }
+        },
         "dto.AssetStatusPage": {
             "type": "object",
             "properties": {
@@ -1652,6 +2130,247 @@
                 }
             }
         },
+        "dto.CreateAssetRequest": {
+            "type": "object",
+            "properties": {
+                "acquisition_date": {
+                    "type": "string"
+                },
+                "acquisition_type": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "annual_percentage_rate": {
+                    "type": "number"
+                },
+                "archived_at": {
+                    "type": "string"
+                },
+                "asset_type_id": {
+                    "type": "integer"
+                },
+                "body_subtype": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "body_type": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "capitalized_cost": {
+                    "type": "number"
+                },
+                "color": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "current_meter": {
+                    "type": "number"
+                },
+                "current_meter_date": {
+                    "type": "string"
+                },
+                "custom_fields": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "down_payment": {
+                    "type": "number"
+                },
+                "estimated_replacement_mileage": {
+                    "type": "integer"
+                },
+                "estimated_resale_price": {
+                    "type": "number"
+                },
+                "estimated_service_months": {
+                    "type": "integer"
+                },
+                "excess_mileage_charge": {
+                    "type": "number"
+                },
+                "external_id": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "first_payment_date": {
+                    "type": "string"
+                },
+                "fuel_type": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "fuel_volume_units": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "generate_expenses": {
+                    "type": "boolean"
+                },
+                "group": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "in_service_date": {
+                    "type": "string"
+                },
+                "in_service_meter": {
+                    "type": "number"
+                },
+                "labels": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "lease_end_date": {
+                    "type": "string"
+                },
+                "lease_number": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "lease_start_date": {
+                    "type": "string"
+                },
+                "lease_vendor_id": {
+                    "type": "integer"
+                },
+                "license_plate": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "linked_vehicles": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "loan_account_number": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "loan_amount": {
+                    "type": "number"
+                },
+                "loan_end_date": {
+                    "type": "string"
+                },
+                "loan_ended_at": {
+                    "type": "string"
+                },
+                "loan_notes": {
+                    "type": "string"
+                },
+                "loan_start_date": {
+                    "type": "string"
+                },
+                "loan_started_at": {
+                    "type": "string"
+                },
+                "loan_vendor_id": {
+                    "type": "integer"
+                },
+                "make": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "meter_unit": {
+                    "type": "string",
+                    "maxLength": 5
+                },
+                "mileage_cap": {
+                    "type": "integer"
+                },
+                "model": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "monthly_cost": {
+                    "type": "number"
+                },
+                "monthly_payment": {
+                    "type": "number"
+                },
+                "msrp": {
+                    "type": "number"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "notes": {
+                    "type": "string"
+                },
+                "number_of_payments": {
+                    "type": "integer"
+                },
+                "out_of_service_date": {
+                    "type": "string"
+                },
+                "out_of_service_meter": {
+                    "type": "number"
+                },
+                "owner_company_id": {
+                    "type": "integer"
+                },
+                "ownership_type": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "photo": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "purchase_date": {
+                    "type": "string"
+                },
+                "purchase_meter": {
+                    "type": "number"
+                },
+                "purchase_price": {
+                    "type": "number"
+                },
+                "purchase_vendor": {
+                    "type": "string",
+                    "maxLength": 200
+                },
+                "registration_state": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "residual_value": {
+                    "type": "number"
+                },
+                "secondary_meter_unit": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "secondary_meter_value": {
+                    "type": "number"
+                },
+                "status_id": {
+                    "type": "integer"
+                },
+                "trim": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "vehicle_type": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "vin_sn": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "year": {
+                    "type": "integer"
+                }
+            }
+        },
         "dto.CreateAssetStatusRequest": {
             "type": "object",
             "required": [
@@ -1841,6 +2560,247 @@
             "properties": {
                 "refresh_token": {
                     "type": "string"
+                }
+            }
+        },
+        "dto.UpdateAssetRequest": {
+            "type": "object",
+            "properties": {
+                "acquisition_date": {
+                    "type": "string"
+                },
+                "acquisition_type": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "annual_percentage_rate": {
+                    "type": "number"
+                },
+                "archived_at": {
+                    "type": "string"
+                },
+                "asset_type_id": {
+                    "type": "integer"
+                },
+                "body_subtype": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "body_type": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "capitalized_cost": {
+                    "type": "number"
+                },
+                "color": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "current_meter": {
+                    "type": "number"
+                },
+                "current_meter_date": {
+                    "type": "string"
+                },
+                "custom_fields": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "down_payment": {
+                    "type": "number"
+                },
+                "estimated_replacement_mileage": {
+                    "type": "integer"
+                },
+                "estimated_resale_price": {
+                    "type": "number"
+                },
+                "estimated_service_months": {
+                    "type": "integer"
+                },
+                "excess_mileage_charge": {
+                    "type": "number"
+                },
+                "external_id": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "first_payment_date": {
+                    "type": "string"
+                },
+                "fuel_type": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "fuel_volume_units": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "generate_expenses": {
+                    "type": "boolean"
+                },
+                "group": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "in_service_date": {
+                    "type": "string"
+                },
+                "in_service_meter": {
+                    "type": "number"
+                },
+                "labels": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "lease_end_date": {
+                    "type": "string"
+                },
+                "lease_number": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "lease_start_date": {
+                    "type": "string"
+                },
+                "lease_vendor_id": {
+                    "type": "integer"
+                },
+                "license_plate": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "linked_vehicles": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "loan_account_number": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "loan_amount": {
+                    "type": "number"
+                },
+                "loan_end_date": {
+                    "type": "string"
+                },
+                "loan_ended_at": {
+                    "type": "string"
+                },
+                "loan_notes": {
+                    "type": "string"
+                },
+                "loan_start_date": {
+                    "type": "string"
+                },
+                "loan_started_at": {
+                    "type": "string"
+                },
+                "loan_vendor_id": {
+                    "type": "integer"
+                },
+                "make": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "meter_unit": {
+                    "type": "string",
+                    "maxLength": 5
+                },
+                "mileage_cap": {
+                    "type": "integer"
+                },
+                "model": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "monthly_cost": {
+                    "type": "number"
+                },
+                "monthly_payment": {
+                    "type": "number"
+                },
+                "msrp": {
+                    "type": "number"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "notes": {
+                    "type": "string"
+                },
+                "number_of_payments": {
+                    "type": "integer"
+                },
+                "out_of_service_date": {
+                    "type": "string"
+                },
+                "out_of_service_meter": {
+                    "type": "number"
+                },
+                "owner_company_id": {
+                    "type": "integer"
+                },
+                "ownership_type": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "photo": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "purchase_date": {
+                    "type": "string"
+                },
+                "purchase_meter": {
+                    "type": "number"
+                },
+                "purchase_price": {
+                    "type": "number"
+                },
+                "purchase_vendor": {
+                    "type": "string",
+                    "maxLength": 200
+                },
+                "registration_state": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "residual_value": {
+                    "type": "number"
+                },
+                "secondary_meter_unit": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "secondary_meter_value": {
+                    "type": "number"
+                },
+                "status_id": {
+                    "type": "integer"
+                },
+                "trim": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "vehicle_type": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "vin_sn": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "year": {
+                    "type": "integer"
                 }
             }
         },

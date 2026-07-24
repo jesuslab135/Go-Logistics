@@ -65,6 +65,10 @@ func NewRouter(d Deps) *gin.Engine {
 	crud.NewHandler[dto.CompanyResponse, dto.CreateCompanyRequest, dto.UpdateCompanyRequest](
 		NewCompanyStore(d.Queries)).Register(api, "/companies")
 
+	// Phase 2: assets
+	crud.NewHandler[dto.AssetResponse, dto.CreateAssetRequest, dto.UpdateAssetRequest](
+		NewAssetStore(d.Queries)).Register(api, "/assets")
+
 	// Phase 1: asset catalogs & vehicle models (tenant-scoped)
 	crud.NewHandler[dto.AssetTypeResponse, dto.CreateAssetTypeRequest, dto.UpdateAssetTypeRequest](
 		NewAssetTypeStore(d.Queries)).Register(api, "/asset-types")

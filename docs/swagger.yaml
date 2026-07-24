@@ -11,6 +11,195 @@ definitions:
       token_type:
         type: string
     type: object
+  dto.AssetPage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.AssetResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.AssetResponse:
+    properties:
+      acquisition_date:
+        type: string
+      acquisition_type:
+        maxLength: 20
+        type: string
+      annual_percentage_rate:
+        type: number
+      archived_at:
+        type: string
+      asset_type_id:
+        type: integer
+      body_subtype:
+        maxLength: 100
+        type: string
+      body_type:
+        maxLength: 100
+        type: string
+      capitalized_cost:
+        type: number
+      color:
+        maxLength: 50
+        type: string
+      company_id:
+        type: integer
+      current_meter:
+        type: number
+      current_meter_date:
+        type: string
+      custom_fields:
+        items:
+          type: integer
+        type: array
+      down_payment:
+        type: number
+      estimated_replacement_mileage:
+        type: integer
+      estimated_resale_price:
+        type: number
+      estimated_service_months:
+        type: integer
+      excess_mileage_charge:
+        type: number
+      external_id:
+        maxLength: 100
+        type: string
+      first_payment_date:
+        type: string
+      fuel_type:
+        maxLength: 20
+        type: string
+      fuel_volume_units:
+        maxLength: 20
+        type: string
+      generate_expenses:
+        type: boolean
+      group:
+        maxLength: 100
+        type: string
+      id:
+        type: integer
+      in_service_date:
+        type: string
+      in_service_meter:
+        type: number
+      labels:
+        items:
+          type: integer
+        type: array
+      lease_end_date:
+        type: string
+      lease_number:
+        maxLength: 100
+        type: string
+      lease_start_date:
+        type: string
+      lease_vendor_id:
+        type: integer
+      license_plate:
+        maxLength: 20
+        type: string
+      linked_vehicles:
+        items:
+          type: integer
+        type: array
+      loan_account_number:
+        maxLength: 100
+        type: string
+      loan_amount:
+        type: number
+      loan_end_date:
+        type: string
+      loan_ended_at:
+        type: string
+      loan_notes:
+        type: string
+      loan_start_date:
+        type: string
+      loan_started_at:
+        type: string
+      loan_vendor_id:
+        type: integer
+      make:
+        maxLength: 100
+        type: string
+      meter_unit:
+        maxLength: 5
+        type: string
+      mileage_cap:
+        type: integer
+      model:
+        maxLength: 100
+        type: string
+      monthly_cost:
+        type: number
+      monthly_payment:
+        type: number
+      msrp:
+        type: number
+      name:
+        maxLength: 100
+        type: string
+      notes:
+        type: string
+      number_of_payments:
+        type: integer
+      out_of_service_date:
+        type: string
+      out_of_service_meter:
+        type: number
+      owner_company_id:
+        type: integer
+      ownership_type:
+        maxLength: 20
+        type: string
+      photo:
+        maxLength: 100
+        type: string
+      purchase_date:
+        type: string
+      purchase_meter:
+        type: number
+      purchase_price:
+        type: number
+      purchase_vendor:
+        maxLength: 200
+        type: string
+      registration_state:
+        maxLength: 50
+        type: string
+      residual_value:
+        type: number
+      secondary_meter_unit:
+        maxLength: 20
+        type: string
+      secondary_meter_value:
+        type: number
+      status_id:
+        type: integer
+      trim:
+        maxLength: 100
+        type: string
+      updated_at:
+        type: string
+      vehicle_type:
+        maxLength: 20
+        type: string
+      vin_sn:
+        maxLength: 100
+        type: string
+      year:
+        type: integer
+    type: object
   dto.AssetStatusPage:
     properties:
       data:
@@ -140,6 +329,174 @@ definitions:
         type: string
       website:
         type: string
+    type: object
+  dto.CreateAssetRequest:
+    properties:
+      acquisition_date:
+        type: string
+      acquisition_type:
+        maxLength: 20
+        type: string
+      annual_percentage_rate:
+        type: number
+      archived_at:
+        type: string
+      asset_type_id:
+        type: integer
+      body_subtype:
+        maxLength: 100
+        type: string
+      body_type:
+        maxLength: 100
+        type: string
+      capitalized_cost:
+        type: number
+      color:
+        maxLength: 50
+        type: string
+      current_meter:
+        type: number
+      current_meter_date:
+        type: string
+      custom_fields:
+        items:
+          type: integer
+        type: array
+      down_payment:
+        type: number
+      estimated_replacement_mileage:
+        type: integer
+      estimated_resale_price:
+        type: number
+      estimated_service_months:
+        type: integer
+      excess_mileage_charge:
+        type: number
+      external_id:
+        maxLength: 100
+        type: string
+      first_payment_date:
+        type: string
+      fuel_type:
+        maxLength: 20
+        type: string
+      fuel_volume_units:
+        maxLength: 20
+        type: string
+      generate_expenses:
+        type: boolean
+      group:
+        maxLength: 100
+        type: string
+      in_service_date:
+        type: string
+      in_service_meter:
+        type: number
+      labels:
+        items:
+          type: integer
+        type: array
+      lease_end_date:
+        type: string
+      lease_number:
+        maxLength: 100
+        type: string
+      lease_start_date:
+        type: string
+      lease_vendor_id:
+        type: integer
+      license_plate:
+        maxLength: 20
+        type: string
+      linked_vehicles:
+        items:
+          type: integer
+        type: array
+      loan_account_number:
+        maxLength: 100
+        type: string
+      loan_amount:
+        type: number
+      loan_end_date:
+        type: string
+      loan_ended_at:
+        type: string
+      loan_notes:
+        type: string
+      loan_start_date:
+        type: string
+      loan_started_at:
+        type: string
+      loan_vendor_id:
+        type: integer
+      make:
+        maxLength: 100
+        type: string
+      meter_unit:
+        maxLength: 5
+        type: string
+      mileage_cap:
+        type: integer
+      model:
+        maxLength: 100
+        type: string
+      monthly_cost:
+        type: number
+      monthly_payment:
+        type: number
+      msrp:
+        type: number
+      name:
+        maxLength: 100
+        type: string
+      notes:
+        type: string
+      number_of_payments:
+        type: integer
+      out_of_service_date:
+        type: string
+      out_of_service_meter:
+        type: number
+      owner_company_id:
+        type: integer
+      ownership_type:
+        maxLength: 20
+        type: string
+      photo:
+        maxLength: 100
+        type: string
+      purchase_date:
+        type: string
+      purchase_meter:
+        type: number
+      purchase_price:
+        type: number
+      purchase_vendor:
+        maxLength: 200
+        type: string
+      registration_state:
+        maxLength: 50
+        type: string
+      residual_value:
+        type: number
+      secondary_meter_unit:
+        maxLength: 20
+        type: string
+      secondary_meter_value:
+        type: number
+      status_id:
+        type: integer
+      trim:
+        maxLength: 100
+        type: string
+      vehicle_type:
+        maxLength: 20
+        type: string
+      vin_sn:
+        maxLength: 100
+        type: string
+      year:
+        type: integer
     type: object
   dto.CreateAssetStatusRequest:
     properties:
@@ -273,6 +630,174 @@ definitions:
         type: string
     required:
     - refresh_token
+    type: object
+  dto.UpdateAssetRequest:
+    properties:
+      acquisition_date:
+        type: string
+      acquisition_type:
+        maxLength: 20
+        type: string
+      annual_percentage_rate:
+        type: number
+      archived_at:
+        type: string
+      asset_type_id:
+        type: integer
+      body_subtype:
+        maxLength: 100
+        type: string
+      body_type:
+        maxLength: 100
+        type: string
+      capitalized_cost:
+        type: number
+      color:
+        maxLength: 50
+        type: string
+      current_meter:
+        type: number
+      current_meter_date:
+        type: string
+      custom_fields:
+        items:
+          type: integer
+        type: array
+      down_payment:
+        type: number
+      estimated_replacement_mileage:
+        type: integer
+      estimated_resale_price:
+        type: number
+      estimated_service_months:
+        type: integer
+      excess_mileage_charge:
+        type: number
+      external_id:
+        maxLength: 100
+        type: string
+      first_payment_date:
+        type: string
+      fuel_type:
+        maxLength: 20
+        type: string
+      fuel_volume_units:
+        maxLength: 20
+        type: string
+      generate_expenses:
+        type: boolean
+      group:
+        maxLength: 100
+        type: string
+      in_service_date:
+        type: string
+      in_service_meter:
+        type: number
+      labels:
+        items:
+          type: integer
+        type: array
+      lease_end_date:
+        type: string
+      lease_number:
+        maxLength: 100
+        type: string
+      lease_start_date:
+        type: string
+      lease_vendor_id:
+        type: integer
+      license_plate:
+        maxLength: 20
+        type: string
+      linked_vehicles:
+        items:
+          type: integer
+        type: array
+      loan_account_number:
+        maxLength: 100
+        type: string
+      loan_amount:
+        type: number
+      loan_end_date:
+        type: string
+      loan_ended_at:
+        type: string
+      loan_notes:
+        type: string
+      loan_start_date:
+        type: string
+      loan_started_at:
+        type: string
+      loan_vendor_id:
+        type: integer
+      make:
+        maxLength: 100
+        type: string
+      meter_unit:
+        maxLength: 5
+        type: string
+      mileage_cap:
+        type: integer
+      model:
+        maxLength: 100
+        type: string
+      monthly_cost:
+        type: number
+      monthly_payment:
+        type: number
+      msrp:
+        type: number
+      name:
+        maxLength: 100
+        type: string
+      notes:
+        type: string
+      number_of_payments:
+        type: integer
+      out_of_service_date:
+        type: string
+      out_of_service_meter:
+        type: number
+      owner_company_id:
+        type: integer
+      ownership_type:
+        maxLength: 20
+        type: string
+      photo:
+        maxLength: 100
+        type: string
+      purchase_date:
+        type: string
+      purchase_meter:
+        type: number
+      purchase_price:
+        type: number
+      purchase_vendor:
+        maxLength: 200
+        type: string
+      registration_state:
+        maxLength: 50
+        type: string
+      residual_value:
+        type: number
+      secondary_meter_unit:
+        maxLength: 20
+        type: string
+      secondary_meter_value:
+        type: number
+      status_id:
+        type: integer
+      trim:
+        maxLength: 100
+        type: string
+      vehicle_type:
+        maxLength: 20
+        type: string
+      vin_sn:
+        maxLength: 100
+        type: string
+      year:
+        type: integer
     type: object
   dto.UpdateAssetStatusRequest:
     properties:
@@ -710,6 +1235,133 @@ paths:
       summary: Update an asset type
       tags:
       - asset-types
+  /api/v1/assets:
+    get:
+      parameters:
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.AssetPage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List assets
+      tags:
+      - assets
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateAssetRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.AssetResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create assets
+      tags:
+      - assets
+  /api/v1/assets/{id}:
+    delete:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete assets
+      tags:
+      - assets
+    get:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.AssetResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get assets
+      tags:
+      - assets
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateAssetRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.AssetResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update assets
+      tags:
+      - assets
   /api/v1/catalog-options:
     get:
       parameters:
