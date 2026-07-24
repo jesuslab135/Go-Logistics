@@ -130,5 +130,21 @@ func NewRouter(d Deps) *gin.Engine {
 
 	api.POST("/uploads", NewUploadHandler(d.Storage).Upload)
 
+	// Phase 8: nested, parent-scoped child resources
+	crud.NewNestedHandler[dto.WorkOrderLineItemResponse, dto.CreateWorkOrderLineItemRequest, dto.UpdateWorkOrderLineItemRequest](NewWorkOrderLineItemStore(d.Queries)).Register(api, "/work-orders", "/line-items")
+	crud.NewNestedHandler[dto.WorkOrderStatusLogResponse, dto.CreateWorkOrderStatusLogRequest, dto.UpdateWorkOrderStatusLogRequest](NewWorkOrderStatusLogStore(d.Queries)).Register(api, "/work-orders", "/status-logs")
+	crud.NewNestedHandler[dto.PurchaseOrderLineItemResponse, dto.CreatePurchaseOrderLineItemRequest, dto.UpdatePurchaseOrderLineItemRequest](NewPurchaseOrderLineItemStore(d.Queries)).Register(api, "/purchase-orders", "/line-items")
+	crud.NewNestedHandler[dto.ServiceTaskPartResponse, dto.CreateServiceTaskPartRequest, dto.UpdateServiceTaskPartRequest](NewServiceTaskPartStore(d.Queries)).Register(api, "/service-tasks", "/parts")
+	crud.NewNestedHandler[dto.ServiceEntryLineItemResponse, dto.CreateServiceEntryLineItemRequest, dto.UpdateServiceEntryLineItemRequest](NewServiceEntryLineItemStore(d.Queries)).Register(api, "/service-entries", "/line-items")
+	crud.NewNestedHandler[dto.InspectionFormItemResponse, dto.CreateInspectionFormItemRequest, dto.UpdateInspectionFormItemRequest](NewInspectionFormItemStore(d.Queries)).Register(api, "/inspection-forms", "/items")
+	crud.NewNestedHandler[dto.InspectionSubmissionItemResponse, dto.CreateInspectionSubmissionItemRequest, dto.UpdateInspectionSubmissionItemRequest](NewInspectionSubmissionItemStore(d.Queries)).Register(api, "/inspection-submissions", "/items")
+	crud.NewNestedHandler[dto.AxleDefinitionResponse, dto.CreateAxleDefinitionRequest, dto.UpdateAxleDefinitionRequest](NewAxleDefinitionStore(d.Queries)).Register(api, "/axle-templates", "/definitions")
+	crud.NewNestedHandler[dto.AssetTrailerAssignmentResponse, dto.CreateAssetTrailerAssignmentRequest, dto.UpdateAssetTrailerAssignmentRequest](NewAssetTrailerAssignmentStore(d.Queries)).Register(api, "/assets", "/trailer-assignments")
+	crud.NewNestedHandler[dto.PartInventoryResponse, dto.CreatePartInventoryRequest, dto.UpdatePartInventoryRequest](NewPartInventoryStore(d.Queries)).Register(api, "/parts", "/inventory")
+	crud.NewNestedHandler[dto.FuelEntryResponse, dto.CreateFuelEntryRequest, dto.UpdateFuelEntryRequest](NewFuelEntryStore(d.Queries)).Register(api, "/assets", "/fuel-entries")
+	crud.NewNestedHandler[dto.TireInstallationResponse, dto.CreateTireInstallationRequest, dto.UpdateTireInstallationRequest](NewTireInstallationStore(d.Queries)).Register(api, "/tires", "/installations")
+	crud.NewNestedHandler[dto.TireInspectionResponse, dto.CreateTireInspectionRequest, dto.UpdateTireInspectionRequest](NewTireInspectionStore(d.Queries)).Register(api, "/tires", "/inspections")
+	crud.NewNestedHandler[dto.TireMountLogResponse, dto.CreateTireMountLogRequest, dto.UpdateTireMountLogRequest](NewTireMountLogStore(d.Queries)).Register(api, "/tires", "/mount-logs")
+
 	return r
 }
