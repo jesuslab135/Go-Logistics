@@ -1,0 +1,86 @@
+-- 000001_init.down.sql
+-- Reverses 000001_init.up.sql. CASCADE handles FK/constraint teardown, so the
+-- drop order does not matter.
+
+DROP TABLE IF EXISTS service_entry_line_item_issues CASCADE;
+DROP TABLE IF EXISTS issue_watchers CASCADE;
+DROP TABLE IF EXISTS issue_assigned_to CASCADE;
+DROP TABLE IF EXISTS work_order_line_item_issues CASCADE;
+DROP TABLE IF EXISTS work_order_faults CASCADE;
+DROP TABLE IF EXISTS work_order_issues CASCADE;
+DROP TABLE IF EXISTS employee_companies CASCADE;
+
+DROP TABLE IF EXISTS weekly_mileage_goal CASCADE;
+DROP TABLE IF EXISTS warranty CASCADE;
+DROP TABLE IF EXISTS comment CASCADE;
+DROP TABLE IF EXISTS media CASCADE;
+
+DROP TABLE IF EXISTS inspection_submission_item CASCADE;
+DROP TABLE IF EXISTS inspection_submission CASCADE;
+DROP TABLE IF EXISTS inspection_form_item CASCADE;
+DROP TABLE IF EXISTS inspection_form CASCADE;
+
+DROP TABLE IF EXISTS fuel_photo CASCADE;
+DROP TABLE IF EXISTS fuel_comment CASCADE;
+DROP TABLE IF EXISTS fuel_entry CASCADE;
+DROP TABLE IF EXISTS fuel_type CASCADE;
+
+DROP TABLE IF EXISTS tire_assignment_request CASCADE;
+DROP TABLE IF EXISTS vehicle_axle_config CASCADE;
+DROP TABLE IF EXISTS tire_inspection CASCADE;
+DROP TABLE IF EXISTS tire_mount_log CASCADE;
+DROP TABLE IF EXISTS tire_installation CASCADE;
+DROP TABLE IF EXISTS tire CASCADE;
+DROP TABLE IF EXISTS tire_model CASCADE;
+DROP TABLE IF EXISTS wheel_position_definition CASCADE;
+DROP TABLE IF EXISTS axle_definition CASCADE;
+DROP TABLE IF EXISTS axle_template CASCADE;
+
+DROP TABLE IF EXISTS service_entry_line_item CASCADE;
+DROP TABLE IF EXISTS service_entry CASCADE;
+DROP TABLE IF EXISTS service_reminder CASCADE;
+DROP TABLE IF EXISTS service_task_part CASCADE;
+DROP TABLE IF EXISTS service_task CASCADE;
+
+DROP TABLE IF EXISTS purchase_order_line_item CASCADE;
+DROP TABLE IF EXISTS purchase_order CASCADE;
+
+DROP TABLE IF EXISTS issue CASCADE;
+DROP TABLE IF EXISTS fault CASCADE;
+DROP TABLE IF EXISTS issue_priority CASCADE;
+
+DROP TABLE IF EXISTS work_order_status_log CASCADE;
+DROP TABLE IF EXISTS labor_time_entry CASCADE;
+DROP TABLE IF EXISTS work_order_sub_line_item CASCADE;
+DROP TABLE IF EXISTS work_order_line_item CASCADE;
+DROP TABLE IF EXISTS work_order CASCADE;
+DROP TABLE IF EXISTS work_order_status CASCADE;
+
+DROP TABLE IF EXISTS vendor CASCADE;
+
+DROP TABLE IF EXISTS inventory_journal_entry CASCADE;
+DROP TABLE IF EXISTS inventory_adjustment_reason CASCADE;
+DROP TABLE IF EXISTS part_inventory CASCADE;
+DROP TABLE IF EXISTS part_location CASCADE;
+DROP TABLE IF EXISTS location CASCADE;
+DROP TABLE IF EXISTS part CASCADE;
+DROP TABLE IF EXISTS measurement_unit CASCADE;
+DROP TABLE IF EXISTS part_manufacturer CASCADE;
+DROP TABLE IF EXISTS part_category CASCADE;
+
+DROP TABLE IF EXISTS vehicle_model CASCADE;
+DROP TABLE IF EXISTS vehicle_make CASCADE;
+DROP TABLE IF EXISTS asset_trailer_assignment CASCADE;
+DROP TABLE IF EXISTS trailer CASCADE;
+DROP TABLE IF EXISTS vehicle CASCADE;
+DROP TABLE IF EXISTS asset CASCADE;
+DROP TABLE IF EXISTS catalog_option CASCADE;
+DROP TABLE IF EXISTS asset_status CASCADE;
+DROP TABLE IF EXISTS asset_type CASCADE;
+
+DROP TABLE IF EXISTS employee CASCADE;
+DROP TABLE IF EXISTS "group" CASCADE;
+DROP TABLE IF EXISTS role CASCADE;
+DROP TABLE IF EXISTS company CASCADE;
+
+DROP EXTENSION IF EXISTS pg_trgm;
