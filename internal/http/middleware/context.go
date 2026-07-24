@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 
@@ -8,6 +9,16 @@ import (
 
 	"fleet/internal/auth"
 )
+
+// companyContextKey carries the authenticated tenant id on the request context
+// so repository stores can scope every query without depending on gin.
+type companyContextKey struct{}
+
+// CompanyFromContext returns the tenant company id set by Auth, or 0 if absent.
+func CompanyFromContext(ctx context.Context) int64 {
+	id, _ := ctx.Value(companyContextKey{}).(int64)
+	return id
+}
 
 const (
 	RequestIDHeader = "X-Request-ID"

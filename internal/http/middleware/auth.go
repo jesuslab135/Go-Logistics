@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -32,6 +33,9 @@ func Auth(tokens *auth.TokenService) gin.HandlerFunc {
 		}
 
 		c.Set(claimsKey, claims)
+		c.Request = c.Request.WithContext(
+			context.WithValue(c.Request.Context(), companyContextKey{}, claims.CompanyID),
+		)
 		c.Next()
 	}
 }

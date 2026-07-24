@@ -5,6 +5,8 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 
 	"fleet/internal/auth"
 	"fleet/internal/db/gen"
@@ -48,6 +50,11 @@ func NewRouter(d Deps) *gin.Engine {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 
+	// Interactive API docs. Disabled in production to avoid exposing the schema.
+	if !d.Production {
+		r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	}
+
 	authH := NewAuthHandler(d.Tokens, d.Verifier)
 	r.POST("/auth/login", authH.Login)
 	r.POST("/auth/refresh", authH.Refresh)
@@ -55,10 +62,22 @@ func NewRouter(d Deps) *gin.Engine {
 	api := r.Group("/api/v1")
 	api.Use(middleware.Auth(d.Tokens))
 
-	companies := crud.NewHandler[dto.CompanyResponse, dto.CreateCompanyRequest, dto.UpdateCompanyRequest](
-		NewCompanyStore(d.Queries),
-	)
-	companies.Register(api, "/companies")
+	crud.NewHandler[dto.CompanyResponse, dto.CreateCompanyRequest, dto.UpdateCompanyRequest](
+		NewCompanyStore(d.Queries)).Register(api, "/companies")
+
+	// Phase 1: asset catalogs & vehicle models (tenant-scoped)
+	crud.NewHandler[dto.AssetTypeResponse, dto.CreateAssetTypeRequest, dto.UpdateAssetTypeRequest](
+		NewAssetTypeStore(d.Queries)).Register(api, "/asset-types")
+	crud.NewHandler[dto.AssetStatusResponse, dto.CreateAssetStatusRequest, dto.UpdateAssetStatusRequest](
+		NewAssetStatusStore(d.Queries)).Register(api, "/asset-statuses")
+	crud.NewHandler[dto.CatalogOptionResponse, dto.CreateCatalogOptionRequest, dto.UpdateCatalogOptionRequest](
+		NewCatalogOptionStore(d.Queries)).Register(api, "/catalog-options")
+	crud.NewHandler[dto.VehicleMakeResponse, dto.CreateVehicleMakeRequest, dto.UpdateVehicleMakeRequest](
+		NewVehicleMakeStore(d.Queries)).Register(api, "/vehicle-makes")
+	crud.NewHandler[dto.VehicleModelResponse, dto.CreateVehicleModelRequest, dto.UpdateVehicleModelRequest](
+		NewVehicleModelStore(d.Queries)).Register(api, "/vehicle-models")
+
+	api.POST("/uploads", NewUploadHandler(d.Storage).Upload)
 
 	return r
 }
