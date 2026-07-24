@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgxpool"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 
@@ -20,6 +21,7 @@ import (
 // (pgx pool -> gen.Queries, token service, etc.) and calls NewRouter.
 type Deps struct {
 	Queries     *gen.Queries
+	Pool        *pgxpool.Pool
 	Tokens      *auth.TokenService
 	Verifier    CredentialVerifier
 	Storage     storage.Storage
@@ -115,6 +117,8 @@ func NewRouter(d Deps) *gin.Engine {
 	crud.NewHandler[dto.WarrantyResponse, dto.CreateWarrantyRequest, dto.UpdateWarrantyRequest](NewWarrantyStore(d.Queries)).Register(api, "/warranties")
 	crud.NewHandler[dto.WeeklyMileageGoalResponse, dto.CreateWeeklyMileageGoalRequest, dto.UpdateWeeklyMileageGoalRequest](NewWeeklyMileageGoalStore(d.Queries)).Register(api, "/weekly-mileage-goals")
 	crud.NewHandler[dto.RoleResponse, dto.CreateRoleRequest, dto.UpdateRoleRequest](NewRoleStore(d.Queries)).Register(api, "/roles")
+	// employee: m2m-scoped, password_hash excluded, transactional create
+	crud.NewHandler[dto.EmployeeResponse, dto.CreateEmployeeRequest, dto.UpdateEmployeeRequest](NewEmployeeStore(d.Queries, d.Pool)).Register(api, "/employees")
 
 	// Phase 1: asset catalogs & vehicle models (tenant-scoped)
 	crud.NewHandler[dto.AssetTypeResponse, dto.CreateAssetTypeRequest, dto.UpdateAssetTypeRequest](

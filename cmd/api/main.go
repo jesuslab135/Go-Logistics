@@ -64,6 +64,7 @@ func run(logger *slog.Logger) error {
 
 	router := handler.NewRouter(handler.Deps{
 		Queries:     queries,
+		Pool:        pool,
 		Tokens:      tokens,
 		Verifier:    handler.NewEmployeeCredentialVerifier(queries),
 		Storage:     blobs,

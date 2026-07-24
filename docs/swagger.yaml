@@ -765,6 +765,92 @@ definitions:
     - name
     - tax_id
     type: object
+  dto.CreateEmployeeRequest:
+    properties:
+      birth_date:
+        type: string
+      city:
+        maxLength: 100
+        type: string
+      country:
+        maxLength: 50
+        type: string
+      custom_fields:
+        items:
+          type: integer
+        type: array
+      dashboard_preferences:
+        items:
+          type: integer
+        type: array
+      default_company_id:
+        type: integer
+      email:
+        maxLength: 254
+        type: string
+      employee_id:
+        maxLength: 50
+        type: string
+      first_name:
+        maxLength: 100
+        type: string
+      group_id:
+        type: integer
+      hourly_labor_rate:
+        type: number
+      is_account_owner:
+        type: boolean
+      is_active:
+        type: boolean
+      is_technician:
+        type: boolean
+      is_vehicle_operator:
+        type: boolean
+      job_title:
+        maxLength: 100
+        type: string
+      last_name:
+        maxLength: 100
+        type: string
+      leave_date:
+        type: string
+      license_class:
+        maxLength: 10
+        type: string
+      license_expiry:
+        type: string
+      license_number:
+        maxLength: 50
+        type: string
+      license_state:
+        maxLength: 50
+        type: string
+      mobile_phone:
+        maxLength: 20
+        type: string
+      postal_code:
+        maxLength: 20
+        type: string
+      region:
+        maxLength: 50
+        type: string
+      role_id:
+        type: integer
+      start_date:
+        type: string
+      street_address:
+        maxLength: 200
+        type: string
+      table_preferences:
+        items:
+          type: integer
+        type: array
+      user_id:
+        type: integer
+      work_phone:
+        maxLength: 20
+        type: string
+    type: object
   dto.CreateFaultRequest:
     properties:
       applies_to_asset_types:
@@ -1972,6 +2058,111 @@ definitions:
         type: integer
       unit_cost:
         type: number
+    type: object
+  dto.EmployeePage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.EmployeeResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.EmployeeResponse:
+    properties:
+      birth_date:
+        type: string
+      city:
+        maxLength: 100
+        type: string
+      country:
+        maxLength: 50
+        type: string
+      custom_fields:
+        items:
+          type: integer
+        type: array
+      dashboard_preferences:
+        items:
+          type: integer
+        type: array
+      default_company_id:
+        type: integer
+      email:
+        maxLength: 254
+        type: string
+      employee_id:
+        maxLength: 50
+        type: string
+      first_name:
+        maxLength: 100
+        type: string
+      group_id:
+        type: integer
+      hourly_labor_rate:
+        type: number
+      id:
+        type: integer
+      is_account_owner:
+        type: boolean
+      is_active:
+        type: boolean
+      is_technician:
+        type: boolean
+      is_vehicle_operator:
+        type: boolean
+      job_title:
+        maxLength: 100
+        type: string
+      last_name:
+        maxLength: 100
+        type: string
+      leave_date:
+        type: string
+      license_class:
+        maxLength: 10
+        type: string
+      license_expiry:
+        type: string
+      license_number:
+        maxLength: 50
+        type: string
+      license_state:
+        maxLength: 50
+        type: string
+      mobile_phone:
+        maxLength: 20
+        type: string
+      postal_code:
+        maxLength: 20
+        type: string
+      region:
+        maxLength: 50
+        type: string
+      role_id:
+        type: integer
+      start_date:
+        type: string
+      street_address:
+        maxLength: 200
+        type: string
+      table_preferences:
+        items:
+          type: integer
+        type: array
+      updated_at:
+        type: string
+      user_id:
+        type: integer
+      work_phone:
+        maxLength: 20
+        type: string
     type: object
   dto.ErrorBody:
     properties:
@@ -4079,6 +4270,92 @@ definitions:
     required:
     - name
     - tax_id
+    type: object
+  dto.UpdateEmployeeRequest:
+    properties:
+      birth_date:
+        type: string
+      city:
+        maxLength: 100
+        type: string
+      country:
+        maxLength: 50
+        type: string
+      custom_fields:
+        items:
+          type: integer
+        type: array
+      dashboard_preferences:
+        items:
+          type: integer
+        type: array
+      default_company_id:
+        type: integer
+      email:
+        maxLength: 254
+        type: string
+      employee_id:
+        maxLength: 50
+        type: string
+      first_name:
+        maxLength: 100
+        type: string
+      group_id:
+        type: integer
+      hourly_labor_rate:
+        type: number
+      is_account_owner:
+        type: boolean
+      is_active:
+        type: boolean
+      is_technician:
+        type: boolean
+      is_vehicle_operator:
+        type: boolean
+      job_title:
+        maxLength: 100
+        type: string
+      last_name:
+        maxLength: 100
+        type: string
+      leave_date:
+        type: string
+      license_class:
+        maxLength: 10
+        type: string
+      license_expiry:
+        type: string
+      license_number:
+        maxLength: 50
+        type: string
+      license_state:
+        maxLength: 50
+        type: string
+      mobile_phone:
+        maxLength: 20
+        type: string
+      postal_code:
+        maxLength: 20
+        type: string
+      region:
+        maxLength: 50
+        type: string
+      role_id:
+        type: integer
+      start_date:
+        type: string
+      street_address:
+        maxLength: 200
+        type: string
+      table_preferences:
+        items:
+          type: integer
+        type: array
+      user_id:
+        type: integer
+      work_phone:
+        maxLength: 20
+        type: string
     type: object
   dto.UpdateFaultRequest:
     properties:
@@ -8102,6 +8379,133 @@ paths:
       summary: Update a company
       tags:
       - companies
+  /api/v1/employees:
+    get:
+      parameters:
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.EmployeePage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List employees
+      tags:
+      - employees
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateEmployeeRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.EmployeeResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create employees
+      tags:
+      - employees
+  /api/v1/employees/{id}:
+    delete:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete employees
+      tags:
+      - employees
+    get:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.EmployeeResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get employees
+      tags:
+      - employees
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateEmployeeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.EmployeeResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update employees
+      tags:
+      - employees
   /api/v1/faults:
     get:
       parameters:

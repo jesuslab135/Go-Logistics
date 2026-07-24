@@ -2748,6 +2748,211 @@
                 }
             }
         },
+        "/api/v1/employees": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "employees"
+                ],
+                "summary": "List employees",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Size",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.EmployeePage"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "employees"
+                ],
+                "summary": "Create employees",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.CreateEmployeeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/dto.EmployeeResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/employees/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "employees"
+                ],
+                "summary": "Get employees",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.EmployeeResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "employees"
+                ],
+                "summary": "Update employees",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.UpdateEmployeeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.EmployeeResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "employees"
+                ],
+                "summary": "Delete employees",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/faults": {
             "get": {
                 "security": [
@@ -13605,6 +13810,128 @@
                 }
             }
         },
+        "dto.CreateEmployeeRequest": {
+            "type": "object",
+            "properties": {
+                "birth_date": {
+                    "type": "string"
+                },
+                "city": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "country": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "custom_fields": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "dashboard_preferences": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "default_company_id": {
+                    "type": "integer"
+                },
+                "email": {
+                    "type": "string",
+                    "maxLength": 254
+                },
+                "employee_id": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "first_name": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "group_id": {
+                    "type": "integer"
+                },
+                "hourly_labor_rate": {
+                    "type": "number"
+                },
+                "is_account_owner": {
+                    "type": "boolean"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "is_technician": {
+                    "type": "boolean"
+                },
+                "is_vehicle_operator": {
+                    "type": "boolean"
+                },
+                "job_title": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "last_name": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "leave_date": {
+                    "type": "string"
+                },
+                "license_class": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "license_expiry": {
+                    "type": "string"
+                },
+                "license_number": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "license_state": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "mobile_phone": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "postal_code": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "region": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "role_id": {
+                    "type": "integer"
+                },
+                "start_date": {
+                    "type": "string"
+                },
+                "street_address": {
+                    "type": "string",
+                    "maxLength": 200
+                },
+                "table_preferences": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "user_id": {
+                    "type": "integer"
+                },
+                "work_phone": {
+                    "type": "string",
+                    "maxLength": 20
+                }
+            }
+        },
         "dto.CreateFaultRequest": {
             "type": "object",
             "properties": {
@@ -15378,6 +15705,157 @@
                 },
                 "unit_cost": {
                     "type": "number"
+                }
+            }
+        },
+        "dto.EmployeePage": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.EmployeeResponse"
+                    }
+                },
+                "has_next": {
+                    "type": "boolean"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.EmployeeResponse": {
+            "type": "object",
+            "properties": {
+                "birth_date": {
+                    "type": "string"
+                },
+                "city": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "country": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "custom_fields": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "dashboard_preferences": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "default_company_id": {
+                    "type": "integer"
+                },
+                "email": {
+                    "type": "string",
+                    "maxLength": 254
+                },
+                "employee_id": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "first_name": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "group_id": {
+                    "type": "integer"
+                },
+                "hourly_labor_rate": {
+                    "type": "number"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "is_account_owner": {
+                    "type": "boolean"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "is_technician": {
+                    "type": "boolean"
+                },
+                "is_vehicle_operator": {
+                    "type": "boolean"
+                },
+                "job_title": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "last_name": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "leave_date": {
+                    "type": "string"
+                },
+                "license_class": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "license_expiry": {
+                    "type": "string"
+                },
+                "license_number": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "license_state": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "mobile_phone": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "postal_code": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "region": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "role_id": {
+                    "type": "integer"
+                },
+                "start_date": {
+                    "type": "string"
+                },
+                "street_address": {
+                    "type": "string",
+                    "maxLength": 200
+                },
+                "table_preferences": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "integer"
+                },
+                "work_phone": {
+                    "type": "string",
+                    "maxLength": 20
                 }
             }
         },
@@ -18501,6 +18979,128 @@
                 "website": {
                     "type": "string",
                     "maxLength": 200
+                }
+            }
+        },
+        "dto.UpdateEmployeeRequest": {
+            "type": "object",
+            "properties": {
+                "birth_date": {
+                    "type": "string"
+                },
+                "city": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "country": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "custom_fields": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "dashboard_preferences": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "default_company_id": {
+                    "type": "integer"
+                },
+                "email": {
+                    "type": "string",
+                    "maxLength": 254
+                },
+                "employee_id": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "first_name": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "group_id": {
+                    "type": "integer"
+                },
+                "hourly_labor_rate": {
+                    "type": "number"
+                },
+                "is_account_owner": {
+                    "type": "boolean"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "is_technician": {
+                    "type": "boolean"
+                },
+                "is_vehicle_operator": {
+                    "type": "boolean"
+                },
+                "job_title": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "last_name": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "leave_date": {
+                    "type": "string"
+                },
+                "license_class": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "license_expiry": {
+                    "type": "string"
+                },
+                "license_number": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "license_state": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "mobile_phone": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "postal_code": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "region": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "role_id": {
+                    "type": "integer"
+                },
+                "start_date": {
+                    "type": "string"
+                },
+                "street_address": {
+                    "type": "string",
+                    "maxLength": 200
+                },
+                "table_preferences": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "user_id": {
+                    "type": "integer"
+                },
+                "work_phone": {
+                    "type": "string",
+                    "maxLength": 20
                 }
             }
         },

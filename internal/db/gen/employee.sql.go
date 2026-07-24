@@ -8,14 +8,201 @@ package gen
 import (
 	"context"
 	"time"
+
+	"github.com/shopspring/decimal"
 )
 
-const getEmployee = `-- name: GetEmployee :one
-SELECT id, user_id, default_company_id, first_name, last_name, employee_id, role_id, is_active, email, mobile_phone, work_phone, job_title, start_date, leave_date, birth_date, hourly_labor_rate, is_technician, is_vehicle_operator, is_account_owner, license_class, license_number, license_state, license_expiry, street_address, city, region, postal_code, country, group_id, custom_fields, table_preferences, dashboard_preferences, updated_at, password_hash FROM employee WHERE id = $1
+const addEmployeeCompany = `-- name: AddEmployeeCompany :exec
+INSERT INTO employee_companies (employee_id, company_id)
+VALUES ($1, $2)
+ON CONFLICT (employee_id, company_id) DO NOTHING
 `
 
-func (q *Queries) GetEmployee(ctx context.Context, id int64) (Employee, error) {
-	row := q.db.QueryRow(ctx, getEmployee, id)
+type AddEmployeeCompanyParams struct {
+	EmployeeID int64
+	CompanyID  int64
+}
+
+func (q *Queries) AddEmployeeCompany(ctx context.Context, arg AddEmployeeCompanyParams) error {
+	_, err := q.db.Exec(ctx, addEmployeeCompany, arg.EmployeeID, arg.CompanyID)
+	return err
+}
+
+const countEmployees = `-- name: CountEmployees :one
+SELECT count(*) FROM employee e
+WHERE EXISTS (SELECT 1 FROM employee_companies ec WHERE ec.employee_id = e.id AND ec.company_id = $1)
+`
+
+func (q *Queries) CountEmployees(ctx context.Context, companyID int64) (int64, error) {
+	row := q.db.QueryRow(ctx, countEmployees, companyID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const createEmployee = `-- name: CreateEmployee :one
+INSERT INTO employee (
+    user_id, default_company_id, first_name, last_name, employee_id, role_id, is_active,
+    email, mobile_phone, work_phone, job_title, start_date, leave_date, birth_date,
+    hourly_labor_rate, is_technician, is_vehicle_operator, is_account_owner, license_class,
+    license_number, license_state, license_expiry, street_address, city, region, postal_code,
+    country, group_id, custom_fields, table_preferences, dashboard_preferences, updated_at
+) VALUES (
+    $1, $2, $3, $4,
+    $5, $6, $7, $8,
+    $9, $10, $11, $12,
+    $13, $14, $15, $16,
+    $17, $18, $19,
+    $20, $21, $22,
+    $23, $24, $25, $26,
+    $27, $28, $29, $30,
+    $31, $32
+)
+RETURNING id, user_id, default_company_id, first_name, last_name, employee_id, role_id, is_active, email, mobile_phone, work_phone, job_title, start_date, leave_date, birth_date, hourly_labor_rate, is_technician, is_vehicle_operator, is_account_owner, license_class, license_number, license_state, license_expiry, street_address, city, region, postal_code, country, group_id, custom_fields, table_preferences, dashboard_preferences, updated_at, password_hash
+`
+
+type CreateEmployeeParams struct {
+	UserID               *int64
+	DefaultCompanyID     *int64
+	FirstName            string
+	LastName             string
+	EmployeeID           string
+	RoleID               *int64
+	IsActive             bool
+	Email                string
+	MobilePhone          string
+	WorkPhone            string
+	JobTitle             string
+	StartDate            *time.Time
+	LeaveDate            *time.Time
+	BirthDate            *time.Time
+	HourlyLaborRate      *decimal.Decimal
+	IsTechnician         bool
+	IsVehicleOperator    bool
+	IsAccountOwner       bool
+	LicenseClass         string
+	LicenseNumber        string
+	LicenseState         string
+	LicenseExpiry        *time.Time
+	StreetAddress        string
+	City                 string
+	Region               string
+	PostalCode           string
+	Country              string
+	GroupID              *int64
+	CustomFields         []byte
+	TablePreferences     []byte
+	DashboardPreferences []byte
+	UpdatedAt            time.Time
+}
+
+func (q *Queries) CreateEmployee(ctx context.Context, arg CreateEmployeeParams) (Employee, error) {
+	row := q.db.QueryRow(ctx, createEmployee,
+		arg.UserID,
+		arg.DefaultCompanyID,
+		arg.FirstName,
+		arg.LastName,
+		arg.EmployeeID,
+		arg.RoleID,
+		arg.IsActive,
+		arg.Email,
+		arg.MobilePhone,
+		arg.WorkPhone,
+		arg.JobTitle,
+		arg.StartDate,
+		arg.LeaveDate,
+		arg.BirthDate,
+		arg.HourlyLaborRate,
+		arg.IsTechnician,
+		arg.IsVehicleOperator,
+		arg.IsAccountOwner,
+		arg.LicenseClass,
+		arg.LicenseNumber,
+		arg.LicenseState,
+		arg.LicenseExpiry,
+		arg.StreetAddress,
+		arg.City,
+		arg.Region,
+		arg.PostalCode,
+		arg.Country,
+		arg.GroupID,
+		arg.CustomFields,
+		arg.TablePreferences,
+		arg.DashboardPreferences,
+		arg.UpdatedAt,
+	)
+	var i Employee
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.DefaultCompanyID,
+		&i.FirstName,
+		&i.LastName,
+		&i.EmployeeID,
+		&i.RoleID,
+		&i.IsActive,
+		&i.Email,
+		&i.MobilePhone,
+		&i.WorkPhone,
+		&i.JobTitle,
+		&i.StartDate,
+		&i.LeaveDate,
+		&i.BirthDate,
+		&i.HourlyLaborRate,
+		&i.IsTechnician,
+		&i.IsVehicleOperator,
+		&i.IsAccountOwner,
+		&i.LicenseClass,
+		&i.LicenseNumber,
+		&i.LicenseState,
+		&i.LicenseExpiry,
+		&i.StreetAddress,
+		&i.City,
+		&i.Region,
+		&i.PostalCode,
+		&i.Country,
+		&i.GroupID,
+		&i.CustomFields,
+		&i.TablePreferences,
+		&i.DashboardPreferences,
+		&i.UpdatedAt,
+		&i.PasswordHash,
+	)
+	return i, err
+}
+
+const deleteEmployee = `-- name: DeleteEmployee :exec
+DELETE FROM employee e
+WHERE e.id = $1
+  AND EXISTS (SELECT 1 FROM employee_companies ec WHERE ec.employee_id = e.id AND ec.company_id = $2)
+`
+
+type DeleteEmployeeParams struct {
+	ID        int64
+	CompanyID int64
+}
+
+func (q *Queries) DeleteEmployee(ctx context.Context, arg DeleteEmployeeParams) error {
+	_, err := q.db.Exec(ctx, deleteEmployee, arg.ID, arg.CompanyID)
+	return err
+}
+
+const getEmployee = `-- name: GetEmployee :one
+
+SELECT e.id, e.user_id, e.default_company_id, e.first_name, e.last_name, e.employee_id, e.role_id, e.is_active, e.email, e.mobile_phone, e.work_phone, e.job_title, e.start_date, e.leave_date, e.birth_date, e.hourly_labor_rate, e.is_technician, e.is_vehicle_operator, e.is_account_owner, e.license_class, e.license_number, e.license_state, e.license_expiry, e.street_address, e.city, e.region, e.postal_code, e.country, e.group_id, e.custom_fields, e.table_preferences, e.dashboard_preferences, e.updated_at, e.password_hash FROM employee e
+WHERE e.id = $1
+  AND EXISTS (SELECT 1 FROM employee_companies ec WHERE ec.employee_id = e.id AND ec.company_id = $2)
+`
+
+type GetEmployeeParams struct {
+	ID        int64
+	CompanyID int64
+}
+
+// Employee CRUD is scoped by company membership via the employee_companies m2m,
+// and never reads/writes password_hash (managed only by the auth queries above).
+func (q *Queries) GetEmployee(ctx context.Context, arg GetEmployeeParams) (Employee, error) {
+	row := q.db.QueryRow(ctx, getEmployee, arg.ID, arg.CompanyID)
 	var i Employee
 	err := row.Scan(
 		&i.ID,
@@ -79,6 +266,208 @@ func (q *Queries) GetEmployeeAuthByEmail(ctx context.Context, email string) (Get
 		&i.DefaultCompanyID,
 		&i.PasswordHash,
 		&i.IsAdmin,
+	)
+	return i, err
+}
+
+const listEmployees = `-- name: ListEmployees :many
+SELECT e.id, e.user_id, e.default_company_id, e.first_name, e.last_name, e.employee_id, e.role_id, e.is_active, e.email, e.mobile_phone, e.work_phone, e.job_title, e.start_date, e.leave_date, e.birth_date, e.hourly_labor_rate, e.is_technician, e.is_vehicle_operator, e.is_account_owner, e.license_class, e.license_number, e.license_state, e.license_expiry, e.street_address, e.city, e.region, e.postal_code, e.country, e.group_id, e.custom_fields, e.table_preferences, e.dashboard_preferences, e.updated_at, e.password_hash FROM employee e
+WHERE EXISTS (SELECT 1 FROM employee_companies ec WHERE ec.employee_id = e.id AND ec.company_id = $1)
+ORDER BY e.last_name, e.first_name
+LIMIT $3 OFFSET $2
+`
+
+type ListEmployeesParams struct {
+	CompanyID int64
+	Off       int32
+	Lim       int32
+}
+
+func (q *Queries) ListEmployees(ctx context.Context, arg ListEmployeesParams) ([]Employee, error) {
+	rows, err := q.db.Query(ctx, listEmployees, arg.CompanyID, arg.Off, arg.Lim)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Employee{}
+	for rows.Next() {
+		var i Employee
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.DefaultCompanyID,
+			&i.FirstName,
+			&i.LastName,
+			&i.EmployeeID,
+			&i.RoleID,
+			&i.IsActive,
+			&i.Email,
+			&i.MobilePhone,
+			&i.WorkPhone,
+			&i.JobTitle,
+			&i.StartDate,
+			&i.LeaveDate,
+			&i.BirthDate,
+			&i.HourlyLaborRate,
+			&i.IsTechnician,
+			&i.IsVehicleOperator,
+			&i.IsAccountOwner,
+			&i.LicenseClass,
+			&i.LicenseNumber,
+			&i.LicenseState,
+			&i.LicenseExpiry,
+			&i.StreetAddress,
+			&i.City,
+			&i.Region,
+			&i.PostalCode,
+			&i.Country,
+			&i.GroupID,
+			&i.CustomFields,
+			&i.TablePreferences,
+			&i.DashboardPreferences,
+			&i.UpdatedAt,
+			&i.PasswordHash,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const updateEmployee = `-- name: UpdateEmployee :one
+UPDATE employee e SET
+    user_id = $1, default_company_id = $2,
+    first_name = $3, last_name = $4, employee_id = $5,
+    role_id = $6, is_active = $7, email = $8,
+    mobile_phone = $9, work_phone = $10, job_title = $11,
+    start_date = $12, leave_date = $13, birth_date = $14,
+    hourly_labor_rate = $15, is_technician = $16,
+    is_vehicle_operator = $17, is_account_owner = $18,
+    license_class = $19, license_number = $20,
+    license_state = $21, license_expiry = $22,
+    street_address = $23, city = $24, region = $25,
+    postal_code = $26, country = $27, group_id = $28,
+    custom_fields = $29, table_preferences = $30,
+    dashboard_preferences = $31, updated_at = $32
+WHERE e.id = $33
+  AND EXISTS (SELECT 1 FROM employee_companies ec WHERE ec.employee_id = e.id AND ec.company_id = $34)
+RETURNING e.id, e.user_id, e.default_company_id, e.first_name, e.last_name, e.employee_id, e.role_id, e.is_active, e.email, e.mobile_phone, e.work_phone, e.job_title, e.start_date, e.leave_date, e.birth_date, e.hourly_labor_rate, e.is_technician, e.is_vehicle_operator, e.is_account_owner, e.license_class, e.license_number, e.license_state, e.license_expiry, e.street_address, e.city, e.region, e.postal_code, e.country, e.group_id, e.custom_fields, e.table_preferences, e.dashboard_preferences, e.updated_at, e.password_hash
+`
+
+type UpdateEmployeeParams struct {
+	UserID               *int64
+	DefaultCompanyID     *int64
+	FirstName            string
+	LastName             string
+	EmployeeID           string
+	RoleID               *int64
+	IsActive             bool
+	Email                string
+	MobilePhone          string
+	WorkPhone            string
+	JobTitle             string
+	StartDate            *time.Time
+	LeaveDate            *time.Time
+	BirthDate            *time.Time
+	HourlyLaborRate      *decimal.Decimal
+	IsTechnician         bool
+	IsVehicleOperator    bool
+	IsAccountOwner       bool
+	LicenseClass         string
+	LicenseNumber        string
+	LicenseState         string
+	LicenseExpiry        *time.Time
+	StreetAddress        string
+	City                 string
+	Region               string
+	PostalCode           string
+	Country              string
+	GroupID              *int64
+	CustomFields         []byte
+	TablePreferences     []byte
+	DashboardPreferences []byte
+	UpdatedAt            time.Time
+	ID                   int64
+	CompanyID            int64
+}
+
+func (q *Queries) UpdateEmployee(ctx context.Context, arg UpdateEmployeeParams) (Employee, error) {
+	row := q.db.QueryRow(ctx, updateEmployee,
+		arg.UserID,
+		arg.DefaultCompanyID,
+		arg.FirstName,
+		arg.LastName,
+		arg.EmployeeID,
+		arg.RoleID,
+		arg.IsActive,
+		arg.Email,
+		arg.MobilePhone,
+		arg.WorkPhone,
+		arg.JobTitle,
+		arg.StartDate,
+		arg.LeaveDate,
+		arg.BirthDate,
+		arg.HourlyLaborRate,
+		arg.IsTechnician,
+		arg.IsVehicleOperator,
+		arg.IsAccountOwner,
+		arg.LicenseClass,
+		arg.LicenseNumber,
+		arg.LicenseState,
+		arg.LicenseExpiry,
+		arg.StreetAddress,
+		arg.City,
+		arg.Region,
+		arg.PostalCode,
+		arg.Country,
+		arg.GroupID,
+		arg.CustomFields,
+		arg.TablePreferences,
+		arg.DashboardPreferences,
+		arg.UpdatedAt,
+		arg.ID,
+		arg.CompanyID,
+	)
+	var i Employee
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.DefaultCompanyID,
+		&i.FirstName,
+		&i.LastName,
+		&i.EmployeeID,
+		&i.RoleID,
+		&i.IsActive,
+		&i.Email,
+		&i.MobilePhone,
+		&i.WorkPhone,
+		&i.JobTitle,
+		&i.StartDate,
+		&i.LeaveDate,
+		&i.BirthDate,
+		&i.HourlyLaborRate,
+		&i.IsTechnician,
+		&i.IsVehicleOperator,
+		&i.IsAccountOwner,
+		&i.LicenseClass,
+		&i.LicenseNumber,
+		&i.LicenseState,
+		&i.LicenseExpiry,
+		&i.StreetAddress,
+		&i.City,
+		&i.Region,
+		&i.PostalCode,
+		&i.Country,
+		&i.GroupID,
+		&i.CustomFields,
+		&i.TablePreferences,
+		&i.DashboardPreferences,
+		&i.UpdatedAt,
+		&i.PasswordHash,
 	)
 	return i, err
 }

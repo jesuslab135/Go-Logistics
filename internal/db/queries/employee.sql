@@ -5,8 +5,72 @@ LEFT JOIN role r ON r.id = e.role_id
 WHERE e.email = $1 AND e.is_active = true
 LIMIT 1;
 
--- name: GetEmployee :one
-SELECT * FROM employee WHERE id = $1;
-
 -- name: UpdateEmployeePassword :exec
 UPDATE employee SET password_hash = $2, updated_at = $3 WHERE id = $1;
+
+-- Employee CRUD is scoped by company membership via the employee_companies m2m,
+-- and never reads/writes password_hash (managed only by the auth queries above).
+
+-- name: GetEmployee :one
+SELECT e.* FROM employee e
+WHERE e.id = sqlc.arg(id)
+  AND EXISTS (SELECT 1 FROM employee_companies ec WHERE ec.employee_id = e.id AND ec.company_id = sqlc.arg(company_id));
+
+-- name: ListEmployees :many
+SELECT e.* FROM employee e
+WHERE EXISTS (SELECT 1 FROM employee_companies ec WHERE ec.employee_id = e.id AND ec.company_id = sqlc.arg(company_id))
+ORDER BY e.last_name, e.first_name
+LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off);
+
+-- name: CountEmployees :one
+SELECT count(*) FROM employee e
+WHERE EXISTS (SELECT 1 FROM employee_companies ec WHERE ec.employee_id = e.id AND ec.company_id = sqlc.arg(company_id));
+
+-- name: CreateEmployee :one
+INSERT INTO employee (
+    user_id, default_company_id, first_name, last_name, employee_id, role_id, is_active,
+    email, mobile_phone, work_phone, job_title, start_date, leave_date, birth_date,
+    hourly_labor_rate, is_technician, is_vehicle_operator, is_account_owner, license_class,
+    license_number, license_state, license_expiry, street_address, city, region, postal_code,
+    country, group_id, custom_fields, table_preferences, dashboard_preferences, updated_at
+) VALUES (
+    sqlc.arg(user_id), sqlc.arg(default_company_id), sqlc.arg(first_name), sqlc.arg(last_name),
+    sqlc.arg(employee_id), sqlc.arg(role_id), sqlc.arg(is_active), sqlc.arg(email),
+    sqlc.arg(mobile_phone), sqlc.arg(work_phone), sqlc.arg(job_title), sqlc.arg(start_date),
+    sqlc.arg(leave_date), sqlc.arg(birth_date), sqlc.arg(hourly_labor_rate), sqlc.arg(is_technician),
+    sqlc.arg(is_vehicle_operator), sqlc.arg(is_account_owner), sqlc.arg(license_class),
+    sqlc.arg(license_number), sqlc.arg(license_state), sqlc.arg(license_expiry),
+    sqlc.arg(street_address), sqlc.arg(city), sqlc.arg(region), sqlc.arg(postal_code),
+    sqlc.arg(country), sqlc.arg(group_id), sqlc.arg(custom_fields), sqlc.arg(table_preferences),
+    sqlc.arg(dashboard_preferences), sqlc.arg(updated_at)
+)
+RETURNING *;
+
+-- name: AddEmployeeCompany :exec
+INSERT INTO employee_companies (employee_id, company_id)
+VALUES (sqlc.arg(employee_id), sqlc.arg(company_id))
+ON CONFLICT (employee_id, company_id) DO NOTHING;
+
+-- name: UpdateEmployee :one
+UPDATE employee e SET
+    user_id = sqlc.arg(user_id), default_company_id = sqlc.arg(default_company_id),
+    first_name = sqlc.arg(first_name), last_name = sqlc.arg(last_name), employee_id = sqlc.arg(employee_id),
+    role_id = sqlc.arg(role_id), is_active = sqlc.arg(is_active), email = sqlc.arg(email),
+    mobile_phone = sqlc.arg(mobile_phone), work_phone = sqlc.arg(work_phone), job_title = sqlc.arg(job_title),
+    start_date = sqlc.arg(start_date), leave_date = sqlc.arg(leave_date), birth_date = sqlc.arg(birth_date),
+    hourly_labor_rate = sqlc.arg(hourly_labor_rate), is_technician = sqlc.arg(is_technician),
+    is_vehicle_operator = sqlc.arg(is_vehicle_operator), is_account_owner = sqlc.arg(is_account_owner),
+    license_class = sqlc.arg(license_class), license_number = sqlc.arg(license_number),
+    license_state = sqlc.arg(license_state), license_expiry = sqlc.arg(license_expiry),
+    street_address = sqlc.arg(street_address), city = sqlc.arg(city), region = sqlc.arg(region),
+    postal_code = sqlc.arg(postal_code), country = sqlc.arg(country), group_id = sqlc.arg(group_id),
+    custom_fields = sqlc.arg(custom_fields), table_preferences = sqlc.arg(table_preferences),
+    dashboard_preferences = sqlc.arg(dashboard_preferences), updated_at = sqlc.arg(updated_at)
+WHERE e.id = sqlc.arg(id)
+  AND EXISTS (SELECT 1 FROM employee_companies ec WHERE ec.employee_id = e.id AND ec.company_id = sqlc.arg(company_id))
+RETURNING e.*;
+
+-- name: DeleteEmployee :exec
+DELETE FROM employee e
+WHERE e.id = sqlc.arg(id)
+  AND EXISTS (SELECT 1 FROM employee_companies ec WHERE ec.employee_id = e.id AND ec.company_id = sqlc.arg(company_id));
