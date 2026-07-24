@@ -54,3 +54,14 @@ type CompanyResponse struct {
 	SystemOfMeasurement string    `json:"system_of_measurement"`
 	CreatedAt           time.Time `json:"created_at"`
 }
+
+// CompanyPage is the paginated companies response. It mirrors
+// paginate.Page[CompanyResponse]; declared concretely so the OpenAPI schema
+// stays generics-free.
+type CompanyPage struct {
+	Data    []CompanyResponse `json:"data"`
+	Total   int64             `json:"total"`
+	Limit   int               `json:"limit"`
+	Offset  int               `json:"offset"`
+	HasNext bool              `json:"has_next"`
+}

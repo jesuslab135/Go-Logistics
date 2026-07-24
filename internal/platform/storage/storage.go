@@ -29,12 +29,24 @@ type Storage interface {
 	URL(key string) string
 }
 
-// FromEnv builds the storage backend from configuration. Only local disk exists
-// today; an S3 backend can slot in here behind the same interface without
-// touching callers. STORAGE_LOCAL_ROOT (default ./uploads),
-// STORAGE_BASE_URL (default /media).
-func FromEnv() Storage {
-	return NewLocal(env("STORAGE_LOCAL_ROOT", "./uploads"), env("STORAGE_BASE_URL", "/media"))
+// FromEnv builds the storage backend selected by STORAGE_BACKEND (local|minio),
+// defaulting to local disk. Both satisfy Storage, so callers are unaffected.
+func FromEnv() (Storage, error) {
+	switch strings.ToLower(env("STORAGE_BACKEND", "local")) {
+	case "minio", "s3":
+		return NewMinIO(context.Background(), MinIOConfig{
+			Endpoint:  env("STORAGE_MINIO_ENDPOINT", "localhost:9000"),
+			AccessKey: os.Getenv("STORAGE_MINIO_ACCESS_KEY"),
+			SecretKey: os.Getenv("STORAGE_MINIO_SECRET_KEY"),
+			Bucket:    env("STORAGE_MINIO_BUCKET", "fleet"),
+			Region:    env("STORAGE_MINIO_REGION", "us-east-1"),
+			UseSSL:    env("STORAGE_MINIO_USE_SSL", "false") == "true",
+			Public:    env("STORAGE_MINIO_PUBLIC", "false") == "true",
+			PublicURL: os.Getenv("STORAGE_MINIO_PUBLIC_URL"),
+		})
+	default:
+		return NewLocal(env("STORAGE_LOCAL_ROOT", "./uploads"), env("STORAGE_BASE_URL", "/media")), nil
+	}
 }
 
 type Local struct {

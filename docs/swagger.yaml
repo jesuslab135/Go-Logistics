@@ -1,0 +1,1348 @@
+basePath: /
+definitions:
+  auth.TokenPair:
+    properties:
+      access_token:
+        type: string
+      expires_in:
+        type: integer
+      refresh_token:
+        type: string
+      token_type:
+        type: string
+    type: object
+  dto.AssetStatusPage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.AssetStatusResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.AssetStatusResponse:
+    properties:
+      color_code:
+        type: string
+      company_id:
+        type: integer
+      id:
+        type: integer
+      name:
+        type: string
+    type: object
+  dto.AssetTypePage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.AssetTypeResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.AssetTypeResponse:
+    properties:
+      category:
+        type: string
+      company_id:
+        type: integer
+      description:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+    type: object
+  dto.CatalogOptionPage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.CatalogOptionResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.CatalogOptionResponse:
+    properties:
+      category:
+        type: string
+      company_id:
+        type: integer
+      id:
+        type: integer
+      value:
+        type: string
+    type: object
+  dto.CompanyPage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.CompanyResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.CompanyResponse:
+    properties:
+      address:
+        type: string
+      city:
+        type: string
+      country:
+        type: string
+      created_at:
+        type: string
+      currency:
+        type: string
+      email:
+        type: string
+      id:
+        type: integer
+      logo:
+        type: string
+      name:
+        type: string
+      phone:
+        type: string
+      postal_code:
+        type: string
+      region:
+        type: string
+      system_of_measurement:
+        type: string
+      tax_id:
+        type: string
+      timezone:
+        type: string
+      website:
+        type: string
+    type: object
+  dto.CreateAssetStatusRequest:
+    properties:
+      color_code:
+        maxLength: 7
+        type: string
+      name:
+        maxLength: 50
+        type: string
+    required:
+    - name
+    type: object
+  dto.CreateAssetTypeRequest:
+    properties:
+      category:
+        maxLength: 50
+        type: string
+      description:
+        type: string
+      name:
+        maxLength: 100
+        type: string
+    required:
+    - name
+    type: object
+  dto.CreateCatalogOptionRequest:
+    properties:
+      category:
+        maxLength: 30
+        type: string
+      value:
+        maxLength: 100
+        type: string
+    required:
+    - category
+    - value
+    type: object
+  dto.CreateCompanyRequest:
+    properties:
+      address:
+        type: string
+      city:
+        maxLength: 100
+        type: string
+      country:
+        maxLength: 50
+        type: string
+      currency:
+        maxLength: 3
+        type: string
+      email:
+        maxLength: 254
+        type: string
+      logo:
+        maxLength: 100
+        type: string
+      name:
+        maxLength: 200
+        type: string
+      phone:
+        maxLength: 20
+        type: string
+      postal_code:
+        maxLength: 20
+        type: string
+      region:
+        maxLength: 50
+        type: string
+      system_of_measurement:
+        enum:
+        - metric
+        - imperial
+        type: string
+      tax_id:
+        maxLength: 50
+        type: string
+      timezone:
+        maxLength: 50
+        type: string
+      website:
+        maxLength: 200
+        type: string
+    required:
+    - name
+    - tax_id
+    type: object
+  dto.CreateVehicleMakeRequest:
+    properties:
+      name:
+        maxLength: 100
+        type: string
+    required:
+    - name
+    type: object
+  dto.CreateVehicleModelRequest:
+    properties:
+      make_id:
+        type: integer
+      name:
+        maxLength: 100
+        type: string
+    required:
+    - name
+    type: object
+  dto.ErrorBody:
+    properties:
+      code:
+        type: string
+      details: {}
+      message:
+        type: string
+    type: object
+  dto.ErrorResponse:
+    properties:
+      error:
+        $ref: '#/definitions/dto.ErrorBody'
+    type: object
+  dto.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  dto.RefreshRequest:
+    properties:
+      refresh_token:
+        type: string
+    required:
+    - refresh_token
+    type: object
+  dto.UpdateAssetStatusRequest:
+    properties:
+      color_code:
+        maxLength: 7
+        type: string
+      name:
+        maxLength: 50
+        type: string
+    required:
+    - name
+    type: object
+  dto.UpdateAssetTypeRequest:
+    properties:
+      category:
+        maxLength: 50
+        type: string
+      description:
+        type: string
+      name:
+        maxLength: 100
+        type: string
+    required:
+    - name
+    type: object
+  dto.UpdateCatalogOptionRequest:
+    properties:
+      category:
+        maxLength: 30
+        type: string
+      value:
+        maxLength: 100
+        type: string
+    required:
+    - category
+    - value
+    type: object
+  dto.UpdateCompanyRequest:
+    properties:
+      address:
+        type: string
+      city:
+        maxLength: 100
+        type: string
+      country:
+        maxLength: 50
+        type: string
+      currency:
+        maxLength: 3
+        type: string
+      email:
+        maxLength: 254
+        type: string
+      logo:
+        maxLength: 100
+        type: string
+      name:
+        maxLength: 200
+        type: string
+      phone:
+        maxLength: 20
+        type: string
+      postal_code:
+        maxLength: 20
+        type: string
+      region:
+        maxLength: 50
+        type: string
+      system_of_measurement:
+        enum:
+        - metric
+        - imperial
+        type: string
+      tax_id:
+        maxLength: 50
+        type: string
+      timezone:
+        maxLength: 50
+        type: string
+      website:
+        maxLength: 200
+        type: string
+    required:
+    - name
+    - tax_id
+    type: object
+  dto.UpdateVehicleMakeRequest:
+    properties:
+      name:
+        maxLength: 100
+        type: string
+    required:
+    - name
+    type: object
+  dto.UpdateVehicleModelRequest:
+    properties:
+      make_id:
+        type: integer
+      name:
+        maxLength: 100
+        type: string
+    required:
+    - name
+    type: object
+  dto.VehicleMakePage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.VehicleMakeResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.VehicleMakeResponse:
+    properties:
+      company_id:
+        type: integer
+      created_at:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  dto.VehicleModelPage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.VehicleModelResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.VehicleModelResponse:
+    properties:
+      company_id:
+        type: integer
+      created_at:
+        type: string
+      id:
+        type: integer
+      make_id:
+        type: integer
+      name:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  storage.Object:
+    properties:
+      content_type:
+        type: string
+      key:
+        type: string
+      size:
+        type: integer
+      url:
+        type: string
+    type: object
+info:
+  contact: {}
+  description: Go port of the fleet-management backend (auth, companies, uploads).
+  title: Fleet API
+  version: "1.0"
+paths:
+  /api/v1/asset-statuses:
+    get:
+      parameters:
+      - description: Page number
+        in: query
+        name: page
+        type: integer
+      - description: Items per page
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.AssetStatusPage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List asset statuses
+      tags:
+      - asset-statuses
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Asset status
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateAssetStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.AssetStatusResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create an asset status
+      tags:
+      - asset-statuses
+  /api/v1/asset-statuses/{id}:
+    delete:
+      parameters:
+      - description: Asset status id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete an asset status
+      tags:
+      - asset-statuses
+    get:
+      parameters:
+      - description: Asset status id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.AssetStatusResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get an asset status
+      tags:
+      - asset-statuses
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Asset status id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Asset status
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateAssetStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.AssetStatusResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update an asset status
+      tags:
+      - asset-statuses
+  /api/v1/asset-types:
+    get:
+      parameters:
+      - description: Page number
+        in: query
+        name: page
+        type: integer
+      - description: Items per page
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.AssetTypePage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List asset types
+      tags:
+      - asset-types
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Asset type
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateAssetTypeRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.AssetTypeResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create an asset type
+      tags:
+      - asset-types
+  /api/v1/asset-types/{id}:
+    delete:
+      parameters:
+      - description: Asset type id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete an asset type
+      tags:
+      - asset-types
+    get:
+      parameters:
+      - description: Asset type id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.AssetTypeResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get an asset type
+      tags:
+      - asset-types
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Asset type id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Asset type
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateAssetTypeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.AssetTypeResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update an asset type
+      tags:
+      - asset-types
+  /api/v1/catalog-options:
+    get:
+      parameters:
+      - description: Page number
+        in: query
+        name: page
+        type: integer
+      - description: Items per page
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.CatalogOptionPage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List catalog options
+      tags:
+      - catalog-options
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Catalog option
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateCatalogOptionRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.CatalogOptionResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a catalog option
+      tags:
+      - catalog-options
+  /api/v1/catalog-options/{id}:
+    delete:
+      parameters:
+      - description: Catalog option id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete a catalog option
+      tags:
+      - catalog-options
+    get:
+      parameters:
+      - description: Catalog option id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.CatalogOptionResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get a catalog option
+      tags:
+      - catalog-options
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Catalog option id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Catalog option
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateCatalogOptionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.CatalogOptionResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update a catalog option
+      tags:
+      - catalog-options
+  /api/v1/companies:
+    get:
+      parameters:
+      - description: Page number (1-based)
+        in: query
+        name: page
+        type: integer
+      - description: Items per page
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.CompanyPage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List companies (paginated)
+      tags:
+      - companies
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Company
+        in: body
+        name: company
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateCompanyRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.CompanyResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a company
+      tags:
+      - companies
+  /api/v1/companies/{id}:
+    delete:
+      parameters:
+      - description: Company id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete a company
+      tags:
+      - companies
+    get:
+      parameters:
+      - description: Company id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.CompanyResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get a company by id
+      tags:
+      - companies
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Company id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Company
+        in: body
+        name: company
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateCompanyRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.CompanyResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update a company
+      tags:
+      - companies
+  /api/v1/uploads:
+    post:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: File to upload
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/storage.Object'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Upload a file (image) to object storage
+      tags:
+      - uploads
+  /api/v1/vehicle-makes:
+    get:
+      parameters:
+      - description: Page number
+        in: query
+        name: page
+        type: integer
+      - description: Items per page
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.VehicleMakePage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List vehicle makes
+      tags:
+      - vehicle-makes
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Vehicle make
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateVehicleMakeRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.VehicleMakeResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a vehicle make
+      tags:
+      - vehicle-makes
+  /api/v1/vehicle-makes/{id}:
+    delete:
+      parameters:
+      - description: Vehicle make id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete a vehicle make
+      tags:
+      - vehicle-makes
+    get:
+      parameters:
+      - description: Vehicle make id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.VehicleMakeResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get a vehicle make
+      tags:
+      - vehicle-makes
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Vehicle make id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Vehicle make
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateVehicleMakeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.VehicleMakeResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update a vehicle make
+      tags:
+      - vehicle-makes
+  /api/v1/vehicle-models:
+    get:
+      parameters:
+      - description: Page number
+        in: query
+        name: page
+        type: integer
+      - description: Items per page
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.VehicleModelPage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List vehicle models
+      tags:
+      - vehicle-models
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Vehicle model
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateVehicleModelRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.VehicleModelResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a vehicle model
+      tags:
+      - vehicle-models
+  /api/v1/vehicle-models/{id}:
+    delete:
+      parameters:
+      - description: Vehicle model id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete a vehicle model
+      tags:
+      - vehicle-models
+    get:
+      parameters:
+      - description: Vehicle model id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.VehicleModelResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get a vehicle model
+      tags:
+      - vehicle-models
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Vehicle model id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Vehicle model
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateVehicleModelRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.VehicleModelResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update a vehicle model
+      tags:
+      - vehicle-models
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Credentials
+        in: body
+        name: credentials
+        required: true
+        schema:
+          $ref: '#/definitions/dto.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/auth.TokenPair'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Log in with email and password
+      tags:
+      - auth
+  /auth/refresh:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Refresh token
+        in: body
+        name: refresh
+        required: true
+        schema:
+          $ref: '#/definitions/dto.RefreshRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/auth.TokenPair'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Exchange a refresh token for a new token pair
+      tags:
+      - auth
+  /healthz:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Liveness check
+      tags:
+      - system
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

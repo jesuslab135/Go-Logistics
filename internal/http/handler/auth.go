@@ -39,6 +39,17 @@ func NewAuthHandler(tokens *auth.TokenService, verifier CredentialVerifier) *Aut
 	return &AuthHandler{tokens: tokens, verifier: verifier}
 }
 
+// Login godoc
+//
+//	@Summary	Log in with email and password
+//	@Tags		auth
+//	@Accept		json
+//	@Produce	json
+//	@Param		credentials	body		dto.LoginRequest	true	"Credentials"
+//	@Success	200			{object}	auth.TokenPair
+//	@Failure	400			{object}	dto.ErrorResponse
+//	@Failure	401			{object}	dto.ErrorResponse
+//	@Router		/auth/login [post]
 func (h *AuthHandler) Login(c *gin.Context) {
 	if h.verifier == nil {
 		apierr.Abort(c, apierr.New(http.StatusNotImplemented, "not_implemented", "credential verification is not configured"))
@@ -65,6 +76,17 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	c.JSON(http.StatusOK, pair)
 }
 
+// Refresh godoc
+//
+//	@Summary	Exchange a refresh token for a new token pair
+//	@Tags		auth
+//	@Accept		json
+//	@Produce	json
+//	@Param		refresh	body		dto.RefreshRequest	true	"Refresh token"
+//	@Success	200		{object}	auth.TokenPair
+//	@Failure	400		{object}	dto.ErrorResponse
+//	@Failure	401		{object}	dto.ErrorResponse
+//	@Router		/auth/refresh [post]
 func (h *AuthHandler) Refresh(c *gin.Context) {
 	var req dto.RefreshRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

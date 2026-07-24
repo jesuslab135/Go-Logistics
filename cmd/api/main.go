@@ -18,8 +18,17 @@ import (
 	"fleet/internal/db/gen"
 	"fleet/internal/http/handler"
 	"fleet/internal/platform/storage"
+
+	_ "fleet/docs" // generated OpenAPI spec (swag init)
 )
 
+// @title						Fleet API
+// @version					1.0
+// @description				Go port of the fleet-management backend (auth, companies, uploads).
+// @BasePath					/
+// @securityDefinitions.apikey	BearerAuth
+// @in							header
+// @name						Authorization
 func main() {
 	_ = godotenv.Load()
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
@@ -48,11 +57,16 @@ func run(logger *slog.Logger) error {
 	queries := gen.New(pool)
 	tokens := auth.NewTokenService(cfg.JWT.Secret, cfg.JWT.Issuer, cfg.JWT.AccessTTL, cfg.JWT.RefreshTTL)
 
+	blobs, err := storage.FromEnv()
+	if err != nil {
+		return err
+	}
+
 	router := handler.NewRouter(handler.Deps{
 		Queries:     queries,
 		Tokens:      tokens,
 		Verifier:    handler.NewEmployeeCredentialVerifier(queries),
-		Storage:     storage.FromEnv(),
+		Storage:     blobs,
 		Logger:      logger,
 		CORSOrigins: cfg.CORSOrigins,
 		Production:  cfg.IsProduction(),
