@@ -9,6 +9,17 @@ import (
 	"context"
 )
 
+const countFaults = `-- name: CountFaults :one
+SELECT count(*) FROM fault WHERE company_id = $1
+`
+
+func (q *Queries) CountFaults(ctx context.Context, companyID int64) (int64, error) {
+	row := q.db.QueryRow(ctx, countFaults, companyID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createFault = `-- name: CreateFault :one
 INSERT INTO fault (
     company_id, family, code, name, description, applies_to_asset_types
@@ -49,12 +60,31 @@ func (q *Queries) CreateFault(ctx context.Context, arg CreateFaultParams) (Fault
 	return i, err
 }
 
-const getFault = `-- name: GetFault :one
-SELECT id, company_id, family, code, name, description, applies_to_asset_types FROM fault WHERE id = $1
+const deleteFault = `-- name: DeleteFault :exec
+DELETE FROM fault WHERE id = $1 AND company_id = $2
 `
 
-func (q *Queries) GetFault(ctx context.Context, id int64) (Fault, error) {
-	row := q.db.QueryRow(ctx, getFault, id)
+type DeleteFaultParams struct {
+	ID        int64
+	CompanyID int64
+}
+
+func (q *Queries) DeleteFault(ctx context.Context, arg DeleteFaultParams) error {
+	_, err := q.db.Exec(ctx, deleteFault, arg.ID, arg.CompanyID)
+	return err
+}
+
+const getFault = `-- name: GetFault :one
+SELECT id, company_id, family, code, name, description, applies_to_asset_types FROM fault WHERE id = $1 AND company_id = $2
+`
+
+type GetFaultParams struct {
+	ID        int64
+	CompanyID int64
+}
+
+func (q *Queries) GetFault(ctx context.Context, arg GetFaultParams) (Fault, error) {
+	row := q.db.QueryRow(ctx, getFault, arg.ID, arg.CompanyID)
 	var i Fault
 	err := row.Scan(
 		&i.ID,
@@ -68,12 +98,18 @@ func (q *Queries) GetFault(ctx context.Context, id int64) (Fault, error) {
 	return i, err
 }
 
-const listFaultsByCompany = `-- name: ListFaultsByCompany :many
-SELECT id, company_id, family, code, name, description, applies_to_asset_types FROM fault WHERE company_id = $1 ORDER BY code
+const listFaults = `-- name: ListFaults :many
+SELECT id, company_id, family, code, name, description, applies_to_asset_types FROM fault WHERE company_id = $1 ORDER BY code LIMIT $2 OFFSET $3
 `
 
-func (q *Queries) ListFaultsByCompany(ctx context.Context, companyID int64) ([]Fault, error) {
-	rows, err := q.db.Query(ctx, listFaultsByCompany, companyID)
+type ListFaultsParams struct {
+	CompanyID int64
+	Limit     int32
+	Offset    int32
+}
+
+func (q *Queries) ListFaults(ctx context.Context, arg ListFaultsParams) ([]Fault, error) {
+	rows, err := q.db.Query(ctx, listFaults, arg.CompanyID, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -98,4 +134,43 @@ func (q *Queries) ListFaultsByCompany(ctx context.Context, companyID int64) ([]F
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateFault = `-- name: UpdateFault :one
+UPDATE fault SET family = $3, code = $4, name = $5, description = $6, applies_to_asset_types = $7
+WHERE id = $1 AND company_id = $2
+RETURNING id, company_id, family, code, name, description, applies_to_asset_types
+`
+
+type UpdateFaultParams struct {
+	ID                  int64
+	CompanyID           int64
+	Family              string
+	Code                string
+	Name                string
+	Description         string
+	AppliesToAssetTypes []string
+}
+
+func (q *Queries) UpdateFault(ctx context.Context, arg UpdateFaultParams) (Fault, error) {
+	row := q.db.QueryRow(ctx, updateFault,
+		arg.ID,
+		arg.CompanyID,
+		arg.Family,
+		arg.Code,
+		arg.Name,
+		arg.Description,
+		arg.AppliesToAssetTypes,
+	)
+	var i Fault
+	err := row.Scan(
+		&i.ID,
+		&i.CompanyID,
+		&i.Family,
+		&i.Code,
+		&i.Name,
+		&i.Description,
+		&i.AppliesToAssetTypes,
+	)
+	return i, err
 }

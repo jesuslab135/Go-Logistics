@@ -85,6 +85,15 @@ func NewRouter(d Deps) *gin.Engine {
 	crud.NewHandler[dto.InventoryJournalEntryResponse, dto.CreateInventoryJournalEntryRequest, dto.UpdateInventoryJournalEntryRequest](
 		NewInventoryJournalEntryStore(d.Queries)).Register(api, "/inventory-journal-entries")
 
+	// Phase 4: vendors, work orders & issues
+	crud.NewHandler[dto.VendorResponse, dto.CreateVendorRequest, dto.UpdateVendorRequest](NewVendorStore(d.Queries)).Register(api, "/vendors")
+	crud.NewHandler[dto.WorkOrderStatusResponse, dto.CreateWorkOrderStatusRequest, dto.UpdateWorkOrderStatusRequest](NewWorkOrderStatusStore(d.Queries)).Register(api, "/work-order-statuses")
+	crud.NewHandler[dto.LocationResponse, dto.CreateLocationRequest, dto.UpdateLocationRequest](NewLocationStore(d.Queries)).Register(api, "/locations")
+	crud.NewHandler[dto.WorkOrderResponse, dto.CreateWorkOrderRequest, dto.UpdateWorkOrderRequest](NewWorkOrderStore(d.Queries)).Register(api, "/work-orders")
+	crud.NewHandler[dto.IssueResponse, dto.CreateIssueRequest, dto.UpdateIssueRequest](NewIssueStore(d.Queries)).Register(api, "/issues")
+	crud.NewHandler[dto.IssuePriorityResponse, dto.CreateIssuePriorityRequest, dto.UpdateIssuePriorityRequest](NewIssuePriorityStore(d.Queries)).Register(api, "/issue-priorities")
+	crud.NewHandler[dto.FaultResponse, dto.CreateFaultRequest, dto.UpdateFaultRequest](NewFaultStore(d.Queries)).Register(api, "/faults")
+
 	// Phase 1: asset catalogs & vehicle models (tenant-scoped)
 	crud.NewHandler[dto.AssetTypeResponse, dto.CreateAssetTypeRequest, dto.UpdateAssetTypeRequest](
 		NewAssetTypeStore(d.Queries)).Register(api, "/asset-types")

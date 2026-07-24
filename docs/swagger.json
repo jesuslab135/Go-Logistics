@@ -1069,6 +1069,211 @@
                 }
             }
         },
+        "/api/v1/faults": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "faults"
+                ],
+                "summary": "List faults",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Size",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.FaultPage"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "faults"
+                ],
+                "summary": "Create faults",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.CreateFaultRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/dto.FaultResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/faults/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "faults"
+                ],
+                "summary": "Get faults",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.FaultResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "faults"
+                ],
+                "summary": "Update faults",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.UpdateFaultRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.FaultResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "faults"
+                ],
+                "summary": "Delete faults",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/inventory-adjustment-reasons": {
             "get": {
                 "security": [
@@ -1457,6 +1662,621 @@
                     "inventory-journal-entries"
                 ],
                 "summary": "Delete inventory-journal-entries",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/issue-priorities": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "issue-priorities"
+                ],
+                "summary": "List issue-priorities",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Size",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.IssuePriorityPage"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "issue-priorities"
+                ],
+                "summary": "Create issue-priorities",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.CreateIssuePriorityRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/dto.IssuePriorityResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/issue-priorities/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "issue-priorities"
+                ],
+                "summary": "Get issue-priorities",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.IssuePriorityResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "issue-priorities"
+                ],
+                "summary": "Update issue-priorities",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.UpdateIssuePriorityRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.IssuePriorityResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "issue-priorities"
+                ],
+                "summary": "Delete issue-priorities",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/issues": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "issues"
+                ],
+                "summary": "List issues",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Size",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.IssuePage"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "issues"
+                ],
+                "summary": "Create issues",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.CreateIssueRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/dto.IssueResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/issues/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "issues"
+                ],
+                "summary": "Get issues",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.IssueResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "issues"
+                ],
+                "summary": "Update issues",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.UpdateIssueRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.IssueResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "issues"
+                ],
+                "summary": "Delete issues",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/locations": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "locations"
+                ],
+                "summary": "List locations",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Size",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.LocationPage"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "locations"
+                ],
+                "summary": "Create locations",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.CreateLocationRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/dto.LocationResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/locations/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "locations"
+                ],
+                "summary": "Get locations",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.LocationResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "locations"
+                ],
+                "summary": "Update locations",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.UpdateLocationRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.LocationResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "locations"
+                ],
+                "summary": "Delete locations",
                 "parameters": [
                     {
                         "type": "integer",
@@ -2962,6 +3782,621 @@
                 }
             }
         },
+        "/api/v1/vendors": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vendors"
+                ],
+                "summary": "List vendors",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Size",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.VendorPage"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vendors"
+                ],
+                "summary": "Create vendors",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.CreateVendorRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/dto.VendorResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/vendors/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vendors"
+                ],
+                "summary": "Get vendors",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.VendorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vendors"
+                ],
+                "summary": "Update vendors",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.UpdateVendorRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.VendorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "vendors"
+                ],
+                "summary": "Delete vendors",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/work-order-statuses": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "work-order-statuses"
+                ],
+                "summary": "List work-order-statuses",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Size",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.WorkOrderStatusPage"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "work-order-statuses"
+                ],
+                "summary": "Create work-order-statuses",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.CreateWorkOrderStatusRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/dto.WorkOrderStatusResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/work-order-statuses/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "work-order-statuses"
+                ],
+                "summary": "Get work-order-statuses",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.WorkOrderStatusResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "work-order-statuses"
+                ],
+                "summary": "Update work-order-statuses",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.UpdateWorkOrderStatusRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.WorkOrderStatusResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "work-order-statuses"
+                ],
+                "summary": "Delete work-order-statuses",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/work-orders": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "work-orders"
+                ],
+                "summary": "List work-orders",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Size",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.WorkOrderPage"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "work-orders"
+                ],
+                "summary": "Create work-orders",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.CreateWorkOrderRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/dto.WorkOrderResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/work-orders/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "work-orders"
+                ],
+                "summary": "Get work-orders",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.WorkOrderResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "work-orders"
+                ],
+                "summary": "Update work-orders",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.UpdateWorkOrderRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.WorkOrderResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "work-orders"
+                ],
+                "summary": "Delete work-orders",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/auth/login": {
             "post": {
                 "consumes": [
@@ -3925,6 +5360,33 @@
                 }
             }
         },
+        "dto.CreateFaultRequest": {
+            "type": "object",
+            "properties": {
+                "applies_to_asset_types": {
+                    "type": "array",
+                    "maxItems": 20,
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "code": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "description": {
+                    "type": "string"
+                },
+                "family": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 255
+                }
+            }
+        },
         "dto.CreateInventoryAdjustmentReasonRequest": {
             "type": "object",
             "properties": {
@@ -3979,6 +5441,155 @@
                 },
                 "work_order_id": {
                     "type": "integer"
+                }
+            }
+        },
+        "dto.CreateIssuePriorityRequest": {
+            "type": "object",
+            "properties": {
+                "color": {
+                    "type": "string",
+                    "maxLength": 7
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "position": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.CreateIssueRequest": {
+            "type": "object",
+            "properties": {
+                "asset_id": {
+                    "type": "integer"
+                },
+                "asset_type": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "closed_at": {
+                    "type": "string"
+                },
+                "closed_by_id": {
+                    "type": "integer"
+                },
+                "closed_note": {
+                    "type": "string"
+                },
+                "comments_count": {
+                    "type": "integer"
+                },
+                "created_by_workflow": {
+                    "type": "boolean"
+                },
+                "custom_fields": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "description": {
+                    "type": "string"
+                },
+                "documents_count": {
+                    "type": "integer"
+                },
+                "due_date": {
+                    "type": "string"
+                },
+                "due_meter_value": {
+                    "type": "number"
+                },
+                "due_secondary_meter_value": {
+                    "type": "number"
+                },
+                "external_id": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "fault_id": {
+                    "type": "integer"
+                },
+                "images_count": {
+                    "type": "integer"
+                },
+                "inspection_submission_id": {
+                    "type": "integer"
+                },
+                "labels": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 255
+                },
+                "number": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "overdue": {
+                    "type": "boolean"
+                },
+                "priority_id": {
+                    "type": "integer"
+                },
+                "reopened_at": {
+                    "type": "string"
+                },
+                "reopened_by_id": {
+                    "type": "integer"
+                },
+                "reported_at": {
+                    "type": "string"
+                },
+                "reported_by_id": {
+                    "type": "integer"
+                },
+                "resolution_note": {
+                    "type": "string"
+                },
+                "resolvable_id": {
+                    "type": "integer"
+                },
+                "resolvable_type": {
+                    "type": "string",
+                    "maxLength": 30
+                },
+                "resolved_at": {
+                    "type": "string"
+                },
+                "resolved_by_id": {
+                    "type": "integer"
+                },
+                "source_type": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "state": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "summary": {
+                    "type": "string",
+                    "maxLength": 255
+                }
+            }
+        },
+        "dto.CreateLocationRequest": {
+            "type": "object",
+            "properties": {
+                "is_active": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 100
                 }
             }
         },
@@ -4125,6 +5736,269 @@
                 }
             }
         },
+        "dto.CreateVendorRequest": {
+            "type": "object",
+            "properties": {
+                "archived_at": {
+                    "type": "string"
+                },
+                "city": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "contact_email": {
+                    "type": "string",
+                    "maxLength": 254
+                },
+                "contact_name": {
+                    "type": "string",
+                    "maxLength": 200
+                },
+                "contact_phone": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "country": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "custom_fields": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "external_id": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "is_fuel_vendor": {
+                    "type": "boolean"
+                },
+                "is_mobile_service": {
+                    "type": "boolean"
+                },
+                "is_parts_vendor": {
+                    "type": "boolean"
+                },
+                "is_service_vendor": {
+                    "type": "boolean"
+                },
+                "labels": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "latitude": {
+                    "type": "number"
+                },
+                "longitude": {
+                    "type": "number"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 200
+                },
+                "phone": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "postal_code": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "region": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "street_address": {
+                    "type": "string",
+                    "maxLength": 200
+                },
+                "street_address_line_2": {
+                    "type": "string",
+                    "maxLength": 200
+                },
+                "website": {
+                    "type": "string",
+                    "maxLength": 200
+                }
+            }
+        },
+        "dto.CreateWorkOrderRequest": {
+            "type": "object",
+            "properties": {
+                "asset_id": {
+                    "type": "integer"
+                },
+                "assigned_to_id": {
+                    "type": "integer"
+                },
+                "comments_count": {
+                    "type": "integer"
+                },
+                "completed_at": {
+                    "type": "string"
+                },
+                "custom_fields": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "description": {
+                    "type": "string"
+                },
+                "discount": {
+                    "type": "number"
+                },
+                "discount_type": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "documents_count": {
+                    "type": "integer"
+                },
+                "duration_seconds": {
+                    "type": "integer"
+                },
+                "ending_meter": {
+                    "type": "number"
+                },
+                "expected_completed_at": {
+                    "type": "string"
+                },
+                "fault_id": {
+                    "type": "integer"
+                },
+                "images_count": {
+                    "type": "integer"
+                },
+                "invoice_number": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "issued_at": {
+                    "type": "string"
+                },
+                "issued_by_id": {
+                    "type": "integer"
+                },
+                "labels": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "labor_markup": {
+                    "type": "number"
+                },
+                "labor_markup_percentage": {
+                    "type": "number"
+                },
+                "labor_markup_type": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "labor_subtotal": {
+                    "type": "number"
+                },
+                "labor_time_seconds": {
+                    "type": "integer"
+                },
+                "location_id": {
+                    "type": "integer"
+                },
+                "number": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "parts_markup": {
+                    "type": "number"
+                },
+                "parts_markup_percentage": {
+                    "type": "number"
+                },
+                "parts_markup_type": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "parts_subtotal": {
+                    "type": "number"
+                },
+                "purchase_order_number": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "scheduled_at": {
+                    "type": "string"
+                },
+                "started_at": {
+                    "type": "string"
+                },
+                "starting_meter": {
+                    "type": "number"
+                },
+                "status_id": {
+                    "type": "integer"
+                },
+                "subtotal": {
+                    "type": "number"
+                },
+                "tax_1": {
+                    "type": "number"
+                },
+                "tax_1_percentage": {
+                    "type": "number"
+                },
+                "tax_1_type": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "tax_2": {
+                    "type": "number"
+                },
+                "tax_2_percentage": {
+                    "type": "number"
+                },
+                "tax_2_type": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "total_amount": {
+                    "type": "number"
+                },
+                "vendor_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.CreateWorkOrderStatusRequest": {
+            "type": "object",
+            "properties": {
+                "color": {
+                    "type": "string",
+                    "maxLength": 7
+                },
+                "description": {
+                    "type": "string"
+                },
+                "is_default": {
+                    "type": "boolean"
+                },
+                "marks_as_completed": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "position": {
+                    "type": "integer"
+                }
+            }
+        },
         "dto.ErrorBody": {
             "type": "object",
             "properties": {
@@ -4142,6 +6016,62 @@
             "properties": {
                 "error": {
                     "$ref": "#/definitions/dto.ErrorBody"
+                }
+            }
+        },
+        "dto.FaultPage": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.FaultResponse"
+                    }
+                },
+                "has_next": {
+                    "type": "boolean"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.FaultResponse": {
+            "type": "object",
+            "properties": {
+                "applies_to_asset_types": {
+                    "type": "array",
+                    "maxItems": 20,
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "code": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "company_id": {
+                    "type": "integer"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "family": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 255
                 }
             }
         },
@@ -4263,6 +6193,248 @@
                 },
                 "work_order_id": {
                     "type": "integer"
+                }
+            }
+        },
+        "dto.IssuePage": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.IssueResponse"
+                    }
+                },
+                "has_next": {
+                    "type": "boolean"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.IssuePriorityPage": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.IssuePriorityResponse"
+                    }
+                },
+                "has_next": {
+                    "type": "boolean"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.IssuePriorityResponse": {
+            "type": "object",
+            "properties": {
+                "color": {
+                    "type": "string",
+                    "maxLength": 7
+                },
+                "company_id": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "position": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.IssueResponse": {
+            "type": "object",
+            "properties": {
+                "asset_id": {
+                    "type": "integer"
+                },
+                "asset_type": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "closed_at": {
+                    "type": "string"
+                },
+                "closed_by_id": {
+                    "type": "integer"
+                },
+                "closed_note": {
+                    "type": "string"
+                },
+                "comments_count": {
+                    "type": "integer"
+                },
+                "company_id": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by_workflow": {
+                    "type": "boolean"
+                },
+                "custom_fields": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "description": {
+                    "type": "string"
+                },
+                "documents_count": {
+                    "type": "integer"
+                },
+                "due_date": {
+                    "type": "string"
+                },
+                "due_meter_value": {
+                    "type": "number"
+                },
+                "due_secondary_meter_value": {
+                    "type": "number"
+                },
+                "external_id": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "fault_id": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "images_count": {
+                    "type": "integer"
+                },
+                "inspection_submission_id": {
+                    "type": "integer"
+                },
+                "labels": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 255
+                },
+                "number": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "overdue": {
+                    "type": "boolean"
+                },
+                "priority_id": {
+                    "type": "integer"
+                },
+                "reopened_at": {
+                    "type": "string"
+                },
+                "reopened_by_id": {
+                    "type": "integer"
+                },
+                "reported_at": {
+                    "type": "string"
+                },
+                "reported_by_id": {
+                    "type": "integer"
+                },
+                "resolution_note": {
+                    "type": "string"
+                },
+                "resolvable_id": {
+                    "type": "integer"
+                },
+                "resolvable_type": {
+                    "type": "string",
+                    "maxLength": 30
+                },
+                "resolved_at": {
+                    "type": "string"
+                },
+                "resolved_by_id": {
+                    "type": "integer"
+                },
+                "source_type": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "state": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "summary": {
+                    "type": "string",
+                    "maxLength": 255
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.LocationPage": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.LocationResponse"
+                    }
+                },
+                "has_next": {
+                    "type": "boolean"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.LocationResponse": {
+            "type": "object",
+            "properties": {
+                "company_id": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 100
                 }
             }
         },
@@ -4934,6 +7106,33 @@
                 }
             }
         },
+        "dto.UpdateFaultRequest": {
+            "type": "object",
+            "properties": {
+                "applies_to_asset_types": {
+                    "type": "array",
+                    "maxItems": 20,
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "code": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "description": {
+                    "type": "string"
+                },
+                "family": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 255
+                }
+            }
+        },
         "dto.UpdateInventoryAdjustmentReasonRequest": {
             "type": "object",
             "properties": {
@@ -4988,6 +7187,155 @@
                 },
                 "work_order_id": {
                     "type": "integer"
+                }
+            }
+        },
+        "dto.UpdateIssuePriorityRequest": {
+            "type": "object",
+            "properties": {
+                "color": {
+                    "type": "string",
+                    "maxLength": 7
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "position": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.UpdateIssueRequest": {
+            "type": "object",
+            "properties": {
+                "asset_id": {
+                    "type": "integer"
+                },
+                "asset_type": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "closed_at": {
+                    "type": "string"
+                },
+                "closed_by_id": {
+                    "type": "integer"
+                },
+                "closed_note": {
+                    "type": "string"
+                },
+                "comments_count": {
+                    "type": "integer"
+                },
+                "created_by_workflow": {
+                    "type": "boolean"
+                },
+                "custom_fields": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "description": {
+                    "type": "string"
+                },
+                "documents_count": {
+                    "type": "integer"
+                },
+                "due_date": {
+                    "type": "string"
+                },
+                "due_meter_value": {
+                    "type": "number"
+                },
+                "due_secondary_meter_value": {
+                    "type": "number"
+                },
+                "external_id": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "fault_id": {
+                    "type": "integer"
+                },
+                "images_count": {
+                    "type": "integer"
+                },
+                "inspection_submission_id": {
+                    "type": "integer"
+                },
+                "labels": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 255
+                },
+                "number": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "overdue": {
+                    "type": "boolean"
+                },
+                "priority_id": {
+                    "type": "integer"
+                },
+                "reopened_at": {
+                    "type": "string"
+                },
+                "reopened_by_id": {
+                    "type": "integer"
+                },
+                "reported_at": {
+                    "type": "string"
+                },
+                "reported_by_id": {
+                    "type": "integer"
+                },
+                "resolution_note": {
+                    "type": "string"
+                },
+                "resolvable_id": {
+                    "type": "integer"
+                },
+                "resolvable_type": {
+                    "type": "string",
+                    "maxLength": 30
+                },
+                "resolved_at": {
+                    "type": "string"
+                },
+                "resolved_by_id": {
+                    "type": "integer"
+                },
+                "source_type": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "state": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "summary": {
+                    "type": "string",
+                    "maxLength": 255
+                }
+            }
+        },
+        "dto.UpdateLocationRequest": {
+            "type": "object",
+            "properties": {
+                "is_active": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 100
                 }
             }
         },
@@ -5134,6 +7482,269 @@
                 }
             }
         },
+        "dto.UpdateVendorRequest": {
+            "type": "object",
+            "properties": {
+                "archived_at": {
+                    "type": "string"
+                },
+                "city": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "contact_email": {
+                    "type": "string",
+                    "maxLength": 254
+                },
+                "contact_name": {
+                    "type": "string",
+                    "maxLength": 200
+                },
+                "contact_phone": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "country": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "custom_fields": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "external_id": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "is_fuel_vendor": {
+                    "type": "boolean"
+                },
+                "is_mobile_service": {
+                    "type": "boolean"
+                },
+                "is_parts_vendor": {
+                    "type": "boolean"
+                },
+                "is_service_vendor": {
+                    "type": "boolean"
+                },
+                "labels": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "latitude": {
+                    "type": "number"
+                },
+                "longitude": {
+                    "type": "number"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 200
+                },
+                "phone": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "postal_code": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "region": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "street_address": {
+                    "type": "string",
+                    "maxLength": 200
+                },
+                "street_address_line_2": {
+                    "type": "string",
+                    "maxLength": 200
+                },
+                "website": {
+                    "type": "string",
+                    "maxLength": 200
+                }
+            }
+        },
+        "dto.UpdateWorkOrderRequest": {
+            "type": "object",
+            "properties": {
+                "asset_id": {
+                    "type": "integer"
+                },
+                "assigned_to_id": {
+                    "type": "integer"
+                },
+                "comments_count": {
+                    "type": "integer"
+                },
+                "completed_at": {
+                    "type": "string"
+                },
+                "custom_fields": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "description": {
+                    "type": "string"
+                },
+                "discount": {
+                    "type": "number"
+                },
+                "discount_type": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "documents_count": {
+                    "type": "integer"
+                },
+                "duration_seconds": {
+                    "type": "integer"
+                },
+                "ending_meter": {
+                    "type": "number"
+                },
+                "expected_completed_at": {
+                    "type": "string"
+                },
+                "fault_id": {
+                    "type": "integer"
+                },
+                "images_count": {
+                    "type": "integer"
+                },
+                "invoice_number": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "issued_at": {
+                    "type": "string"
+                },
+                "issued_by_id": {
+                    "type": "integer"
+                },
+                "labels": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "labor_markup": {
+                    "type": "number"
+                },
+                "labor_markup_percentage": {
+                    "type": "number"
+                },
+                "labor_markup_type": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "labor_subtotal": {
+                    "type": "number"
+                },
+                "labor_time_seconds": {
+                    "type": "integer"
+                },
+                "location_id": {
+                    "type": "integer"
+                },
+                "number": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "parts_markup": {
+                    "type": "number"
+                },
+                "parts_markup_percentage": {
+                    "type": "number"
+                },
+                "parts_markup_type": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "parts_subtotal": {
+                    "type": "number"
+                },
+                "purchase_order_number": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "scheduled_at": {
+                    "type": "string"
+                },
+                "started_at": {
+                    "type": "string"
+                },
+                "starting_meter": {
+                    "type": "number"
+                },
+                "status_id": {
+                    "type": "integer"
+                },
+                "subtotal": {
+                    "type": "number"
+                },
+                "tax_1": {
+                    "type": "number"
+                },
+                "tax_1_percentage": {
+                    "type": "number"
+                },
+                "tax_1_type": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "tax_2": {
+                    "type": "number"
+                },
+                "tax_2_percentage": {
+                    "type": "number"
+                },
+                "tax_2_type": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "total_amount": {
+                    "type": "number"
+                },
+                "vendor_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.UpdateWorkOrderStatusRequest": {
+            "type": "object",
+            "properties": {
+                "color": {
+                    "type": "string",
+                    "maxLength": 7
+                },
+                "description": {
+                    "type": "string"
+                },
+                "is_default": {
+                    "type": "boolean"
+                },
+                "marks_as_completed": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "position": {
+                    "type": "integer"
+                }
+            }
+        },
         "dto.VehicleMakePage": {
             "type": "object",
             "properties": {
@@ -5220,6 +7831,368 @@
                 },
                 "updated_at": {
                     "type": "string"
+                }
+            }
+        },
+        "dto.VendorPage": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.VendorResponse"
+                    }
+                },
+                "has_next": {
+                    "type": "boolean"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.VendorResponse": {
+            "type": "object",
+            "properties": {
+                "archived_at": {
+                    "type": "string"
+                },
+                "city": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "company_id": {
+                    "type": "integer"
+                },
+                "contact_email": {
+                    "type": "string",
+                    "maxLength": 254
+                },
+                "contact_name": {
+                    "type": "string",
+                    "maxLength": 200
+                },
+                "contact_phone": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "country": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "custom_fields": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "external_id": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "is_fuel_vendor": {
+                    "type": "boolean"
+                },
+                "is_mobile_service": {
+                    "type": "boolean"
+                },
+                "is_parts_vendor": {
+                    "type": "boolean"
+                },
+                "is_service_vendor": {
+                    "type": "boolean"
+                },
+                "labels": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "latitude": {
+                    "type": "number"
+                },
+                "longitude": {
+                    "type": "number"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 200
+                },
+                "phone": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "postal_code": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "region": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "street_address": {
+                    "type": "string",
+                    "maxLength": 200
+                },
+                "street_address_line_2": {
+                    "type": "string",
+                    "maxLength": 200
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "website": {
+                    "type": "string",
+                    "maxLength": 200
+                }
+            }
+        },
+        "dto.WorkOrderPage": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.WorkOrderResponse"
+                    }
+                },
+                "has_next": {
+                    "type": "boolean"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.WorkOrderResponse": {
+            "type": "object",
+            "properties": {
+                "asset_id": {
+                    "type": "integer"
+                },
+                "assigned_to_id": {
+                    "type": "integer"
+                },
+                "comments_count": {
+                    "type": "integer"
+                },
+                "company_id": {
+                    "type": "integer"
+                },
+                "completed_at": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "custom_fields": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "description": {
+                    "type": "string"
+                },
+                "discount": {
+                    "type": "number"
+                },
+                "discount_type": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "documents_count": {
+                    "type": "integer"
+                },
+                "duration_seconds": {
+                    "type": "integer"
+                },
+                "ending_meter": {
+                    "type": "number"
+                },
+                "expected_completed_at": {
+                    "type": "string"
+                },
+                "fault_id": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "images_count": {
+                    "type": "integer"
+                },
+                "invoice_number": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "issued_at": {
+                    "type": "string"
+                },
+                "issued_by_id": {
+                    "type": "integer"
+                },
+                "labels": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "labor_markup": {
+                    "type": "number"
+                },
+                "labor_markup_percentage": {
+                    "type": "number"
+                },
+                "labor_markup_type": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "labor_subtotal": {
+                    "type": "number"
+                },
+                "labor_time_seconds": {
+                    "type": "integer"
+                },
+                "location_id": {
+                    "type": "integer"
+                },
+                "number": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "parts_markup": {
+                    "type": "number"
+                },
+                "parts_markup_percentage": {
+                    "type": "number"
+                },
+                "parts_markup_type": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "parts_subtotal": {
+                    "type": "number"
+                },
+                "purchase_order_number": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "scheduled_at": {
+                    "type": "string"
+                },
+                "started_at": {
+                    "type": "string"
+                },
+                "starting_meter": {
+                    "type": "number"
+                },
+                "status_id": {
+                    "type": "integer"
+                },
+                "subtotal": {
+                    "type": "number"
+                },
+                "tax_1": {
+                    "type": "number"
+                },
+                "tax_1_percentage": {
+                    "type": "number"
+                },
+                "tax_1_type": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "tax_2": {
+                    "type": "number"
+                },
+                "tax_2_percentage": {
+                    "type": "number"
+                },
+                "tax_2_type": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "total_amount": {
+                    "type": "number"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "vendor_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.WorkOrderStatusPage": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.WorkOrderStatusResponse"
+                    }
+                },
+                "has_next": {
+                    "type": "boolean"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.WorkOrderStatusResponse": {
+            "type": "object",
+            "properties": {
+                "color": {
+                    "type": "string",
+                    "maxLength": 7
+                },
+                "company_id": {
+                    "type": "integer"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "is_default": {
+                    "type": "boolean"
+                },
+                "marks_as_completed": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "position": {
+                    "type": "integer"
                 }
             }
         },

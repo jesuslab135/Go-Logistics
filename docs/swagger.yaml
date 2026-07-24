@@ -583,6 +583,25 @@ definitions:
     - name
     - tax_id
     type: object
+  dto.CreateFaultRequest:
+    properties:
+      applies_to_asset_types:
+        items:
+          type: string
+        maxItems: 20
+        type: array
+      code:
+        maxLength: 50
+        type: string
+      description:
+        type: string
+      family:
+        maxLength: 20
+        type: string
+      name:
+        maxLength: 255
+        type: string
+    type: object
   dto.CreateInventoryAdjustmentReasonRequest:
     properties:
       name:
@@ -620,6 +639,108 @@ definitions:
         type: integer
       work_order_id:
         type: integer
+    type: object
+  dto.CreateIssuePriorityRequest:
+    properties:
+      color:
+        maxLength: 7
+        type: string
+      name:
+        maxLength: 50
+        type: string
+      position:
+        type: integer
+    type: object
+  dto.CreateIssueRequest:
+    properties:
+      asset_id:
+        type: integer
+      asset_type:
+        maxLength: 20
+        type: string
+      closed_at:
+        type: string
+      closed_by_id:
+        type: integer
+      closed_note:
+        type: string
+      comments_count:
+        type: integer
+      created_by_workflow:
+        type: boolean
+      custom_fields:
+        items:
+          type: integer
+        type: array
+      description:
+        type: string
+      documents_count:
+        type: integer
+      due_date:
+        type: string
+      due_meter_value:
+        type: number
+      due_secondary_meter_value:
+        type: number
+      external_id:
+        maxLength: 100
+        type: string
+      fault_id:
+        type: integer
+      images_count:
+        type: integer
+      inspection_submission_id:
+        type: integer
+      labels:
+        items:
+          type: integer
+        type: array
+      name:
+        maxLength: 255
+        type: string
+      number:
+        maxLength: 50
+        type: string
+      overdue:
+        type: boolean
+      priority_id:
+        type: integer
+      reopened_at:
+        type: string
+      reopened_by_id:
+        type: integer
+      reported_at:
+        type: string
+      reported_by_id:
+        type: integer
+      resolution_note:
+        type: string
+      resolvable_id:
+        type: integer
+      resolvable_type:
+        maxLength: 30
+        type: string
+      resolved_at:
+        type: string
+      resolved_by_id:
+        type: integer
+      source_type:
+        maxLength: 20
+        type: string
+      state:
+        maxLength: 20
+        type: string
+      summary:
+        maxLength: 255
+        type: string
+    type: object
+  dto.CreateLocationRequest:
+    properties:
+      is_active:
+        type: boolean
+      name:
+        maxLength: 100
+        type: string
     type: object
   dto.CreateMeasurementUnitRequest:
     properties:
@@ -719,6 +840,188 @@ definitions:
     required:
     - name
     type: object
+  dto.CreateVendorRequest:
+    properties:
+      archived_at:
+        type: string
+      city:
+        maxLength: 100
+        type: string
+      contact_email:
+        maxLength: 254
+        type: string
+      contact_name:
+        maxLength: 200
+        type: string
+      contact_phone:
+        maxLength: 20
+        type: string
+      country:
+        maxLength: 50
+        type: string
+      custom_fields:
+        items:
+          type: integer
+        type: array
+      external_id:
+        maxLength: 100
+        type: string
+      is_fuel_vendor:
+        type: boolean
+      is_mobile_service:
+        type: boolean
+      is_parts_vendor:
+        type: boolean
+      is_service_vendor:
+        type: boolean
+      labels:
+        items:
+          type: integer
+        type: array
+      latitude:
+        type: number
+      longitude:
+        type: number
+      name:
+        maxLength: 200
+        type: string
+      phone:
+        maxLength: 20
+        type: string
+      postal_code:
+        maxLength: 20
+        type: string
+      region:
+        maxLength: 50
+        type: string
+      street_address:
+        maxLength: 200
+        type: string
+      street_address_line_2:
+        maxLength: 200
+        type: string
+      website:
+        maxLength: 200
+        type: string
+    type: object
+  dto.CreateWorkOrderRequest:
+    properties:
+      asset_id:
+        type: integer
+      assigned_to_id:
+        type: integer
+      comments_count:
+        type: integer
+      completed_at:
+        type: string
+      custom_fields:
+        items:
+          type: integer
+        type: array
+      description:
+        type: string
+      discount:
+        type: number
+      discount_type:
+        maxLength: 10
+        type: string
+      documents_count:
+        type: integer
+      duration_seconds:
+        type: integer
+      ending_meter:
+        type: number
+      expected_completed_at:
+        type: string
+      fault_id:
+        type: integer
+      images_count:
+        type: integer
+      invoice_number:
+        maxLength: 100
+        type: string
+      issued_at:
+        type: string
+      issued_by_id:
+        type: integer
+      labels:
+        items:
+          type: integer
+        type: array
+      labor_markup:
+        type: number
+      labor_markup_percentage:
+        type: number
+      labor_markup_type:
+        maxLength: 10
+        type: string
+      labor_subtotal:
+        type: number
+      labor_time_seconds:
+        type: integer
+      location_id:
+        type: integer
+      number:
+        maxLength: 50
+        type: string
+      parts_markup:
+        type: number
+      parts_markup_percentage:
+        type: number
+      parts_markup_type:
+        maxLength: 10
+        type: string
+      parts_subtotal:
+        type: number
+      purchase_order_number:
+        maxLength: 100
+        type: string
+      scheduled_at:
+        type: string
+      started_at:
+        type: string
+      starting_meter:
+        type: number
+      status_id:
+        type: integer
+      subtotal:
+        type: number
+      tax_1:
+        type: number
+      tax_1_percentage:
+        type: number
+      tax_1_type:
+        maxLength: 10
+        type: string
+      tax_2:
+        type: number
+      tax_2_percentage:
+        type: number
+      tax_2_type:
+        maxLength: 10
+        type: string
+      total_amount:
+        type: number
+      vendor_id:
+        type: integer
+    type: object
+  dto.CreateWorkOrderStatusRequest:
+    properties:
+      color:
+        maxLength: 7
+        type: string
+      description:
+        type: string
+      is_default:
+        type: boolean
+      marks_as_completed:
+        type: boolean
+      name:
+        maxLength: 100
+        type: string
+      position:
+        type: integer
+    type: object
   dto.ErrorBody:
     properties:
       code:
@@ -731,6 +1034,44 @@ definitions:
     properties:
       error:
         $ref: '#/definitions/dto.ErrorBody'
+    type: object
+  dto.FaultPage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.FaultResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.FaultResponse:
+    properties:
+      applies_to_asset_types:
+        items:
+          type: string
+        maxItems: 20
+        type: array
+      code:
+        maxLength: 50
+        type: string
+      company_id:
+        type: integer
+      description:
+        type: string
+      family:
+        maxLength: 20
+        type: string
+      id:
+        type: integer
+      name:
+        maxLength: 255
+        type: string
     type: object
   dto.InventoryAdjustmentReasonPage:
     properties:
@@ -811,6 +1152,169 @@ definitions:
         type: integer
       work_order_id:
         type: integer
+    type: object
+  dto.IssuePage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.IssueResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.IssuePriorityPage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.IssuePriorityResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.IssuePriorityResponse:
+    properties:
+      color:
+        maxLength: 7
+        type: string
+      company_id:
+        type: integer
+      id:
+        type: integer
+      name:
+        maxLength: 50
+        type: string
+      position:
+        type: integer
+    type: object
+  dto.IssueResponse:
+    properties:
+      asset_id:
+        type: integer
+      asset_type:
+        maxLength: 20
+        type: string
+      closed_at:
+        type: string
+      closed_by_id:
+        type: integer
+      closed_note:
+        type: string
+      comments_count:
+        type: integer
+      company_id:
+        type: integer
+      created_at:
+        type: string
+      created_by_workflow:
+        type: boolean
+      custom_fields:
+        items:
+          type: integer
+        type: array
+      description:
+        type: string
+      documents_count:
+        type: integer
+      due_date:
+        type: string
+      due_meter_value:
+        type: number
+      due_secondary_meter_value:
+        type: number
+      external_id:
+        maxLength: 100
+        type: string
+      fault_id:
+        type: integer
+      id:
+        type: integer
+      images_count:
+        type: integer
+      inspection_submission_id:
+        type: integer
+      labels:
+        items:
+          type: integer
+        type: array
+      name:
+        maxLength: 255
+        type: string
+      number:
+        maxLength: 50
+        type: string
+      overdue:
+        type: boolean
+      priority_id:
+        type: integer
+      reopened_at:
+        type: string
+      reopened_by_id:
+        type: integer
+      reported_at:
+        type: string
+      reported_by_id:
+        type: integer
+      resolution_note:
+        type: string
+      resolvable_id:
+        type: integer
+      resolvable_type:
+        maxLength: 30
+        type: string
+      resolved_at:
+        type: string
+      resolved_by_id:
+        type: integer
+      source_type:
+        maxLength: 20
+        type: string
+      state:
+        maxLength: 20
+        type: string
+      summary:
+        maxLength: 255
+        type: string
+      updated_at:
+        type: string
+    type: object
+  dto.LocationPage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.LocationResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.LocationResponse:
+    properties:
+      company_id:
+        type: integer
+      id:
+        type: integer
+      is_active:
+        type: boolean
+      name:
+        maxLength: 100
+        type: string
     type: object
   dto.LoginRequest:
     properties:
@@ -1271,6 +1775,25 @@ definitions:
     - name
     - tax_id
     type: object
+  dto.UpdateFaultRequest:
+    properties:
+      applies_to_asset_types:
+        items:
+          type: string
+        maxItems: 20
+        type: array
+      code:
+        maxLength: 50
+        type: string
+      description:
+        type: string
+      family:
+        maxLength: 20
+        type: string
+      name:
+        maxLength: 255
+        type: string
+    type: object
   dto.UpdateInventoryAdjustmentReasonRequest:
     properties:
       name:
@@ -1308,6 +1831,108 @@ definitions:
         type: integer
       work_order_id:
         type: integer
+    type: object
+  dto.UpdateIssuePriorityRequest:
+    properties:
+      color:
+        maxLength: 7
+        type: string
+      name:
+        maxLength: 50
+        type: string
+      position:
+        type: integer
+    type: object
+  dto.UpdateIssueRequest:
+    properties:
+      asset_id:
+        type: integer
+      asset_type:
+        maxLength: 20
+        type: string
+      closed_at:
+        type: string
+      closed_by_id:
+        type: integer
+      closed_note:
+        type: string
+      comments_count:
+        type: integer
+      created_by_workflow:
+        type: boolean
+      custom_fields:
+        items:
+          type: integer
+        type: array
+      description:
+        type: string
+      documents_count:
+        type: integer
+      due_date:
+        type: string
+      due_meter_value:
+        type: number
+      due_secondary_meter_value:
+        type: number
+      external_id:
+        maxLength: 100
+        type: string
+      fault_id:
+        type: integer
+      images_count:
+        type: integer
+      inspection_submission_id:
+        type: integer
+      labels:
+        items:
+          type: integer
+        type: array
+      name:
+        maxLength: 255
+        type: string
+      number:
+        maxLength: 50
+        type: string
+      overdue:
+        type: boolean
+      priority_id:
+        type: integer
+      reopened_at:
+        type: string
+      reopened_by_id:
+        type: integer
+      reported_at:
+        type: string
+      reported_by_id:
+        type: integer
+      resolution_note:
+        type: string
+      resolvable_id:
+        type: integer
+      resolvable_type:
+        maxLength: 30
+        type: string
+      resolved_at:
+        type: string
+      resolved_by_id:
+        type: integer
+      source_type:
+        maxLength: 20
+        type: string
+      state:
+        maxLength: 20
+        type: string
+      summary:
+        maxLength: 255
+        type: string
+    type: object
+  dto.UpdateLocationRequest:
+    properties:
+      is_active:
+        type: boolean
+      name:
+        maxLength: 100
+        type: string
     type: object
   dto.UpdateMeasurementUnitRequest:
     properties:
@@ -1407,6 +2032,188 @@ definitions:
     required:
     - name
     type: object
+  dto.UpdateVendorRequest:
+    properties:
+      archived_at:
+        type: string
+      city:
+        maxLength: 100
+        type: string
+      contact_email:
+        maxLength: 254
+        type: string
+      contact_name:
+        maxLength: 200
+        type: string
+      contact_phone:
+        maxLength: 20
+        type: string
+      country:
+        maxLength: 50
+        type: string
+      custom_fields:
+        items:
+          type: integer
+        type: array
+      external_id:
+        maxLength: 100
+        type: string
+      is_fuel_vendor:
+        type: boolean
+      is_mobile_service:
+        type: boolean
+      is_parts_vendor:
+        type: boolean
+      is_service_vendor:
+        type: boolean
+      labels:
+        items:
+          type: integer
+        type: array
+      latitude:
+        type: number
+      longitude:
+        type: number
+      name:
+        maxLength: 200
+        type: string
+      phone:
+        maxLength: 20
+        type: string
+      postal_code:
+        maxLength: 20
+        type: string
+      region:
+        maxLength: 50
+        type: string
+      street_address:
+        maxLength: 200
+        type: string
+      street_address_line_2:
+        maxLength: 200
+        type: string
+      website:
+        maxLength: 200
+        type: string
+    type: object
+  dto.UpdateWorkOrderRequest:
+    properties:
+      asset_id:
+        type: integer
+      assigned_to_id:
+        type: integer
+      comments_count:
+        type: integer
+      completed_at:
+        type: string
+      custom_fields:
+        items:
+          type: integer
+        type: array
+      description:
+        type: string
+      discount:
+        type: number
+      discount_type:
+        maxLength: 10
+        type: string
+      documents_count:
+        type: integer
+      duration_seconds:
+        type: integer
+      ending_meter:
+        type: number
+      expected_completed_at:
+        type: string
+      fault_id:
+        type: integer
+      images_count:
+        type: integer
+      invoice_number:
+        maxLength: 100
+        type: string
+      issued_at:
+        type: string
+      issued_by_id:
+        type: integer
+      labels:
+        items:
+          type: integer
+        type: array
+      labor_markup:
+        type: number
+      labor_markup_percentage:
+        type: number
+      labor_markup_type:
+        maxLength: 10
+        type: string
+      labor_subtotal:
+        type: number
+      labor_time_seconds:
+        type: integer
+      location_id:
+        type: integer
+      number:
+        maxLength: 50
+        type: string
+      parts_markup:
+        type: number
+      parts_markup_percentage:
+        type: number
+      parts_markup_type:
+        maxLength: 10
+        type: string
+      parts_subtotal:
+        type: number
+      purchase_order_number:
+        maxLength: 100
+        type: string
+      scheduled_at:
+        type: string
+      started_at:
+        type: string
+      starting_meter:
+        type: number
+      status_id:
+        type: integer
+      subtotal:
+        type: number
+      tax_1:
+        type: number
+      tax_1_percentage:
+        type: number
+      tax_1_type:
+        maxLength: 10
+        type: string
+      tax_2:
+        type: number
+      tax_2_percentage:
+        type: number
+      tax_2_type:
+        maxLength: 10
+        type: string
+      total_amount:
+        type: number
+      vendor_id:
+        type: integer
+    type: object
+  dto.UpdateWorkOrderStatusRequest:
+    properties:
+      color:
+        maxLength: 7
+        type: string
+      description:
+        type: string
+      is_default:
+        type: boolean
+      marks_as_completed:
+        type: boolean
+      name:
+        maxLength: 100
+        type: string
+      position:
+        type: integer
+    type: object
   dto.VehicleMakePage:
     properties:
       data:
@@ -1464,6 +2271,253 @@ definitions:
         type: string
       updated_at:
         type: string
+    type: object
+  dto.VendorPage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.VendorResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.VendorResponse:
+    properties:
+      archived_at:
+        type: string
+      city:
+        maxLength: 100
+        type: string
+      company_id:
+        type: integer
+      contact_email:
+        maxLength: 254
+        type: string
+      contact_name:
+        maxLength: 200
+        type: string
+      contact_phone:
+        maxLength: 20
+        type: string
+      country:
+        maxLength: 50
+        type: string
+      created_at:
+        type: string
+      custom_fields:
+        items:
+          type: integer
+        type: array
+      external_id:
+        maxLength: 100
+        type: string
+      id:
+        type: integer
+      is_fuel_vendor:
+        type: boolean
+      is_mobile_service:
+        type: boolean
+      is_parts_vendor:
+        type: boolean
+      is_service_vendor:
+        type: boolean
+      labels:
+        items:
+          type: integer
+        type: array
+      latitude:
+        type: number
+      longitude:
+        type: number
+      name:
+        maxLength: 200
+        type: string
+      phone:
+        maxLength: 20
+        type: string
+      postal_code:
+        maxLength: 20
+        type: string
+      region:
+        maxLength: 50
+        type: string
+      street_address:
+        maxLength: 200
+        type: string
+      street_address_line_2:
+        maxLength: 200
+        type: string
+      updated_at:
+        type: string
+      website:
+        maxLength: 200
+        type: string
+    type: object
+  dto.WorkOrderPage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.WorkOrderResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.WorkOrderResponse:
+    properties:
+      asset_id:
+        type: integer
+      assigned_to_id:
+        type: integer
+      comments_count:
+        type: integer
+      company_id:
+        type: integer
+      completed_at:
+        type: string
+      created_at:
+        type: string
+      custom_fields:
+        items:
+          type: integer
+        type: array
+      description:
+        type: string
+      discount:
+        type: number
+      discount_type:
+        maxLength: 10
+        type: string
+      documents_count:
+        type: integer
+      duration_seconds:
+        type: integer
+      ending_meter:
+        type: number
+      expected_completed_at:
+        type: string
+      fault_id:
+        type: integer
+      id:
+        type: integer
+      images_count:
+        type: integer
+      invoice_number:
+        maxLength: 100
+        type: string
+      issued_at:
+        type: string
+      issued_by_id:
+        type: integer
+      labels:
+        items:
+          type: integer
+        type: array
+      labor_markup:
+        type: number
+      labor_markup_percentage:
+        type: number
+      labor_markup_type:
+        maxLength: 10
+        type: string
+      labor_subtotal:
+        type: number
+      labor_time_seconds:
+        type: integer
+      location_id:
+        type: integer
+      number:
+        maxLength: 50
+        type: string
+      parts_markup:
+        type: number
+      parts_markup_percentage:
+        type: number
+      parts_markup_type:
+        maxLength: 10
+        type: string
+      parts_subtotal:
+        type: number
+      purchase_order_number:
+        maxLength: 100
+        type: string
+      scheduled_at:
+        type: string
+      started_at:
+        type: string
+      starting_meter:
+        type: number
+      status_id:
+        type: integer
+      subtotal:
+        type: number
+      tax_1:
+        type: number
+      tax_1_percentage:
+        type: number
+      tax_1_type:
+        maxLength: 10
+        type: string
+      tax_2:
+        type: number
+      tax_2_percentage:
+        type: number
+      tax_2_type:
+        maxLength: 10
+        type: string
+      total_amount:
+        type: number
+      updated_at:
+        type: string
+      vendor_id:
+        type: integer
+    type: object
+  dto.WorkOrderStatusPage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.WorkOrderStatusResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.WorkOrderStatusResponse:
+    properties:
+      color:
+        maxLength: 7
+        type: string
+      company_id:
+        type: integer
+      description:
+        type: string
+      id:
+        type: integer
+      is_default:
+        type: boolean
+      marks_as_completed:
+        type: boolean
+      name:
+        maxLength: 100
+        type: string
+      position:
+        type: integer
     type: object
   storage.Object:
     properties:
@@ -2141,6 +3195,133 @@ paths:
       summary: Update a company
       tags:
       - companies
+  /api/v1/faults:
+    get:
+      parameters:
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.FaultPage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List faults
+      tags:
+      - faults
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateFaultRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.FaultResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create faults
+      tags:
+      - faults
+  /api/v1/faults/{id}:
+    delete:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete faults
+      tags:
+      - faults
+    get:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.FaultResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get faults
+      tags:
+      - faults
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateFaultRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.FaultResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update faults
+      tags:
+      - faults
   /api/v1/inventory-adjustment-reasons:
     get:
       parameters:
@@ -2395,6 +3576,387 @@ paths:
       summary: Update inventory-journal-entries
       tags:
       - inventory-journal-entries
+  /api/v1/issue-priorities:
+    get:
+      parameters:
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.IssuePriorityPage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List issue-priorities
+      tags:
+      - issue-priorities
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateIssuePriorityRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.IssuePriorityResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create issue-priorities
+      tags:
+      - issue-priorities
+  /api/v1/issue-priorities/{id}:
+    delete:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete issue-priorities
+      tags:
+      - issue-priorities
+    get:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.IssuePriorityResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get issue-priorities
+      tags:
+      - issue-priorities
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateIssuePriorityRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.IssuePriorityResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update issue-priorities
+      tags:
+      - issue-priorities
+  /api/v1/issues:
+    get:
+      parameters:
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.IssuePage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List issues
+      tags:
+      - issues
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateIssueRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.IssueResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create issues
+      tags:
+      - issues
+  /api/v1/issues/{id}:
+    delete:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete issues
+      tags:
+      - issues
+    get:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.IssueResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get issues
+      tags:
+      - issues
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateIssueRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.IssueResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update issues
+      tags:
+      - issues
+  /api/v1/locations:
+    get:
+      parameters:
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.LocationPage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List locations
+      tags:
+      - locations
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateLocationRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.LocationResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create locations
+      tags:
+      - locations
+  /api/v1/locations/{id}:
+    delete:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete locations
+      tags:
+      - locations
+    get:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.LocationResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get locations
+      tags:
+      - locations
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateLocationRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.LocationResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update locations
+      tags:
+      - locations
   /api/v1/measurement-units:
     get:
       parameters:
@@ -3314,6 +4876,387 @@ paths:
       summary: Update a vehicle model
       tags:
       - vehicle-models
+  /api/v1/vendors:
+    get:
+      parameters:
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.VendorPage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List vendors
+      tags:
+      - vendors
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateVendorRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.VendorResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create vendors
+      tags:
+      - vendors
+  /api/v1/vendors/{id}:
+    delete:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete vendors
+      tags:
+      - vendors
+    get:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.VendorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get vendors
+      tags:
+      - vendors
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateVendorRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.VendorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update vendors
+      tags:
+      - vendors
+  /api/v1/work-order-statuses:
+    get:
+      parameters:
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.WorkOrderStatusPage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List work-order-statuses
+      tags:
+      - work-order-statuses
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateWorkOrderStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.WorkOrderStatusResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create work-order-statuses
+      tags:
+      - work-order-statuses
+  /api/v1/work-order-statuses/{id}:
+    delete:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete work-order-statuses
+      tags:
+      - work-order-statuses
+    get:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.WorkOrderStatusResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get work-order-statuses
+      tags:
+      - work-order-statuses
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateWorkOrderStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.WorkOrderStatusResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update work-order-statuses
+      tags:
+      - work-order-statuses
+  /api/v1/work-orders:
+    get:
+      parameters:
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.WorkOrderPage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List work-orders
+      tags:
+      - work-orders
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateWorkOrderRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.WorkOrderResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create work-orders
+      tags:
+      - work-orders
+  /api/v1/work-orders/{id}:
+    delete:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete work-orders
+      tags:
+      - work-orders
+    get:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.WorkOrderResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get work-orders
+      tags:
+      - work-orders
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateWorkOrderRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.WorkOrderResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update work-orders
+      tags:
+      - work-orders
   /auth/login:
     post:
       consumes:
