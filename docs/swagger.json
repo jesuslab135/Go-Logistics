@@ -1085,6 +1085,234 @@
                 }
             }
         },
+        "/api/v1/axle-definitions/{id}/wheel-positions": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "wheel-position-definitions"
+                ],
+                "summary": "List wheel-position-definitions",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "parent id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.WheelPositionDefinitionPage"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "wheel-position-definitions"
+                ],
+                "summary": "Create wheel-position-definitions",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "parent id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.CreateWheelPositionDefinitionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/dto.WheelPositionDefinitionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/axle-definitions/{id}/wheel-positions/{child_id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "wheel-position-definitions"
+                ],
+                "summary": "Get wheel-position-definitions",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "parent id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "child_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.WheelPositionDefinitionResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "wheel-position-definitions"
+                ],
+                "summary": "Update wheel-position-definitions",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "parent id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "child_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.UpdateWheelPositionDefinitionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.WheelPositionDefinitionResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "wheel-position-definitions"
+                ],
+                "summary": "Delete wheel-position-definitions",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "parent id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "child_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/axle-templates": {
             "get": {
                 "security": [
@@ -2351,6 +2579,462 @@
                         "type": "integer",
                         "description": "id",
                         "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/fuel-entries/{id}/comments": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "fuel-comments"
+                ],
+                "summary": "List fuel-comments",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "parent id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.FuelCommentPage"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "fuel-comments"
+                ],
+                "summary": "Create fuel-comments",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "parent id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.CreateFuelCommentRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/dto.FuelCommentResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/fuel-entries/{id}/comments/{child_id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "fuel-comments"
+                ],
+                "summary": "Get fuel-comments",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "parent id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "child_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.FuelCommentResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "fuel-comments"
+                ],
+                "summary": "Update fuel-comments",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "parent id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "child_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.UpdateFuelCommentRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.FuelCommentResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "fuel-comments"
+                ],
+                "summary": "Delete fuel-comments",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "parent id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "child_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/fuel-entries/{id}/photos": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "fuel-photos"
+                ],
+                "summary": "List fuel-photos",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "parent id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.FuelPhotoPage"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "fuel-photos"
+                ],
+                "summary": "Create fuel-photos",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "parent id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.CreateFuelPhotoRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/dto.FuelPhotoResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/fuel-entries/{id}/photos/{child_id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "fuel-photos"
+                ],
+                "summary": "Get fuel-photos",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "parent id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "child_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.FuelPhotoResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "fuel-photos"
+                ],
+                "summary": "Update fuel-photos",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "parent id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "child_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.UpdateFuelPhotoRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.FuelPhotoResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "fuel-photos"
+                ],
+                "summary": "Delete fuel-photos",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "parent id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "child_id",
                         "in": "path",
                         "required": true
                     }
@@ -10003,6 +10687,234 @@
                 }
             }
         },
+        "/api/v1/work-order-line-items/{id}/sub-line-items": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "work-order-sub-line-items"
+                ],
+                "summary": "List work-order-sub-line-items",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "parent id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.WorkOrderSubLineItemPage"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "work-order-sub-line-items"
+                ],
+                "summary": "Create work-order-sub-line-items",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "parent id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.CreateWorkOrderSubLineItemRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/dto.WorkOrderSubLineItemResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/work-order-line-items/{id}/sub-line-items/{child_id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "work-order-sub-line-items"
+                ],
+                "summary": "Get work-order-sub-line-items",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "parent id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "child_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.WorkOrderSubLineItemResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "work-order-sub-line-items"
+                ],
+                "summary": "Update work-order-sub-line-items",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "parent id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "child_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.UpdateWorkOrderSubLineItemRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.WorkOrderSubLineItemResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "work-order-sub-line-items"
+                ],
+                "summary": "Delete work-order-sub-line-items",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "parent id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "child_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/work-order-statuses": {
             "get": {
                 "security": [
@@ -10191,6 +11103,234 @@
                         "type": "integer",
                         "description": "id",
                         "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/work-order-sub-line-items/{id}/labor-entries": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "labor-time-entries"
+                ],
+                "summary": "List labor-time-entries",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "parent id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.LaborTimeEntryPage"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "labor-time-entries"
+                ],
+                "summary": "Create labor-time-entries",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "parent id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.CreateLaborTimeEntryRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/dto.LaborTimeEntryResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/work-order-sub-line-items/{id}/labor-entries/{child_id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "labor-time-entries"
+                ],
+                "summary": "Get labor-time-entries",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "parent id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "child_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.LaborTimeEntryResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "labor-time-entries"
+                ],
+                "summary": "Update labor-time-entries",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "parent id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "child_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.UpdateLaborTimeEntryRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.LaborTimeEntryResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "labor-time-entries"
+                ],
+                "summary": "Delete labor-time-entries",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "parent id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "child_id",
                         "in": "path",
                         "required": true
                     }
@@ -12135,6 +13275,17 @@
                 }
             }
         },
+        "dto.CreateFuelCommentRequest": {
+            "type": "object",
+            "properties": {
+                "text": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "integer"
+                }
+            }
+        },
         "dto.CreateFuelEntryRequest": {
             "type": "object",
             "properties": {
@@ -12206,6 +13357,38 @@
                     "type": "number"
                 },
                 "vendor_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.CreateFuelPhotoRequest": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "file": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "file_name": {
+                    "type": "string",
+                    "maxLength": 255
+                },
+                "file_size": {
+                    "type": "integer"
+                },
+                "is_primary": {
+                    "type": "boolean"
+                },
+                "mime_type": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "uploaded_at": {
+                    "type": "string"
+                },
+                "uploaded_by_id": {
                     "type": "integer"
                 }
             }
@@ -12594,6 +13777,38 @@
                 "summary": {
                     "type": "string",
                     "maxLength": 255
+                }
+            }
+        },
+        "dto.CreateLaborTimeEntryRequest": {
+            "type": "object",
+            "properties": {
+                "clock_in_latitude": {
+                    "type": "number"
+                },
+                "clock_in_longitude": {
+                    "type": "number"
+                },
+                "clock_out_latitude": {
+                    "type": "number"
+                },
+                "clock_out_longitude": {
+                    "type": "number"
+                },
+                "duration_seconds": {
+                    "type": "integer"
+                },
+                "ended_at": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "started_at": {
+                    "type": "string"
+                },
+                "technician_id": {
+                    "type": "integer"
                 }
             }
         },
@@ -13546,6 +14761,22 @@
                 }
             }
         },
+        "dto.CreateWheelPositionDefinitionRequest": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "side": {
+                    "type": "string",
+                    "maxLength": 1
+                },
+                "slot": {
+                    "type": "integer"
+                }
+            }
+        },
         "dto.CreateWorkOrderLineItemRequest": {
             "type": "object",
             "properties": {
@@ -13762,6 +14993,37 @@
                 }
             }
         },
+        "dto.CreateWorkOrderSubLineItemRequest": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string",
+                    "maxLength": 255
+                },
+                "item_type": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "part_id": {
+                    "type": "integer"
+                },
+                "part_location_detail_id": {
+                    "type": "integer"
+                },
+                "position": {
+                    "type": "integer"
+                },
+                "quantity": {
+                    "type": "number"
+                },
+                "technician_id": {
+                    "type": "integer"
+                },
+                "unit_cost": {
+                    "type": "number"
+                }
+            }
+        },
         "dto.ErrorBody": {
             "type": "object",
             "properties": {
@@ -13835,6 +15097,52 @@
                 "name": {
                     "type": "string",
                     "maxLength": 255
+                }
+            }
+        },
+        "dto.FuelCommentPage": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.FuelCommentResponse"
+                    }
+                },
+                "has_next": {
+                    "type": "boolean"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.FuelCommentResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "entry_id": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "text": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "integer"
                 }
             }
         },
@@ -13941,6 +15249,67 @@
                     "type": "string"
                 },
                 "vendor_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.FuelPhotoPage": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.FuelPhotoResponse"
+                    }
+                },
+                "has_next": {
+                    "type": "boolean"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.FuelPhotoResponse": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "entry_id": {
+                    "type": "integer"
+                },
+                "file": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "file_name": {
+                    "type": "string",
+                    "maxLength": 255
+                },
+                "file_size": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "is_primary": {
+                    "type": "boolean"
+                },
+                "mime_type": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "uploaded_at": {
+                    "type": "string"
+                },
+                "uploaded_by_id": {
                     "type": "integer"
                 }
             }
@@ -14620,6 +15989,70 @@
                 },
                 "updated_at": {
                     "type": "string"
+                }
+            }
+        },
+        "dto.LaborTimeEntryPage": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.LaborTimeEntryResponse"
+                    }
+                },
+                "has_next": {
+                    "type": "boolean"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.LaborTimeEntryResponse": {
+            "type": "object",
+            "properties": {
+                "clock_in_latitude": {
+                    "type": "number"
+                },
+                "clock_in_longitude": {
+                    "type": "number"
+                },
+                "clock_out_latitude": {
+                    "type": "number"
+                },
+                "clock_out_longitude": {
+                    "type": "number"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "duration_seconds": {
+                    "type": "integer"
+                },
+                "ended_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "started_at": {
+                    "type": "string"
+                },
+                "sub_line_item_id": {
+                    "type": "integer"
+                },
+                "technician_id": {
+                    "type": "integer"
                 }
             }
         },
@@ -16596,6 +18029,17 @@
                 }
             }
         },
+        "dto.UpdateFuelCommentRequest": {
+            "type": "object",
+            "properties": {
+                "text": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "integer"
+                }
+            }
+        },
         "dto.UpdateFuelEntryRequest": {
             "type": "object",
             "properties": {
@@ -16667,6 +18111,38 @@
                     "type": "number"
                 },
                 "vendor_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.UpdateFuelPhotoRequest": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "file": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "file_name": {
+                    "type": "string",
+                    "maxLength": 255
+                },
+                "file_size": {
+                    "type": "integer"
+                },
+                "is_primary": {
+                    "type": "boolean"
+                },
+                "mime_type": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "uploaded_at": {
+                    "type": "string"
+                },
+                "uploaded_by_id": {
                     "type": "integer"
                 }
             }
@@ -17055,6 +18531,38 @@
                 "summary": {
                     "type": "string",
                     "maxLength": 255
+                }
+            }
+        },
+        "dto.UpdateLaborTimeEntryRequest": {
+            "type": "object",
+            "properties": {
+                "clock_in_latitude": {
+                    "type": "number"
+                },
+                "clock_in_longitude": {
+                    "type": "number"
+                },
+                "clock_out_latitude": {
+                    "type": "number"
+                },
+                "clock_out_longitude": {
+                    "type": "number"
+                },
+                "duration_seconds": {
+                    "type": "integer"
+                },
+                "ended_at": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "started_at": {
+                    "type": "string"
+                },
+                "technician_id": {
+                    "type": "integer"
                 }
             }
         },
@@ -18007,6 +19515,22 @@
                 }
             }
         },
+        "dto.UpdateWheelPositionDefinitionRequest": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "side": {
+                    "type": "string",
+                    "maxLength": 1
+                },
+                "slot": {
+                    "type": "integer"
+                }
+            }
+        },
         "dto.UpdateWorkOrderLineItemRequest": {
             "type": "object",
             "properties": {
@@ -18220,6 +19744,37 @@
                 },
                 "position": {
                     "type": "integer"
+                }
+            }
+        },
+        "dto.UpdateWorkOrderSubLineItemRequest": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string",
+                    "maxLength": 255
+                },
+                "item_type": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "part_id": {
+                    "type": "integer"
+                },
+                "part_location_detail_id": {
+                    "type": "integer"
+                },
+                "position": {
+                    "type": "integer"
+                },
+                "quantity": {
+                    "type": "number"
+                },
+                "technician_id": {
+                    "type": "integer"
+                },
+                "unit_cost": {
+                    "type": "number"
                 }
             }
         },
@@ -18556,6 +20111,51 @@
                     "type": "string"
                 },
                 "weekly_mileage_goal": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.WheelPositionDefinitionPage": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.WheelPositionDefinitionResponse"
+                    }
+                },
+                "has_next": {
+                    "type": "boolean"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.WheelPositionDefinitionResponse": {
+            "type": "object",
+            "properties": {
+                "axle_id": {
+                    "type": "integer"
+                },
+                "code": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "side": {
+                    "type": "string",
+                    "maxLength": 1
+                },
+                "slot": {
                     "type": "integer"
                 }
             }
@@ -18901,6 +20501,72 @@
                 },
                 "position": {
                     "type": "integer"
+                }
+            }
+        },
+        "dto.WorkOrderSubLineItemPage": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.WorkOrderSubLineItemResponse"
+                    }
+                },
+                "has_next": {
+                    "type": "boolean"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.WorkOrderSubLineItemResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string",
+                    "maxLength": 255
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "item_type": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "line_item_id": {
+                    "type": "integer"
+                },
+                "part_id": {
+                    "type": "integer"
+                },
+                "part_location_detail_id": {
+                    "type": "integer"
+                },
+                "position": {
+                    "type": "integer"
+                },
+                "quantity": {
+                    "type": "number"
+                },
+                "technician_id": {
+                    "type": "integer"
+                },
+                "unit_cost": {
+                    "type": "number"
+                },
+                "updated_at": {
+                    "type": "string"
                 }
             }
         },

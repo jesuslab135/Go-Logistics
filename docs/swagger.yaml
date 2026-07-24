@@ -784,6 +784,13 @@ definitions:
         maxLength: 255
         type: string
     type: object
+  dto.CreateFuelCommentRequest:
+    properties:
+      text:
+        type: string
+      user_id:
+        type: integer
+    type: object
   dto.CreateFuelEntryRequest:
     properties:
       date:
@@ -834,6 +841,28 @@ definitions:
       unit_cost:
         type: number
       vendor_id:
+        type: integer
+    type: object
+  dto.CreateFuelPhotoRequest:
+    properties:
+      description:
+        type: string
+      file:
+        maxLength: 100
+        type: string
+      file_name:
+        maxLength: 255
+        type: string
+      file_size:
+        type: integer
+      is_primary:
+        type: boolean
+      mime_type:
+        maxLength: 100
+        type: string
+      uploaded_at:
+        type: string
+      uploaded_by_id:
         type: integer
     type: object
   dto.CreateFuelTypeRequest:
@@ -1098,6 +1127,27 @@ definitions:
       summary:
         maxLength: 255
         type: string
+    type: object
+  dto.CreateLaborTimeEntryRequest:
+    properties:
+      clock_in_latitude:
+        type: number
+      clock_in_longitude:
+        type: number
+      clock_out_latitude:
+        type: number
+      clock_out_longitude:
+        type: number
+      duration_seconds:
+        type: integer
+      ended_at:
+        type: string
+      is_active:
+        type: boolean
+      started_at:
+        type: string
+      technician_id:
+        type: integer
     type: object
   dto.CreateLocationRequest:
     properties:
@@ -1744,6 +1794,17 @@ definitions:
       weekly_mileage_goal:
         type: integer
     type: object
+  dto.CreateWheelPositionDefinitionRequest:
+    properties:
+      code:
+        maxLength: 10
+        type: string
+      side:
+        maxLength: 1
+        type: string
+      slot:
+        type: integer
+    type: object
   dto.CreateWorkOrderLineItemRequest:
     properties:
       description:
@@ -1891,6 +1952,27 @@ definitions:
       position:
         type: integer
     type: object
+  dto.CreateWorkOrderSubLineItemRequest:
+    properties:
+      description:
+        maxLength: 255
+        type: string
+      item_type:
+        maxLength: 10
+        type: string
+      part_id:
+        type: integer
+      part_location_detail_id:
+        type: integer
+      position:
+        type: integer
+      quantity:
+        type: number
+      technician_id:
+        type: integer
+      unit_cost:
+        type: number
+    type: object
   dto.ErrorBody:
     properties:
       code:
@@ -1941,6 +2023,36 @@ definitions:
       name:
         maxLength: 255
         type: string
+    type: object
+  dto.FuelCommentPage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.FuelCommentResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.FuelCommentResponse:
+    properties:
+      created_at:
+        type: string
+      entry_id:
+        type: integer
+      id:
+        type: integer
+      text:
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: integer
     type: object
   dto.FuelEntryPage:
     properties:
@@ -2013,6 +2125,47 @@ definitions:
       updated_at:
         type: string
       vendor_id:
+        type: integer
+    type: object
+  dto.FuelPhotoPage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.FuelPhotoResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.FuelPhotoResponse:
+    properties:
+      description:
+        type: string
+      entry_id:
+        type: integer
+      file:
+        maxLength: 100
+        type: string
+      file_name:
+        maxLength: 255
+        type: string
+      file_size:
+        type: integer
+      id:
+        type: integer
+      is_primary:
+        type: boolean
+      mime_type:
+        maxLength: 100
+        type: string
+      uploaded_at:
+        type: string
+      uploaded_by_id:
         type: integer
     type: object
   dto.FuelTypePage:
@@ -2468,6 +2621,48 @@ definitions:
         type: string
       updated_at:
         type: string
+    type: object
+  dto.LaborTimeEntryPage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.LaborTimeEntryResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.LaborTimeEntryResponse:
+    properties:
+      clock_in_latitude:
+        type: number
+      clock_in_longitude:
+        type: number
+      clock_out_latitude:
+        type: number
+      clock_out_longitude:
+        type: number
+      created_at:
+        type: string
+      duration_seconds:
+        type: integer
+      ended_at:
+        type: string
+      id:
+        type: integer
+      is_active:
+        type: boolean
+      started_at:
+        type: string
+      sub_line_item_id:
+        type: integer
+      technician_id:
+        type: integer
     type: object
   dto.LocationPage:
     properties:
@@ -3799,6 +3994,13 @@ definitions:
         maxLength: 255
         type: string
     type: object
+  dto.UpdateFuelCommentRequest:
+    properties:
+      text:
+        type: string
+      user_id:
+        type: integer
+    type: object
   dto.UpdateFuelEntryRequest:
     properties:
       date:
@@ -3849,6 +4051,28 @@ definitions:
       unit_cost:
         type: number
       vendor_id:
+        type: integer
+    type: object
+  dto.UpdateFuelPhotoRequest:
+    properties:
+      description:
+        type: string
+      file:
+        maxLength: 100
+        type: string
+      file_name:
+        maxLength: 255
+        type: string
+      file_size:
+        type: integer
+      is_primary:
+        type: boolean
+      mime_type:
+        maxLength: 100
+        type: string
+      uploaded_at:
+        type: string
+      uploaded_by_id:
         type: integer
     type: object
   dto.UpdateFuelTypeRequest:
@@ -4113,6 +4337,27 @@ definitions:
       summary:
         maxLength: 255
         type: string
+    type: object
+  dto.UpdateLaborTimeEntryRequest:
+    properties:
+      clock_in_latitude:
+        type: number
+      clock_in_longitude:
+        type: number
+      clock_out_latitude:
+        type: number
+      clock_out_longitude:
+        type: number
+      duration_seconds:
+        type: integer
+      ended_at:
+        type: string
+      is_active:
+        type: boolean
+      started_at:
+        type: string
+      technician_id:
+        type: integer
     type: object
   dto.UpdateLocationRequest:
     properties:
@@ -4759,6 +5004,17 @@ definitions:
       weekly_mileage_goal:
         type: integer
     type: object
+  dto.UpdateWheelPositionDefinitionRequest:
+    properties:
+      code:
+        maxLength: 10
+        type: string
+      side:
+        maxLength: 1
+        type: string
+      slot:
+        type: integer
+    type: object
   dto.UpdateWorkOrderLineItemRequest:
     properties:
       description:
@@ -4905,6 +5161,27 @@ definitions:
         type: string
       position:
         type: integer
+    type: object
+  dto.UpdateWorkOrderSubLineItemRequest:
+    properties:
+      description:
+        maxLength: 255
+        type: string
+      item_type:
+        maxLength: 10
+        type: string
+      part_id:
+        type: integer
+      part_location_detail_id:
+        type: integer
+      position:
+        type: integer
+      quantity:
+        type: number
+      technician_id:
+        type: integer
+      unit_cost:
+        type: number
     type: object
   dto.VehicleMakePage:
     properties:
@@ -5130,6 +5407,36 @@ definitions:
       updated_at:
         type: string
       weekly_mileage_goal:
+        type: integer
+    type: object
+  dto.WheelPositionDefinitionPage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.WheelPositionDefinitionResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.WheelPositionDefinitionResponse:
+    properties:
+      axle_id:
+        type: integer
+      code:
+        maxLength: 10
+        type: string
+      id:
+        type: integer
+      side:
+        maxLength: 1
+        type: string
+      slot:
         type: integer
     type: object
   dto.WorkOrderLineItemPage:
@@ -5362,6 +5669,50 @@ definitions:
         type: string
       position:
         type: integer
+    type: object
+  dto.WorkOrderSubLineItemPage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.WorkOrderSubLineItemResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.WorkOrderSubLineItemResponse:
+    properties:
+      created_at:
+        type: string
+      description:
+        maxLength: 255
+        type: string
+      id:
+        type: integer
+      item_type:
+        maxLength: 10
+        type: string
+      line_item_id:
+        type: integer
+      part_id:
+        type: integer
+      part_location_detail_id:
+        type: integer
+      position:
+        type: integer
+      quantity:
+        type: number
+      technician_id:
+        type: integer
+      unit_cost:
+        type: number
+      updated_at:
+        type: string
     type: object
   storage.Object:
     properties:
@@ -6053,6 +6404,150 @@ paths:
       summary: Update asset-trailer-assignments
       tags:
       - asset-trailer-assignments
+  /api/v1/axle-definitions/{id}/wheel-positions:
+    get:
+      parameters:
+      - description: parent id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.WheelPositionDefinitionPage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List wheel-position-definitions
+      tags:
+      - wheel-position-definitions
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: parent id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateWheelPositionDefinitionRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.WheelPositionDefinitionResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create wheel-position-definitions
+      tags:
+      - wheel-position-definitions
+  /api/v1/axle-definitions/{id}/wheel-positions/{child_id}:
+    delete:
+      parameters:
+      - description: parent id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: id
+        in: path
+        name: child_id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete wheel-position-definitions
+      tags:
+      - wheel-position-definitions
+    get:
+      parameters:
+      - description: parent id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: id
+        in: path
+        name: child_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.WheelPositionDefinitionResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get wheel-position-definitions
+      tags:
+      - wheel-position-definitions
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: parent id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: id
+        in: path
+        name: child_id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateWheelPositionDefinitionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.WheelPositionDefinitionResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update wheel-position-definitions
+      tags:
+      - wheel-position-definitions
   /api/v1/axle-templates:
     get:
       parameters:
@@ -6852,6 +7347,294 @@ paths:
       summary: Update faults
       tags:
       - faults
+  /api/v1/fuel-entries/{id}/comments:
+    get:
+      parameters:
+      - description: parent id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.FuelCommentPage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List fuel-comments
+      tags:
+      - fuel-comments
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: parent id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateFuelCommentRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.FuelCommentResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create fuel-comments
+      tags:
+      - fuel-comments
+  /api/v1/fuel-entries/{id}/comments/{child_id}:
+    delete:
+      parameters:
+      - description: parent id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: id
+        in: path
+        name: child_id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete fuel-comments
+      tags:
+      - fuel-comments
+    get:
+      parameters:
+      - description: parent id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: id
+        in: path
+        name: child_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.FuelCommentResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get fuel-comments
+      tags:
+      - fuel-comments
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: parent id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: id
+        in: path
+        name: child_id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateFuelCommentRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.FuelCommentResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update fuel-comments
+      tags:
+      - fuel-comments
+  /api/v1/fuel-entries/{id}/photos:
+    get:
+      parameters:
+      - description: parent id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.FuelPhotoPage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List fuel-photos
+      tags:
+      - fuel-photos
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: parent id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateFuelPhotoRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.FuelPhotoResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create fuel-photos
+      tags:
+      - fuel-photos
+  /api/v1/fuel-entries/{id}/photos/{child_id}:
+    delete:
+      parameters:
+      - description: parent id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: id
+        in: path
+        name: child_id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete fuel-photos
+      tags:
+      - fuel-photos
+    get:
+      parameters:
+      - description: parent id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: id
+        in: path
+        name: child_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.FuelPhotoResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get fuel-photos
+      tags:
+      - fuel-photos
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: parent id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: id
+        in: path
+        name: child_id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateFuelPhotoRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.FuelPhotoResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update fuel-photos
+      tags:
+      - fuel-photos
   /api/v1/fuel-types:
     get:
       parameters:
@@ -11607,6 +12390,150 @@ paths:
       summary: Update weekly-mileage-goals
       tags:
       - weekly-mileage-goals
+  /api/v1/work-order-line-items/{id}/sub-line-items:
+    get:
+      parameters:
+      - description: parent id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.WorkOrderSubLineItemPage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List work-order-sub-line-items
+      tags:
+      - work-order-sub-line-items
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: parent id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateWorkOrderSubLineItemRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.WorkOrderSubLineItemResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create work-order-sub-line-items
+      tags:
+      - work-order-sub-line-items
+  /api/v1/work-order-line-items/{id}/sub-line-items/{child_id}:
+    delete:
+      parameters:
+      - description: parent id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: id
+        in: path
+        name: child_id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete work-order-sub-line-items
+      tags:
+      - work-order-sub-line-items
+    get:
+      parameters:
+      - description: parent id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: id
+        in: path
+        name: child_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.WorkOrderSubLineItemResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get work-order-sub-line-items
+      tags:
+      - work-order-sub-line-items
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: parent id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: id
+        in: path
+        name: child_id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateWorkOrderSubLineItemRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.WorkOrderSubLineItemResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update work-order-sub-line-items
+      tags:
+      - work-order-sub-line-items
   /api/v1/work-order-statuses:
     get:
       parameters:
@@ -11734,6 +12661,150 @@ paths:
       summary: Update work-order-statuses
       tags:
       - work-order-statuses
+  /api/v1/work-order-sub-line-items/{id}/labor-entries:
+    get:
+      parameters:
+      - description: parent id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.LaborTimeEntryPage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List labor-time-entries
+      tags:
+      - labor-time-entries
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: parent id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateLaborTimeEntryRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.LaborTimeEntryResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create labor-time-entries
+      tags:
+      - labor-time-entries
+  /api/v1/work-order-sub-line-items/{id}/labor-entries/{child_id}:
+    delete:
+      parameters:
+      - description: parent id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: id
+        in: path
+        name: child_id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete labor-time-entries
+      tags:
+      - labor-time-entries
+    get:
+      parameters:
+      - description: parent id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: id
+        in: path
+        name: child_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.LaborTimeEntryResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get labor-time-entries
+      tags:
+      - labor-time-entries
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: parent id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: id
+        in: path
+        name: child_id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateLaborTimeEntryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.LaborTimeEntryResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update labor-time-entries
+      tags:
+      - labor-time-entries
   /api/v1/work-orders:
     get:
       parameters:

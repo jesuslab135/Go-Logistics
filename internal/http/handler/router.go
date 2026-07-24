@@ -146,5 +146,12 @@ func NewRouter(d Deps) *gin.Engine {
 	crud.NewNestedHandler[dto.TireInspectionResponse, dto.CreateTireInspectionRequest, dto.UpdateTireInspectionRequest](NewTireInspectionStore(d.Queries)).Register(api, "/tires", "/inspections")
 	crud.NewNestedHandler[dto.TireMountLogResponse, dto.CreateTireMountLogRequest, dto.UpdateTireMountLogRequest](NewTireMountLogStore(d.Queries)).Register(api, "/tires", "/mount-logs")
 
+	// Phase 8b: deeper (grandchild) nested resources, scoped up the chain to company
+	crud.NewNestedHandler[dto.WorkOrderSubLineItemResponse, dto.CreateWorkOrderSubLineItemRequest, dto.UpdateWorkOrderSubLineItemRequest](NewWorkOrderSubLineItemStore(d.Queries)).Register(api, "/work-order-line-items", "/sub-line-items")
+	crud.NewNestedHandler[dto.LaborTimeEntryResponse, dto.CreateLaborTimeEntryRequest, dto.UpdateLaborTimeEntryRequest](NewLaborTimeEntryStore(d.Queries)).Register(api, "/work-order-sub-line-items", "/labor-entries")
+	crud.NewNestedHandler[dto.WheelPositionDefinitionResponse, dto.CreateWheelPositionDefinitionRequest, dto.UpdateWheelPositionDefinitionRequest](NewWheelPositionDefinitionStore(d.Queries)).Register(api, "/axle-definitions", "/wheel-positions")
+	crud.NewNestedHandler[dto.FuelCommentResponse, dto.CreateFuelCommentRequest, dto.UpdateFuelCommentRequest](NewFuelCommentStore(d.Queries)).Register(api, "/fuel-entries", "/comments")
+	crud.NewNestedHandler[dto.FuelPhotoResponse, dto.CreateFuelPhotoRequest, dto.UpdateFuelPhotoRequest](NewFuelPhotoStore(d.Queries)).Register(api, "/fuel-entries", "/photos")
+
 	return r
 }
