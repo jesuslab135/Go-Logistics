@@ -636,6 +636,125 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/assets/{id}/axle-config": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vehicle-axle-config"
+                ],
+                "summary": "Get vehicle-axle-config",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "asset id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.VehicleAxleConfigResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vehicle-axle-config"
+                ],
+                "summary": "Create or update vehicle-axle-config",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "asset id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.UpsertVehicleAxleConfigRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.VehicleAxleConfigResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "vehicle-axle-config"
+                ],
+                "summary": "Delete vehicle-axle-config",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "asset id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/assets/{id}/fuel-entries": {
             "get": {
                 "security": [
@@ -864,6 +983,125 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/assets/{id}/trailer": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "trailer"
+                ],
+                "summary": "Get trailer",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "asset id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.TrailerResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "trailer"
+                ],
+                "summary": "Create or update trailer",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "asset id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.UpsertTrailerRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.TrailerResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "trailer"
+                ],
+                "summary": "Delete trailer",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "asset id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/assets/{id}/trailer-assignments": {
             "get": {
                 "security": [
@@ -1075,6 +1313,125 @@ const docTemplate = `{
                         "type": "integer",
                         "description": "id",
                         "name": "child_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/assets/{id}/vehicle": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vehicle"
+                ],
+                "summary": "Get vehicle",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "asset id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.VehicleResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vehicle"
+                ],
+                "summary": "Create or update vehicle",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "asset id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.UpsertVehicleRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.VehicleResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "vehicle"
+                ],
+                "summary": "Delete vehicle",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "asset id",
+                        "name": "id",
                         "in": "path",
                         "required": true
                     }
@@ -17572,6 +17929,151 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.TrailerResponse": {
+            "type": "object",
+            "properties": {
+                "aero_kit_type": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "asset_id": {
+                    "type": "integer"
+                },
+                "classification": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "classification_2": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "contract_end": {
+                    "type": "string"
+                },
+                "contract_period": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "contract_reference": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "contract_start": {
+                    "type": "string"
+                },
+                "decommission_date": {
+                    "type": "string"
+                },
+                "decommission_reason": {
+                    "type": "string"
+                },
+                "doors": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "financing": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "floor_type": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "fumigation_cert": {
+                    "type": "boolean"
+                },
+                "fumigation_date": {
+                    "type": "string"
+                },
+                "gps_contract_end": {
+                    "type": "string"
+                },
+                "gps_contract_reference": {
+                    "type": "string",
+                    "maxLength": 200
+                },
+                "gps_contract_start": {
+                    "type": "string"
+                },
+                "gps_provider": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "gps_serial": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "gps_signal_status": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "hazmat_type": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "license_plate_mx": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "license_plate_us": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "license_plate_us_state": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "operation_zone": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "operational_use": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "owner_name": {
+                    "type": "string",
+                    "maxLength": 200
+                },
+                "rail_post": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "registration_date": {
+                    "type": "string"
+                },
+                "roof_type": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "size": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "skylight": {
+                    "type": "boolean"
+                },
+                "supplier": {
+                    "type": "string",
+                    "maxLength": 200
+                },
+                "suspension": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "trailer_type": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "walls": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "waterproofing_date": {
+                    "type": "string"
+                }
+            }
+        },
         "dto.UpdateAssetRequest": {
             "type": "object",
             "properties": {
@@ -19785,6 +20287,472 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.UpsertTrailerRequest": {
+            "type": "object",
+            "properties": {
+                "aero_kit_type": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "classification": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "classification_2": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "contract_end": {
+                    "type": "string"
+                },
+                "contract_period": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "contract_reference": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "contract_start": {
+                    "type": "string"
+                },
+                "decommission_date": {
+                    "type": "string"
+                },
+                "decommission_reason": {
+                    "type": "string"
+                },
+                "doors": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "financing": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "floor_type": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "fumigation_cert": {
+                    "type": "boolean"
+                },
+                "fumigation_date": {
+                    "type": "string"
+                },
+                "gps_contract_end": {
+                    "type": "string"
+                },
+                "gps_contract_reference": {
+                    "type": "string",
+                    "maxLength": 200
+                },
+                "gps_contract_start": {
+                    "type": "string"
+                },
+                "gps_provider": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "gps_serial": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "gps_signal_status": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "hazmat_type": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "license_plate_mx": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "license_plate_us": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "license_plate_us_state": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "operation_zone": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "operational_use": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "owner_name": {
+                    "type": "string",
+                    "maxLength": 200
+                },
+                "rail_post": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "registration_date": {
+                    "type": "string"
+                },
+                "roof_type": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "size": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "skylight": {
+                    "type": "boolean"
+                },
+                "supplier": {
+                    "type": "string",
+                    "maxLength": 200
+                },
+                "suspension": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "trailer_type": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "walls": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "waterproofing_date": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.UpsertVehicleAxleConfigRequest": {
+            "type": "object",
+            "properties": {
+                "display_name": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "template_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.UpsertVehicleRequest": {
+            "type": "object",
+            "properties": {
+                "apu_type": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "axles": {
+                    "type": "integer"
+                },
+                "bed_length": {
+                    "type": "number"
+                },
+                "brake_system": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "cab_type": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "cargo_volume": {
+                    "type": "number"
+                },
+                "cell": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "cruise_speed_limit": {
+                    "type": "integer"
+                },
+                "curb_weight": {
+                    "type": "number"
+                },
+                "differential": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "differential_ratio": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "drive_type": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "duty_type": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "emission_active": {
+                    "type": "boolean"
+                },
+                "emission_standard": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "engine_aspiration": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "engine_block_type": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "engine_bore": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "engine_brand": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "engine_compression": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "engine_cylinders": {
+                    "type": "integer"
+                },
+                "engine_description": {
+                    "type": "string",
+                    "maxLength": 200
+                },
+                "engine_displacement": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "engine_serial": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "epa_city": {
+                    "type": "number"
+                },
+                "epa_combined": {
+                    "type": "number"
+                },
+                "epa_highway": {
+                    "type": "number"
+                },
+                "front_tire_psi": {
+                    "type": "number"
+                },
+                "front_tire_type": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "front_track_width": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "front_wheel_diameter": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "fuel_group": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "fuel_induction": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "fuel_quality": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "fuel_tank_2_capacity": {
+                    "type": "number"
+                },
+                "fuel_tank_capacity": {
+                    "type": "number"
+                },
+                "ground_clearance": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "gvwr": {
+                    "type": "number"
+                },
+                "has_spare_tire_rack": {
+                    "type": "boolean"
+                },
+                "height": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "idle_shutdown": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "interior_volume": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "is_active_company": {
+                    "type": "boolean"
+                },
+                "is_active_dispatch": {
+                    "type": "boolean"
+                },
+                "length": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "management": {
+                    "type": "string",
+                    "maxLength": 200
+                },
+                "max_hp": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "max_payload": {
+                    "type": "number"
+                },
+                "max_torque": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "max_weight_capacity": {
+                    "type": "number"
+                },
+                "oil_capacity": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "operator": {
+                    "type": "string",
+                    "maxLength": 255
+                },
+                "passenger_volume": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "pedal_speed_limit": {
+                    "type": "integer"
+                },
+                "rear_axle_type": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "rear_tire_psi": {
+                    "type": "number"
+                },
+                "rear_tire_type": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "rear_track_width": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "rear_wheel_diameter": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "redline_rpm": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "service_type": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "stroke": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "supervisor": {
+                    "type": "string",
+                    "maxLength": 200
+                },
+                "suspension": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "sweetspot_rpm": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "tank_1_security": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "tank_2_security": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "telematics_system": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "tire_size": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "towing_capacity": {
+                    "type": "number"
+                },
+                "transmission_brand": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "transmission_description": {
+                    "type": "string",
+                    "maxLength": 200
+                },
+                "transmission_gears": {
+                    "type": "integer"
+                },
+                "transmission_type": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "truck_config": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "valves": {
+                    "type": "integer"
+                },
+                "weight_class": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "wheelbase": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "width": {
+                    "type": "string",
+                    "maxLength": 50
+                }
+            }
+        },
+        "dto.VehicleAxleConfigResponse": {
+            "type": "object",
+            "properties": {
+                "display_name": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "template_id": {
+                    "type": "integer"
+                },
+                "vehicle_id": {
+                    "type": "integer"
+                }
+            }
+        },
         "dto.VehicleMakePage": {
             "type": "object",
             "properties": {
@@ -19871,6 +20839,306 @@ const docTemplate = `{
                 },
                 "updated_at": {
                     "type": "string"
+                }
+            }
+        },
+        "dto.VehicleResponse": {
+            "type": "object",
+            "properties": {
+                "apu_type": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "asset_id": {
+                    "type": "integer"
+                },
+                "axles": {
+                    "type": "integer"
+                },
+                "bed_length": {
+                    "type": "number"
+                },
+                "brake_system": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "cab_type": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "cargo_volume": {
+                    "type": "number"
+                },
+                "cell": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "cruise_speed_limit": {
+                    "type": "integer"
+                },
+                "curb_weight": {
+                    "type": "number"
+                },
+                "differential": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "differential_ratio": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "drive_type": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "duty_type": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "emission_active": {
+                    "type": "boolean"
+                },
+                "emission_standard": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "engine_aspiration": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "engine_block_type": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "engine_bore": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "engine_brand": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "engine_compression": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "engine_cylinders": {
+                    "type": "integer"
+                },
+                "engine_description": {
+                    "type": "string",
+                    "maxLength": 200
+                },
+                "engine_displacement": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "engine_serial": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "epa_city": {
+                    "type": "number"
+                },
+                "epa_combined": {
+                    "type": "number"
+                },
+                "epa_highway": {
+                    "type": "number"
+                },
+                "front_tire_psi": {
+                    "type": "number"
+                },
+                "front_tire_type": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "front_track_width": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "front_wheel_diameter": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "fuel_group": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "fuel_induction": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "fuel_quality": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "fuel_tank_2_capacity": {
+                    "type": "number"
+                },
+                "fuel_tank_capacity": {
+                    "type": "number"
+                },
+                "ground_clearance": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "gvwr": {
+                    "type": "number"
+                },
+                "has_spare_tire_rack": {
+                    "type": "boolean"
+                },
+                "height": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "idle_shutdown": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "interior_volume": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "is_active_company": {
+                    "type": "boolean"
+                },
+                "is_active_dispatch": {
+                    "type": "boolean"
+                },
+                "length": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "management": {
+                    "type": "string",
+                    "maxLength": 200
+                },
+                "max_hp": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "max_payload": {
+                    "type": "number"
+                },
+                "max_torque": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "max_weight_capacity": {
+                    "type": "number"
+                },
+                "oil_capacity": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "operator": {
+                    "type": "string",
+                    "maxLength": 255
+                },
+                "passenger_volume": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "pedal_speed_limit": {
+                    "type": "integer"
+                },
+                "rear_axle_type": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "rear_tire_psi": {
+                    "type": "number"
+                },
+                "rear_tire_type": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "rear_track_width": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "rear_wheel_diameter": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "redline_rpm": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "service_type": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "stroke": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "supervisor": {
+                    "type": "string",
+                    "maxLength": 200
+                },
+                "suspension": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "sweetspot_rpm": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "tank_1_security": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "tank_2_security": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "telematics_system": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "tire_size": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "towing_capacity": {
+                    "type": "number"
+                },
+                "transmission_brand": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "transmission_description": {
+                    "type": "string",
+                    "maxLength": 200
+                },
+                "transmission_gears": {
+                    "type": "integer"
+                },
+                "transmission_type": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "truck_config": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "valves": {
+                    "type": "integer"
+                },
+                "weight_class": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "wheelbase": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "width": {
+                    "type": "string",
+                    "maxLength": 50
                 }
             }
         },

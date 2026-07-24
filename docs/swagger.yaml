@@ -3671,6 +3671,111 @@ definitions:
       vendor_id:
         type: integer
     type: object
+  dto.TrailerResponse:
+    properties:
+      aero_kit_type:
+        maxLength: 50
+        type: string
+      asset_id:
+        type: integer
+      classification:
+        maxLength: 100
+        type: string
+      classification_2:
+        maxLength: 100
+        type: string
+      contract_end:
+        type: string
+      contract_period:
+        maxLength: 50
+        type: string
+      contract_reference:
+        maxLength: 100
+        type: string
+      contract_start:
+        type: string
+      decommission_date:
+        type: string
+      decommission_reason:
+        type: string
+      doors:
+        maxLength: 50
+        type: string
+      financing:
+        maxLength: 20
+        type: string
+      floor_type:
+        maxLength: 50
+        type: string
+      fumigation_cert:
+        type: boolean
+      fumigation_date:
+        type: string
+      gps_contract_end:
+        type: string
+      gps_contract_reference:
+        maxLength: 200
+        type: string
+      gps_contract_start:
+        type: string
+      gps_provider:
+        maxLength: 100
+        type: string
+      gps_serial:
+        maxLength: 100
+        type: string
+      gps_signal_status:
+        maxLength: 50
+        type: string
+      hazmat_type:
+        maxLength: 100
+        type: string
+      license_plate_mx:
+        maxLength: 20
+        type: string
+      license_plate_us:
+        maxLength: 20
+        type: string
+      license_plate_us_state:
+        maxLength: 10
+        type: string
+      operation_zone:
+        maxLength: 100
+        type: string
+      operational_use:
+        maxLength: 20
+        type: string
+      owner_name:
+        maxLength: 200
+        type: string
+      rail_post:
+        maxLength: 50
+        type: string
+      registration_date:
+        type: string
+      roof_type:
+        maxLength: 50
+        type: string
+      size:
+        maxLength: 20
+        type: string
+      skylight:
+        type: boolean
+      supplier:
+        maxLength: 200
+        type: string
+      suspension:
+        maxLength: 100
+        type: string
+      trailer_type:
+        maxLength: 20
+        type: string
+      walls:
+        maxLength: 50
+        type: string
+      waterproofing_date:
+        type: string
+    type: object
   dto.UpdateAssetRequest:
     properties:
       acquisition_date:
@@ -5183,6 +5288,343 @@ definitions:
       unit_cost:
         type: number
     type: object
+  dto.UpsertTrailerRequest:
+    properties:
+      aero_kit_type:
+        maxLength: 50
+        type: string
+      classification:
+        maxLength: 100
+        type: string
+      classification_2:
+        maxLength: 100
+        type: string
+      contract_end:
+        type: string
+      contract_period:
+        maxLength: 50
+        type: string
+      contract_reference:
+        maxLength: 100
+        type: string
+      contract_start:
+        type: string
+      decommission_date:
+        type: string
+      decommission_reason:
+        type: string
+      doors:
+        maxLength: 50
+        type: string
+      financing:
+        maxLength: 20
+        type: string
+      floor_type:
+        maxLength: 50
+        type: string
+      fumigation_cert:
+        type: boolean
+      fumigation_date:
+        type: string
+      gps_contract_end:
+        type: string
+      gps_contract_reference:
+        maxLength: 200
+        type: string
+      gps_contract_start:
+        type: string
+      gps_provider:
+        maxLength: 100
+        type: string
+      gps_serial:
+        maxLength: 100
+        type: string
+      gps_signal_status:
+        maxLength: 50
+        type: string
+      hazmat_type:
+        maxLength: 100
+        type: string
+      license_plate_mx:
+        maxLength: 20
+        type: string
+      license_plate_us:
+        maxLength: 20
+        type: string
+      license_plate_us_state:
+        maxLength: 10
+        type: string
+      operation_zone:
+        maxLength: 100
+        type: string
+      operational_use:
+        maxLength: 20
+        type: string
+      owner_name:
+        maxLength: 200
+        type: string
+      rail_post:
+        maxLength: 50
+        type: string
+      registration_date:
+        type: string
+      roof_type:
+        maxLength: 50
+        type: string
+      size:
+        maxLength: 20
+        type: string
+      skylight:
+        type: boolean
+      supplier:
+        maxLength: 200
+        type: string
+      suspension:
+        maxLength: 100
+        type: string
+      trailer_type:
+        maxLength: 20
+        type: string
+      walls:
+        maxLength: 50
+        type: string
+      waterproofing_date:
+        type: string
+    type: object
+  dto.UpsertVehicleAxleConfigRequest:
+    properties:
+      display_name:
+        maxLength: 100
+        type: string
+      template_id:
+        type: integer
+    type: object
+  dto.UpsertVehicleRequest:
+    properties:
+      apu_type:
+        maxLength: 50
+        type: string
+      axles:
+        type: integer
+      bed_length:
+        type: number
+      brake_system:
+        maxLength: 20
+        type: string
+      cab_type:
+        maxLength: 20
+        type: string
+      cargo_volume:
+        type: number
+      cell:
+        maxLength: 100
+        type: string
+      cruise_speed_limit:
+        type: integer
+      curb_weight:
+        type: number
+      differential:
+        maxLength: 100
+        type: string
+      differential_ratio:
+        maxLength: 20
+        type: string
+      drive_type:
+        maxLength: 20
+        type: string
+      duty_type:
+        maxLength: 20
+        type: string
+      emission_active:
+        type: boolean
+      emission_standard:
+        maxLength: 50
+        type: string
+      engine_aspiration:
+        maxLength: 50
+        type: string
+      engine_block_type:
+        maxLength: 50
+        type: string
+      engine_bore:
+        maxLength: 50
+        type: string
+      engine_brand:
+        maxLength: 100
+        type: string
+      engine_compression:
+        maxLength: 50
+        type: string
+      engine_cylinders:
+        type: integer
+      engine_description:
+        maxLength: 200
+        type: string
+      engine_displacement:
+        maxLength: 50
+        type: string
+      engine_serial:
+        maxLength: 100
+        type: string
+      epa_city:
+        type: number
+      epa_combined:
+        type: number
+      epa_highway:
+        type: number
+      front_tire_psi:
+        type: number
+      front_tire_type:
+        maxLength: 50
+        type: string
+      front_track_width:
+        maxLength: 50
+        type: string
+      front_wheel_diameter:
+        maxLength: 50
+        type: string
+      fuel_group:
+        maxLength: 100
+        type: string
+      fuel_induction:
+        maxLength: 50
+        type: string
+      fuel_quality:
+        maxLength: 100
+        type: string
+      fuel_tank_2_capacity:
+        type: number
+      fuel_tank_capacity:
+        type: number
+      ground_clearance:
+        maxLength: 50
+        type: string
+      gvwr:
+        type: number
+      has_spare_tire_rack:
+        type: boolean
+      height:
+        maxLength: 50
+        type: string
+      idle_shutdown:
+        maxLength: 50
+        type: string
+      interior_volume:
+        maxLength: 50
+        type: string
+      is_active_company:
+        type: boolean
+      is_active_dispatch:
+        type: boolean
+      length:
+        maxLength: 50
+        type: string
+      management:
+        maxLength: 200
+        type: string
+      max_hp:
+        maxLength: 50
+        type: string
+      max_payload:
+        type: number
+      max_torque:
+        maxLength: 50
+        type: string
+      max_weight_capacity:
+        type: number
+      oil_capacity:
+        maxLength: 50
+        type: string
+      operator:
+        maxLength: 255
+        type: string
+      passenger_volume:
+        maxLength: 50
+        type: string
+      pedal_speed_limit:
+        type: integer
+      rear_axle_type:
+        maxLength: 100
+        type: string
+      rear_tire_psi:
+        type: number
+      rear_tire_type:
+        maxLength: 50
+        type: string
+      rear_track_width:
+        maxLength: 50
+        type: string
+      rear_wheel_diameter:
+        maxLength: 50
+        type: string
+      redline_rpm:
+        maxLength: 50
+        type: string
+      service_type:
+        maxLength: 100
+        type: string
+      stroke:
+        maxLength: 50
+        type: string
+      supervisor:
+        maxLength: 200
+        type: string
+      suspension:
+        maxLength: 100
+        type: string
+      sweetspot_rpm:
+        maxLength: 50
+        type: string
+      tank_1_security:
+        maxLength: 10
+        type: string
+      tank_2_security:
+        maxLength: 10
+        type: string
+      telematics_system:
+        maxLength: 100
+        type: string
+      tire_size:
+        maxLength: 50
+        type: string
+      towing_capacity:
+        type: number
+      transmission_brand:
+        maxLength: 100
+        type: string
+      transmission_description:
+        maxLength: 200
+        type: string
+      transmission_gears:
+        type: integer
+      transmission_type:
+        maxLength: 50
+        type: string
+      truck_config:
+        maxLength: 20
+        type: string
+      valves:
+        type: integer
+      weight_class:
+        maxLength: 50
+        type: string
+      wheelbase:
+        maxLength: 50
+        type: string
+      width:
+        maxLength: 50
+        type: string
+    type: object
+  dto.VehicleAxleConfigResponse:
+    properties:
+      display_name:
+        maxLength: 100
+        type: string
+      template_id:
+        type: integer
+      vehicle_id:
+        type: integer
+    type: object
   dto.VehicleMakePage:
     properties:
       data:
@@ -5239,6 +5681,224 @@ definitions:
       name:
         type: string
       updated_at:
+        type: string
+    type: object
+  dto.VehicleResponse:
+    properties:
+      apu_type:
+        maxLength: 50
+        type: string
+      asset_id:
+        type: integer
+      axles:
+        type: integer
+      bed_length:
+        type: number
+      brake_system:
+        maxLength: 20
+        type: string
+      cab_type:
+        maxLength: 20
+        type: string
+      cargo_volume:
+        type: number
+      cell:
+        maxLength: 100
+        type: string
+      cruise_speed_limit:
+        type: integer
+      curb_weight:
+        type: number
+      differential:
+        maxLength: 100
+        type: string
+      differential_ratio:
+        maxLength: 20
+        type: string
+      drive_type:
+        maxLength: 20
+        type: string
+      duty_type:
+        maxLength: 20
+        type: string
+      emission_active:
+        type: boolean
+      emission_standard:
+        maxLength: 50
+        type: string
+      engine_aspiration:
+        maxLength: 50
+        type: string
+      engine_block_type:
+        maxLength: 50
+        type: string
+      engine_bore:
+        maxLength: 50
+        type: string
+      engine_brand:
+        maxLength: 100
+        type: string
+      engine_compression:
+        maxLength: 50
+        type: string
+      engine_cylinders:
+        type: integer
+      engine_description:
+        maxLength: 200
+        type: string
+      engine_displacement:
+        maxLength: 50
+        type: string
+      engine_serial:
+        maxLength: 100
+        type: string
+      epa_city:
+        type: number
+      epa_combined:
+        type: number
+      epa_highway:
+        type: number
+      front_tire_psi:
+        type: number
+      front_tire_type:
+        maxLength: 50
+        type: string
+      front_track_width:
+        maxLength: 50
+        type: string
+      front_wheel_diameter:
+        maxLength: 50
+        type: string
+      fuel_group:
+        maxLength: 100
+        type: string
+      fuel_induction:
+        maxLength: 50
+        type: string
+      fuel_quality:
+        maxLength: 100
+        type: string
+      fuel_tank_2_capacity:
+        type: number
+      fuel_tank_capacity:
+        type: number
+      ground_clearance:
+        maxLength: 50
+        type: string
+      gvwr:
+        type: number
+      has_spare_tire_rack:
+        type: boolean
+      height:
+        maxLength: 50
+        type: string
+      idle_shutdown:
+        maxLength: 50
+        type: string
+      interior_volume:
+        maxLength: 50
+        type: string
+      is_active_company:
+        type: boolean
+      is_active_dispatch:
+        type: boolean
+      length:
+        maxLength: 50
+        type: string
+      management:
+        maxLength: 200
+        type: string
+      max_hp:
+        maxLength: 50
+        type: string
+      max_payload:
+        type: number
+      max_torque:
+        maxLength: 50
+        type: string
+      max_weight_capacity:
+        type: number
+      oil_capacity:
+        maxLength: 50
+        type: string
+      operator:
+        maxLength: 255
+        type: string
+      passenger_volume:
+        maxLength: 50
+        type: string
+      pedal_speed_limit:
+        type: integer
+      rear_axle_type:
+        maxLength: 100
+        type: string
+      rear_tire_psi:
+        type: number
+      rear_tire_type:
+        maxLength: 50
+        type: string
+      rear_track_width:
+        maxLength: 50
+        type: string
+      rear_wheel_diameter:
+        maxLength: 50
+        type: string
+      redline_rpm:
+        maxLength: 50
+        type: string
+      service_type:
+        maxLength: 100
+        type: string
+      stroke:
+        maxLength: 50
+        type: string
+      supervisor:
+        maxLength: 200
+        type: string
+      suspension:
+        maxLength: 100
+        type: string
+      sweetspot_rpm:
+        maxLength: 50
+        type: string
+      tank_1_security:
+        maxLength: 10
+        type: string
+      tank_2_security:
+        maxLength: 10
+        type: string
+      telematics_system:
+        maxLength: 100
+        type: string
+      tire_size:
+        maxLength: 50
+        type: string
+      towing_capacity:
+        type: number
+      transmission_brand:
+        maxLength: 100
+        type: string
+      transmission_description:
+        maxLength: 200
+        type: string
+      transmission_gears:
+        type: integer
+      transmission_type:
+        maxLength: 50
+        type: string
+      truck_config:
+        maxLength: 20
+        type: string
+      valves:
+        type: integer
+      weight_class:
+        maxLength: 50
+        type: string
+      wheelbase:
+        maxLength: 50
+        type: string
+      width:
+        maxLength: 50
         type: string
     type: object
   dto.VendorPage:
@@ -6116,6 +6776,80 @@ paths:
       summary: Update assets
       tags:
       - assets
+  /api/v1/assets/{id}/axle-config:
+    delete:
+      parameters:
+      - description: asset id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete vehicle-axle-config
+      tags:
+      - vehicle-axle-config
+    get:
+      parameters:
+      - description: asset id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.VehicleAxleConfigResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get vehicle-axle-config
+      tags:
+      - vehicle-axle-config
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: asset id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpsertVehicleAxleConfigRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.VehicleAxleConfigResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create or update vehicle-axle-config
+      tags:
+      - vehicle-axle-config
   /api/v1/assets/{id}/fuel-entries:
     get:
       parameters:
@@ -6260,6 +6994,80 @@ paths:
       summary: Update fuel-entries
       tags:
       - fuel-entries
+  /api/v1/assets/{id}/trailer:
+    delete:
+      parameters:
+      - description: asset id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete trailer
+      tags:
+      - trailer
+    get:
+      parameters:
+      - description: asset id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.TrailerResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get trailer
+      tags:
+      - trailer
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: asset id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpsertTrailerRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.TrailerResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create or update trailer
+      tags:
+      - trailer
   /api/v1/assets/{id}/trailer-assignments:
     get:
       parameters:
@@ -6404,6 +7212,80 @@ paths:
       summary: Update asset-trailer-assignments
       tags:
       - asset-trailer-assignments
+  /api/v1/assets/{id}/vehicle:
+    delete:
+      parameters:
+      - description: asset id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete vehicle
+      tags:
+      - vehicle
+    get:
+      parameters:
+      - description: asset id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.VehicleResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get vehicle
+      tags:
+      - vehicle
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: asset id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpsertVehicleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.VehicleResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create or update vehicle
+      tags:
+      - vehicle
   /api/v1/axle-definitions/{id}/wheel-positions:
     get:
       parameters:

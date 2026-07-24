@@ -153,5 +153,10 @@ func NewRouter(d Deps) *gin.Engine {
 	crud.NewNestedHandler[dto.FuelCommentResponse, dto.CreateFuelCommentRequest, dto.UpdateFuelCommentRequest](NewFuelCommentStore(d.Queries)).Register(api, "/fuel-entries", "/comments")
 	crud.NewNestedHandler[dto.FuelPhotoResponse, dto.CreateFuelPhotoRequest, dto.UpdateFuelPhotoRequest](NewFuelPhotoStore(d.Queries)).Register(api, "/fuel-entries", "/photos")
 
+	// Phase 8c: shared-PK 1:1 sub-types (singleton under the asset)
+	crud.NewSingletonHandler[dto.VehicleResponse, dto.UpsertVehicleRequest](NewVehicleStore(d.Queries)).Register(api, "/assets", "/vehicle")
+	crud.NewSingletonHandler[dto.TrailerResponse, dto.UpsertTrailerRequest](NewTrailerStore(d.Queries)).Register(api, "/assets", "/trailer")
+	crud.NewSingletonHandler[dto.VehicleAxleConfigResponse, dto.UpsertVehicleAxleConfigRequest](NewVehicleAxleConfigStore(d.Queries)).Register(api, "/assets", "/axle-config")
+
 	return r
 }

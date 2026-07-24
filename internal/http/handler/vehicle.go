@@ -1,0 +1,200 @@
+package handler
+
+import (
+	"context"
+
+	"fleet/internal/db/gen"
+	"fleet/internal/http/dto"
+	"fleet/internal/http/middleware"
+)
+
+type VehicleStore struct{ q *gen.Queries }
+
+func NewVehicleStore(q *gen.Queries) *VehicleStore { return &VehicleStore{q: q} }
+
+func (s *VehicleStore) Get(ctx context.Context, parentID int64) (dto.VehicleResponse, error) {
+	r, err := s.q.GetVehicle(ctx, gen.GetVehicleParams{ParentID: parentID, CompanyID: middleware.CompanyFromContext(ctx)})
+	if err != nil {
+		return dto.VehicleResponse{}, err
+	}
+	return toVehicleResponse(r), nil
+}
+
+func (s *VehicleStore) Upsert(ctx context.Context, parentID int64, in dto.UpsertVehicleRequest) (dto.VehicleResponse, error) {
+	r, err := s.q.UpsertVehicle(ctx, gen.UpsertVehicleParams{
+		ParentID:                parentID,
+		CompanyID:               middleware.CompanyFromContext(ctx),
+		EngineSerial:            in.EngineSerial,
+		EngineDescription:       in.EngineDescription,
+		EngineBrand:             in.EngineBrand,
+		EngineCylinders:         in.EngineCylinders,
+		EngineDisplacement:      in.EngineDisplacement,
+		MaxHp:                   in.MaxHp,
+		MaxTorque:               in.MaxTorque,
+		OilCapacity:             in.OilCapacity,
+		EngineAspiration:        in.EngineAspiration,
+		EngineBlockType:         in.EngineBlockType,
+		EngineCompression:       in.EngineCompression,
+		FuelInduction:           in.FuelInduction,
+		TransmissionDescription: in.TransmissionDescription,
+		TransmissionBrand:       in.TransmissionBrand,
+		TransmissionType:        in.TransmissionType,
+		TransmissionGears:       in.TransmissionGears,
+		DriveType:               in.DriveType,
+		BrakeSystem:             in.BrakeSystem,
+		Axles:                   in.Axles,
+		Differential:            in.Differential,
+		DifferentialRatio:       in.DifferentialRatio,
+		Suspension:              in.Suspension,
+		TireSize:                in.TireSize,
+		Height:                  in.Height,
+		Length:                  in.Length,
+		Width:                   in.Width,
+		Wheelbase:               in.Wheelbase,
+		CurbWeight:              in.CurbWeight,
+		Gvwr:                    in.Gvwr,
+		MaxWeightCapacity:       in.MaxWeightCapacity,
+		MaxPayload:              in.MaxPayload,
+		TowingCapacity:          in.TowingCapacity,
+		FuelTankCapacity:        in.FuelTankCapacity,
+		FuelTank2Capacity:       in.FuelTank2Capacity,
+		Tank1Security:           in.Tank1Security,
+		Tank2Security:           in.Tank2Security,
+		InteriorVolume:          in.InteriorVolume,
+		PassengerVolume:         in.PassengerVolume,
+		GroundClearance:         in.GroundClearance,
+		EngineBore:              in.EngineBore,
+		RedlineRpm:              in.RedlineRpm,
+		Stroke:                  in.Stroke,
+		Valves:                  in.Valves,
+		FrontTrackWidth:         in.FrontTrackWidth,
+		RearTrackWidth:          in.RearTrackWidth,
+		FrontWheelDiameter:      in.FrontWheelDiameter,
+		RearWheelDiameter:       in.RearWheelDiameter,
+		FuelQuality:             in.FuelQuality,
+		CabType:                 in.CabType,
+		TruckConfig:             in.TruckConfig,
+		TelematicsSystem:        in.TelematicsSystem,
+		EmissionStandard:        in.EmissionStandard,
+		EmissionActive:          in.EmissionActive,
+		SweetspotRpm:            in.SweetspotRpm,
+		PedalSpeedLimit:         in.PedalSpeedLimit,
+		CruiseSpeedLimit:        in.CruiseSpeedLimit,
+		IdleShutdown:            in.IdleShutdown,
+		ApuType:                 in.ApuType,
+		HasSpareTireRack:        in.HasSpareTireRack,
+		FuelGroup:               in.FuelGroup,
+		Cell:                    in.Cell,
+		ServiceType:             in.ServiceType,
+		Supervisor:              in.Supervisor,
+		Management:              in.Management,
+		IsActiveDispatch:        in.IsActiveDispatch,
+		IsActiveCompany:         in.IsActiveCompany,
+		DutyType:                in.DutyType,
+		WeightClass:             in.WeightClass,
+		CargoVolume:             in.CargoVolume,
+		BedLength:               in.BedLength,
+		FrontTirePsi:            in.FrontTirePsi,
+		RearTirePsi:             in.RearTirePsi,
+		FrontTireType:           in.FrontTireType,
+		RearTireType:            in.RearTireType,
+		RearAxleType:            in.RearAxleType,
+		Operator:                in.Operator,
+		EpaCity:                 in.EpaCity,
+		EpaHighway:              in.EpaHighway,
+		EpaCombined:             in.EpaCombined,
+	})
+	if err != nil {
+		return dto.VehicleResponse{}, err
+	}
+	return toVehicleResponse(r), nil
+}
+
+func (s *VehicleStore) Delete(ctx context.Context, parentID int64) error {
+	return s.q.DeleteVehicle(ctx, gen.DeleteVehicleParams{ParentID: parentID, CompanyID: middleware.CompanyFromContext(ctx)})
+}
+
+func toVehicleResponse(r gen.Vehicle) dto.VehicleResponse {
+	return dto.VehicleResponse{
+		AssetID:                 r.AssetID,
+		EngineSerial:            r.EngineSerial,
+		EngineDescription:       r.EngineDescription,
+		EngineBrand:             r.EngineBrand,
+		EngineCylinders:         r.EngineCylinders,
+		EngineDisplacement:      r.EngineDisplacement,
+		MaxHp:                   r.MaxHp,
+		MaxTorque:               r.MaxTorque,
+		OilCapacity:             r.OilCapacity,
+		EngineAspiration:        r.EngineAspiration,
+		EngineBlockType:         r.EngineBlockType,
+		EngineCompression:       r.EngineCompression,
+		FuelInduction:           r.FuelInduction,
+		TransmissionDescription: r.TransmissionDescription,
+		TransmissionBrand:       r.TransmissionBrand,
+		TransmissionType:        r.TransmissionType,
+		TransmissionGears:       r.TransmissionGears,
+		DriveType:               r.DriveType,
+		BrakeSystem:             r.BrakeSystem,
+		Axles:                   r.Axles,
+		Differential:            r.Differential,
+		DifferentialRatio:       r.DifferentialRatio,
+		Suspension:              r.Suspension,
+		TireSize:                r.TireSize,
+		Height:                  r.Height,
+		Length:                  r.Length,
+		Width:                   r.Width,
+		Wheelbase:               r.Wheelbase,
+		CurbWeight:              r.CurbWeight,
+		Gvwr:                    r.Gvwr,
+		MaxWeightCapacity:       r.MaxWeightCapacity,
+		MaxPayload:              r.MaxPayload,
+		TowingCapacity:          r.TowingCapacity,
+		FuelTankCapacity:        r.FuelTankCapacity,
+		FuelTank2Capacity:       r.FuelTank2Capacity,
+		Tank1Security:           r.Tank1Security,
+		Tank2Security:           r.Tank2Security,
+		InteriorVolume:          r.InteriorVolume,
+		PassengerVolume:         r.PassengerVolume,
+		GroundClearance:         r.GroundClearance,
+		EngineBore:              r.EngineBore,
+		RedlineRpm:              r.RedlineRpm,
+		Stroke:                  r.Stroke,
+		Valves:                  r.Valves,
+		FrontTrackWidth:         r.FrontTrackWidth,
+		RearTrackWidth:          r.RearTrackWidth,
+		FrontWheelDiameter:      r.FrontWheelDiameter,
+		RearWheelDiameter:       r.RearWheelDiameter,
+		FuelQuality:             r.FuelQuality,
+		CabType:                 r.CabType,
+		TruckConfig:             r.TruckConfig,
+		TelematicsSystem:        r.TelematicsSystem,
+		EmissionStandard:        r.EmissionStandard,
+		EmissionActive:          r.EmissionActive,
+		SweetspotRpm:            r.SweetspotRpm,
+		PedalSpeedLimit:         r.PedalSpeedLimit,
+		CruiseSpeedLimit:        r.CruiseSpeedLimit,
+		IdleShutdown:            r.IdleShutdown,
+		ApuType:                 r.ApuType,
+		HasSpareTireRack:        r.HasSpareTireRack,
+		FuelGroup:               r.FuelGroup,
+		Cell:                    r.Cell,
+		ServiceType:             r.ServiceType,
+		Supervisor:              r.Supervisor,
+		Management:              r.Management,
+		IsActiveDispatch:        r.IsActiveDispatch,
+		IsActiveCompany:         r.IsActiveCompany,
+		DutyType:                r.DutyType,
+		WeightClass:             r.WeightClass,
+		CargoVolume:             r.CargoVolume,
+		BedLength:               r.BedLength,
+		FrontTirePsi:            r.FrontTirePsi,
+		RearTirePsi:             r.RearTirePsi,
+		FrontTireType:           r.FrontTireType,
+		RearTireType:            r.RearTireType,
+		RearAxleType:            r.RearAxleType,
+		Operator:                r.Operator,
+		EpaCity:                 r.EpaCity,
+		EpaHighway:              r.EpaHighway,
+		EpaCombined:             r.EpaCombined,
+	}
+}
