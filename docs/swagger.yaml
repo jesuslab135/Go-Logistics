@@ -822,6 +822,189 @@ definitions:
       useful_life_months:
         type: integer
     type: object
+  dto.CreatePurchaseOrderRequest:
+    properties:
+      approved_at:
+        type: string
+      approved_by_id:
+        type: integer
+      closed_at:
+        type: string
+      created_by_id:
+        type: integer
+      custom_fields:
+        items:
+          type: integer
+        type: array
+      description:
+        type: string
+      destination_id:
+        type: integer
+      discount:
+        type: number
+      discount_percentage:
+        type: number
+      discount_type:
+        maxLength: 10
+        type: string
+      labels:
+        items:
+          type: integer
+        type: array
+      number:
+        maxLength: 50
+        type: string
+      purchased_at:
+        type: string
+      received_full_at:
+        type: string
+      received_partial_at:
+        type: string
+      rejected_at:
+        type: string
+      rejected_by_id:
+        type: integer
+      shipping:
+        type: number
+      state:
+        maxLength: 20
+        type: string
+      submitted_at:
+        type: string
+      submitted_by_id:
+        type: integer
+      subtotal:
+        type: number
+      tax_1:
+        type: number
+      tax_1_percentage:
+        type: number
+      tax_1_type:
+        maxLength: 10
+        type: string
+      tax_2:
+        type: number
+      tax_2_percentage:
+        type: number
+      tax_2_type:
+        maxLength: 10
+        type: string
+      total_amount:
+        type: number
+      vendor_id:
+        type: integer
+    type: object
+  dto.CreateServiceEntryRequest:
+    properties:
+      asset_id:
+        type: integer
+      completed_at:
+        type: string
+      custom_fields:
+        items:
+          type: integer
+        type: array
+      discount:
+        type: number
+      discount_type:
+        maxLength: 10
+        type: string
+      general_notes:
+        type: string
+      is_roadside_assistance:
+        type: boolean
+      labels:
+        items:
+          type: integer
+        type: array
+      labor_subtotal:
+        type: number
+      labor_time_seconds:
+        type: integer
+      meter_value:
+        type: number
+      parts_subtotal:
+        type: number
+      reference:
+        maxLength: 100
+        type: string
+      started_at:
+        type: string
+      status:
+        maxLength: 20
+        type: string
+      subtotal:
+        type: number
+      tax_1:
+        type: number
+      tax_1_percentage:
+        type: number
+      tax_1_type:
+        maxLength: 10
+        type: string
+      tax_2:
+        type: number
+      tax_2_percentage:
+        type: number
+      tax_2_type:
+        maxLength: 10
+        type: string
+      total_amount:
+        type: number
+      vendor_id:
+        type: integer
+      work_order_id:
+        type: integer
+    type: object
+  dto.CreateServiceReminderRequest:
+    properties:
+      asset_id:
+        type: integer
+      due_soon_at:
+        type: string
+      due_soon_meter_threshold:
+        type: number
+      due_soon_meter_value:
+        type: number
+      due_soon_time_threshold:
+        type: integer
+      is_active:
+        type: boolean
+      last_service_entry_id:
+        type: integer
+      meter_interval:
+        type: number
+      next_due_at:
+        type: string
+      next_due_meter_value:
+        type: number
+      service_task_id:
+        type: integer
+      snooze_until:
+        type: string
+      status:
+        maxLength: 20
+        type: string
+      time_frequency:
+        maxLength: 10
+        type: string
+      time_interval:
+        type: integer
+    type: object
+  dto.CreateServiceTaskRequest:
+    properties:
+      archived_at:
+        type: string
+      description:
+        type: string
+      expected_duration_seconds:
+        type: integer
+      name:
+        maxLength: 255
+        type: string
+      parent_task_id:
+        type: integer
+    type: object
   dto.CreateVehicleMakeRequest:
     properties:
       name:
@@ -1515,12 +1698,287 @@ definitions:
       useful_life_months:
         type: integer
     type: object
+  dto.PurchaseOrderPage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.PurchaseOrderResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.PurchaseOrderResponse:
+    properties:
+      approved_at:
+        type: string
+      approved_by_id:
+        type: integer
+      closed_at:
+        type: string
+      company_id:
+        type: integer
+      created_at:
+        type: string
+      created_by_id:
+        type: integer
+      custom_fields:
+        items:
+          type: integer
+        type: array
+      description:
+        type: string
+      destination_id:
+        type: integer
+      discount:
+        type: number
+      discount_percentage:
+        type: number
+      discount_type:
+        maxLength: 10
+        type: string
+      id:
+        type: integer
+      labels:
+        items:
+          type: integer
+        type: array
+      number:
+        maxLength: 50
+        type: string
+      purchased_at:
+        type: string
+      received_full_at:
+        type: string
+      received_partial_at:
+        type: string
+      rejected_at:
+        type: string
+      rejected_by_id:
+        type: integer
+      shipping:
+        type: number
+      state:
+        maxLength: 20
+        type: string
+      submitted_at:
+        type: string
+      submitted_by_id:
+        type: integer
+      subtotal:
+        type: number
+      tax_1:
+        type: number
+      tax_1_percentage:
+        type: number
+      tax_1_type:
+        maxLength: 10
+        type: string
+      tax_2:
+        type: number
+      tax_2_percentage:
+        type: number
+      tax_2_type:
+        maxLength: 10
+        type: string
+      total_amount:
+        type: number
+      updated_at:
+        type: string
+      vendor_id:
+        type: integer
+    type: object
   dto.RefreshRequest:
     properties:
       refresh_token:
         type: string
     required:
     - refresh_token
+    type: object
+  dto.ServiceEntryPage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.ServiceEntryResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.ServiceEntryResponse:
+    properties:
+      asset_id:
+        type: integer
+      company_id:
+        type: integer
+      completed_at:
+        type: string
+      created_at:
+        type: string
+      custom_fields:
+        items:
+          type: integer
+        type: array
+      discount:
+        type: number
+      discount_type:
+        maxLength: 10
+        type: string
+      general_notes:
+        type: string
+      id:
+        type: integer
+      is_roadside_assistance:
+        type: boolean
+      labels:
+        items:
+          type: integer
+        type: array
+      labor_subtotal:
+        type: number
+      labor_time_seconds:
+        type: integer
+      meter_value:
+        type: number
+      parts_subtotal:
+        type: number
+      reference:
+        maxLength: 100
+        type: string
+      started_at:
+        type: string
+      status:
+        maxLength: 20
+        type: string
+      subtotal:
+        type: number
+      tax_1:
+        type: number
+      tax_1_percentage:
+        type: number
+      tax_1_type:
+        maxLength: 10
+        type: string
+      tax_2:
+        type: number
+      tax_2_percentage:
+        type: number
+      tax_2_type:
+        maxLength: 10
+        type: string
+      total_amount:
+        type: number
+      updated_at:
+        type: string
+      vendor_id:
+        type: integer
+      work_order_id:
+        type: integer
+    type: object
+  dto.ServiceReminderPage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.ServiceReminderResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.ServiceReminderResponse:
+    properties:
+      asset_id:
+        type: integer
+      company_id:
+        type: integer
+      created_at:
+        type: string
+      due_soon_at:
+        type: string
+      due_soon_meter_threshold:
+        type: number
+      due_soon_meter_value:
+        type: number
+      due_soon_time_threshold:
+        type: integer
+      id:
+        type: integer
+      is_active:
+        type: boolean
+      last_service_entry_id:
+        type: integer
+      meter_interval:
+        type: number
+      next_due_at:
+        type: string
+      next_due_meter_value:
+        type: number
+      service_task_id:
+        type: integer
+      snooze_until:
+        type: string
+      status:
+        maxLength: 20
+        type: string
+      time_frequency:
+        maxLength: 10
+        type: string
+      time_interval:
+        type: integer
+      updated_at:
+        type: string
+    type: object
+  dto.ServiceTaskPage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.ServiceTaskResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.ServiceTaskResponse:
+    properties:
+      archived_at:
+        type: string
+      company_id:
+        type: integer
+      created_at:
+        type: string
+      description:
+        type: string
+      expected_duration_seconds:
+        type: integer
+      id:
+        type: integer
+      name:
+        maxLength: 255
+        type: string
+      parent_task_id:
+        type: integer
+      updated_at:
+        type: string
     type: object
   dto.UpdateAssetRequest:
     properties:
@@ -2012,6 +2470,189 @@ definitions:
       useful_life_distance:
         type: integer
       useful_life_months:
+        type: integer
+    type: object
+  dto.UpdatePurchaseOrderRequest:
+    properties:
+      approved_at:
+        type: string
+      approved_by_id:
+        type: integer
+      closed_at:
+        type: string
+      created_by_id:
+        type: integer
+      custom_fields:
+        items:
+          type: integer
+        type: array
+      description:
+        type: string
+      destination_id:
+        type: integer
+      discount:
+        type: number
+      discount_percentage:
+        type: number
+      discount_type:
+        maxLength: 10
+        type: string
+      labels:
+        items:
+          type: integer
+        type: array
+      number:
+        maxLength: 50
+        type: string
+      purchased_at:
+        type: string
+      received_full_at:
+        type: string
+      received_partial_at:
+        type: string
+      rejected_at:
+        type: string
+      rejected_by_id:
+        type: integer
+      shipping:
+        type: number
+      state:
+        maxLength: 20
+        type: string
+      submitted_at:
+        type: string
+      submitted_by_id:
+        type: integer
+      subtotal:
+        type: number
+      tax_1:
+        type: number
+      tax_1_percentage:
+        type: number
+      tax_1_type:
+        maxLength: 10
+        type: string
+      tax_2:
+        type: number
+      tax_2_percentage:
+        type: number
+      tax_2_type:
+        maxLength: 10
+        type: string
+      total_amount:
+        type: number
+      vendor_id:
+        type: integer
+    type: object
+  dto.UpdateServiceEntryRequest:
+    properties:
+      asset_id:
+        type: integer
+      completed_at:
+        type: string
+      custom_fields:
+        items:
+          type: integer
+        type: array
+      discount:
+        type: number
+      discount_type:
+        maxLength: 10
+        type: string
+      general_notes:
+        type: string
+      is_roadside_assistance:
+        type: boolean
+      labels:
+        items:
+          type: integer
+        type: array
+      labor_subtotal:
+        type: number
+      labor_time_seconds:
+        type: integer
+      meter_value:
+        type: number
+      parts_subtotal:
+        type: number
+      reference:
+        maxLength: 100
+        type: string
+      started_at:
+        type: string
+      status:
+        maxLength: 20
+        type: string
+      subtotal:
+        type: number
+      tax_1:
+        type: number
+      tax_1_percentage:
+        type: number
+      tax_1_type:
+        maxLength: 10
+        type: string
+      tax_2:
+        type: number
+      tax_2_percentage:
+        type: number
+      tax_2_type:
+        maxLength: 10
+        type: string
+      total_amount:
+        type: number
+      vendor_id:
+        type: integer
+      work_order_id:
+        type: integer
+    type: object
+  dto.UpdateServiceReminderRequest:
+    properties:
+      asset_id:
+        type: integer
+      due_soon_at:
+        type: string
+      due_soon_meter_threshold:
+        type: number
+      due_soon_meter_value:
+        type: number
+      due_soon_time_threshold:
+        type: integer
+      is_active:
+        type: boolean
+      last_service_entry_id:
+        type: integer
+      meter_interval:
+        type: number
+      next_due_at:
+        type: string
+      next_due_meter_value:
+        type: number
+      service_task_id:
+        type: integer
+      snooze_until:
+        type: string
+      status:
+        maxLength: 20
+        type: string
+      time_frequency:
+        maxLength: 10
+        type: string
+      time_interval:
+        type: integer
+    type: object
+  dto.UpdateServiceTaskRequest:
+    properties:
+      archived_at:
+        type: string
+      description:
+        type: string
+      expected_duration_seconds:
+        type: integer
+      name:
+        maxLength: 255
+        type: string
+      parent_task_id:
         type: integer
     type: object
   dto.UpdateVehicleMakeRequest:
@@ -4592,6 +5233,514 @@ paths:
       summary: Update parts
       tags:
       - parts
+  /api/v1/purchase-orders:
+    get:
+      parameters:
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PurchaseOrderPage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List purchase-orders
+      tags:
+      - purchase-orders
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreatePurchaseOrderRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.PurchaseOrderResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create purchase-orders
+      tags:
+      - purchase-orders
+  /api/v1/purchase-orders/{id}:
+    delete:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete purchase-orders
+      tags:
+      - purchase-orders
+    get:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PurchaseOrderResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get purchase-orders
+      tags:
+      - purchase-orders
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdatePurchaseOrderRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PurchaseOrderResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update purchase-orders
+      tags:
+      - purchase-orders
+  /api/v1/service-entries:
+    get:
+      parameters:
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.ServiceEntryPage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List service-entries
+      tags:
+      - service-entries
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateServiceEntryRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.ServiceEntryResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create service-entries
+      tags:
+      - service-entries
+  /api/v1/service-entries/{id}:
+    delete:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete service-entries
+      tags:
+      - service-entries
+    get:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.ServiceEntryResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get service-entries
+      tags:
+      - service-entries
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateServiceEntryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.ServiceEntryResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update service-entries
+      tags:
+      - service-entries
+  /api/v1/service-reminders:
+    get:
+      parameters:
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.ServiceReminderPage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List service-reminders
+      tags:
+      - service-reminders
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateServiceReminderRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.ServiceReminderResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create service-reminders
+      tags:
+      - service-reminders
+  /api/v1/service-reminders/{id}:
+    delete:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete service-reminders
+      tags:
+      - service-reminders
+    get:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.ServiceReminderResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get service-reminders
+      tags:
+      - service-reminders
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateServiceReminderRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.ServiceReminderResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update service-reminders
+      tags:
+      - service-reminders
+  /api/v1/service-tasks:
+    get:
+      parameters:
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.ServiceTaskPage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List service-tasks
+      tags:
+      - service-tasks
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateServiceTaskRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.ServiceTaskResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create service-tasks
+      tags:
+      - service-tasks
+  /api/v1/service-tasks/{id}:
+    delete:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete service-tasks
+      tags:
+      - service-tasks
+    get:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.ServiceTaskResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get service-tasks
+      tags:
+      - service-tasks
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateServiceTaskRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.ServiceTaskResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update service-tasks
+      tags:
+      - service-tasks
   /api/v1/uploads:
     post:
       consumes:

@@ -94,6 +94,12 @@ func NewRouter(d Deps) *gin.Engine {
 	crud.NewHandler[dto.IssuePriorityResponse, dto.CreateIssuePriorityRequest, dto.UpdateIssuePriorityRequest](NewIssuePriorityStore(d.Queries)).Register(api, "/issue-priorities")
 	crud.NewHandler[dto.FaultResponse, dto.CreateFaultRequest, dto.UpdateFaultRequest](NewFaultStore(d.Queries)).Register(api, "/faults")
 
+	// Phase 5: purchase orders & service
+	crud.NewHandler[dto.PurchaseOrderResponse, dto.CreatePurchaseOrderRequest, dto.UpdatePurchaseOrderRequest](NewPurchaseOrderStore(d.Queries)).Register(api, "/purchase-orders")
+	crud.NewHandler[dto.ServiceTaskResponse, dto.CreateServiceTaskRequest, dto.UpdateServiceTaskRequest](NewServiceTaskStore(d.Queries)).Register(api, "/service-tasks")
+	crud.NewHandler[dto.ServiceReminderResponse, dto.CreateServiceReminderRequest, dto.UpdateServiceReminderRequest](NewServiceReminderStore(d.Queries)).Register(api, "/service-reminders")
+	crud.NewHandler[dto.ServiceEntryResponse, dto.CreateServiceEntryRequest, dto.UpdateServiceEntryRequest](NewServiceEntryStore(d.Queries)).Register(api, "/service-entries")
+
 	// Phase 1: asset catalogs & vehicle models (tenant-scoped)
 	crud.NewHandler[dto.AssetTypeResponse, dto.CreateAssetTypeRequest, dto.UpdateAssetTypeRequest](
 		NewAssetTypeStore(d.Queries)).Register(api, "/asset-types")

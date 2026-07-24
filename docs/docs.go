@@ -3331,6 +3331,826 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/purchase-orders": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "purchase-orders"
+                ],
+                "summary": "List purchase-orders",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Size",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PurchaseOrderPage"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "purchase-orders"
+                ],
+                "summary": "Create purchase-orders",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.CreatePurchaseOrderRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PurchaseOrderResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/purchase-orders/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "purchase-orders"
+                ],
+                "summary": "Get purchase-orders",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PurchaseOrderResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "purchase-orders"
+                ],
+                "summary": "Update purchase-orders",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.UpdatePurchaseOrderRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PurchaseOrderResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "purchase-orders"
+                ],
+                "summary": "Delete purchase-orders",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/service-entries": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "service-entries"
+                ],
+                "summary": "List service-entries",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Size",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ServiceEntryPage"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "service-entries"
+                ],
+                "summary": "Create service-entries",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.CreateServiceEntryRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ServiceEntryResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/service-entries/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "service-entries"
+                ],
+                "summary": "Get service-entries",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ServiceEntryResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "service-entries"
+                ],
+                "summary": "Update service-entries",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.UpdateServiceEntryRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ServiceEntryResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "service-entries"
+                ],
+                "summary": "Delete service-entries",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/service-reminders": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "service-reminders"
+                ],
+                "summary": "List service-reminders",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Size",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ServiceReminderPage"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "service-reminders"
+                ],
+                "summary": "Create service-reminders",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.CreateServiceReminderRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ServiceReminderResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/service-reminders/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "service-reminders"
+                ],
+                "summary": "Get service-reminders",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ServiceReminderResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "service-reminders"
+                ],
+                "summary": "Update service-reminders",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.UpdateServiceReminderRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ServiceReminderResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "service-reminders"
+                ],
+                "summary": "Delete service-reminders",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/service-tasks": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "service-tasks"
+                ],
+                "summary": "List service-tasks",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Size",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ServiceTaskPage"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "service-tasks"
+                ],
+                "summary": "Create service-tasks",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.CreateServiceTaskRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ServiceTaskResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/service-tasks/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "service-tasks"
+                ],
+                "summary": "Get service-tasks",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ServiceTaskResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "service-tasks"
+                ],
+                "summary": "Update service-tasks",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.UpdateServiceTaskRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ServiceTaskResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "service-tasks"
+                ],
+                "summary": "Delete service-tasks",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/uploads": {
             "post": {
                 "security": [
@@ -5716,6 +6536,276 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.CreatePurchaseOrderRequest": {
+            "type": "object",
+            "properties": {
+                "approved_at": {
+                    "type": "string"
+                },
+                "approved_by_id": {
+                    "type": "integer"
+                },
+                "closed_at": {
+                    "type": "string"
+                },
+                "created_by_id": {
+                    "type": "integer"
+                },
+                "custom_fields": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "description": {
+                    "type": "string"
+                },
+                "destination_id": {
+                    "type": "integer"
+                },
+                "discount": {
+                    "type": "number"
+                },
+                "discount_percentage": {
+                    "type": "number"
+                },
+                "discount_type": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "labels": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "number": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "purchased_at": {
+                    "type": "string"
+                },
+                "received_full_at": {
+                    "type": "string"
+                },
+                "received_partial_at": {
+                    "type": "string"
+                },
+                "rejected_at": {
+                    "type": "string"
+                },
+                "rejected_by_id": {
+                    "type": "integer"
+                },
+                "shipping": {
+                    "type": "number"
+                },
+                "state": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "submitted_at": {
+                    "type": "string"
+                },
+                "submitted_by_id": {
+                    "type": "integer"
+                },
+                "subtotal": {
+                    "type": "number"
+                },
+                "tax_1": {
+                    "type": "number"
+                },
+                "tax_1_percentage": {
+                    "type": "number"
+                },
+                "tax_1_type": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "tax_2": {
+                    "type": "number"
+                },
+                "tax_2_percentage": {
+                    "type": "number"
+                },
+                "tax_2_type": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "total_amount": {
+                    "type": "number"
+                },
+                "vendor_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.CreateServiceEntryRequest": {
+            "type": "object",
+            "properties": {
+                "asset_id": {
+                    "type": "integer"
+                },
+                "completed_at": {
+                    "type": "string"
+                },
+                "custom_fields": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "discount": {
+                    "type": "number"
+                },
+                "discount_type": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "general_notes": {
+                    "type": "string"
+                },
+                "is_roadside_assistance": {
+                    "type": "boolean"
+                },
+                "labels": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "labor_subtotal": {
+                    "type": "number"
+                },
+                "labor_time_seconds": {
+                    "type": "integer"
+                },
+                "meter_value": {
+                    "type": "number"
+                },
+                "parts_subtotal": {
+                    "type": "number"
+                },
+                "reference": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "started_at": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "subtotal": {
+                    "type": "number"
+                },
+                "tax_1": {
+                    "type": "number"
+                },
+                "tax_1_percentage": {
+                    "type": "number"
+                },
+                "tax_1_type": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "tax_2": {
+                    "type": "number"
+                },
+                "tax_2_percentage": {
+                    "type": "number"
+                },
+                "tax_2_type": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "total_amount": {
+                    "type": "number"
+                },
+                "vendor_id": {
+                    "type": "integer"
+                },
+                "work_order_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.CreateServiceReminderRequest": {
+            "type": "object",
+            "properties": {
+                "asset_id": {
+                    "type": "integer"
+                },
+                "due_soon_at": {
+                    "type": "string"
+                },
+                "due_soon_meter_threshold": {
+                    "type": "number"
+                },
+                "due_soon_meter_value": {
+                    "type": "number"
+                },
+                "due_soon_time_threshold": {
+                    "type": "integer"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "last_service_entry_id": {
+                    "type": "integer"
+                },
+                "meter_interval": {
+                    "type": "number"
+                },
+                "next_due_at": {
+                    "type": "string"
+                },
+                "next_due_meter_value": {
+                    "type": "number"
+                },
+                "service_task_id": {
+                    "type": "integer"
+                },
+                "snooze_until": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "time_frequency": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "time_interval": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.CreateServiceTaskRequest": {
+            "type": "object",
+            "properties": {
+                "archived_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "expected_duration_seconds": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 255
+                },
+                "parent_task_id": {
+                    "type": "integer"
+                }
+            }
+        },
         "dto.CreateVehicleMakeRequest": {
             "type": "object",
             "required": [
@@ -6742,6 +7832,147 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.PurchaseOrderPage": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.PurchaseOrderResponse"
+                    }
+                },
+                "has_next": {
+                    "type": "boolean"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.PurchaseOrderResponse": {
+            "type": "object",
+            "properties": {
+                "approved_at": {
+                    "type": "string"
+                },
+                "approved_by_id": {
+                    "type": "integer"
+                },
+                "closed_at": {
+                    "type": "string"
+                },
+                "company_id": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by_id": {
+                    "type": "integer"
+                },
+                "custom_fields": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "description": {
+                    "type": "string"
+                },
+                "destination_id": {
+                    "type": "integer"
+                },
+                "discount": {
+                    "type": "number"
+                },
+                "discount_percentage": {
+                    "type": "number"
+                },
+                "discount_type": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "labels": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "number": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "purchased_at": {
+                    "type": "string"
+                },
+                "received_full_at": {
+                    "type": "string"
+                },
+                "received_partial_at": {
+                    "type": "string"
+                },
+                "rejected_at": {
+                    "type": "string"
+                },
+                "rejected_by_id": {
+                    "type": "integer"
+                },
+                "shipping": {
+                    "type": "number"
+                },
+                "state": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "submitted_at": {
+                    "type": "string"
+                },
+                "submitted_by_id": {
+                    "type": "integer"
+                },
+                "subtotal": {
+                    "type": "number"
+                },
+                "tax_1": {
+                    "type": "number"
+                },
+                "tax_1_percentage": {
+                    "type": "number"
+                },
+                "tax_1_type": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "tax_2": {
+                    "type": "number"
+                },
+                "tax_2_percentage": {
+                    "type": "number"
+                },
+                "tax_2_type": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "total_amount": {
+                    "type": "number"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "vendor_id": {
+                    "type": "integer"
+                }
+            }
+        },
         "dto.RefreshRequest": {
             "type": "object",
             "required": [
@@ -6749,6 +7980,275 @@ const docTemplate = `{
             ],
             "properties": {
                 "refresh_token": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.ServiceEntryPage": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.ServiceEntryResponse"
+                    }
+                },
+                "has_next": {
+                    "type": "boolean"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.ServiceEntryResponse": {
+            "type": "object",
+            "properties": {
+                "asset_id": {
+                    "type": "integer"
+                },
+                "company_id": {
+                    "type": "integer"
+                },
+                "completed_at": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "custom_fields": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "discount": {
+                    "type": "number"
+                },
+                "discount_type": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "general_notes": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "is_roadside_assistance": {
+                    "type": "boolean"
+                },
+                "labels": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "labor_subtotal": {
+                    "type": "number"
+                },
+                "labor_time_seconds": {
+                    "type": "integer"
+                },
+                "meter_value": {
+                    "type": "number"
+                },
+                "parts_subtotal": {
+                    "type": "number"
+                },
+                "reference": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "started_at": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "subtotal": {
+                    "type": "number"
+                },
+                "tax_1": {
+                    "type": "number"
+                },
+                "tax_1_percentage": {
+                    "type": "number"
+                },
+                "tax_1_type": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "tax_2": {
+                    "type": "number"
+                },
+                "tax_2_percentage": {
+                    "type": "number"
+                },
+                "tax_2_type": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "total_amount": {
+                    "type": "number"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "vendor_id": {
+                    "type": "integer"
+                },
+                "work_order_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.ServiceReminderPage": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.ServiceReminderResponse"
+                    }
+                },
+                "has_next": {
+                    "type": "boolean"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.ServiceReminderResponse": {
+            "type": "object",
+            "properties": {
+                "asset_id": {
+                    "type": "integer"
+                },
+                "company_id": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "due_soon_at": {
+                    "type": "string"
+                },
+                "due_soon_meter_threshold": {
+                    "type": "number"
+                },
+                "due_soon_meter_value": {
+                    "type": "number"
+                },
+                "due_soon_time_threshold": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "last_service_entry_id": {
+                    "type": "integer"
+                },
+                "meter_interval": {
+                    "type": "number"
+                },
+                "next_due_at": {
+                    "type": "string"
+                },
+                "next_due_meter_value": {
+                    "type": "number"
+                },
+                "service_task_id": {
+                    "type": "integer"
+                },
+                "snooze_until": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "time_frequency": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "time_interval": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.ServiceTaskPage": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.ServiceTaskResponse"
+                    }
+                },
+                "has_next": {
+                    "type": "boolean"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.ServiceTaskResponse": {
+            "type": "object",
+            "properties": {
+                "archived_at": {
+                    "type": "string"
+                },
+                "company_id": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "expected_duration_seconds": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 255
+                },
+                "parent_task_id": {
+                    "type": "integer"
+                },
+                "updated_at": {
                     "type": "string"
                 }
             }
@@ -7458,6 +8958,276 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "useful_life_months": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.UpdatePurchaseOrderRequest": {
+            "type": "object",
+            "properties": {
+                "approved_at": {
+                    "type": "string"
+                },
+                "approved_by_id": {
+                    "type": "integer"
+                },
+                "closed_at": {
+                    "type": "string"
+                },
+                "created_by_id": {
+                    "type": "integer"
+                },
+                "custom_fields": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "description": {
+                    "type": "string"
+                },
+                "destination_id": {
+                    "type": "integer"
+                },
+                "discount": {
+                    "type": "number"
+                },
+                "discount_percentage": {
+                    "type": "number"
+                },
+                "discount_type": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "labels": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "number": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "purchased_at": {
+                    "type": "string"
+                },
+                "received_full_at": {
+                    "type": "string"
+                },
+                "received_partial_at": {
+                    "type": "string"
+                },
+                "rejected_at": {
+                    "type": "string"
+                },
+                "rejected_by_id": {
+                    "type": "integer"
+                },
+                "shipping": {
+                    "type": "number"
+                },
+                "state": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "submitted_at": {
+                    "type": "string"
+                },
+                "submitted_by_id": {
+                    "type": "integer"
+                },
+                "subtotal": {
+                    "type": "number"
+                },
+                "tax_1": {
+                    "type": "number"
+                },
+                "tax_1_percentage": {
+                    "type": "number"
+                },
+                "tax_1_type": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "tax_2": {
+                    "type": "number"
+                },
+                "tax_2_percentage": {
+                    "type": "number"
+                },
+                "tax_2_type": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "total_amount": {
+                    "type": "number"
+                },
+                "vendor_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.UpdateServiceEntryRequest": {
+            "type": "object",
+            "properties": {
+                "asset_id": {
+                    "type": "integer"
+                },
+                "completed_at": {
+                    "type": "string"
+                },
+                "custom_fields": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "discount": {
+                    "type": "number"
+                },
+                "discount_type": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "general_notes": {
+                    "type": "string"
+                },
+                "is_roadside_assistance": {
+                    "type": "boolean"
+                },
+                "labels": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "labor_subtotal": {
+                    "type": "number"
+                },
+                "labor_time_seconds": {
+                    "type": "integer"
+                },
+                "meter_value": {
+                    "type": "number"
+                },
+                "parts_subtotal": {
+                    "type": "number"
+                },
+                "reference": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "started_at": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "subtotal": {
+                    "type": "number"
+                },
+                "tax_1": {
+                    "type": "number"
+                },
+                "tax_1_percentage": {
+                    "type": "number"
+                },
+                "tax_1_type": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "tax_2": {
+                    "type": "number"
+                },
+                "tax_2_percentage": {
+                    "type": "number"
+                },
+                "tax_2_type": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "total_amount": {
+                    "type": "number"
+                },
+                "vendor_id": {
+                    "type": "integer"
+                },
+                "work_order_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.UpdateServiceReminderRequest": {
+            "type": "object",
+            "properties": {
+                "asset_id": {
+                    "type": "integer"
+                },
+                "due_soon_at": {
+                    "type": "string"
+                },
+                "due_soon_meter_threshold": {
+                    "type": "number"
+                },
+                "due_soon_meter_value": {
+                    "type": "number"
+                },
+                "due_soon_time_threshold": {
+                    "type": "integer"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "last_service_entry_id": {
+                    "type": "integer"
+                },
+                "meter_interval": {
+                    "type": "number"
+                },
+                "next_due_at": {
+                    "type": "string"
+                },
+                "next_due_meter_value": {
+                    "type": "number"
+                },
+                "service_task_id": {
+                    "type": "integer"
+                },
+                "snooze_until": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "time_frequency": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "time_interval": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.UpdateServiceTaskRequest": {
+            "type": "object",
+            "properties": {
+                "archived_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "expected_duration_seconds": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 255
+                },
+                "parent_task_id": {
                     "type": "integer"
                 }
             }
