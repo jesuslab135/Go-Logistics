@@ -583,6 +583,124 @@ definitions:
     - name
     - tax_id
     type: object
+  dto.CreateInventoryAdjustmentReasonRequest:
+    properties:
+      name:
+        maxLength: 100
+        type: string
+    type: object
+  dto.CreateInventoryJournalEntryRequest:
+    properties:
+      adjustment_quantity:
+        type: number
+      adjustment_type:
+        maxLength: 20
+        type: string
+      current_quantity:
+        type: number
+      notes:
+        type: string
+      part_id:
+        type: integer
+      part_location_detail_id:
+        type: integer
+      previous_quantity:
+        type: number
+      purchase_order_line_id:
+        type: integer
+      reason_id:
+        type: integer
+      transfer_part_location_id:
+        type: integer
+      unit_cost:
+        type: number
+      user_id:
+        type: integer
+      vendor_id:
+        type: integer
+      work_order_id:
+        type: integer
+    type: object
+  dto.CreateMeasurementUnitRequest:
+    properties:
+      abbreviation:
+        maxLength: 10
+        type: string
+      name:
+        maxLength: 50
+        type: string
+    type: object
+  dto.CreatePartCategoryRequest:
+    properties:
+      description:
+        type: string
+      name:
+        maxLength: 100
+        type: string
+    type: object
+  dto.CreatePartLocationRequest:
+    properties:
+      address:
+        maxLength: 200
+        type: string
+      city:
+        maxLength: 100
+        type: string
+      location_id:
+        type: integer
+      name:
+        maxLength: 100
+        type: string
+      region:
+        maxLength: 50
+        type: string
+    type: object
+  dto.CreatePartManufacturerRequest:
+    properties:
+      name:
+        maxLength: 200
+        type: string
+      website:
+        maxLength: 200
+        type: string
+    type: object
+  dto.CreatePartRequest:
+    properties:
+      archived_at:
+        type: string
+      custom_fields:
+        items:
+          type: integer
+        type: array
+      description:
+        type: string
+      inventory_item:
+        type: boolean
+      manufacturer_part_number:
+        maxLength: 100
+        type: string
+      measurement_unit_id:
+        type: integer
+      part_category_id:
+        type: integer
+      part_manufacturer_id:
+        type: integer
+      part_number:
+        maxLength: 100
+        type: string
+      supplier_part_number:
+        maxLength: 100
+        type: string
+      unit_cost:
+        type: number
+      upc:
+        maxLength: 50
+        type: string
+      useful_life_distance:
+        type: integer
+      useful_life_months:
+        type: integer
+    type: object
   dto.CreateVehicleMakeRequest:
     properties:
       name:
@@ -614,6 +732,86 @@ definitions:
       error:
         $ref: '#/definitions/dto.ErrorBody'
     type: object
+  dto.InventoryAdjustmentReasonPage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.InventoryAdjustmentReasonResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.InventoryAdjustmentReasonResponse:
+    properties:
+      company_id:
+        type: integer
+      created_at:
+        type: string
+      id:
+        type: integer
+      name:
+        maxLength: 100
+        type: string
+    type: object
+  dto.InventoryJournalEntryPage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.InventoryJournalEntryResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.InventoryJournalEntryResponse:
+    properties:
+      adjustment_quantity:
+        type: number
+      adjustment_type:
+        maxLength: 20
+        type: string
+      company_id:
+        type: integer
+      created_at:
+        type: string
+      current_quantity:
+        type: number
+      id:
+        type: integer
+      notes:
+        type: string
+      part_id:
+        type: integer
+      part_location_detail_id:
+        type: integer
+      previous_quantity:
+        type: number
+      purchase_order_line_id:
+        type: integer
+      reason_id:
+        type: integer
+      transfer_part_location_id:
+        type: integer
+      unit_cost:
+        type: number
+      user_id:
+        type: integer
+      vendor_id:
+        type: integer
+      work_order_id:
+        type: integer
+    type: object
   dto.LoginRequest:
     properties:
       email:
@@ -623,6 +821,195 @@ definitions:
     required:
     - email
     - password
+    type: object
+  dto.MeasurementUnitPage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.MeasurementUnitResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.MeasurementUnitResponse:
+    properties:
+      abbreviation:
+        maxLength: 10
+        type: string
+      company_id:
+        type: integer
+      created_at:
+        type: string
+      id:
+        type: integer
+      name:
+        maxLength: 50
+        type: string
+    type: object
+  dto.PartCategoryPage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.PartCategoryResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.PartCategoryResponse:
+    properties:
+      company_id:
+        type: integer
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      name:
+        maxLength: 100
+        type: string
+    type: object
+  dto.PartLocationPage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.PartLocationResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.PartLocationResponse:
+    properties:
+      address:
+        maxLength: 200
+        type: string
+      city:
+        maxLength: 100
+        type: string
+      company_id:
+        type: integer
+      created_at:
+        type: string
+      id:
+        type: integer
+      location_id:
+        type: integer
+      name:
+        maxLength: 100
+        type: string
+      region:
+        maxLength: 50
+        type: string
+      updated_at:
+        type: string
+    type: object
+  dto.PartManufacturerPage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.PartManufacturerResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.PartManufacturerResponse:
+    properties:
+      company_id:
+        type: integer
+      created_at:
+        type: string
+      id:
+        type: integer
+      name:
+        maxLength: 200
+        type: string
+      website:
+        maxLength: 200
+        type: string
+    type: object
+  dto.PartPage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.PartResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.PartResponse:
+    properties:
+      archived_at:
+        type: string
+      company_id:
+        type: integer
+      created_at:
+        type: string
+      custom_fields:
+        items:
+          type: integer
+        type: array
+      description:
+        type: string
+      id:
+        type: integer
+      inventory_item:
+        type: boolean
+      manufacturer_part_number:
+        maxLength: 100
+        type: string
+      measurement_unit_id:
+        type: integer
+      part_category_id:
+        type: integer
+      part_manufacturer_id:
+        type: integer
+      part_number:
+        maxLength: 100
+        type: string
+      supplier_part_number:
+        maxLength: 100
+        type: string
+      unit_cost:
+        type: number
+      upc:
+        maxLength: 50
+        type: string
+      updated_at:
+        type: string
+      useful_life_distance:
+        type: integer
+      useful_life_months:
+        type: integer
     type: object
   dto.RefreshRequest:
     properties:
@@ -883,6 +1270,124 @@ definitions:
     required:
     - name
     - tax_id
+    type: object
+  dto.UpdateInventoryAdjustmentReasonRequest:
+    properties:
+      name:
+        maxLength: 100
+        type: string
+    type: object
+  dto.UpdateInventoryJournalEntryRequest:
+    properties:
+      adjustment_quantity:
+        type: number
+      adjustment_type:
+        maxLength: 20
+        type: string
+      current_quantity:
+        type: number
+      notes:
+        type: string
+      part_id:
+        type: integer
+      part_location_detail_id:
+        type: integer
+      previous_quantity:
+        type: number
+      purchase_order_line_id:
+        type: integer
+      reason_id:
+        type: integer
+      transfer_part_location_id:
+        type: integer
+      unit_cost:
+        type: number
+      user_id:
+        type: integer
+      vendor_id:
+        type: integer
+      work_order_id:
+        type: integer
+    type: object
+  dto.UpdateMeasurementUnitRequest:
+    properties:
+      abbreviation:
+        maxLength: 10
+        type: string
+      name:
+        maxLength: 50
+        type: string
+    type: object
+  dto.UpdatePartCategoryRequest:
+    properties:
+      description:
+        type: string
+      name:
+        maxLength: 100
+        type: string
+    type: object
+  dto.UpdatePartLocationRequest:
+    properties:
+      address:
+        maxLength: 200
+        type: string
+      city:
+        maxLength: 100
+        type: string
+      location_id:
+        type: integer
+      name:
+        maxLength: 100
+        type: string
+      region:
+        maxLength: 50
+        type: string
+    type: object
+  dto.UpdatePartManufacturerRequest:
+    properties:
+      name:
+        maxLength: 200
+        type: string
+      website:
+        maxLength: 200
+        type: string
+    type: object
+  dto.UpdatePartRequest:
+    properties:
+      archived_at:
+        type: string
+      custom_fields:
+        items:
+          type: integer
+        type: array
+      description:
+        type: string
+      inventory_item:
+        type: boolean
+      manufacturer_part_number:
+        maxLength: 100
+        type: string
+      measurement_unit_id:
+        type: integer
+      part_category_id:
+        type: integer
+      part_manufacturer_id:
+        type: integer
+      part_number:
+        maxLength: 100
+        type: string
+      supplier_part_number:
+        maxLength: 100
+        type: string
+      unit_cost:
+        type: number
+      upc:
+        maxLength: 50
+        type: string
+      useful_life_distance:
+        type: integer
+      useful_life_months:
+        type: integer
     type: object
   dto.UpdateVehicleMakeRequest:
     properties:
@@ -1636,6 +2141,895 @@ paths:
       summary: Update a company
       tags:
       - companies
+  /api/v1/inventory-adjustment-reasons:
+    get:
+      parameters:
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.InventoryAdjustmentReasonPage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List inventory-adjustment-reasons
+      tags:
+      - inventory-adjustment-reasons
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateInventoryAdjustmentReasonRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.InventoryAdjustmentReasonResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create inventory-adjustment-reasons
+      tags:
+      - inventory-adjustment-reasons
+  /api/v1/inventory-adjustment-reasons/{id}:
+    delete:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete inventory-adjustment-reasons
+      tags:
+      - inventory-adjustment-reasons
+    get:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.InventoryAdjustmentReasonResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get inventory-adjustment-reasons
+      tags:
+      - inventory-adjustment-reasons
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateInventoryAdjustmentReasonRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.InventoryAdjustmentReasonResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update inventory-adjustment-reasons
+      tags:
+      - inventory-adjustment-reasons
+  /api/v1/inventory-journal-entries:
+    get:
+      parameters:
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.InventoryJournalEntryPage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List inventory-journal-entries
+      tags:
+      - inventory-journal-entries
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateInventoryJournalEntryRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.InventoryJournalEntryResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create inventory-journal-entries
+      tags:
+      - inventory-journal-entries
+  /api/v1/inventory-journal-entries/{id}:
+    delete:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete inventory-journal-entries
+      tags:
+      - inventory-journal-entries
+    get:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.InventoryJournalEntryResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get inventory-journal-entries
+      tags:
+      - inventory-journal-entries
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateInventoryJournalEntryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.InventoryJournalEntryResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update inventory-journal-entries
+      tags:
+      - inventory-journal-entries
+  /api/v1/measurement-units:
+    get:
+      parameters:
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.MeasurementUnitPage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List measurement-units
+      tags:
+      - measurement-units
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateMeasurementUnitRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.MeasurementUnitResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create measurement-units
+      tags:
+      - measurement-units
+  /api/v1/measurement-units/{id}:
+    delete:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete measurement-units
+      tags:
+      - measurement-units
+    get:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.MeasurementUnitResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get measurement-units
+      tags:
+      - measurement-units
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateMeasurementUnitRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.MeasurementUnitResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update measurement-units
+      tags:
+      - measurement-units
+  /api/v1/part-categories:
+    get:
+      parameters:
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PartCategoryPage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List part-categories
+      tags:
+      - part-categories
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreatePartCategoryRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.PartCategoryResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create part-categories
+      tags:
+      - part-categories
+  /api/v1/part-categories/{id}:
+    delete:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete part-categories
+      tags:
+      - part-categories
+    get:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PartCategoryResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get part-categories
+      tags:
+      - part-categories
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdatePartCategoryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PartCategoryResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update part-categories
+      tags:
+      - part-categories
+  /api/v1/part-locations:
+    get:
+      parameters:
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PartLocationPage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List part-locations
+      tags:
+      - part-locations
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreatePartLocationRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.PartLocationResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create part-locations
+      tags:
+      - part-locations
+  /api/v1/part-locations/{id}:
+    delete:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete part-locations
+      tags:
+      - part-locations
+    get:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PartLocationResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get part-locations
+      tags:
+      - part-locations
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdatePartLocationRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PartLocationResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update part-locations
+      tags:
+      - part-locations
+  /api/v1/part-manufacturers:
+    get:
+      parameters:
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PartManufacturerPage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List part-manufacturers
+      tags:
+      - part-manufacturers
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreatePartManufacturerRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.PartManufacturerResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create part-manufacturers
+      tags:
+      - part-manufacturers
+  /api/v1/part-manufacturers/{id}:
+    delete:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete part-manufacturers
+      tags:
+      - part-manufacturers
+    get:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PartManufacturerResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get part-manufacturers
+      tags:
+      - part-manufacturers
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdatePartManufacturerRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PartManufacturerResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update part-manufacturers
+      tags:
+      - part-manufacturers
+  /api/v1/parts:
+    get:
+      parameters:
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PartPage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List parts
+      tags:
+      - parts
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreatePartRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.PartResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create parts
+      tags:
+      - parts
+  /api/v1/parts/{id}:
+    delete:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete parts
+      tags:
+      - parts
+    get:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PartResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get parts
+      tags:
+      - parts
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdatePartRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PartResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update parts
+      tags:
+      - parts
   /api/v1/uploads:
     post:
       consumes:

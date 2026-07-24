@@ -69,6 +69,22 @@ func NewRouter(d Deps) *gin.Engine {
 	crud.NewHandler[dto.AssetResponse, dto.CreateAssetRequest, dto.UpdateAssetRequest](
 		NewAssetStore(d.Queries)).Register(api, "/assets")
 
+	// Phase 3: parts & inventory
+	crud.NewHandler[dto.PartCategoryResponse, dto.CreatePartCategoryRequest, dto.UpdatePartCategoryRequest](
+		NewPartCategoryStore(d.Queries)).Register(api, "/part-categories")
+	crud.NewHandler[dto.PartManufacturerResponse, dto.CreatePartManufacturerRequest, dto.UpdatePartManufacturerRequest](
+		NewPartManufacturerStore(d.Queries)).Register(api, "/part-manufacturers")
+	crud.NewHandler[dto.MeasurementUnitResponse, dto.CreateMeasurementUnitRequest, dto.UpdateMeasurementUnitRequest](
+		NewMeasurementUnitStore(d.Queries)).Register(api, "/measurement-units")
+	crud.NewHandler[dto.PartResponse, dto.CreatePartRequest, dto.UpdatePartRequest](
+		NewPartStore(d.Queries)).Register(api, "/parts")
+	crud.NewHandler[dto.PartLocationResponse, dto.CreatePartLocationRequest, dto.UpdatePartLocationRequest](
+		NewPartLocationStore(d.Queries)).Register(api, "/part-locations")
+	crud.NewHandler[dto.InventoryAdjustmentReasonResponse, dto.CreateInventoryAdjustmentReasonRequest, dto.UpdateInventoryAdjustmentReasonRequest](
+		NewInventoryAdjustmentReasonStore(d.Queries)).Register(api, "/inventory-adjustment-reasons")
+	crud.NewHandler[dto.InventoryJournalEntryResponse, dto.CreateInventoryJournalEntryRequest, dto.UpdateInventoryJournalEntryRequest](
+		NewInventoryJournalEntryStore(d.Queries)).Register(api, "/inventory-journal-entries")
+
 	// Phase 1: asset catalogs & vehicle models (tenant-scoped)
 	crud.NewHandler[dto.AssetTypeResponse, dto.CreateAssetTypeRequest, dto.UpdateAssetTypeRequest](
 		NewAssetTypeStore(d.Queries)).Register(api, "/asset-types")
