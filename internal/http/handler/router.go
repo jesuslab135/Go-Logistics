@@ -100,6 +100,22 @@ func NewRouter(d Deps) *gin.Engine {
 	crud.NewHandler[dto.ServiceReminderResponse, dto.CreateServiceReminderRequest, dto.UpdateServiceReminderRequest](NewServiceReminderStore(d.Queries)).Register(api, "/service-reminders")
 	crud.NewHandler[dto.ServiceEntryResponse, dto.CreateServiceEntryRequest, dto.UpdateServiceEntryRequest](NewServiceEntryStore(d.Queries)).Register(api, "/service-entries")
 
+	// Phase 6: tires
+	crud.NewHandler[dto.TireResponse, dto.CreateTireRequest, dto.UpdateTireRequest](NewTireStore(d.Queries)).Register(api, "/tires")
+	crud.NewHandler[dto.TireModelResponse, dto.CreateTireModelRequest, dto.UpdateTireModelRequest](NewTireModelStore(d.Queries)).Register(api, "/tire-models")
+	crud.NewHandler[dto.AxleTemplateResponse, dto.CreateAxleTemplateRequest, dto.UpdateAxleTemplateRequest](NewAxleTemplateStore(d.Queries)).Register(api, "/axle-templates")
+	crud.NewHandler[dto.TireAssignmentRequestResponse, dto.CreateTireAssignmentRequestRequest, dto.UpdateTireAssignmentRequestRequest](NewTireAssignmentRequestStore(d.Queries)).Register(api, "/tire-assignment-requests")
+
+	// Phase 7: fuel, inspections, org & misc
+	crud.NewHandler[dto.FuelTypeResponse, dto.CreateFuelTypeRequest, dto.UpdateFuelTypeRequest](NewFuelTypeStore(d.Queries)).Register(api, "/fuel-types")
+	crud.NewHandler[dto.InspectionFormResponse, dto.CreateInspectionFormRequest, dto.UpdateInspectionFormRequest](NewInspectionFormStore(d.Queries)).Register(api, "/inspection-forms")
+	crud.NewHandler[dto.InspectionSubmissionResponse, dto.CreateInspectionSubmissionRequest, dto.UpdateInspectionSubmissionRequest](NewInspectionSubmissionStore(d.Queries)).Register(api, "/inspection-submissions")
+	crud.NewHandler[dto.MediumResponse, dto.CreateMediumRequest, dto.UpdateMediumRequest](NewMediumStore(d.Queries)).Register(api, "/media")
+	crud.NewHandler[dto.CommentResponse, dto.CreateCommentRequest, dto.UpdateCommentRequest](NewCommentStore(d.Queries)).Register(api, "/comments")
+	crud.NewHandler[dto.WarrantyResponse, dto.CreateWarrantyRequest, dto.UpdateWarrantyRequest](NewWarrantyStore(d.Queries)).Register(api, "/warranties")
+	crud.NewHandler[dto.WeeklyMileageGoalResponse, dto.CreateWeeklyMileageGoalRequest, dto.UpdateWeeklyMileageGoalRequest](NewWeeklyMileageGoalStore(d.Queries)).Register(api, "/weekly-mileage-goals")
+	crud.NewHandler[dto.RoleResponse, dto.CreateRoleRequest, dto.UpdateRoleRequest](NewRoleStore(d.Queries)).Register(api, "/roles")
+
 	// Phase 1: asset catalogs & vehicle models (tenant-scoped)
 	crud.NewHandler[dto.AssetTypeResponse, dto.CreateAssetTypeRequest, dto.UpdateAssetTypeRequest](
 		NewAssetTypeStore(d.Queries)).Register(api, "/asset-types")

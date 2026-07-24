@@ -254,6 +254,35 @@ definitions:
       name:
         type: string
     type: object
+  dto.AxleTemplatePage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.AxleTemplateResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.AxleTemplateResponse:
+    properties:
+      company_id:
+        type: integer
+      description:
+        type: string
+      id:
+        type: integer
+      name:
+        maxLength: 100
+        type: string
+      total_positions:
+        type: integer
+    type: object
   dto.CatalogOptionPage:
     properties:
       data:
@@ -278,6 +307,40 @@ definitions:
       id:
         type: integer
       value:
+        type: string
+    type: object
+  dto.CommentPage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.CommentResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.CommentResponse:
+    properties:
+      author_id:
+        type: integer
+      body:
+        type: string
+      company_id:
+        type: integer
+      content_type_id:
+        type: integer
+      created_at:
+        type: string
+      id:
+        type: integer
+      object_id:
+        type: integer
+      updated_at:
         type: string
     type: object
   dto.CompanyPage:
@@ -522,6 +585,16 @@ definitions:
     required:
     - name
     type: object
+  dto.CreateAxleTemplateRequest:
+    properties:
+      description:
+        type: string
+      name:
+        maxLength: 100
+        type: string
+      total_positions:
+        type: integer
+    type: object
   dto.CreateCatalogOptionRequest:
     properties:
       category:
@@ -533,6 +606,17 @@ definitions:
     required:
     - category
     - value
+    type: object
+  dto.CreateCommentRequest:
+    properties:
+      author_id:
+        type: integer
+      body:
+        type: string
+      content_type_id:
+        type: integer
+      object_id:
+        type: integer
     type: object
   dto.CreateCompanyRequest:
     properties:
@@ -601,6 +685,71 @@ definitions:
       name:
         maxLength: 255
         type: string
+    type: object
+  dto.CreateFuelTypeRequest:
+    properties:
+      name:
+        maxLength: 50
+        type: string
+    type: object
+  dto.CreateInspectionFormRequest:
+    properties:
+      archived_at:
+        type: string
+      auto_create_issues:
+        type: boolean
+      color:
+        maxLength: 7
+        type: string
+      description:
+        type: string
+      require_live_photo:
+        type: boolean
+      title:
+        maxLength: 255
+        type: string
+      version:
+        type: integer
+    type: object
+  dto.CreateInspectionSubmissionRequest:
+    properties:
+      asset_id:
+        type: integer
+      comments_count:
+        type: integer
+      duration_seconds:
+        type: integer
+      failed_items_count:
+        type: integer
+      form_id:
+        type: integer
+      general_notes:
+        type: string
+      images_count:
+        type: integer
+      odometer:
+        type: number
+      passed_items_count:
+        type: integer
+      signature:
+        maxLength: 100
+        type: string
+      started_at:
+        type: string
+      starting_latitude:
+        type: number
+      starting_longitude:
+        type: number
+      submitted_at:
+        type: string
+      submitted_by_id:
+        type: integer
+      submitted_latitude:
+        type: number
+      submitted_longitude:
+        type: number
+      total_items:
+        type: integer
     type: object
   dto.CreateInventoryAdjustmentReasonRequest:
     properties:
@@ -751,6 +900,26 @@ definitions:
         maxLength: 50
         type: string
     type: object
+  dto.CreateMediumRequest:
+    properties:
+      asset_id:
+        type: integer
+      description:
+        type: string
+      file:
+        maxLength: 100
+        type: string
+      file_size:
+        type: integer
+      file_type:
+        maxLength: 20
+        type: string
+      title:
+        maxLength: 255
+        type: string
+      uploaded_by_id:
+        type: integer
+    type: object
   dto.CreatePartCategoryRequest:
     properties:
       description:
@@ -894,6 +1063,18 @@ definitions:
       vendor_id:
         type: integer
     type: object
+  dto.CreateRoleRequest:
+    properties:
+      is_admin:
+        type: boolean
+      name:
+        maxLength: 100
+        type: string
+      permissions:
+        items:
+          type: integer
+        type: array
+    type: object
   dto.CreateServiceEntryRequest:
     properties:
       asset_id:
@@ -1005,6 +1186,79 @@ definitions:
       parent_task_id:
         type: integer
     type: object
+  dto.CreateTireAssignmentRequestRequest:
+    properties:
+      approved_by_id:
+        type: integer
+      notes:
+        type: string
+      position_code:
+        maxLength: 10
+        type: string
+      rejection_reason:
+        type: string
+      requested_at:
+        type: string
+      requested_by_id:
+        type: integer
+      resolved_at:
+        type: string
+      state:
+        maxLength: 10
+        type: string
+      tire_id:
+        type: integer
+      vehicle_id:
+        type: integer
+    type: object
+  dto.CreateTireModelRequest:
+    properties:
+      brand:
+        maxLength: 100
+        type: string
+      factory_tread_depth_32nds:
+        type: integer
+      life_expectancy_miles:
+        type: integer
+      minimum_tread_depth_32nds:
+        type: integer
+      model_name:
+        maxLength: 150
+        type: string
+      recommended_psi:
+        type: number
+      size:
+        maxLength: 50
+        type: string
+    type: object
+  dto.CreateTireRequest:
+    properties:
+      current_position_code:
+        maxLength: 10
+        type: string
+      current_psi:
+        type: number
+      current_tread_depth_32nds:
+        type: integer
+      current_vehicle_id:
+        type: integer
+      purchase_cost:
+        type: number
+      purchase_date:
+        type: string
+      status:
+        maxLength: 15
+        type: string
+      tire_identification_number:
+        maxLength: 100
+        type: string
+      tire_model_id:
+        type: integer
+      total_miles:
+        type: integer
+      vendor_id:
+        type: integer
+    type: object
   dto.CreateVehicleMakeRequest:
     properties:
       name:
@@ -1086,6 +1340,45 @@ definitions:
       website:
         maxLength: 200
         type: string
+    type: object
+  dto.CreateWarrantyRequest:
+    properties:
+      asset_id:
+        type: integer
+      end_date:
+        type: string
+      is_active:
+        type: boolean
+      part_id:
+        type: integer
+      provider_id:
+        type: integer
+      start_date:
+        type: string
+      terms:
+        type: string
+    type: object
+  dto.CreateWeeklyMileageGoalRequest:
+    properties:
+      is_active:
+        type: boolean
+      machines_in_workshop:
+        type: integer
+      missing_miles:
+        type: integer
+      mpg_goal:
+        type: number
+      rate_per_mile:
+        type: number
+      service_type:
+        maxLength: 100
+        type: string
+      sort_order:
+        type: integer
+      units_per_service:
+        type: integer
+      weekly_mileage_goal:
+        type: integer
     type: object
   dto.CreateWorkOrderRequest:
     properties:
@@ -1255,6 +1548,136 @@ definitions:
       name:
         maxLength: 255
         type: string
+    type: object
+  dto.FuelTypePage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.FuelTypeResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.FuelTypeResponse:
+    properties:
+      company_id:
+        type: integer
+      created_at:
+        type: string
+      id:
+        type: integer
+      name:
+        maxLength: 50
+        type: string
+    type: object
+  dto.InspectionFormPage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.InspectionFormResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.InspectionFormResponse:
+    properties:
+      archived_at:
+        type: string
+      auto_create_issues:
+        type: boolean
+      color:
+        maxLength: 7
+        type: string
+      company_id:
+        type: integer
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      require_live_photo:
+        type: boolean
+      title:
+        maxLength: 255
+        type: string
+      updated_at:
+        type: string
+      version:
+        type: integer
+    type: object
+  dto.InspectionSubmissionPage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.InspectionSubmissionResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.InspectionSubmissionResponse:
+    properties:
+      asset_id:
+        type: integer
+      comments_count:
+        type: integer
+      company_id:
+        type: integer
+      created_at:
+        type: string
+      duration_seconds:
+        type: integer
+      failed_items_count:
+        type: integer
+      form_id:
+        type: integer
+      general_notes:
+        type: string
+      id:
+        type: integer
+      images_count:
+        type: integer
+      odometer:
+        type: number
+      passed_items_count:
+        type: integer
+      signature:
+        maxLength: 100
+        type: string
+      started_at:
+        type: string
+      starting_latitude:
+        type: number
+      starting_longitude:
+        type: number
+      submitted_at:
+        type: string
+      submitted_by_id:
+        type: integer
+      submitted_latitude:
+        type: number
+      submitted_longitude:
+        type: number
+      total_items:
+        type: integer
     type: object
   dto.InventoryAdjustmentReasonPage:
     properties:
@@ -1539,6 +1962,49 @@ definitions:
         maxLength: 50
         type: string
     type: object
+  dto.MediumPage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.MediumResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.MediumResponse:
+    properties:
+      asset_id:
+        type: integer
+      company_id:
+        type: integer
+      created_at:
+        type: string
+      description:
+        type: string
+      file:
+        maxLength: 100
+        type: string
+      file_size:
+        type: integer
+      file_type:
+        maxLength: 20
+        type: string
+      id:
+        type: integer
+      title:
+        maxLength: 255
+        type: string
+      updated_at:
+        type: string
+      uploaded_by_id:
+        type: integer
+    type: object
   dto.PartCategoryPage:
     properties:
       data:
@@ -1800,6 +2266,37 @@ definitions:
     required:
     - refresh_token
     type: object
+  dto.RolePage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.RoleResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.RoleResponse:
+    properties:
+      company_id:
+        type: integer
+      id:
+        type: integer
+      is_admin:
+        type: boolean
+      name:
+        maxLength: 100
+        type: string
+      permissions:
+        items:
+          type: integer
+        type: array
+    type: object
   dto.ServiceEntryPage:
     properties:
       data:
@@ -1979,6 +2476,138 @@ definitions:
         type: integer
       updated_at:
         type: string
+    type: object
+  dto.TireAssignmentRequestPage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.TireAssignmentRequestResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.TireAssignmentRequestResponse:
+    properties:
+      approved_by_id:
+        type: integer
+      company_id:
+        type: integer
+      id:
+        type: integer
+      notes:
+        type: string
+      position_code:
+        maxLength: 10
+        type: string
+      rejection_reason:
+        type: string
+      requested_at:
+        type: string
+      requested_by_id:
+        type: integer
+      resolved_at:
+        type: string
+      state:
+        maxLength: 10
+        type: string
+      tire_id:
+        type: integer
+      vehicle_id:
+        type: integer
+    type: object
+  dto.TireModelPage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.TireModelResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.TireModelResponse:
+    properties:
+      brand:
+        maxLength: 100
+        type: string
+      company_id:
+        type: integer
+      factory_tread_depth_32nds:
+        type: integer
+      id:
+        type: integer
+      life_expectancy_miles:
+        type: integer
+      minimum_tread_depth_32nds:
+        type: integer
+      model_name:
+        maxLength: 150
+        type: string
+      recommended_psi:
+        type: number
+      size:
+        maxLength: 50
+        type: string
+    type: object
+  dto.TirePage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.TireResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.TireResponse:
+    properties:
+      company_id:
+        type: integer
+      created_at:
+        type: string
+      current_position_code:
+        maxLength: 10
+        type: string
+      current_psi:
+        type: number
+      current_tread_depth_32nds:
+        type: integer
+      current_vehicle_id:
+        type: integer
+      id:
+        type: integer
+      purchase_cost:
+        type: number
+      purchase_date:
+        type: string
+      status:
+        maxLength: 15
+        type: string
+      tire_identification_number:
+        maxLength: 100
+        type: string
+      tire_model_id:
+        type: integer
+      total_miles:
+        type: integer
+      vendor_id:
+        type: integer
     type: object
   dto.UpdateAssetRequest:
     properties:
@@ -2172,6 +2801,16 @@ definitions:
     required:
     - name
     type: object
+  dto.UpdateAxleTemplateRequest:
+    properties:
+      description:
+        type: string
+      name:
+        maxLength: 100
+        type: string
+      total_positions:
+        type: integer
+    type: object
   dto.UpdateCatalogOptionRequest:
     properties:
       category:
@@ -2183,6 +2822,17 @@ definitions:
     required:
     - category
     - value
+    type: object
+  dto.UpdateCommentRequest:
+    properties:
+      author_id:
+        type: integer
+      body:
+        type: string
+      content_type_id:
+        type: integer
+      object_id:
+        type: integer
     type: object
   dto.UpdateCompanyRequest:
     properties:
@@ -2251,6 +2901,71 @@ definitions:
       name:
         maxLength: 255
         type: string
+    type: object
+  dto.UpdateFuelTypeRequest:
+    properties:
+      name:
+        maxLength: 50
+        type: string
+    type: object
+  dto.UpdateInspectionFormRequest:
+    properties:
+      archived_at:
+        type: string
+      auto_create_issues:
+        type: boolean
+      color:
+        maxLength: 7
+        type: string
+      description:
+        type: string
+      require_live_photo:
+        type: boolean
+      title:
+        maxLength: 255
+        type: string
+      version:
+        type: integer
+    type: object
+  dto.UpdateInspectionSubmissionRequest:
+    properties:
+      asset_id:
+        type: integer
+      comments_count:
+        type: integer
+      duration_seconds:
+        type: integer
+      failed_items_count:
+        type: integer
+      form_id:
+        type: integer
+      general_notes:
+        type: string
+      images_count:
+        type: integer
+      odometer:
+        type: number
+      passed_items_count:
+        type: integer
+      signature:
+        maxLength: 100
+        type: string
+      started_at:
+        type: string
+      starting_latitude:
+        type: number
+      starting_longitude:
+        type: number
+      submitted_at:
+        type: string
+      submitted_by_id:
+        type: integer
+      submitted_latitude:
+        type: number
+      submitted_longitude:
+        type: number
+      total_items:
+        type: integer
     type: object
   dto.UpdateInventoryAdjustmentReasonRequest:
     properties:
@@ -2401,6 +3116,26 @@ definitions:
         maxLength: 50
         type: string
     type: object
+  dto.UpdateMediumRequest:
+    properties:
+      asset_id:
+        type: integer
+      description:
+        type: string
+      file:
+        maxLength: 100
+        type: string
+      file_size:
+        type: integer
+      file_type:
+        maxLength: 20
+        type: string
+      title:
+        maxLength: 255
+        type: string
+      uploaded_by_id:
+        type: integer
+    type: object
   dto.UpdatePartCategoryRequest:
     properties:
       description:
@@ -2544,6 +3279,18 @@ definitions:
       vendor_id:
         type: integer
     type: object
+  dto.UpdateRoleRequest:
+    properties:
+      is_admin:
+        type: boolean
+      name:
+        maxLength: 100
+        type: string
+      permissions:
+        items:
+          type: integer
+        type: array
+    type: object
   dto.UpdateServiceEntryRequest:
     properties:
       asset_id:
@@ -2655,6 +3402,79 @@ definitions:
       parent_task_id:
         type: integer
     type: object
+  dto.UpdateTireAssignmentRequestRequest:
+    properties:
+      approved_by_id:
+        type: integer
+      notes:
+        type: string
+      position_code:
+        maxLength: 10
+        type: string
+      rejection_reason:
+        type: string
+      requested_at:
+        type: string
+      requested_by_id:
+        type: integer
+      resolved_at:
+        type: string
+      state:
+        maxLength: 10
+        type: string
+      tire_id:
+        type: integer
+      vehicle_id:
+        type: integer
+    type: object
+  dto.UpdateTireModelRequest:
+    properties:
+      brand:
+        maxLength: 100
+        type: string
+      factory_tread_depth_32nds:
+        type: integer
+      life_expectancy_miles:
+        type: integer
+      minimum_tread_depth_32nds:
+        type: integer
+      model_name:
+        maxLength: 150
+        type: string
+      recommended_psi:
+        type: number
+      size:
+        maxLength: 50
+        type: string
+    type: object
+  dto.UpdateTireRequest:
+    properties:
+      current_position_code:
+        maxLength: 10
+        type: string
+      current_psi:
+        type: number
+      current_tread_depth_32nds:
+        type: integer
+      current_vehicle_id:
+        type: integer
+      purchase_cost:
+        type: number
+      purchase_date:
+        type: string
+      status:
+        maxLength: 15
+        type: string
+      tire_identification_number:
+        maxLength: 100
+        type: string
+      tire_model_id:
+        type: integer
+      total_miles:
+        type: integer
+      vendor_id:
+        type: integer
+    type: object
   dto.UpdateVehicleMakeRequest:
     properties:
       name:
@@ -2736,6 +3556,45 @@ definitions:
       website:
         maxLength: 200
         type: string
+    type: object
+  dto.UpdateWarrantyRequest:
+    properties:
+      asset_id:
+        type: integer
+      end_date:
+        type: string
+      is_active:
+        type: boolean
+      part_id:
+        type: integer
+      provider_id:
+        type: integer
+      start_date:
+        type: string
+      terms:
+        type: string
+    type: object
+  dto.UpdateWeeklyMileageGoalRequest:
+    properties:
+      is_active:
+        type: boolean
+      machines_in_workshop:
+        type: integer
+      missing_miles:
+        type: integer
+      mpg_goal:
+        type: number
+      rate_per_mile:
+        type: number
+      service_type:
+        maxLength: 100
+        type: string
+      sort_order:
+        type: integer
+      units_per_service:
+        type: integer
+      weekly_mileage_goal:
+        type: integer
     type: object
   dto.UpdateWorkOrderRequest:
     properties:
@@ -2999,6 +3858,87 @@ definitions:
       website:
         maxLength: 200
         type: string
+    type: object
+  dto.WarrantyPage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.WarrantyResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.WarrantyResponse:
+    properties:
+      asset_id:
+        type: integer
+      company_id:
+        type: integer
+      end_date:
+        type: string
+      id:
+        type: integer
+      is_active:
+        type: boolean
+      part_id:
+        type: integer
+      provider_id:
+        type: integer
+      start_date:
+        type: string
+      terms:
+        type: string
+    type: object
+  dto.WeeklyMileageGoalPage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.WeeklyMileageGoalResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.WeeklyMileageGoalResponse:
+    properties:
+      company_id:
+        type: integer
+      created_at:
+        type: string
+      id:
+        type: integer
+      is_active:
+        type: boolean
+      machines_in_workshop:
+        type: integer
+      missing_miles:
+        type: integer
+      mpg_goal:
+        type: number
+      rate_per_mile:
+        type: number
+      service_type:
+        maxLength: 100
+        type: string
+      sort_order:
+        type: integer
+      units_per_service:
+        type: integer
+      updated_at:
+        type: string
+      weekly_mileage_goal:
+        type: integer
     type: object
   dto.WorkOrderPage:
     properties:
@@ -3562,6 +4502,133 @@ paths:
       summary: Update assets
       tags:
       - assets
+  /api/v1/axle-templates:
+    get:
+      parameters:
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.AxleTemplatePage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List axle-templates
+      tags:
+      - axle-templates
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateAxleTemplateRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.AxleTemplateResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create axle-templates
+      tags:
+      - axle-templates
+  /api/v1/axle-templates/{id}:
+    delete:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete axle-templates
+      tags:
+      - axle-templates
+    get:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.AxleTemplateResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get axle-templates
+      tags:
+      - axle-templates
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateAxleTemplateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.AxleTemplateResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update axle-templates
+      tags:
+      - axle-templates
   /api/v1/catalog-options:
     get:
       parameters:
@@ -3689,6 +4756,133 @@ paths:
       summary: Update a catalog option
       tags:
       - catalog-options
+  /api/v1/comments:
+    get:
+      parameters:
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.CommentPage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List comments
+      tags:
+      - comments
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateCommentRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.CommentResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create comments
+      tags:
+      - comments
+  /api/v1/comments/{id}:
+    delete:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete comments
+      tags:
+      - comments
+    get:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.CommentResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get comments
+      tags:
+      - comments
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateCommentRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.CommentResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update comments
+      tags:
+      - comments
   /api/v1/companies:
     get:
       parameters:
@@ -3963,6 +5157,387 @@ paths:
       summary: Update faults
       tags:
       - faults
+  /api/v1/fuel-types:
+    get:
+      parameters:
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.FuelTypePage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List fuel-types
+      tags:
+      - fuel-types
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateFuelTypeRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.FuelTypeResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create fuel-types
+      tags:
+      - fuel-types
+  /api/v1/fuel-types/{id}:
+    delete:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete fuel-types
+      tags:
+      - fuel-types
+    get:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.FuelTypeResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get fuel-types
+      tags:
+      - fuel-types
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateFuelTypeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.FuelTypeResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update fuel-types
+      tags:
+      - fuel-types
+  /api/v1/inspection-forms:
+    get:
+      parameters:
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.InspectionFormPage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List inspection-forms
+      tags:
+      - inspection-forms
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateInspectionFormRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.InspectionFormResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create inspection-forms
+      tags:
+      - inspection-forms
+  /api/v1/inspection-forms/{id}:
+    delete:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete inspection-forms
+      tags:
+      - inspection-forms
+    get:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.InspectionFormResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get inspection-forms
+      tags:
+      - inspection-forms
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateInspectionFormRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.InspectionFormResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update inspection-forms
+      tags:
+      - inspection-forms
+  /api/v1/inspection-submissions:
+    get:
+      parameters:
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.InspectionSubmissionPage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List inspection-submissions
+      tags:
+      - inspection-submissions
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateInspectionSubmissionRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.InspectionSubmissionResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create inspection-submissions
+      tags:
+      - inspection-submissions
+  /api/v1/inspection-submissions/{id}:
+    delete:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete inspection-submissions
+      tags:
+      - inspection-submissions
+    get:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.InspectionSubmissionResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get inspection-submissions
+      tags:
+      - inspection-submissions
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateInspectionSubmissionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.InspectionSubmissionResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update inspection-submissions
+      tags:
+      - inspection-submissions
   /api/v1/inventory-adjustment-reasons:
     get:
       parameters:
@@ -4725,6 +6300,133 @@ paths:
       summary: Update measurement-units
       tags:
       - measurement-units
+  /api/v1/media:
+    get:
+      parameters:
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.MediumPage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List media
+      tags:
+      - media
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateMediumRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.MediumResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create media
+      tags:
+      - media
+  /api/v1/media/{id}:
+    delete:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete media
+      tags:
+      - media
+    get:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.MediumResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get media
+      tags:
+      - media
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateMediumRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.MediumResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update media
+      tags:
+      - media
   /api/v1/part-categories:
     get:
       parameters:
@@ -5360,6 +7062,133 @@ paths:
       summary: Update purchase-orders
       tags:
       - purchase-orders
+  /api/v1/roles:
+    get:
+      parameters:
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.RolePage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List roles
+      tags:
+      - roles
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateRoleRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.RoleResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create roles
+      tags:
+      - roles
+  /api/v1/roles/{id}:
+    delete:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete roles
+      tags:
+      - roles
+    get:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.RoleResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get roles
+      tags:
+      - roles
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateRoleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.RoleResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update roles
+      tags:
+      - roles
   /api/v1/service-entries:
     get:
       parameters:
@@ -5741,6 +7570,387 @@ paths:
       summary: Update service-tasks
       tags:
       - service-tasks
+  /api/v1/tire-assignment-requests:
+    get:
+      parameters:
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.TireAssignmentRequestPage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List tire-assignment-requests
+      tags:
+      - tire-assignment-requests
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateTireAssignmentRequestRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.TireAssignmentRequestResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create tire-assignment-requests
+      tags:
+      - tire-assignment-requests
+  /api/v1/tire-assignment-requests/{id}:
+    delete:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete tire-assignment-requests
+      tags:
+      - tire-assignment-requests
+    get:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.TireAssignmentRequestResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get tire-assignment-requests
+      tags:
+      - tire-assignment-requests
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateTireAssignmentRequestRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.TireAssignmentRequestResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update tire-assignment-requests
+      tags:
+      - tire-assignment-requests
+  /api/v1/tire-models:
+    get:
+      parameters:
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.TireModelPage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List tire-models
+      tags:
+      - tire-models
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateTireModelRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.TireModelResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create tire-models
+      tags:
+      - tire-models
+  /api/v1/tire-models/{id}:
+    delete:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete tire-models
+      tags:
+      - tire-models
+    get:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.TireModelResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get tire-models
+      tags:
+      - tire-models
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateTireModelRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.TireModelResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update tire-models
+      tags:
+      - tire-models
+  /api/v1/tires:
+    get:
+      parameters:
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.TirePage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List tires
+      tags:
+      - tires
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateTireRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.TireResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create tires
+      tags:
+      - tires
+  /api/v1/tires/{id}:
+    delete:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete tires
+      tags:
+      - tires
+    get:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.TireResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get tires
+      tags:
+      - tires
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateTireRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.TireResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update tires
+      tags:
+      - tires
   /api/v1/uploads:
     post:
       consumes:
@@ -6152,6 +8362,260 @@ paths:
       summary: Update vendors
       tags:
       - vendors
+  /api/v1/warranties:
+    get:
+      parameters:
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.WarrantyPage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List warranties
+      tags:
+      - warranties
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateWarrantyRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.WarrantyResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create warranties
+      tags:
+      - warranties
+  /api/v1/warranties/{id}:
+    delete:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete warranties
+      tags:
+      - warranties
+    get:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.WarrantyResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get warranties
+      tags:
+      - warranties
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateWarrantyRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.WarrantyResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update warranties
+      tags:
+      - warranties
+  /api/v1/weekly-mileage-goals:
+    get:
+      parameters:
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.WeeklyMileageGoalPage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List weekly-mileage-goals
+      tags:
+      - weekly-mileage-goals
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateWeeklyMileageGoalRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.WeeklyMileageGoalResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create weekly-mileage-goals
+      tags:
+      - weekly-mileage-goals
+  /api/v1/weekly-mileage-goals/{id}:
+    delete:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete weekly-mileage-goals
+      tags:
+      - weekly-mileage-goals
+    get:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.WeeklyMileageGoalResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get weekly-mileage-goals
+      tags:
+      - weekly-mileage-goals
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateWeeklyMileageGoalRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.WeeklyMileageGoalResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update weekly-mileage-goals
+      tags:
+      - weekly-mileage-goals
   /api/v1/work-order-statuses:
     get:
       parameters:
