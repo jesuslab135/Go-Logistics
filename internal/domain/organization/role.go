@@ -9,4 +9,3 @@ type Role struct {
 	IsAdmin     bool
 	Permissions map[string]any
 }
-

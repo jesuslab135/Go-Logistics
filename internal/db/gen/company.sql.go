@@ -10,6 +10,17 @@ import (
 	"time"
 )
 
+const countCompanies = `-- name: CountCompanies :one
+SELECT count(*) FROM company
+`
+
+func (q *Queries) CountCompanies(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, countCompanies)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createCompany = `-- name: CreateCompany :one
 INSERT INTO company (
     name, tax_id, address, created_at, phone, email, website, logo,
@@ -116,11 +127,16 @@ func (q *Queries) GetCompany(ctx context.Context, id int64) (Company, error) {
 }
 
 const listCompanies = `-- name: ListCompanies :many
-SELECT id, name, tax_id, address, created_at, phone, email, website, logo, city, region, postal_code, country, timezone, currency, system_of_measurement FROM company ORDER BY name
+SELECT id, name, tax_id, address, created_at, phone, email, website, logo, city, region, postal_code, country, timezone, currency, system_of_measurement FROM company ORDER BY name LIMIT $1 OFFSET $2
 `
 
-func (q *Queries) ListCompanies(ctx context.Context) ([]Company, error) {
-	rows, err := q.db.Query(ctx, listCompanies)
+type ListCompaniesParams struct {
+	Limit  int32
+	Offset int32
+}
+
+func (q *Queries) ListCompanies(ctx context.Context, arg ListCompaniesParams) ([]Company, error) {
+	rows, err := q.db.Query(ctx, listCompanies, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}

@@ -199,6 +199,7 @@ type Employee struct {
 	TablePreferences     []byte
 	DashboardPreferences []byte
 	UpdatedAt            time.Time
+	PasswordHash         string
 }
 
 type EmployeeCompany struct {

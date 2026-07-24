@@ -2,7 +2,10 @@
 SELECT * FROM company WHERE id = $1;
 
 -- name: ListCompanies :many
-SELECT * FROM company ORDER BY name;
+SELECT * FROM company ORDER BY name LIMIT $1 OFFSET $2;
+
+-- name: CountCompanies :one
+SELECT count(*) FROM company;
 
 -- name: CreateCompany :one
 INSERT INTO company (
