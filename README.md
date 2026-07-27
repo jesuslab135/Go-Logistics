@@ -190,6 +190,20 @@ backend also exposes `PresignedGetURL` for time-limited links.
 For QA/PROD, point `STORAGE_MINIO_ENDPOINT` at your S3/MinIO host, set
 `STORAGE_MINIO_USE_SSL=true`, and optionally `STORAGE_MINIO_PUBLIC_URL` to a CDN.
 
+> **⚠️ `STORAGE_MINIO_PUBLIC_URL` must include the bucket.**
+> `publicBase()` is asymmetric: when this variable is set it is used **verbatim**,
+> while the endpoint fallback appends `STORAGE_MINIO_BUCKET` for you. So
+> `http://cdn.example.com` yields `http://cdn.example.com/uploads/1/x.png` — no
+> bucket — and every URL 404s/403s while uploads still return `201`. Set
+> `http://cdn.example.com/<bucket>` instead. This bit us in `docker-compose.yml`
+> (see `docs/KNOWN-ISSUES.md` #1): the failure is silent on the write path and
+> only shows up as broken `<img>` tags in the client.
+
+Note the local ports differ by how you start the stack: the `docker run` commands
+above publish MinIO on **9000/9001**, but `docker-compose.yml` remaps it to
+**9010/9011** (another project already holds 9000). `STORAGE_MINIO_PUBLIC_URL`
+must match whichever you actually run.
+
 ---
 
 ## API surface

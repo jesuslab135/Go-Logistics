@@ -66,7 +66,10 @@ services:
     environment:
       DATABASE_URL: postgres://postgres:postgres@db:5432/fleet?sslmode=disable
       STORAGE_MINIO_ENDPOINT: minio:9000
-      STORAGE_MINIO_PUBLIC_URL: http://localhost:9010
+      # Must include the bucket: publicBase() uses this value verbatim when set,
+      # unlike the endpoint fallback which appends STORAGE_MINIO_BUCKET itself.
+      # Without /fleet, uploads are advertised at a path that 403s in <img> tags.
+      STORAGE_MINIO_PUBLIC_URL: http://localhost:9010/fleet
     ports:
       - "8080:8080"
     depends_on:
