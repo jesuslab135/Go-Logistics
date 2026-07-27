@@ -1,0 +1,101 @@
+name: go-logistics
+
+services:
+  db:
+    image: postgres:16
+    container_name: fleet-pg
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: fleet
+    ports:
+      - "5433:5432"
+    volumes:
+      - fleet_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d fleet"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    container_name: fleet-minio
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    ports:
+      # Remapped off 9000/9001: another project's minio (duran-minio) already
+      # holds those on this machine. Internal container-to-container traffic
+      # (api -> minio:9000) is unaffected — only host-side access moves.
+      - "9010:9000"
+      - "9011:9001"
+    volumes:
+      - fleet_minio_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9000/minio/health/live || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    image: migrate/migrate:v4.17.1
+    container_name: fleet-migrate
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./internal/db/migrations:/migrations:ro
+    entrypoint:
+      [
+        "migrate",
+        "-path", "/migrations",
+        "-database", "postgres://postgres:postgres@db:5432/fleet?sslmode=disable",
+        "up",
+      ]
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fleet-api
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@db:5432/fleet?sslmode=disable
+      STORAGE_MINIO_ENDPOINT: minio:9000
+      STORAGE_MINIO_PUBLIC_URL: http://localhost:9010
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: on-failure
+
+  # One-off tooling container (has the full Go toolchain + source, unlike the
+  # distroless `api` image). Use for the admin CLI, e.g.:
+  #   docker compose run --rm cli setpass --email admin@example.com --password supersecret1
+  cli:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: build
+    working_dir: /src
+    entrypoint: ["go", "run", "./cmd/cli"]
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@db:5432/fleet?sslmode=disable
+      JWT_SECRET: local-dev-secret
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles: ["tools"]
+
+volumes:
+  fleet_pg_data:
+  fleet_minio_data:
