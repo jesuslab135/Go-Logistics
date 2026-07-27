@@ -7,6 +7,10 @@ frontend code.
 Found 2026-07-26/27 during the Django→Go frontend migration. The frontend-side
 view of the same work lives in `fleet-admin-app/docs/backend-migration/`.
 
+**This file is defects only** — routes that exist but misbehave. For capabilities
+the client needs that don't exist yet (missing routes, missing fields, missing
+filters), see [`FRONTEND-REQUESTS.md`](./FRONTEND-REQUESTS.md).
+
 | # | Issue | Severity | Status |
 |---|---|---|---|
 | 1 | `STORAGE_MINIO_PUBLIC_URL` dropped the bucket → every uploaded image 403s | High | ✅ fixed |

@@ -24,6 +24,9 @@ cmd/
   api/            HTTP server entrypoint (@swagger general info lives here)
   cli/            admin CLI (e.g. set an employee password)
 docs/             generated OpenAPI spec (swag init output — do not hand-edit)
+                  plus two hand-written docs:
+                    KNOWN-ISSUES.md     defects in existing routes
+                    FRONTEND-REQUESTS.md what the client needs that doesn't exist yet
 internal/
   config/         env-driven configuration
   auth/           JWT token service + bcrypt helpers
