@@ -83,3 +83,70 @@ func withPerms(base Identity, raw string) Identity {
 	base.Permissions = DecodePermissions([]byte(raw))
 	return base
 }
+
+// What /me/permissions reports must be what the gates enforce, so the report is
+// derived from the same rule rather than restating it.
+func TestEffectivePermissionsMatchesCan(t *testing.T) {
+	identities := map[string]Identity{
+		"admin":        {IsActive: true, IsAdmin: true},
+		"inactive":     {IsAdmin: true},
+		"roleless":     {IsActive: true},
+		"whole module": withPerms(Identity{IsActive: true, HasRole: true}, `{"assets":{}}`),
+		"per action": withPerms(Identity{IsActive: true, HasRole: true},
+			`{"assets":{"read":true,"delete":false},"fuel":{"create":true}}`),
+	}
+
+	methodOf := map[string]string{
+		"read": http.MethodGet, "create": http.MethodPost,
+		"update": http.MethodPut, "delete": http.MethodDelete,
+	}
+
+	for name, identity := range identities {
+		t.Run(name, func(t *testing.T) {
+			effective := identity.EffectivePermissions()
+
+			for _, module := range Modules {
+				actions, ok := effective[module]
+				if !ok {
+					t.Fatalf("module %q missing from the report", module)
+				}
+				for action, method := range methodOf {
+					if got, want := actions[action], identity.Can(module, method); got != want {
+						t.Errorf("%s.%s = %v, but Can(%s) = %v", module, action, got, method, want)
+					}
+				}
+			}
+		})
+	}
+}
+
+// A role may grant an action no HTTP method maps to (Django's warehouse role
+// carries "approve"), and may name a module this build does not know about.
+// Neither may be dropped from the report.
+func TestEffectivePermissionsKeepsCustomActionsAndModules(t *testing.T) {
+	identity := withPerms(Identity{IsActive: true, HasRole: true},
+		`{"tire_approvals":{"approve":true},"future_module":{"read":true}}`)
+
+	effective := identity.EffectivePermissions()
+
+	if !effective["tire_approvals"]["approve"] {
+		t.Error("custom action \"approve\" was dropped from the report")
+	}
+	if _, ok := effective["future_module"]; !ok {
+		t.Error("module outside the registry was dropped from the report")
+	}
+	if !effective["future_module"]["read"] {
+		t.Error("unregistered module reported read = false, want true")
+	}
+}
+
+// An admin's report must grant custom actions too, not just the four standard
+// ones — the gate would let them through.
+func TestEffectivePermissionsAdminGrantsCustomAction(t *testing.T) {
+	identity := withPerms(Identity{IsActive: true, IsAdmin: true, HasRole: true},
+		`{"tire_approvals":{"approve":false}}`)
+
+	if !identity.EffectivePermissions()["tire_approvals"]["approve"] {
+		t.Error("admin reported approve = false, but the gate would allow it")
+	}
+}

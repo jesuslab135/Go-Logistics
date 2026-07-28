@@ -42,6 +42,7 @@ func TestRouterRegistersRoutes(t *testing.T) {
 		"GET /api/v1/assets/:id/fuel-entries",
 		"GET /api/v1/assets/:id/vehicle",
 		"GET /api/v1/work-order-sub-line-items/:id/labor-entries",
+		"GET /api/v1/me/permissions",
 	} {
 		if !routes[want] {
 			t.Errorf("route %q not registered", want)

@@ -48,8 +48,50 @@ var methodAction = map[string]string{
 	http.MethodDelete:  "delete",
 }
 
+// Modules is the registry of module names a role's permissions document can key
+// on: every module_name Django declared across its viewsets. It exists so
+// /me/permissions can report on modules the caller's role says nothing about —
+// a role that omits a module denies it, and the client needs to be told that
+// rather than left to infer it from an absent key.
+//
+// Note that three of these are not RequireModule groups in the router: Django
+// gated company and roles on IsAdminRole, and tire_approvals on the warehouse
+// role check that guarded the approve/reject actions.
+var Modules = []string{
+	"assets",
+	"company",
+	"employees",
+	"fuel",
+	"inspections",
+	"inventory",
+	"issues",
+	"mileage_goals",
+	"parts",
+	"roles",
+	"service",
+	"tire_approvals",
+	"tires",
+	"vendors",
+	"warranties",
+	"work_orders",
+}
+
+// standardActions are the actions every module is reported on, being the ones
+// methodAction can produce. Roles may define others (Django's warehouse role
+// carries "approve"); those are reported too, but only where a role names them.
+var standardActions = []string{"read", "create", "update", "delete"}
+
 // Can ports HasModuleAccess.has_permission.
 func (i Identity) Can(module, method string) bool {
+	// An unrecognised method yields no action, which allows below treats as
+	// "not granted by an explicit action" — matching Django, where an admin or
+	// a whole-module grant still passes and everyone else is refused.
+	return i.allows(module, methodAction[method])
+}
+
+// allows is the single rule behind both the request gate and the permissions
+// report, so what /me/permissions promises cannot drift from what is enforced.
+func (i Identity) allows(module, action string) bool {
 	if !i.IsActive {
 		return false
 	}
@@ -67,14 +109,39 @@ func (i Identity) Can(module, method string) bool {
 	if perms.All {
 		return true
 	}
-
-	// An unrecognised method yields no action, which is refused here unless the
-	// checks above already passed — matching Django.
-	action, ok := methodAction[method]
-	if !ok {
+	if action == "" {
 		return false
 	}
 	return perms.Actions[action]
+}
+
+// EffectivePermissions expands the caller's role into the answer to "may I do X
+// to Y", with the empty-object convention and the admin bypass already applied.
+// Clients render from this instead of reimplementing the rules.
+func (i Identity) EffectivePermissions() map[string]map[string]bool {
+	out := make(map[string]map[string]bool, len(Modules))
+	for _, module := range Modules {
+		out[module] = i.moduleActions(module)
+	}
+	// A role may name a module this build's registry does not know yet; report
+	// it rather than dropping it silently.
+	for module := range i.Permissions {
+		if _, ok := out[module]; !ok {
+			out[module] = i.moduleActions(module)
+		}
+	}
+	return out
+}
+
+func (i Identity) moduleActions(module string) map[string]bool {
+	actions := make(map[string]bool, len(standardActions))
+	for _, action := range standardActions {
+		actions[action] = i.allows(module, action)
+	}
+	for action := range i.Permissions[module].Actions {
+		actions[action] = i.allows(module, action)
+	}
+	return actions
 }
 
 type identityContextKey struct{}

@@ -159,6 +159,11 @@ func NewRouter(d Deps) *gin.Engine {
 
 	member.POST("/uploads", NewUploadHandler(d.Storage, d.Logger).Upload)
 
+	// The caller's own profile and permissions. Gated on identity alone: a
+	// client must be able to discover what it may do — including that it may do
+	// nothing — without first being refused by a module gate.
+	api.GET("/me/permissions", NewMeHandler(d.Queries).Permissions)
+
 	// Phase 8: nested, parent-scoped child resources
 	crud.NewNestedHandler[dto.WorkOrderLineItemResponse, dto.CreateWorkOrderLineItemRequest, dto.UpdateWorkOrderLineItemRequest](NewWorkOrderLineItemStore(d.Queries)).Register(workOrders, "/work-orders", "/line-items")
 	crud.NewNestedHandler[dto.WorkOrderStatusLogResponse, dto.CreateWorkOrderStatusLogRequest, dto.UpdateWorkOrderStatusLogRequest](NewWorkOrderStatusLogStore(d.Queries)).Register(workOrders, "/work-orders", "/status-logs")
