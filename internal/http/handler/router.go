@@ -164,6 +164,19 @@ func NewRouter(d Deps) *gin.Engine {
 	// nothing — without first being refused by a module gate.
 	api.GET("/me/permissions", NewMeHandler(d.Queries).Permissions)
 
+	// Notifications are per-caller, so membership is the only gate that applies.
+	member.GET("/notifications", NewNotificationHandler().List)
+
+	// The dashboard reads across every module, so it is gated on membership
+	// rather than on any one of them; the counts it returns are already scoped
+	// to the caller's company.
+	member.GET("/dashboard/stats", NewDashboardHandler(d.Queries).Stats)
+
+	// Groups are the company's org tree. Django's employee viewset owned them,
+	// so they sit behind the same module.
+	crud.NewHandler[dto.GroupResponse, dto.CreateGroupRequest, dto.UpdateGroupRequest](
+		NewGroupStore(d.Queries)).Register(employees, "/groups")
+
 	// Phase 8: nested, parent-scoped child resources
 	crud.NewNestedHandler[dto.WorkOrderLineItemResponse, dto.CreateWorkOrderLineItemRequest, dto.UpdateWorkOrderLineItemRequest](NewWorkOrderLineItemStore(d.Queries)).Register(workOrders, "/work-orders", "/line-items")
 	crud.NewNestedHandler[dto.WorkOrderStatusLogResponse, dto.CreateWorkOrderStatusLogRequest, dto.UpdateWorkOrderStatusLogRequest](NewWorkOrderStatusLogStore(d.Queries)).Register(workOrders, "/work-orders", "/status-logs")
