@@ -4,19 +4,23 @@ import (
 	"context"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"fleet/internal/db/gen"
 	"fleet/internal/http/dto"
 	"fleet/internal/platform/paginate"
 )
 
 // CompanyStore adapts the sqlc-generated queries to crud.Store, translating
-// between request/response DTOs and the persistence rows.
+// between request/response DTOs and the persistence rows. Company creation
+// seeds the 6 default roles transactionally.
 type CompanyStore struct {
-	q *gen.Queries
+	q    *gen.Queries
+	pool *pgxpool.Pool
 }
 
-func NewCompanyStore(q *gen.Queries) *CompanyStore {
-	return &CompanyStore{q: q}
+func NewCompanyStore(q *gen.Queries, pool *pgxpool.Pool) *CompanyStore {
+	return &CompanyStore{q: q, pool: pool}
 }
 
 func (s *CompanyStore) List(ctx context.Context, p paginate.Params) ([]dto.CompanyResponse, int64, error) {
@@ -48,7 +52,15 @@ func (s *CompanyStore) Get(ctx context.Context, id int64) (dto.CompanyResponse, 
 }
 
 func (s *CompanyStore) Create(ctx context.Context, in dto.CreateCompanyRequest) (dto.CompanyResponse, error) {
-	row, err := s.q.CreateCompany(ctx, gen.CreateCompanyParams{
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return dto.CompanyResponse{}, err
+	}
+	defer tx.Rollback(ctx)
+
+	qtx := s.q.WithTx(tx)
+
+	row, err := qtx.CreateCompany(ctx, gen.CreateCompanyParams{
 		Name:                in.Name,
 		TaxID:               in.TaxID,
 		Address:             in.Address,
@@ -68,6 +80,15 @@ func (s *CompanyStore) Create(ctx context.Context, in dto.CreateCompanyRequest) 
 	if err != nil {
 		return dto.CompanyResponse{}, err
 	}
+
+	if err := SeedDefaultRoles(ctx, qtx, row.ID); err != nil {
+		return dto.CompanyResponse{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return dto.CompanyResponse{}, err
+	}
+
 	return toCompanyResponse(row), nil
 }
 

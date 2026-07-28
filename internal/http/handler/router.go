@@ -64,8 +64,11 @@ func NewRouter(d Deps) *gin.Engine {
 	api := r.Group("/api/v1")
 	api.Use(middleware.Auth(d.Tokens))
 
+	meH := NewMeHandler(d.Queries)
+	api.GET("/me/permissions", meH.GetPermissions)
+
 	crud.NewHandler[dto.CompanyResponse, dto.CreateCompanyRequest, dto.UpdateCompanyRequest](
-		NewCompanyStore(d.Queries)).Register(api, "/companies")
+		NewCompanyStore(d.Queries, d.Pool)).Register(api, "/companies")
 
 	// Phase 2: assets
 	crud.NewHandler[dto.AssetResponse, dto.CreateAssetRequest, dto.UpdateAssetRequest](
