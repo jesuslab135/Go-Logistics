@@ -489,6 +489,7 @@ type Medium struct {
 	UploadedByID *int64
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
+	Thumbnail    string
 }
 
 type Part struct {

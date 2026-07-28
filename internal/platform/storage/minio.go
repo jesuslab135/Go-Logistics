@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
+	"path"
 	"strings"
 	"time"
 
@@ -20,6 +22,10 @@ type MinIOConfig struct {
 	UseSSL    bool
 	Public    bool   // set an anonymous read policy so URLs work in <img> tags
 	PublicURL string // optional base URL override (CDN / custom domain)
+
+	// PublicURLIsBucketRoot allows a PublicURL that does not end in the bucket
+	// name, for CDNs whose origin is mapped to the bucket root.
+	PublicURLIsBucketRoot bool
 }
 
 // MinIO is an S3-compatible object-storage backend (MinIO, AWS S3, etc.).
@@ -49,7 +55,12 @@ func NewMinIO(ctx context.Context, cfg MinIOConfig) (*MinIO, error) {
 		}
 	}
 
-	m := &MinIO{client: client, bucket: cfg.Bucket, baseURL: publicBase(cfg)}
+	base, err := publicBase(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	m := &MinIO{client: client, bucket: cfg.Bucket, baseURL: base}
 
 	if cfg.Public {
 		if err := m.setPublicReadPolicy(ctx); err != nil {
@@ -92,6 +103,25 @@ func (m *MinIO) URL(key string) string {
 	return m.baseURL + "/" + cleanKey(key)
 }
 
+func (m *MinIO) Stat(ctx context.Context, key string) (Object, error) {
+	object := cleanKey(key)
+	if object == "" {
+		return Object{}, ErrInvalidKey
+	}
+	info, err := m.client.StatObject(ctx, m.bucket, object, minio.StatObjectOptions{})
+	if err != nil {
+		if minio.ToErrorResponse(err).StatusCode == http.StatusNotFound {
+			return Object{}, ErrNotFound
+		}
+		return Object{}, err
+	}
+	return Object{Key: object, URL: m.URL(object), Size: info.Size, ContentType: info.ContentType}, nil
+}
+
+func (m *MinIO) KeyFromURL(url string) (string, bool) {
+	return keyFromURL(m.baseURL, url)
+}
+
 // PresignedGetURL returns a time-limited download URL, for private buckets where
 // the object is not publicly readable.
 func (m *MinIO) PresignedGetURL(ctx context.Context, key string, expiry time.Duration) (string, error) {
@@ -107,13 +137,26 @@ func (m *MinIO) setPublicReadPolicy(ctx context.Context) error {
 	return m.client.SetBucketPolicy(ctx, m.bucket, policy)
 }
 
-func publicBase(cfg MinIOConfig) string {
-	if cfg.PublicURL != "" {
-		return strings.TrimRight(cfg.PublicURL, "/")
+// publicBase derives the base URL objects are advertised at. The endpoint
+// fallback appends the bucket, so an override that omits it produces URLs that
+// 404/403 on every read — a misconfiguration invisible on the write path. It is
+// rejected here instead, at startup.
+func publicBase(cfg MinIOConfig) (string, error) {
+	if cfg.PublicURL == "" {
+		scheme := "http"
+		if cfg.UseSSL {
+			scheme = "https"
+		}
+		return fmt.Sprintf("%s://%s/%s", scheme, cfg.Endpoint, cfg.Bucket), nil
 	}
-	scheme := "http"
-	if cfg.UseSSL {
-		scheme = "https"
+
+	base := strings.TrimRight(cfg.PublicURL, "/")
+	if !cfg.PublicURLIsBucketRoot && path.Base(base) != cfg.Bucket {
+		return "", fmt.Errorf(
+			"storage: STORAGE_MINIO_PUBLIC_URL %q must end with the bucket name %q "+
+				"(objects are stored under it); set STORAGE_MINIO_PUBLIC_URL_IS_BUCKET_ROOT=true "+
+				"if a CDN already maps this URL to the bucket root",
+			cfg.PublicURL, cfg.Bucket)
 	}
-	return fmt.Sprintf("%s://%s/%s", scheme, cfg.Endpoint, cfg.Bucket)
+	return base, nil
 }

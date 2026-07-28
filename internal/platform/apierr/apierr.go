@@ -47,6 +47,12 @@ func Unauthorized(message string) *Error {
 func Forbidden(message string) *Error { return New(http.StatusForbidden, "forbidden", message) }
 func NotFound(message string) *Error  { return New(http.StatusNotFound, "not_found", message) }
 func Conflict(message string) *Error  { return New(http.StatusConflict, "conflict", message) }
+func PayloadTooLarge(message string) *Error {
+	return New(http.StatusRequestEntityTooLarge, "payload_too_large", message)
+}
+func UnsupportedMediaType(message string) *Error {
+	return New(http.StatusUnsupportedMediaType, "unsupported_media_type", message)
+}
 
 func Validation(details any) *Error {
 	return New(http.StatusUnprocessableEntity, "validation_failed", "validation failed").WithDetails(details)

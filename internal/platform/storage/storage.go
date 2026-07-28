@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"mime"
 	"os"
 	"path"
 	"path/filepath"
@@ -27,7 +28,16 @@ type Storage interface {
 	Open(ctx context.Context, key string) (io.ReadCloser, error)
 	Delete(ctx context.Context, key string) error
 	URL(key string) string
+
+	// Stat reports an existing object's metadata, and KeyFromURL reverses URL.
+	// Together they let handlers verify that a client-supplied file URL really
+	// points at an object in our own bucket, and read its true size/type rather
+	// than trusting the client.
+	Stat(ctx context.Context, key string) (Object, error)
+	KeyFromURL(url string) (string, bool)
 }
+
+var ErrNotFound = errors.New("storage: object not found")
 
 // FromEnv builds the storage backend selected by STORAGE_BACKEND (local|minio),
 // defaulting to local disk. Both satisfy Storage, so callers are unaffected.
@@ -43,6 +53,8 @@ func FromEnv() (Storage, error) {
 			UseSSL:    env("STORAGE_MINIO_USE_SSL", "false") == "true",
 			Public:    env("STORAGE_MINIO_PUBLIC", "false") == "true",
 			PublicURL: os.Getenv("STORAGE_MINIO_PUBLIC_URL"),
+
+			PublicURLIsBucketRoot: env("STORAGE_MINIO_PUBLIC_URL_IS_BUCKET_ROOT", "false") == "true",
 		})
 	default:
 		return NewLocal(env("STORAGE_LOCAL_ROOT", "./uploads"), env("STORAGE_BASE_URL", "/media")), nil
@@ -102,6 +114,45 @@ func (l *Local) Delete(_ context.Context, key string) error {
 
 func (l *Local) URL(key string) string {
 	return l.baseURL + "/" + cleanKey(key)
+}
+
+func (l *Local) Stat(_ context.Context, key string) (Object, error) {
+	full, err := l.resolve(key)
+	if err != nil {
+		return Object{}, err
+	}
+	info, err := os.Stat(full)
+	if errors.Is(err, os.ErrNotExist) {
+		return Object{}, ErrNotFound
+	}
+	if err != nil {
+		return Object{}, err
+	}
+	clean := cleanKey(key)
+	return Object{
+		Key:         clean,
+		URL:         l.URL(clean),
+		Size:        info.Size(),
+		ContentType: mime.TypeByExtension(path.Ext(clean)),
+	}, nil
+}
+
+func (l *Local) KeyFromURL(url string) (string, bool) {
+	return keyFromURL(l.baseURL, url)
+}
+
+// keyFromURL strips the backend's public base from url, so only objects this
+// backend actually serves resolve to a key.
+func keyFromURL(baseURL, url string) (string, bool) {
+	rest, ok := strings.CutPrefix(url, baseURL+"/")
+	if !ok {
+		return "", false
+	}
+	key := cleanKey(rest)
+	if key == "" {
+		return "", false
+	}
+	return key, true
 }
 
 // resolve maps a key to an absolute path, refusing any key that would escape the

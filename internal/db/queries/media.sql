@@ -9,14 +9,14 @@ SELECT count(*) FROM media WHERE company_id = $1;
 
 -- name: CreateMedium :one
 INSERT INTO media (
-    company_id, asset_id, file, title, description, file_type, file_size, uploaded_by_id, created_at, updated_at
+    company_id, asset_id, file, title, description, file_type, file_size, thumbnail, uploaded_by_id, created_at, updated_at
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
 )
 RETURNING *;
 
 -- name: UpdateMedium :one
-UPDATE media SET asset_id = $3, file = $4, title = $5, description = $6, file_type = $7, file_size = $8, uploaded_by_id = $9, updated_at = $10
+UPDATE media SET asset_id = $3, file = $4, title = $5, description = $6, file_type = $7, file_size = $8, thumbnail = $9, uploaded_by_id = $10, updated_at = $11
 WHERE id = $1 AND company_id = $2
 RETURNING *;
 

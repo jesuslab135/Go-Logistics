@@ -23,11 +23,11 @@ func (q *Queries) CountMediaItems(ctx context.Context, companyID int64) (int64, 
 
 const createMedium = `-- name: CreateMedium :one
 INSERT INTO media (
-    company_id, asset_id, file, title, description, file_type, file_size, uploaded_by_id, created_at, updated_at
+    company_id, asset_id, file, title, description, file_type, file_size, thumbnail, uploaded_by_id, created_at, updated_at
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
 )
-RETURNING id, company_id, asset_id, file, title, description, file_type, file_size, uploaded_by_id, created_at, updated_at
+RETURNING id, company_id, asset_id, file, title, description, file_type, file_size, uploaded_by_id, created_at, updated_at, thumbnail
 `
 
 type CreateMediumParams struct {
@@ -38,6 +38,7 @@ type CreateMediumParams struct {
 	Description  string
 	FileType     string
 	FileSize     int32
+	Thumbnail    string
 	UploadedByID *int64
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
@@ -52,6 +53,7 @@ func (q *Queries) CreateMedium(ctx context.Context, arg CreateMediumParams) (Med
 		arg.Description,
 		arg.FileType,
 		arg.FileSize,
+		arg.Thumbnail,
 		arg.UploadedByID,
 		arg.CreatedAt,
 		arg.UpdatedAt,
@@ -69,6 +71,7 @@ func (q *Queries) CreateMedium(ctx context.Context, arg CreateMediumParams) (Med
 		&i.UploadedByID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Thumbnail,
 	)
 	return i, err
 }
@@ -88,7 +91,7 @@ func (q *Queries) DeleteMedium(ctx context.Context, arg DeleteMediumParams) erro
 }
 
 const getMedium = `-- name: GetMedium :one
-SELECT id, company_id, asset_id, file, title, description, file_type, file_size, uploaded_by_id, created_at, updated_at FROM media WHERE id = $1 AND company_id = $2
+SELECT id, company_id, asset_id, file, title, description, file_type, file_size, uploaded_by_id, created_at, updated_at, thumbnail FROM media WHERE id = $1 AND company_id = $2
 `
 
 type GetMediumParams struct {
@@ -111,12 +114,13 @@ func (q *Queries) GetMedium(ctx context.Context, arg GetMediumParams) (Medium, e
 		&i.UploadedByID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Thumbnail,
 	)
 	return i, err
 }
 
 const listMediaItems = `-- name: ListMediaItems :many
-SELECT id, company_id, asset_id, file, title, description, file_type, file_size, uploaded_by_id, created_at, updated_at FROM media WHERE company_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3
+SELECT id, company_id, asset_id, file, title, description, file_type, file_size, uploaded_by_id, created_at, updated_at, thumbnail FROM media WHERE company_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3
 `
 
 type ListMediaItemsParams struct {
@@ -146,6 +150,7 @@ func (q *Queries) ListMediaItems(ctx context.Context, arg ListMediaItemsParams) 
 			&i.UploadedByID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Thumbnail,
 		); err != nil {
 			return nil, err
 		}
@@ -158,9 +163,9 @@ func (q *Queries) ListMediaItems(ctx context.Context, arg ListMediaItemsParams) 
 }
 
 const updateMedium = `-- name: UpdateMedium :one
-UPDATE media SET asset_id = $3, file = $4, title = $5, description = $6, file_type = $7, file_size = $8, uploaded_by_id = $9, updated_at = $10
+UPDATE media SET asset_id = $3, file = $4, title = $5, description = $6, file_type = $7, file_size = $8, thumbnail = $9, uploaded_by_id = $10, updated_at = $11
 WHERE id = $1 AND company_id = $2
-RETURNING id, company_id, asset_id, file, title, description, file_type, file_size, uploaded_by_id, created_at, updated_at
+RETURNING id, company_id, asset_id, file, title, description, file_type, file_size, uploaded_by_id, created_at, updated_at, thumbnail
 `
 
 type UpdateMediumParams struct {
@@ -172,6 +177,7 @@ type UpdateMediumParams struct {
 	Description  string
 	FileType     string
 	FileSize     int32
+	Thumbnail    string
 	UploadedByID *int64
 	UpdatedAt    time.Time
 }
@@ -186,6 +192,7 @@ func (q *Queries) UpdateMedium(ctx context.Context, arg UpdateMediumParams) (Med
 		arg.Description,
 		arg.FileType,
 		arg.FileSize,
+		arg.Thumbnail,
 		arg.UploadedByID,
 		arg.UpdatedAt,
 	)
@@ -202,6 +209,7 @@ func (q *Queries) UpdateMedium(ctx context.Context, arg UpdateMediumParams) (Med
 		&i.UploadedByID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Thumbnail,
 	)
 	return i, err
 }

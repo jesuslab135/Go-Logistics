@@ -136,7 +136,7 @@ func NewRouter(d Deps) *gin.Engine {
 	crud.NewHandler[dto.FuelTypeResponse, dto.CreateFuelTypeRequest, dto.UpdateFuelTypeRequest](NewFuelTypeStore(d.Queries)).Register(fuel, "/fuel-types")
 	crud.NewHandler[dto.InspectionFormResponse, dto.CreateInspectionFormRequest, dto.UpdateInspectionFormRequest](NewInspectionFormStore(d.Queries)).Register(inspections, "/inspection-forms")
 	crud.NewHandler[dto.InspectionSubmissionResponse, dto.CreateInspectionSubmissionRequest, dto.UpdateInspectionSubmissionRequest](NewInspectionSubmissionStore(d.Queries)).Register(inspections, "/inspection-submissions")
-	crud.NewHandler[dto.MediumResponse, dto.CreateMediumRequest, dto.UpdateMediumRequest](NewMediumStore(d.Queries)).Register(assets, "/media")
+	crud.NewHandler[dto.MediumResponse, dto.CreateMediumRequest, dto.UpdateMediumRequest](NewMediumStore(d.Queries, d.Storage)).Register(assets, "/media")
 	crud.NewHandler[dto.CommentResponse, dto.CreateCommentRequest, dto.UpdateCommentRequest](NewCommentStore(d.Queries)).Register(issues, "/comments")
 	crud.NewHandler[dto.WarrantyResponse, dto.CreateWarrantyRequest, dto.UpdateWarrantyRequest](NewWarrantyStore(d.Queries)).Register(warranties, "/warranties")
 	crud.NewHandler[dto.WeeklyMileageGoalResponse, dto.CreateWeeklyMileageGoalRequest, dto.UpdateWeeklyMileageGoalRequest](NewWeeklyMileageGoalStore(d.Queries)).Register(mileageGoals, "/weekly-mileage-goals")
@@ -157,7 +157,7 @@ func NewRouter(d Deps) *gin.Engine {
 	crud.NewHandler[dto.VehicleModelResponse, dto.CreateVehicleModelRequest, dto.UpdateVehicleModelRequest](
 		NewVehicleModelStore(d.Queries)).Register(member, "/vehicle-models")
 
-	member.POST("/uploads", NewUploadHandler(d.Storage).Upload)
+	member.POST("/uploads", NewUploadHandler(d.Storage, d.Logger).Upload)
 
 	// Phase 8: nested, parent-scoped child resources
 	crud.NewNestedHandler[dto.WorkOrderLineItemResponse, dto.CreateWorkOrderLineItemRequest, dto.UpdateWorkOrderLineItemRequest](NewWorkOrderLineItemStore(d.Queries)).Register(workOrders, "/work-orders", "/line-items")
