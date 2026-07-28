@@ -19,7 +19,7 @@ type CreatePartRequest struct {
 	SupplierPartNumber     string           `json:"supplier_part_number" binding:"omitempty,max=100"`
 	Upc                    string           `json:"upc" binding:"omitempty,max=50"`
 	UnitCost               *decimal.Decimal `json:"unit_cost"`
-	InventoryItem          bool             `json:"inventory_item"`
+	InventoryItem          *bool            `json:"inventory_item"`
 	ArchivedAt             *time.Time       `json:"archived_at"`
 	CustomFields           json.RawMessage  `json:"custom_fields"`
 }

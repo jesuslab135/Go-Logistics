@@ -17,8 +17,8 @@ type CreatePartInventoryRequest struct {
 	ReorderPointEnabled        bool             `json:"reorder_point_enabled"`
 	ReorderQuantity            *int32           `json:"reorder_quantity"`
 	ReorderPointLeadTimeDays   *int32           `json:"reorder_point_lead_time_days"`
-	Active                     bool             `json:"active"`
-	TrackInventory             bool             `json:"track_inventory"`
+	Active                     *bool            `json:"active"`
+	TrackInventory             *bool            `json:"track_inventory"`
 	AverageUnitCost            *decimal.Decimal `json:"average_unit_cost"`
 	AvailableQuantityUpdatedAt *time.Time       `json:"available_quantity_updated_at"`
 }

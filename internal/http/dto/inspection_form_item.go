@@ -11,12 +11,12 @@ type CreateInspectionFormItemRequest struct {
 	ShortDescription                   string          `json:"short_description" binding:"omitempty,max=500"`
 	Instructions                       string          `json:"instructions"`
 	Position                           int32           `json:"position"`
-	IsRequired                         bool            `json:"is_required"`
+	IsRequired                         *bool           `json:"is_required"`
 	PassLabel                          string          `json:"pass_label" binding:"omitempty,max=50"`
 	FailLabel                          string          `json:"fail_label" binding:"omitempty,max=50"`
 	NaLabel                            string          `json:"na_label" binding:"omitempty,max=50"`
 	EnableNaOption                     bool            `json:"enable_na_option"`
-	RequireRemarkOnFail                bool            `json:"require_remark_on_fail"`
+	RequireRemarkOnFail                *bool           `json:"require_remark_on_fail"`
 	RequireRemarkOnPass                bool            `json:"require_remark_on_pass"`
 	RequirePhotoOnFail                 bool            `json:"require_photo_on_fail"`
 	RequireMeterEntryPhotoVerification bool            `json:"require_meter_entry_photo_verification"`

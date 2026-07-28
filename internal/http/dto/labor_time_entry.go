@@ -11,7 +11,7 @@ type CreateLaborTimeEntryRequest struct {
 	StartedAt         time.Time        `json:"started_at"`
 	EndedAt           *time.Time       `json:"ended_at"`
 	DurationSeconds   *int32           `json:"duration_seconds"`
-	IsActive          bool             `json:"is_active"`
+	IsActive          *bool            `json:"is_active"`
 	ClockInLatitude   *decimal.Decimal `json:"clock_in_latitude"`
 	ClockInLongitude  *decimal.Decimal `json:"clock_in_longitude"`
 	ClockOutLatitude  *decimal.Decimal `json:"clock_out_latitude"`

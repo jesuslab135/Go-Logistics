@@ -153,10 +153,3 @@ func toCompanyResponse(c gen.Company) dto.CompanyResponse {
 		CreatedAt:           c.CreatedAt,
 	}
 }
-
-func orDefault(v, fallback string) string {
-	if v == "" {
-		return fallback
-	}
-	return v
-}

@@ -9,7 +9,7 @@ type CreateInspectionFormRequest struct {
 	Description      string     `json:"description"`
 	Version          int32      `json:"version"`
 	RequireLivePhoto bool       `json:"require_live_photo"`
-	AutoCreateIssues bool       `json:"auto_create_issues"`
+	AutoCreateIssues *bool      `json:"auto_create_issues"`
 	Color            string     `json:"color" binding:"omitempty,max=7"`
 	ArchivedAt       *time.Time `json:"archived_at"`
 }

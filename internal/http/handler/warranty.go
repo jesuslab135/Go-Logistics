@@ -47,7 +47,7 @@ func (s *WarrantyStore) Create(ctx context.Context, in dto.CreateWarrantyRequest
 		StartDate:  in.StartDate,
 		EndDate:    in.EndDate,
 		Terms:      in.Terms,
-		IsActive:   in.IsActive,
+		IsActive:   boolOrDefault(in.IsActive, true),
 	})
 	if err != nil {
 		return dto.WarrantyResponse{}, err

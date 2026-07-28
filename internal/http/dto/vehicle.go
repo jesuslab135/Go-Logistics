@@ -69,8 +69,8 @@ type UpsertVehicleRequest struct {
 	ServiceType             string           `json:"service_type" binding:"omitempty,max=100"`
 	Supervisor              string           `json:"supervisor" binding:"omitempty,max=200"`
 	Management              string           `json:"management" binding:"omitempty,max=200"`
-	IsActiveDispatch        bool             `json:"is_active_dispatch"`
-	IsActiveCompany         bool             `json:"is_active_company"`
+	IsActiveDispatch        *bool            `json:"is_active_dispatch"`
+	IsActiveCompany         *bool            `json:"is_active_company"`
 	DutyType                string           `json:"duty_type" binding:"omitempty,max=20"`
 	WeightClass             string           `json:"weight_class" binding:"omitempty,max=50"`
 	CargoVolume             *decimal.Decimal `json:"cargo_volume"`

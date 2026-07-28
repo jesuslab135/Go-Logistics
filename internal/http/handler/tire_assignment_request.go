@@ -46,7 +46,7 @@ func (s *TireAssignmentRequestStore) Create(ctx context.Context, in dto.CreateTi
 		TireID:          in.TireID,
 		VehicleID:       in.VehicleID,
 		PositionCode:    in.PositionCode,
-		State:           in.State,
+		State:           orDefault(in.State, "PENDING"),
 		RequestedByID:   in.RequestedByID,
 		RequestedAt:     in.RequestedAt,
 		ApprovedByID:    in.ApprovedByID,

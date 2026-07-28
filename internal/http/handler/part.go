@@ -55,7 +55,7 @@ func (s *PartStore) Create(ctx context.Context, in dto.CreatePartRequest) (dto.P
 		SupplierPartNumber:     in.SupplierPartNumber,
 		Upc:                    in.Upc,
 		UnitCost:               in.UnitCost,
-		InventoryItem:          in.InventoryItem,
+		InventoryItem:          boolOrDefault(in.InventoryItem, true),
 		ArchivedAt:             in.ArchivedAt,
 		CustomFields:           jsonbOrDefault(in.CustomFields, "{}"),
 		CreatedAt:              now,

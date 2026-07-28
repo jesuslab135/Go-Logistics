@@ -2,7 +2,7 @@ package dto
 
 type CreateLocationRequest struct {
 	Name     string `json:"name" binding:"omitempty,max=100"`
-	IsActive bool   `json:"is_active"`
+	IsActive *bool  `json:"is_active"`
 }
 
 type UpdateLocationRequest struct {

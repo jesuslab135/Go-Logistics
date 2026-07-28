@@ -42,7 +42,7 @@ func (s *LocationStore) Create(ctx context.Context, in dto.CreateLocationRequest
 	r, err := s.q.CreateLocation(ctx, gen.CreateLocationParams{
 		CompanyID: middleware.CompanyFromContext(ctx),
 		Name:      in.Name,
-		IsActive:  in.IsActive,
+		IsActive:  boolOrDefault(in.IsActive, true),
 	})
 	if err != nil {
 		return dto.LocationResponse{}, err

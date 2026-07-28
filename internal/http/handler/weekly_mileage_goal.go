@@ -49,11 +49,11 @@ func (s *WeeklyMileageGoalStore) Create(ctx context.Context, in dto.CreateWeekly
 		RatePerMile:        in.RatePerMile,
 		WeeklyMileageGoal:  in.WeeklyMileageGoal,
 		MpgGoal:            in.MpgGoal,
-		UnitsPerService:    in.UnitsPerService,
+		UnitsPerService:    int32OrDefault(in.UnitsPerService, 1),
 		MachinesInWorkshop: in.MachinesInWorkshop,
 		MissingMiles:       in.MissingMiles,
 		SortOrder:          in.SortOrder,
-		IsActive:           in.IsActive,
+		IsActive:           boolOrDefault(in.IsActive, true),
 		CreatedAt:          now,
 		UpdatedAt:          now,
 	})

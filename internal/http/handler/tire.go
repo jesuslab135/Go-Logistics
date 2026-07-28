@@ -45,7 +45,7 @@ func (s *TireStore) Create(ctx context.Context, in dto.CreateTireRequest) (dto.T
 		CompanyID:                middleware.CompanyFromContext(ctx),
 		TireIdentificationNumber: in.TireIdentificationNumber,
 		TireModelID:              in.TireModelID,
-		Status:                   in.Status,
+		Status:                   orDefault(in.Status, "IN_STOCK"),
 		CurrentTreadDepth32nds:   in.CurrentTreadDepth32nds,
 		CurrentPsi:               in.CurrentPsi,
 		TotalMiles:               in.TotalMiles,

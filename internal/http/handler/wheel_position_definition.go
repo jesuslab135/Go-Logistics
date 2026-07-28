@@ -46,7 +46,7 @@ func (s *WheelPositionDefinitionStore) Create(ctx context.Context, parentID int6
 		CompanyID: middleware.CompanyFromContext(ctx),
 		Code:      in.Code,
 		Side:      in.Side,
-		Slot:      in.Slot,
+		Slot:      int32OrDefault(in.Slot, 1),
 	})
 	if err != nil {
 		return dto.WheelPositionDefinitionResponse{}, err

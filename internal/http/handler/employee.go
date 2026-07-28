@@ -127,7 +127,7 @@ func createEmployeeParams(in dto.CreateEmployeeRequest, now time.Time) gen.Creat
 		LastName:             in.LastName,
 		EmployeeID:           in.EmployeeID,
 		RoleID:               in.RoleID,
-		IsActive:             in.IsActive,
+		IsActive:             boolOrDefault(in.IsActive, true),
 		Email:                in.Email,
 		MobilePhone:          in.MobilePhone,
 		WorkPhone:            in.WorkPhone,

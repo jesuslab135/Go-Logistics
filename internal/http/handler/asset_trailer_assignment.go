@@ -45,11 +45,11 @@ func (s *AssetTrailerAssignmentStore) Create(ctx context.Context, parentID int64
 		ParentID:       parentID,
 		CompanyID:      middleware.CompanyFromContext(ctx),
 		TrailerID:      in.TrailerID,
-		Position:       in.Position,
+		Position:       int32OrDefault(in.Position, 1),
 		AssignedDate:   in.AssignedDate,
 		UnassignedDate: in.UnassignedDate,
 		AssignedByID:   in.AssignedByID,
-		IsActive:       in.IsActive,
+		IsActive:       boolOrDefault(in.IsActive, true),
 		Notes:          in.Notes,
 	})
 	if err != nil {

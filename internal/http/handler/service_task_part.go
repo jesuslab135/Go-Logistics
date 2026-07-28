@@ -45,7 +45,7 @@ func (s *ServiceTaskPartStore) Create(ctx context.Context, parentID int64, in dt
 		ParentID:  parentID,
 		CompanyID: middleware.CompanyFromContext(ctx),
 		PartID:    in.PartID,
-		Quantity:  in.Quantity,
+		Quantity:  decimalOrDefault(in.Quantity, 1),
 		Position:  in.Position,
 	})
 	if err != nil {

@@ -42,7 +42,7 @@ func (s *IssuePriorityStore) Create(ctx context.Context, in dto.CreateIssuePrior
 	r, err := s.q.CreateIssuePriority(ctx, gen.CreateIssuePriorityParams{
 		CompanyID: middleware.CompanyFromContext(ctx),
 		Name:      in.Name,
-		Color:     in.Color,
+		Color:     orDefault(in.Color, "#FFC107"),
 		Position:  in.Position,
 	})
 	if err != nil {

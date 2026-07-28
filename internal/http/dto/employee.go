@@ -14,7 +14,7 @@ type CreateEmployeeRequest struct {
 	LastName             string           `json:"last_name" binding:"omitempty,max=100"`
 	EmployeeID           string           `json:"employee_id" binding:"omitempty,max=50"`
 	RoleID               *int64           `json:"role_id"`
-	IsActive             bool             `json:"is_active"`
+	IsActive             *bool            `json:"is_active"`
 	Email                string           `json:"email" binding:"omitempty,max=254"`
 	MobilePhone          string           `json:"mobile_phone" binding:"omitempty,max=20"`
 	WorkPhone            string           `json:"work_phone" binding:"omitempty,max=20"`

@@ -45,7 +45,7 @@ func (s *AxleDefinitionStore) Create(ctx context.Context, parentID int64, in dto
 		PositionIndex:    in.PositionIndex,
 		Label:            in.Label,
 		AxleRole:         in.AxleRole,
-		PositionsPerSide: in.PositionsPerSide,
+		PositionsPerSide: int32OrDefault(in.PositionsPerSide, 1),
 	})
 	if err != nil {
 		return dto.AxleDefinitionResponse{}, err

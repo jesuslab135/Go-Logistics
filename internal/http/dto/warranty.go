@@ -11,7 +11,7 @@ type CreateWarrantyRequest struct {
 	StartDate  time.Time `json:"start_date"`
 	EndDate    time.Time `json:"end_date"`
 	Terms      string    `json:"terms"`
-	IsActive   bool      `json:"is_active"`
+	IsActive   *bool     `json:"is_active"`
 }
 
 type UpdateWarrantyRequest struct {

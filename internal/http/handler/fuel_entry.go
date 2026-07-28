@@ -52,7 +52,7 @@ func (s *FuelEntryStore) Create(ctx context.Context, parentID int64, in dto.Crea
 		TotalCost:      in.TotalCost,
 		Odometer:       in.Odometer,
 		VendorID:       in.VendorID,
-		FullTank:       in.FullTank,
+		FullTank:       boolOrDefault(in.FullTank, true),
 		MilesTraveled:  in.MilesTraveled,
 		FuelEfficiency: in.FuelEfficiency,
 		State:          in.State,

@@ -15,7 +15,7 @@ type CreateWeeklyMileageGoalRequest struct {
 	MachinesInWorkshop int32            `json:"machines_in_workshop"`
 	MissingMiles       int32            `json:"missing_miles"`
 	SortOrder          int32            `json:"sort_order"`
-	IsActive           bool             `json:"is_active"`
+	IsActive           *bool            `json:"is_active"`
 }
 
 type UpdateWeeklyMileageGoalRequest struct {

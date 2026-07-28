@@ -10,7 +10,7 @@ type CreateAssetTrailerAssignmentRequest struct {
 	AssignedDate   time.Time  `json:"assigned_date"`
 	UnassignedDate *time.Time `json:"unassigned_date"`
 	AssignedByID   *int64     `json:"assigned_by_id"`
-	IsActive       bool       `json:"is_active"`
+	IsActive       *bool      `json:"is_active"`
 	Notes          string     `json:"notes"`
 }
 

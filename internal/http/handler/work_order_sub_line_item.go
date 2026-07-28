@@ -53,7 +53,7 @@ func (s *WorkOrderSubLineItemStore) Create(ctx context.Context, parentID int64, 
 		PartLocationDetailID: in.PartLocationDetailID,
 		TechnicianID:         in.TechnicianID,
 		UnitCost:             in.UnitCost,
-		Quantity:             in.Quantity,
+		Quantity:             decimalOrDefault(in.Quantity, 1),
 		CreatedAt:            now,
 		UpdatedAt:            now,
 	})

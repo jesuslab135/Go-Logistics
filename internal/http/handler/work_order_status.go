@@ -45,7 +45,7 @@ func (s *WorkOrderStatusStore) Create(ctx context.Context, in dto.CreateWorkOrde
 		CompanyID:        middleware.CompanyFromContext(ctx),
 		Name:             in.Name,
 		Description:      in.Description,
-		Color:            in.Color,
+		Color:            orDefault(in.Color, "#6C757D"),
 		IsDefault:        in.IsDefault,
 		MarksAsCompleted: in.MarksAsCompleted,
 		Position:         in.Position,

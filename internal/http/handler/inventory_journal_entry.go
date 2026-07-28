@@ -56,7 +56,7 @@ func (s *InventoryJournalEntryStore) Create(ctx context.Context, in dto.CreateIn
 		WorkOrderID:            in.WorkOrderID,
 		PurchaseOrderLineID:    in.PurchaseOrderLineID,
 		VendorID:               in.VendorID,
-		AdjustmentType:         in.AdjustmentType,
+		AdjustmentType:         orDefault(in.AdjustmentType, "manual"),
 		TransferPartLocationID: in.TransferPartLocationID,
 		Notes:                  in.Notes,
 		CreatedAt:              now,

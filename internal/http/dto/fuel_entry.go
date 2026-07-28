@@ -15,7 +15,7 @@ type CreateFuelEntryRequest struct {
 	TotalCost      decimal.Decimal  `json:"total_cost"`
 	Odometer       decimal.Decimal  `json:"odometer"`
 	VendorID       int64            `json:"vendor_id"`
-	FullTank       bool             `json:"full_tank"`
+	FullTank       *bool            `json:"full_tank"`
 	MilesTraveled  *decimal.Decimal `json:"miles_traveled"`
 	FuelEfficiency *decimal.Decimal `json:"fuel_efficiency"`
 	State          string           `json:"state" binding:"omitempty,max=50"`

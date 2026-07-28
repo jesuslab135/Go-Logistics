@@ -41,7 +41,7 @@ func (s *FaultStore) Get(ctx context.Context, id int64) (dto.FaultResponse, erro
 func (s *FaultStore) Create(ctx context.Context, in dto.CreateFaultRequest) (dto.FaultResponse, error) {
 	r, err := s.q.CreateFault(ctx, gen.CreateFaultParams{
 		CompanyID:           middleware.CompanyFromContext(ctx),
-		Family:              in.Family,
+		Family:              orDefault(in.Family, "OTRO"),
 		Code:                in.Code,
 		Name:                in.Name,
 		Description:         in.Description,

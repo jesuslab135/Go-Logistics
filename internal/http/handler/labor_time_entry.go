@@ -48,7 +48,7 @@ func (s *LaborTimeEntryStore) Create(ctx context.Context, parentID int64, in dto
 		StartedAt:         in.StartedAt,
 		EndedAt:           in.EndedAt,
 		DurationSeconds:   in.DurationSeconds,
-		IsActive:          in.IsActive,
+		IsActive:          boolOrDefault(in.IsActive, true),
 		ClockInLatitude:   in.ClockInLatitude,
 		ClockInLongitude:  in.ClockInLongitude,
 		ClockOutLatitude:  in.ClockOutLatitude,

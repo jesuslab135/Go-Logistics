@@ -9,7 +9,7 @@ import (
 type CreateServiceReminderRequest struct {
 	AssetID               int64            `json:"asset_id"`
 	ServiceTaskID         *int64           `json:"service_task_id"`
-	IsActive              bool             `json:"is_active"`
+	IsActive              *bool            `json:"is_active"`
 	Status                string           `json:"status" binding:"omitempty,max=20"`
 	TimeInterval          *int32           `json:"time_interval"`
 	TimeFrequency         string           `json:"time_frequency" binding:"omitempty,max=10"`
