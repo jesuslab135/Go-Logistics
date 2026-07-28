@@ -141,6 +141,32 @@ VALUES (1, 1, 'Admin', 'User', 'EMP-001', 'admin@example.com',
         '', '', '', '', '', '', '', '', '', '', 'MX', now());
 ```
 
+Then link that employee to the company and seed the company's defaults. Every
+`/api/v1/*` route requires an `employee_companies` membership row, and most also
+require the employee's role to grant the module — an employee without both is
+denied everywhere:
+
+```sh
+go run ./cmd/cli bootstrap --email admin@example.com
+```
+
+This creates the default roles (if absent), the default work order and asset
+statuses, the membership row, and points the employee's role and default company
+at them. `POST /api/v1/companies` does the same thing transactionally for
+companies created through the API, so this command is only for repairing rows
+inserted by hand.
+
+Two roles are seeded per company, both ported from Django:
+
+| Role | `is_admin` | Permissions |
+|---|---|---|
+| `Administrador` | yes | `{}` — access comes from `is_admin`, not an enumeration |
+| `Almacén` | no | `seed_warehouse_role.py` verbatim: full `tire_approvals` (including the custom `approve` action), read on `tires`/`parts`/`assets`, read+update on `inventory` |
+
+Seeding is idempotent by role name, so re-running it never disturbs a role an
+operator has since edited — that is also how companies created before `Almacén`
+existed pick it up.
+
 Set the password with the CLI, then log in:
 
 ```sh
@@ -171,6 +197,19 @@ Storage is abstracted behind a `Storage` interface with two backends, selected b
   startup; with `STORAGE_MINIO_PUBLIC=true` an anonymous read policy is applied so
   object URLs work directly in `<img src>` tags.
 
+`STORAGE_MINIO_PUBLIC_URL` **must end with the bucket name**. Objects live at
+`<endpoint>/<bucket>/<key>` and the public-read policy only grants `s3:GetObject`
+on `arn:aws:s3:::<bucket>/*`, so a base URL without the bucket produces URLs that
+answer `403` — invisible on the write path, and visible only as broken images in
+a client. Startup now rejects that configuration; if a CDN genuinely maps the URL
+to the bucket root, set `STORAGE_MINIO_PUBLIC_URL_IS_BUCKET_ROOT=true`.
+
+Uploads are validated server-side: the body is capped at `UPLOAD_MAX_BYTES`
+(default 5 MB, `413` when exceeded), and the real media type is sniffed from the
+file's first 512 bytes and checked against `UPLOAD_ALLOWED_TYPES` (default JPEG,
+PNG, GIF, WebP, PDF; `415` otherwise). The client-declared `Content-Type` is
+ignored — the object is stored under the sniffed type.
+
 Upload a file (multipart `file` field, requires a token):
 
 ```sh
@@ -179,8 +218,23 @@ curl -X POST http://localhost:8080/api/v1/uploads \
   -F "file=@./logo.png;type=image/png"
 # {"key":"uploads/1/<rand>-logo.png",
 #  "url":"http://localhost:9000/fleet/uploads/1/<rand>-logo.png",
-#  "size":1234,"content_type":"image/png"}
+#  "size":1234,"content_type":"image/png",
+#  "thumbnail_key":"uploads/1/thumbs/<rand>-logo.jpg",
+#  "thumbnail_url":"http://localhost:9000/fleet/uploads/1/thumbs/<rand>-logo.jpg"}
 ```
+
+Every accepted image type — JPEG, PNG, GIF and WebP — also gets a thumbnail,
+generated at upload time and stored beside the original at
+`<dir>/thumbs/<name>.jpg`. Its longest side is `UPLOAD_THUMBNAIL_MAX_DIM`
+(default 320) and the output is always JPEG. WebP decodes through
+`golang.org/x/image/webp`, the one dependency the imaging package needs outside
+the standard library. The `thumbnail_*` fields are empty when none was produced —
+PDFs have none, and a generation failure is logged and swallowed rather than
+failing an upload that already succeeded.
+
+`POST /api/v1/media` derives `file_type`, `file_size` and `thumbnail` from the
+stored object instead of trusting the request, so its `file` must be a URL this
+API returned; anything else is a `400`.
 
 The returned `url` is public and can be stored on a record (e.g. `company.logo`)
 and rendered on the website. Keys are namespaced per tenant (`uploads/<company_id>/`)
@@ -192,6 +246,46 @@ For QA/PROD, point `STORAGE_MINIO_ENDPOINT` at your S3/MinIO host, set
 
 ---
 
+## Authorization
+
+A valid token is necessary but never sufficient. Ported from `api/permissions.py`,
+every request resolves the caller from the database — so deactivating an employee
+or changing a role takes effect immediately, not at the next token refresh — and
+then passes three gates:
+
+| Gate | Django class | Rule |
+|---|---|---|
+| Identity | `request.user.employee` | the employee exists and `is_active` |
+| Membership | `IsCompanyMember` | an `employee_companies` row for the token's company |
+| Module | `HasModuleAccess` | `role.is_admin`, or `role.permissions[module]` grants the method |
+
+`role.permissions` is a JSON object keyed by module. An **empty object grants the
+whole module**; otherwise the request's method maps to an action
+(`GET/HEAD/OPTIONS`→`read`, `POST`→`create`, `PUT/PATCH`→`update`, `DELETE`→`delete`)
+that must be `true`. A missing module, or an employee with no role, denies.
+
+```json
+{"assets": {}, "fuel": {"read": true, "create": true}, "work_orders": {"read": true}}
+```
+
+Modules are `assets`, `tires`, `parts`, `inventory`, `work_orders`, `issues`,
+`service`, `fuel`, `inspections`, `vendors`, `warranties`, `mileage_goals`,
+`employees`. Each route is assigned the module its Django viewset declared as
+`module_name`; the groups in `internal/http/handler/router.go` are named for them.
+
+`middleware.Modules` additionally carries `company`, `roles` and `tire_approvals`.
+Those are not route groups — Django gated the first two on `IsAdminRole` and the
+third on its warehouse-role check — but a role's permissions document may key on
+them, so `/me/permissions` reports them like any other module.
+
+Four resources required membership only in Django and still do: `/locations`,
+`/vehicle-makes`, `/vehicle-models`, `/tire-assignment-requests` (plus
+`/uploads`). `/roles` requires an admin role. `/companies` is scoped to the
+caller's memberships — an employee may belong to several — with reads and
+mutations requiring an admin role and `POST` requiring `is_account_owner`.
+
+---
+
 ## API surface
 
 | Method | Path                     | Auth | Description                    |
@@ -200,12 +294,57 @@ For QA/PROD, point `STORAGE_MINIO_ENDPOINT` at your S3/MinIO host, set
 | GET    | `/swagger/*`             | no   | Swagger UI (dev only)          |
 | POST   | `/auth/login`            | no   | Email + password → tokens      |
 | POST   | `/auth/refresh`          | no   | Refresh token → new tokens     |
-| GET    | `/api/v1/companies`      | yes  | List (`?page`, `?page_size`)   |
-| POST   | `/api/v1/companies`      | yes  | Create                         |
-| GET    | `/api/v1/companies/:id`  | yes  | Get by id                      |
-| PUT    | `/api/v1/companies/:id`  | yes  | Update                         |
-| DELETE | `/api/v1/companies/:id`  | yes  | Delete                         |
-| POST   | `/api/v1/uploads`        | yes  | Upload a file/image            |
+| GET    | `/api/v1/companies`      | admin | List own memberships (`?page`, `?page_size`) |
+| POST   | `/api/v1/companies`      | owner | Create + bootstrap defaults    |
+| GET    | `/api/v1/companies/:id`  | admin | Get by id                      |
+| PUT    | `/api/v1/companies/:id`  | admin | Update                         |
+| DELETE | `/api/v1/companies/:id`  | admin | Delete                         |
+| POST   | `/api/v1/uploads`        | member | Upload a file/image           |
+| GET    | `/api/v1/me/permissions` | identity | Caller's profile, effective permissions, companies |
+| GET    | `/api/v1/dashboard/stats` | member | Six aggregated KPIs in one query |
+| GET    | `/api/v1/notifications`  | member | Stub — always an empty page    |
+
+Every other `/api/v1/*` resource needs membership plus its module — see
+[Authorization](#authorization).
+
+`/me/permissions` is gated on identity alone, deliberately: a client must be able
+to discover what it may do — including that it may do nothing — without first
+being refused by a module gate. It answers with `permissions` (module → action →
+bool, admin bypass and the empty-object convention already applied) and
+`modules`, the readable subset for building navigation. Both are derived from the
+same rule the request gates use, so the report cannot promise access that a
+request would then be denied.
+
+`/dashboard/stats` returns `total_assets`, `active_work_orders`, `overdue_issues`,
+`upcoming_reminders`, `low_stock_parts` and `pending_inspections`. Django had no
+equivalent endpoint, so those definitions are choices rather than a port — they
+are spelled out at the top of `internal/db/queries/dashboard.sql`, and the
+reminder window is `DASHBOARD_UPCOMING_DAYS`.
+
+### Many-to-many links
+
+Every join table in the schema is exposed under its owning side. Each answers
+with the **linked entities**, not the join rows, so one request gets an issue's
+assignees as employees:
+
+| Path | Body | Far side |
+|---|---|---|
+| `/api/v1/issues/:id/assigned-to` | `{"employee_id": N}` | `/…/:employee_id` |
+| `/api/v1/issues/:id/watchers` | `{"employee_id": N}` | `/…/:employee_id` |
+| `/api/v1/work-orders/:id/issues` | `{"issue_id": N}` | `/…/:issue_id` |
+| `/api/v1/work-orders/:id/faults` | `{"fault_id": N}` | `/…/:fault_id` |
+| `/api/v1/work-order-line-items/:id/issues` | `{"issue_id": N}` | `/…/:issue_id` |
+| `/api/v1/service-entry-line-items/:id/issues` | `{"issue_id": N}` | `/…/:issue_id` |
+
+`GET` lists, `POST` links, `DELETE …/<far-side-id>` unlinks. There is no `GET`
+or `PUT` for a single link: a link is identified by the pair, not by a row id.
+`POST` is idempotent and answers `201` whether or not the link already existed,
+so a client retrying a dropped response need not tell the two cases apart. A
+parent or target outside the caller's company is a `404` with nothing written.
+
+`/api/v1/groups` (the company's org tree) sits under the `employees` module.
+`parent_id` must name a group in the same company, and `ancestry` is derived from
+it rather than accepted from the client.
 
 ---
 
@@ -214,6 +353,14 @@ For QA/PROD, point `STORAGE_MINIO_ENDPOINT` at your S3/MinIO host, set
 See `.env.example` for the full DEV / QA / PROD blocks. Required in every
 environment: `DATABASE_URL`, `JWT_SECRET`. Storage is chosen by `STORAGE_BACKEND`
 (`local` | `minio`); when `minio`, set the `STORAGE_MINIO_*` variables.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `UPLOAD_MAX_BYTES` | `5242880` | Rejects larger uploads with `413` |
+| `UPLOAD_ALLOWED_TYPES` | JPEG, PNG, GIF, WebP, PDF | Sniffed media types accepted by `/uploads` |
+| `UPLOAD_THUMBNAIL_MAX_DIM` | `320` | Longest side of a generated thumbnail, in pixels |
+| `DASHBOARD_UPCOMING_DAYS` | `30` | How far ahead `/dashboard/stats` counts a service reminder as upcoming |
+| `STORAGE_MINIO_PUBLIC_URL_IS_BUCKET_ROOT` | `false` | Skip the bucket-suffix check on `STORAGE_MINIO_PUBLIC_URL` |
 
 ---
 

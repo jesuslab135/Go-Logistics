@@ -163,7 +163,7 @@ definitions:
         maxLength: 20
         type: string
       photo:
-        maxLength: 100
+        maxLength: 500
         type: string
       purchase_date:
         type: string
@@ -594,7 +594,7 @@ definitions:
         maxLength: 20
         type: string
       photo:
-        maxLength: 100
+        maxLength: 500
         type: string
       purchase_date:
         type: string
@@ -733,7 +733,7 @@ definitions:
         maxLength: 254
         type: string
       logo:
-        maxLength: 100
+        maxLength: 500
         type: string
       name:
         maxLength: 200
@@ -934,7 +934,7 @@ definitions:
       description:
         type: string
       file:
-        maxLength: 100
+        maxLength: 500
         type: string
       file_name:
         maxLength: 255
@@ -956,6 +956,21 @@ definitions:
       name:
         maxLength: 50
         type: string
+    type: object
+  dto.CreateGroupRequest:
+    properties:
+      is_default:
+        description: 'ancestry is not accepted: it is derived from parent_id (see
+          group.sql).'
+        type: boolean
+      name:
+        maxLength: 100
+        type: string
+      parent_id:
+        minimum: 1
+        type: integer
+    required:
+    - name
     type: object
   dto.CreateInspectionFormItemRequest:
     properties:
@@ -1030,7 +1045,7 @@ definitions:
       longitude:
         type: number
       photo:
-        maxLength: 100
+        maxLength: 500
         type: string
       remark:
         type: string
@@ -1063,7 +1078,7 @@ definitions:
       passed_items_count:
         type: integer
       signature:
-        maxLength: 100
+        maxLength: 500
         type: string
       started_at:
         type: string
@@ -1259,18 +1274,15 @@ definitions:
       description:
         type: string
       file:
-        maxLength: 100
-        type: string
-      file_size:
-        type: integer
-      file_type:
-        maxLength: 20
+        maxLength: 500
         type: string
       title:
         maxLength: 255
         type: string
       uploaded_by_id:
         type: integer
+    required:
+    - file
     type: object
   dto.CreatePartCategoryRequest:
     properties:
@@ -2059,6 +2071,21 @@ definitions:
       unit_cost:
         type: number
     type: object
+  dto.DashboardStatsResponse:
+    properties:
+      active_work_orders:
+        type: integer
+      low_stock_parts:
+        type: integer
+      overdue_issues:
+        type: integer
+      pending_inspections:
+        type: integer
+      total_assets:
+        type: integer
+      upcoming_reminders:
+        type: integer
+    type: object
   dto.EmployeePage:
     properties:
       data:
@@ -2340,7 +2367,7 @@ definitions:
       entry_id:
         type: integer
       file:
-        maxLength: 100
+        maxLength: 500
         type: string
       file_name:
         maxLength: 255
@@ -2384,6 +2411,40 @@ definitions:
         type: integer
       name:
         maxLength: 50
+        type: string
+    type: object
+  dto.GroupPage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.GroupResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.GroupResponse:
+    properties:
+      ancestry:
+        type: string
+      company_id:
+        type: integer
+      created_at:
+        type: string
+      id:
+        type: integer
+      is_default:
+        type: boolean
+      name:
+        type: string
+      parent_id:
+        type: integer
+      updated_at:
         type: string
     type: object
   dto.InspectionFormItemPage:
@@ -2522,7 +2583,7 @@ definitions:
       longitude:
         type: number
       photo:
-        maxLength: 100
+        maxLength: 500
         type: string
       remark:
         type: string
@@ -2578,7 +2639,7 @@ definitions:
       passed_items_count:
         type: integer
       signature:
-        maxLength: 100
+        maxLength: 500
         type: string
       started_at:
         type: string
@@ -2855,6 +2916,30 @@ definitions:
       technician_id:
         type: integer
     type: object
+  dto.LinkEmployeeRequest:
+    properties:
+      employee_id:
+        minimum: 1
+        type: integer
+    required:
+    - employee_id
+    type: object
+  dto.LinkFaultRequest:
+    properties:
+      fault_id:
+        minimum: 1
+        type: integer
+    required:
+    - fault_id
+    type: object
+  dto.LinkIssueRequest:
+    properties:
+      issue_id:
+        minimum: 1
+        type: integer
+    required:
+    - issue_id
+    type: object
   dto.LocationPage:
     properties:
       data:
@@ -2891,6 +2976,75 @@ definitions:
     required:
     - email
     - password
+    type: object
+  dto.MeCompany:
+    properties:
+      id:
+        type: integer
+      logo:
+        type: string
+      name:
+        type: string
+    type: object
+  dto.MeEmployee:
+    properties:
+      default_company_id:
+        type: integer
+      email:
+        type: string
+      first_name:
+        type: string
+      id:
+        type: integer
+      is_active:
+        type: boolean
+      job_title:
+        type: string
+      last_name:
+        type: string
+    type: object
+  dto.MePermissionsResponse:
+    properties:
+      companies:
+        items:
+          $ref: '#/definitions/dto.MeCompany'
+        type: array
+      company_id:
+        type: integer
+      employee:
+        $ref: '#/definitions/dto.MeEmployee'
+      is_account_owner:
+        type: boolean
+      is_admin:
+        type: boolean
+      modules:
+        description: |-
+          Modules lists the modules the caller can read, ready for navigation
+          filtering.
+        items:
+          type: string
+        type: array
+      permissions:
+        additionalProperties:
+          additionalProperties:
+            type: boolean
+          type: object
+        description: |-
+          Permissions is the effective answer per module and action, with the
+          empty-object ("whole module") convention and the admin bypass already
+          applied — clients should not have to re-derive either.
+        type: object
+      role:
+        $ref: '#/definitions/dto.MeRole'
+    type: object
+  dto.MeRole:
+    properties:
+      id:
+        type: integer
+      is_admin:
+        type: boolean
+      name:
+        type: string
     type: object
   dto.MeasurementUnitPage:
     properties:
@@ -2948,7 +3102,7 @@ definitions:
       description:
         type: string
       file:
-        maxLength: 100
+        maxLength: 500
         type: string
       file_size:
         type: integer
@@ -2957,6 +3111,11 @@ definitions:
         type: string
       id:
         type: integer
+      thumbnail:
+        description: |-
+          Thumbnail is empty when none exists: media predating thumbnailing, or a
+          format the server cannot decode.
+        type: string
       title:
         maxLength: 255
         type: string
@@ -2964,6 +3123,32 @@ definitions:
         type: string
       uploaded_by_id:
         type: integer
+    type: object
+  dto.NotificationListResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.NotificationResponse'
+        type: array
+      unread_count:
+        type: integer
+    type: object
+  dto.NotificationResponse:
+    properties:
+      body:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: integer
+      kind:
+        type: string
+      read_at:
+        type: string
+      title:
+        type: string
+      url:
+        type: string
     type: object
   dto.PartCategoryPage:
     properties:
@@ -4100,7 +4285,7 @@ definitions:
         maxLength: 20
         type: string
       photo:
-        maxLength: 100
+        maxLength: 500
         type: string
       purchase_date:
         type: string
@@ -4239,7 +4424,7 @@ definitions:
         maxLength: 254
         type: string
       logo:
-        maxLength: 100
+        maxLength: 500
         type: string
       name:
         maxLength: 200
@@ -4440,7 +4625,7 @@ definitions:
       description:
         type: string
       file:
-        maxLength: 100
+        maxLength: 500
         type: string
       file_name:
         maxLength: 255
@@ -4462,6 +4647,21 @@ definitions:
       name:
         maxLength: 50
         type: string
+    type: object
+  dto.UpdateGroupRequest:
+    properties:
+      is_default:
+        description: 'ancestry is not accepted: it is derived from parent_id (see
+          group.sql).'
+        type: boolean
+      name:
+        maxLength: 100
+        type: string
+      parent_id:
+        minimum: 1
+        type: integer
+    required:
+    - name
     type: object
   dto.UpdateInspectionFormItemRequest:
     properties:
@@ -4536,7 +4736,7 @@ definitions:
       longitude:
         type: number
       photo:
-        maxLength: 100
+        maxLength: 500
         type: string
       remark:
         type: string
@@ -4569,7 +4769,7 @@ definitions:
       passed_items_count:
         type: integer
       signature:
-        maxLength: 100
+        maxLength: 500
         type: string
       started_at:
         type: string
@@ -4765,18 +4965,15 @@ definitions:
       description:
         type: string
       file:
-        maxLength: 100
-        type: string
-      file_size:
-        type: integer
-      file_type:
-        maxLength: 20
+        maxLength: 500
         type: string
       title:
         maxLength: 255
         type: string
       uploaded_by_id:
         type: integer
+    required:
+    - file
     type: object
   dto.UpdatePartCategoryRequest:
     properties:
@@ -5564,6 +5761,21 @@ definitions:
         type: integer
       unit_cost:
         type: number
+    type: object
+  dto.UploadResponse:
+    properties:
+      content_type:
+        type: string
+      key:
+        type: string
+      size:
+        type: integer
+      thumbnail_key:
+        type: string
+      thumbnail_url:
+        type: string
+      url:
+        type: string
     type: object
   dto.UpsertTrailerRequest:
     properties:
@@ -6649,17 +6861,6 @@ definitions:
       unit_cost:
         type: number
       updated_at:
-        type: string
-    type: object
-  storage.Object:
-    properties:
-      content_type:
-        type: string
-      key:
-        type: string
-      size:
-        type: integer
-      url:
         type: string
     type: object
 info:
@@ -8379,6 +8580,28 @@ paths:
       summary: Update a company
       tags:
       - companies
+  /api/v1/dashboard/stats:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.DashboardStatsResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Aggregated dashboard KPIs
+      tags:
+      - dashboard
   /api/v1/employees:
     get:
       parameters:
@@ -9048,6 +9271,133 @@ paths:
       summary: Update fuel-types
       tags:
       - fuel-types
+  /api/v1/groups:
+    get:
+      parameters:
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.GroupPage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List groups
+      tags:
+      - groups
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateGroupRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.GroupResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create groups
+      tags:
+      - groups
+  /api/v1/groups/{id}:
+    delete:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete groups
+      tags:
+      - groups
+    get:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.GroupResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get groups
+      tags:
+      - groups
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateGroupRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.GroupResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update groups
+      tags:
+      - groups
   /api/v1/inspection-forms:
     get:
       parameters:
@@ -10098,6 +10448,190 @@ paths:
       summary: Update issues
       tags:
       - issues
+  /api/v1/issues/{id}/assigned-to:
+    get:
+      parameters:
+      - description: issue id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.EmployeePage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List employees assigned to an issue
+      tags:
+      - issues
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: issue id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.LinkEmployeeRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.EmployeeResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Assign an employee to an issue
+      tags:
+      - issues
+  /api/v1/issues/{id}/assigned-to/{employee_id}:
+    delete:
+      parameters:
+      - description: issue id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: employee id
+        in: path
+        name: employee_id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Unassign an employee from an issue
+      tags:
+      - issues
+  /api/v1/issues/{id}/watchers:
+    get:
+      parameters:
+      - description: issue id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.EmployeePage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List employees watching an issue
+      tags:
+      - issues
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: issue id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.LinkEmployeeRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.EmployeeResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Add a watcher to an issue
+      tags:
+      - issues
+  /api/v1/issues/{id}/watchers/{employee_id}:
+    delete:
+      parameters:
+      - description: issue id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: employee id
+        in: path
+        name: employee_id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Remove a watcher from an issue
+      tags:
+      - issues
   /api/v1/locations:
     get:
       parameters:
@@ -10225,6 +10759,28 @@ paths:
       summary: Update locations
       tags:
       - locations
+  /api/v1/me/permissions:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.MePermissionsResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Current employee, effective permissions and companies
+      tags:
+      - me
   /api/v1/measurement-units:
     get:
       parameters:
@@ -10479,6 +11035,24 @@ paths:
       summary: Update media
       tags:
       - media
+  /api/v1/notifications:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.NotificationListResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List notifications (stub — always empty)
+      tags:
+      - notifications
   /api/v1/part-categories:
     get:
       parameters:
@@ -11800,6 +12374,98 @@ paths:
       summary: Update service-entry-line-items
       tags:
       - service-entry-line-items
+  /api/v1/service-entry-line-items/{id}/issues:
+    get:
+      parameters:
+      - description: service entry line item id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.IssuePage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List issues linked to a service entry line item
+      tags:
+      - service-entries
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: service entry line item id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.LinkIssueRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.IssueResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Link an issue to a service entry line item
+      tags:
+      - service-entries
+  /api/v1/service-entry-line-items/{id}/issues/{issue_id}:
+    delete:
+      parameters:
+      - description: service entry line item id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: issue id
+        in: path
+        name: issue_id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Unlink an issue from a service entry line item
+      tags:
+      - service-entries
   /api/v1/service-reminders:
     get:
       parameters:
@@ -13027,13 +13693,21 @@ paths:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/storage.Object'
+            $ref: '#/definitions/dto.UploadResponse'
         "400":
           description: Bad Request
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
         "401":
           description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "413":
+          description: Request Entity Too Large
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "415":
+          description: Unsupported Media Type
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
       security:
@@ -13676,6 +14350,98 @@ paths:
       summary: Update weekly-mileage-goals
       tags:
       - weekly-mileage-goals
+  /api/v1/work-order-line-items/{id}/issues:
+    get:
+      parameters:
+      - description: work order line item id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.IssuePage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List issues linked to a work order line item
+      tags:
+      - work-orders
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: work order line item id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.LinkIssueRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.IssueResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Link an issue to a work order line item
+      tags:
+      - work-orders
+  /api/v1/work-order-line-items/{id}/issues/{issue_id}:
+    delete:
+      parameters:
+      - description: work order line item id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: issue id
+        in: path
+        name: issue_id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Unlink an issue from a work order line item
+      tags:
+      - work-orders
   /api/v1/work-order-line-items/{id}/sub-line-items:
     get:
       parameters:
@@ -14216,6 +14982,190 @@ paths:
       security:
       - BearerAuth: []
       summary: Update work-orders
+      tags:
+      - work-orders
+  /api/v1/work-orders/{id}/faults:
+    get:
+      parameters:
+      - description: work order id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.FaultPage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List faults linked to a work order
+      tags:
+      - work-orders
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: work order id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.LinkFaultRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.FaultResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Link a fault to a work order
+      tags:
+      - work-orders
+  /api/v1/work-orders/{id}/faults/{fault_id}:
+    delete:
+      parameters:
+      - description: work order id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: fault id
+        in: path
+        name: fault_id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Unlink a fault from a work order
+      tags:
+      - work-orders
+  /api/v1/work-orders/{id}/issues:
+    get:
+      parameters:
+      - description: work order id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.IssuePage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List issues linked to a work order
+      tags:
+      - work-orders
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: work order id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.LinkIssueRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.IssueResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Link an issue to a work order
+      tags:
+      - work-orders
+  /api/v1/work-orders/{id}/issues/{issue_id}:
+    delete:
+      parameters:
+      - description: work order id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: issue id
+        in: path
+        name: issue_id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Unlink an issue from a work order
       tags:
       - work-orders
   /api/v1/work-orders/{id}/line-items:
