@@ -193,6 +193,15 @@ func NewRouter(d Deps) *gin.Engine {
 	crud.NewSingletonHandler[dto.TrailerResponse, dto.UpsertTrailerRequest](NewTrailerStore(d.Queries)).Register(assets, "/assets", "/trailer")
 	crud.NewSingletonHandler[dto.VehicleAxleConfigResponse, dto.UpsertVehicleAxleConfigRequest](NewVehicleAxleConfigStore(d.Queries)).Register(tires, "/assets", "/axle-config")
 
+	// Phase 8d: m2m join tables, exposed under the owning side. Each returns the
+	// linked entities rather than the join rows, so a client that wants an
+	// issue's assignees gets employees back in one request.
+	crud.NewLinkHandler[dto.EmployeeResponse, dto.LinkEmployeeRequest](NewIssueAssigneeStore(d.Queries)).Register(issues, "/issues", "/assigned-to", "employee_id")
+	crud.NewLinkHandler[dto.EmployeeResponse, dto.LinkEmployeeRequest](NewIssueWatcherStore(d.Queries)).Register(issues, "/issues", "/watchers", "employee_id")
+	crud.NewLinkHandler[dto.IssueResponse, dto.LinkIssueRequest](NewWorkOrderIssueStore(d.Queries)).Register(workOrders, "/work-orders", "/issues", "issue_id")
+	crud.NewLinkHandler[dto.FaultResponse, dto.LinkFaultRequest](NewWorkOrderFaultStore(d.Queries)).Register(workOrders, "/work-orders", "/faults", "fault_id")
+	crud.NewLinkHandler[dto.IssueResponse, dto.LinkIssueRequest](NewServiceEntryLineItemIssueStore(d.Queries)).Register(service, "/service-entry-line-items", "/issues", "issue_id")
+	crud.NewLinkHandler[dto.IssueResponse, dto.LinkIssueRequest](NewWorkOrderLineItemIssueStore(d.Queries)).Register(workOrders, "/work-order-line-items", "/issues", "issue_id")
 
 	return r
 }
