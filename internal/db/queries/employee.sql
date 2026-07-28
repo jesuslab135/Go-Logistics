@@ -8,6 +8,26 @@ LIMIT 1;
 -- name: UpdateEmployeePassword :exec
 UPDATE employee SET password_hash = $2, updated_at = $3 WHERE id = $1;
 
+-- GetEmployeeIdentity backs the authorization middleware. Django resolved
+-- request.user.employee (and its role) from the database on every request, so
+-- revoking a role or deactivating an employee takes effect immediately rather
+-- than at the next token refresh; this query preserves that.
+-- name: GetEmployeeIdentity :one
+SELECT
+    e.id,
+    e.is_active,
+    e.is_account_owner,
+    e.role_id,
+    COALESCE(r.is_admin, false)         AS is_admin,
+    COALESCE(r.permissions, '{}'::jsonb) AS permissions,
+    EXISTS (
+        SELECT 1 FROM employee_companies ec
+        WHERE ec.employee_id = e.id AND ec.company_id = sqlc.arg(company_id)
+    ) AS is_member
+FROM employee e
+LEFT JOIN role r ON r.id = e.role_id
+WHERE e.id = sqlc.arg(id);
+
 -- Employee CRUD is scoped by company membership via the employee_companies m2m,
 -- and never reads/writes password_hash (managed only by the auth queries above).
 

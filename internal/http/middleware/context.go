@@ -14,9 +14,19 @@ import (
 // so repository stores can scope every query without depending on gin.
 type companyContextKey struct{}
 
+// employeeContextKey carries the authenticated employee id, for the few stores
+// that must act on behalf of the caller rather than only scope by tenant.
+type employeeContextKey struct{}
+
 // CompanyFromContext returns the tenant company id set by Auth, or 0 if absent.
 func CompanyFromContext(ctx context.Context) int64 {
 	id, _ := ctx.Value(companyContextKey{}).(int64)
+	return id
+}
+
+// EmployeeFromContext returns the authenticated employee id set by Auth, or 0.
+func EmployeeFromContext(ctx context.Context) int64 {
+	id, _ := ctx.Value(employeeContextKey{}).(int64)
 	return id
 }
 

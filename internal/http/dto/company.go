@@ -9,7 +9,7 @@ type CreateCompanyRequest struct {
 	Phone               string  `json:"phone" binding:"max=20"`
 	Email               string  `json:"email" binding:"omitempty,email,max=254"`
 	Website             string  `json:"website" binding:"max=200"`
-	Logo                *string `json:"logo" binding:"omitempty,max=100"`
+	Logo                *string `json:"logo" binding:"omitempty,max=500"`
 	City                string  `json:"city" binding:"max=100"`
 	Region              string  `json:"region" binding:"max=50"`
 	PostalCode          string  `json:"postal_code" binding:"max=20"`
@@ -26,7 +26,7 @@ type UpdateCompanyRequest struct {
 	Phone               string  `json:"phone" binding:"max=20"`
 	Email               string  `json:"email" binding:"omitempty,email,max=254"`
 	Website             string  `json:"website" binding:"max=200"`
-	Logo                *string `json:"logo" binding:"omitempty,max=100"`
+	Logo                *string `json:"logo" binding:"omitempty,max=500"`
 	City                string  `json:"city" binding:"max=100"`
 	Region              string  `json:"region" binding:"max=50"`
 	PostalCode          string  `json:"postal_code" binding:"max=20"`

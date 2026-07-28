@@ -10,12 +10,39 @@ import (
 	"time"
 )
 
-const countCompanies = `-- name: CountCompanies :one
-SELECT count(*) FROM company
+const bootstrapEmployeeCompany = `-- name: BootstrapEmployeeCompany :exec
+UPDATE employee SET
+    role_id            = COALESCE(role_id, $1),
+    default_company_id = COALESCE(default_company_id, $2),
+    updated_at         = $3
+WHERE id = $4
 `
 
-func (q *Queries) CountCompanies(ctx context.Context) (int64, error) {
-	row := q.db.QueryRow(ctx, countCompanies)
+type BootstrapEmployeeCompanyParams struct {
+	RoleID    *int64
+	CompanyID *int64
+	UpdatedAt time.Time
+	ID        int64
+}
+
+// Mirrors Django: only fills role/default_company when the employee has none.
+func (q *Queries) BootstrapEmployeeCompany(ctx context.Context, arg BootstrapEmployeeCompanyParams) error {
+	_, err := q.db.Exec(ctx, bootstrapEmployeeCompany,
+		arg.RoleID,
+		arg.CompanyID,
+		arg.UpdatedAt,
+		arg.ID,
+	)
+	return err
+}
+
+const countCompanies = `-- name: CountCompanies :one
+SELECT count(*) FROM company c
+WHERE EXISTS (SELECT 1 FROM employee_companies ec WHERE ec.company_id = c.id AND ec.employee_id = $1)
+`
+
+func (q *Queries) CountCompanies(ctx context.Context, employeeID int64) (int64, error) {
+	row := q.db.QueryRow(ctx, countCompanies, employeeID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -90,20 +117,39 @@ func (q *Queries) CreateCompany(ctx context.Context, arg CreateCompanyParams) (C
 }
 
 const deleteCompany = `-- name: DeleteCompany :exec
-DELETE FROM company WHERE id = $1
+DELETE FROM company c
+WHERE c.id = $1
+  AND EXISTS (SELECT 1 FROM employee_companies ec WHERE ec.company_id = c.id AND ec.employee_id = $2)
 `
 
-func (q *Queries) DeleteCompany(ctx context.Context, id int64) error {
-	_, err := q.db.Exec(ctx, deleteCompany, id)
+type DeleteCompanyParams struct {
+	ID         int64
+	EmployeeID int64
+}
+
+func (q *Queries) DeleteCompany(ctx context.Context, arg DeleteCompanyParams) error {
+	_, err := q.db.Exec(ctx, deleteCompany, arg.ID, arg.EmployeeID)
 	return err
 }
 
 const getCompany = `-- name: GetCompany :one
-SELECT id, name, tax_id, address, created_at, phone, email, website, logo, city, region, postal_code, country, timezone, currency, system_of_measurement FROM company WHERE id = $1
+
+SELECT c.id, c.name, c.tax_id, c.address, c.created_at, c.phone, c.email, c.website, c.logo, c.city, c.region, c.postal_code, c.country, c.timezone, c.currency, c.system_of_measurement FROM company c
+WHERE c.id = $1
+  AND EXISTS (SELECT 1 FROM employee_companies ec WHERE ec.company_id = c.id AND ec.employee_id = $2)
 `
 
-func (q *Queries) GetCompany(ctx context.Context, id int64) (Company, error) {
-	row := q.db.QueryRow(ctx, getCompany, id)
+type GetCompanyParams struct {
+	ID         int64
+	EmployeeID int64
+}
+
+// Companies are scoped by the caller's employee_companies membership, not by the
+// JWT's single company_id: an employee may belong to several companies and must
+// see all of them. Django left this queryset unfiltered, which let any company
+// admin read and DELETE other tenants' companies (cascading to their data).
+func (q *Queries) GetCompany(ctx context.Context, arg GetCompanyParams) (Company, error) {
+	row := q.db.QueryRow(ctx, getCompany, arg.ID, arg.EmployeeID)
 	var i Company
 	err := row.Scan(
 		&i.ID,
@@ -127,16 +173,20 @@ func (q *Queries) GetCompany(ctx context.Context, id int64) (Company, error) {
 }
 
 const listCompanies = `-- name: ListCompanies :many
-SELECT id, name, tax_id, address, created_at, phone, email, website, logo, city, region, postal_code, country, timezone, currency, system_of_measurement FROM company ORDER BY name LIMIT $1 OFFSET $2
+SELECT c.id, c.name, c.tax_id, c.address, c.created_at, c.phone, c.email, c.website, c.logo, c.city, c.region, c.postal_code, c.country, c.timezone, c.currency, c.system_of_measurement FROM company c
+WHERE EXISTS (SELECT 1 FROM employee_companies ec WHERE ec.company_id = c.id AND ec.employee_id = $1)
+ORDER BY c.name
+LIMIT $3 OFFSET $2
 `
 
 type ListCompaniesParams struct {
-	Limit  int32
-	Offset int32
+	EmployeeID int64
+	Off        int32
+	Lim        int32
 }
 
 func (q *Queries) ListCompanies(ctx context.Context, arg ListCompaniesParams) ([]Company, error) {
-	rows, err := q.db.Query(ctx, listCompanies, arg.Limit, arg.Offset)
+	rows, err := q.db.Query(ctx, listCompanies, arg.EmployeeID, arg.Off, arg.Lim)
 	if err != nil {
 		return nil, err
 	}
@@ -172,17 +222,72 @@ func (q *Queries) ListCompanies(ctx context.Context, arg ListCompaniesParams) ([
 	return items, nil
 }
 
+const seedAssetStatus = `-- name: SeedAssetStatus :exec
+
+INSERT INTO asset_status (company_id, name, color_code)
+VALUES ($1, $2, $3)
+ON CONFLICT (company_id, name) DO NOTHING
+`
+
+type SeedAssetStatusParams struct {
+	CompanyID int64
+	Name      string
+	ColorCode string
+}
+
+// Company bootstrap. Django's CompanyViewSet.perform_create ran these in one
+// transaction with the insert, so a company is never created unusable. The
+// ON CONFLICT clauses make each seed idempotent, matching get_or_create.
+func (q *Queries) SeedAssetStatus(ctx context.Context, arg SeedAssetStatusParams) error {
+	_, err := q.db.Exec(ctx, seedAssetStatus, arg.CompanyID, arg.Name, arg.ColorCode)
+	return err
+}
+
+const seedWorkOrderStatus = `-- name: SeedWorkOrderStatus :exec
+INSERT INTO work_order_status (
+    company_id, name, description, color, is_default, marks_as_completed, position
+) VALUES (
+    $1, $2, '', $3,
+    $4, $5, $6
+)
+ON CONFLICT (company_id, name) DO NOTHING
+`
+
+type SeedWorkOrderStatusParams struct {
+	CompanyID        int64
+	Name             string
+	Color            string
+	IsDefault        bool
+	MarksAsCompleted bool
+	Position         int32
+}
+
+func (q *Queries) SeedWorkOrderStatus(ctx context.Context, arg SeedWorkOrderStatusParams) error {
+	_, err := q.db.Exec(ctx, seedWorkOrderStatus,
+		arg.CompanyID,
+		arg.Name,
+		arg.Color,
+		arg.IsDefault,
+		arg.MarksAsCompleted,
+		arg.Position,
+	)
+	return err
+}
+
 const updateCompany = `-- name: UpdateCompany :one
-UPDATE company SET
-    name = $2, tax_id = $3, address = $4, phone = $5, email = $6, website = $7,
-    logo = $8, city = $9, region = $10, postal_code = $11, country = $12,
-    timezone = $13, currency = $14, system_of_measurement = $15
-WHERE id = $1
-RETURNING id, name, tax_id, address, created_at, phone, email, website, logo, city, region, postal_code, country, timezone, currency, system_of_measurement
+UPDATE company c SET
+    name = $1, tax_id = $2, address = $3,
+    phone = $4, email = $5, website = $6,
+    logo = $7, city = $8, region = $9,
+    postal_code = $10, country = $11,
+    timezone = $12, currency = $13,
+    system_of_measurement = $14
+WHERE c.id = $15
+  AND EXISTS (SELECT 1 FROM employee_companies ec WHERE ec.company_id = c.id AND ec.employee_id = $16)
+RETURNING c.id, c.name, c.tax_id, c.address, c.created_at, c.phone, c.email, c.website, c.logo, c.city, c.region, c.postal_code, c.country, c.timezone, c.currency, c.system_of_measurement
 `
 
 type UpdateCompanyParams struct {
-	ID                  int64
 	Name                string
 	TaxID               string
 	Address             string
@@ -197,11 +302,12 @@ type UpdateCompanyParams struct {
 	Timezone            string
 	Currency            string
 	SystemOfMeasurement string
+	ID                  int64
+	EmployeeID          int64
 }
 
 func (q *Queries) UpdateCompany(ctx context.Context, arg UpdateCompanyParams) (Company, error) {
 	row := q.db.QueryRow(ctx, updateCompany,
-		arg.ID,
 		arg.Name,
 		arg.TaxID,
 		arg.Address,
@@ -216,6 +322,8 @@ func (q *Queries) UpdateCompany(ctx context.Context, arg UpdateCompanyParams) (C
 		arg.Timezone,
 		arg.Currency,
 		arg.SystemOfMeasurement,
+		arg.ID,
+		arg.EmployeeID,
 	)
 	var i Company
 	err := row.Scan(

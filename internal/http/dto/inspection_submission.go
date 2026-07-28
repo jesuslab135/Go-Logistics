@@ -17,7 +17,7 @@ type CreateInspectionSubmissionRequest struct {
 	StartingLongitude  *decimal.Decimal `json:"starting_longitude"`
 	SubmittedLatitude  *decimal.Decimal `json:"submitted_latitude"`
 	SubmittedLongitude *decimal.Decimal `json:"submitted_longitude"`
-	Signature          *string          `json:"signature" binding:"omitempty,max=100"`
+	Signature          *string          `json:"signature" binding:"omitempty,max=500"`
 	Odometer           *decimal.Decimal `json:"odometer"`
 	TotalItems         int32            `json:"total_items"`
 	FailedItemsCount   int32            `json:"failed_items_count"`
@@ -38,7 +38,7 @@ type UpdateInspectionSubmissionRequest struct {
 	StartingLongitude  *decimal.Decimal `json:"starting_longitude"`
 	SubmittedLatitude  *decimal.Decimal `json:"submitted_latitude"`
 	SubmittedLongitude *decimal.Decimal `json:"submitted_longitude"`
-	Signature          *string          `json:"signature" binding:"omitempty,max=100"`
+	Signature          *string          `json:"signature" binding:"omitempty,max=500"`
 	Odometer           *decimal.Decimal `json:"odometer"`
 	TotalItems         int32            `json:"total_items"`
 	FailedItemsCount   int32            `json:"failed_items_count"`
@@ -61,7 +61,7 @@ type InspectionSubmissionResponse struct {
 	StartingLongitude  *decimal.Decimal `json:"starting_longitude"`
 	SubmittedLatitude  *decimal.Decimal `json:"submitted_latitude"`
 	SubmittedLongitude *decimal.Decimal `json:"submitted_longitude"`
-	Signature          *string          `json:"signature" binding:"omitempty,max=100"`
+	Signature          *string          `json:"signature" binding:"omitempty,max=500"`
 	Odometer           *decimal.Decimal `json:"odometer"`
 	TotalItems         int32            `json:"total_items"`
 	FailedItemsCount   int32            `json:"failed_items_count"`

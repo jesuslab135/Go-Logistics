@@ -4,30 +4,39 @@ import (
 	"context"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"fleet/internal/bootstrap"
 	"fleet/internal/db/gen"
 	"fleet/internal/http/dto"
+	"fleet/internal/http/middleware"
 	"fleet/internal/platform/paginate"
 )
 
 // CompanyStore adapts the sqlc-generated queries to crud.Store, translating
-// between request/response DTOs and the persistence rows.
+// between request/response DTOs and the persistence rows. Reads and writes are
+// scoped to the caller's company memberships; Create additionally bootstraps the
+// new company (see Create) inside one transaction.
 type CompanyStore struct {
-	q *gen.Queries
+	q    *gen.Queries
+	pool *pgxpool.Pool
 }
 
-func NewCompanyStore(q *gen.Queries) *CompanyStore {
-	return &CompanyStore{q: q}
+func NewCompanyStore(q *gen.Queries, pool *pgxpool.Pool) *CompanyStore {
+	return &CompanyStore{q: q, pool: pool}
 }
 
 func (s *CompanyStore) List(ctx context.Context, p paginate.Params) ([]dto.CompanyResponse, int64, error) {
+	employee := middleware.EmployeeFromContext(ctx)
 	rows, err := s.q.ListCompanies(ctx, gen.ListCompaniesParams{
-		Limit:  int32(p.Limit),
-		Offset: int32(p.Offset),
+		EmployeeID: employee,
+		Lim:        int32(p.Limit),
+		Off:        int32(p.Offset),
 	})
 	if err != nil {
 		return nil, 0, err
 	}
-	total, err := s.q.CountCompanies(ctx)
+	total, err := s.q.CountCompanies(ctx, employee)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -40,15 +49,29 @@ func (s *CompanyStore) List(ctx context.Context, p paginate.Params) ([]dto.Compa
 }
 
 func (s *CompanyStore) Get(ctx context.Context, id int64) (dto.CompanyResponse, error) {
-	row, err := s.q.GetCompany(ctx, id)
+	row, err := s.q.GetCompany(ctx, gen.GetCompanyParams{
+		ID:         id,
+		EmployeeID: middleware.EmployeeFromContext(ctx),
+	})
 	if err != nil {
 		return dto.CompanyResponse{}, err
 	}
 	return toCompanyResponse(row), nil
 }
 
+// Create ports Django's CompanyViewSet.perform_create: the company, its default
+// admin role, its default work order and asset statuses, and the creator's
+// membership are all written in one transaction, so a company is never left in a
+// state where the product cannot be used.
 func (s *CompanyStore) Create(ctx context.Context, in dto.CreateCompanyRequest) (dto.CompanyResponse, error) {
-	row, err := s.q.CreateCompany(ctx, gen.CreateCompanyParams{
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return dto.CompanyResponse{}, err
+	}
+	defer tx.Rollback(ctx)
+
+	qtx := s.q.WithTx(tx)
+	row, err := qtx.CreateCompany(ctx, gen.CreateCompanyParams{
 		Name:                in.Name,
 		TaxID:               in.TaxID,
 		Address:             in.Address,
@@ -68,12 +91,20 @@ func (s *CompanyStore) Create(ctx context.Context, in dto.CreateCompanyRequest) 
 	if err != nil {
 		return dto.CompanyResponse{}, err
 	}
+
+	if err := bootstrap.Company(ctx, qtx, row.ID, middleware.EmployeeFromContext(ctx)); err != nil {
+		return dto.CompanyResponse{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return dto.CompanyResponse{}, err
+	}
 	return toCompanyResponse(row), nil
 }
 
 func (s *CompanyStore) Update(ctx context.Context, id int64, in dto.UpdateCompanyRequest) (dto.CompanyResponse, error) {
 	row, err := s.q.UpdateCompany(ctx, gen.UpdateCompanyParams{
 		ID:                  id,
+		EmployeeID:          middleware.EmployeeFromContext(ctx),
 		Name:                in.Name,
 		TaxID:               in.TaxID,
 		Address:             in.Address,
@@ -96,7 +127,10 @@ func (s *CompanyStore) Update(ctx context.Context, id int64, in dto.UpdateCompan
 }
 
 func (s *CompanyStore) Delete(ctx context.Context, id int64) error {
-	return s.q.DeleteCompany(ctx, id)
+	return s.q.DeleteCompany(ctx, gen.DeleteCompanyParams{
+		ID:         id,
+		EmployeeID: middleware.EmployeeFromContext(ctx),
+	})
 }
 
 func toCompanyResponse(c gen.Company) dto.CompanyResponse {

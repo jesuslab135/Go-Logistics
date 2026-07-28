@@ -35,7 +35,7 @@ type CreateAssetRequest struct {
 	Color                       string           `json:"color" binding:"omitempty,max=50"`
 	LicensePlate                string           `json:"license_plate" binding:"omitempty,max=20"`
 	Group                       string           `json:"group" binding:"omitempty,max=100"`
-	Photo                       *string          `json:"photo" binding:"omitempty,max=100"`
+	Photo                       *string          `json:"photo" binding:"omitempty,max=500"`
 	MeterUnit                   string           `json:"meter_unit" binding:"omitempty,max=5"`
 	CurrentMeter                *decimal.Decimal `json:"current_meter"`
 	SecondaryMeterUnit          string           `json:"secondary_meter_unit" binding:"omitempty,max=20"`
@@ -106,7 +106,7 @@ type UpdateAssetRequest struct {
 	Color                       string           `json:"color" binding:"omitempty,max=50"`
 	LicensePlate                string           `json:"license_plate" binding:"omitempty,max=20"`
 	Group                       string           `json:"group" binding:"omitempty,max=100"`
-	Photo                       *string          `json:"photo" binding:"omitempty,max=100"`
+	Photo                       *string          `json:"photo" binding:"omitempty,max=500"`
 	MeterUnit                   string           `json:"meter_unit" binding:"omitempty,max=5"`
 	CurrentMeter                *decimal.Decimal `json:"current_meter"`
 	SecondaryMeterUnit          string           `json:"secondary_meter_unit" binding:"omitempty,max=20"`
@@ -179,7 +179,7 @@ type AssetResponse struct {
 	Color                       string           `json:"color" binding:"omitempty,max=50"`
 	LicensePlate                string           `json:"license_plate" binding:"omitempty,max=20"`
 	Group                       string           `json:"group" binding:"omitempty,max=100"`
-	Photo                       *string          `json:"photo" binding:"omitempty,max=100"`
+	Photo                       *string          `json:"photo" binding:"omitempty,max=500"`
 	MeterUnit                   string           `json:"meter_unit" binding:"omitempty,max=5"`
 	CurrentMeter                *decimal.Decimal `json:"current_meter"`
 	SecondaryMeterUnit          string           `json:"secondary_meter_unit" binding:"omitempty,max=20"`

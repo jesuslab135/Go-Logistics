@@ -11,7 +11,7 @@ type CreateInspectionSubmissionItemRequest struct {
 	ResultStatus     string           `json:"result_status" binding:"omitempty,max=10"`
 	ResultValue      json.RawMessage  `json:"result_value"`
 	Remark           string           `json:"remark"`
-	Photo            *string          `json:"photo" binding:"omitempty,max=100"`
+	Photo            *string          `json:"photo" binding:"omitempty,max=500"`
 	Latitude         *decimal.Decimal `json:"latitude"`
 	Longitude        *decimal.Decimal `json:"longitude"`
 	GeneratedIssueID *int64           `json:"generated_issue_id"`
@@ -22,7 +22,7 @@ type UpdateInspectionSubmissionItemRequest struct {
 	ResultStatus     string           `json:"result_status" binding:"omitempty,max=10"`
 	ResultValue      json.RawMessage  `json:"result_value"`
 	Remark           string           `json:"remark"`
-	Photo            *string          `json:"photo" binding:"omitempty,max=100"`
+	Photo            *string          `json:"photo" binding:"omitempty,max=500"`
 	Latitude         *decimal.Decimal `json:"latitude"`
 	Longitude        *decimal.Decimal `json:"longitude"`
 	GeneratedIssueID *int64           `json:"generated_issue_id"`
@@ -35,7 +35,7 @@ type InspectionSubmissionItemResponse struct {
 	ResultStatus     string           `json:"result_status" binding:"omitempty,max=10"`
 	ResultValue      json.RawMessage  `json:"result_value"`
 	Remark           string           `json:"remark"`
-	Photo            *string          `json:"photo" binding:"omitempty,max=100"`
+	Photo            *string          `json:"photo" binding:"omitempty,max=500"`
 	Latitude         *decimal.Decimal `json:"latitude"`
 	Longitude        *decimal.Decimal `json:"longitude"`
 	GeneratedIssueID *int64           `json:"generated_issue_id"`

@@ -62,105 +62,148 @@ func NewRouter(d Deps) *gin.Engine {
 	r.POST("/auth/refresh", authH.Refresh)
 
 	api := r.Group("/api/v1")
-	api.Use(middleware.Auth(d.Tokens))
+	api.Use(middleware.Auth(d.Tokens), middleware.RequireIdentity(NewIdentityLoader(d.Queries)))
 
-	crud.NewHandler[dto.CompanyResponse, dto.CreateCompanyRequest, dto.UpdateCompanyRequest](
-		NewCompanyStore(d.Queries)).Register(api, "/companies")
+	// Authorization mirrors api/permissions.py: every resource requires company
+	// membership, and most additionally require the caller's role to grant the
+	// module the resource belonged to in Django (its viewset's module_name).
+	// Groups below are named for that module.
+	member := api.Group("", middleware.RequireCompanyMember())
+
+	registerCompanyRoutes(api, member, d)
+
+	assets := member.Group("", middleware.RequireModule("assets"))
+	tires := member.Group("", middleware.RequireModule("tires"))
+	parts := member.Group("", middleware.RequireModule("parts"))
+	inventory := member.Group("", middleware.RequireModule("inventory"))
+	workOrders := member.Group("", middleware.RequireModule("work_orders"))
+	issues := member.Group("", middleware.RequireModule("issues"))
+	service := member.Group("", middleware.RequireModule("service"))
+	fuel := member.Group("", middleware.RequireModule("fuel"))
+	inspections := member.Group("", middleware.RequireModule("inspections"))
+	vendors := member.Group("", middleware.RequireModule("vendors"))
+	warranties := member.Group("", middleware.RequireModule("warranties"))
+	mileageGoals := member.Group("", middleware.RequireModule("mileage_goals"))
+	employees := member.Group("", middleware.RequireModule("employees"))
+	// Django gated roles on IsAdminRole rather than on a module entry.
+	roles := member.Group("", middleware.RequireAdminRole())
 
 	// Phase 2: assets
 	crud.NewHandler[dto.AssetResponse, dto.CreateAssetRequest, dto.UpdateAssetRequest](
-		NewAssetStore(d.Queries)).Register(api, "/assets")
+		NewAssetStore(d.Queries)).Register(assets, "/assets")
 
 	// Phase 3: parts & inventory
 	crud.NewHandler[dto.PartCategoryResponse, dto.CreatePartCategoryRequest, dto.UpdatePartCategoryRequest](
-		NewPartCategoryStore(d.Queries)).Register(api, "/part-categories")
+		NewPartCategoryStore(d.Queries)).Register(parts, "/part-categories")
 	crud.NewHandler[dto.PartManufacturerResponse, dto.CreatePartManufacturerRequest, dto.UpdatePartManufacturerRequest](
-		NewPartManufacturerStore(d.Queries)).Register(api, "/part-manufacturers")
+		NewPartManufacturerStore(d.Queries)).Register(parts, "/part-manufacturers")
 	crud.NewHandler[dto.MeasurementUnitResponse, dto.CreateMeasurementUnitRequest, dto.UpdateMeasurementUnitRequest](
-		NewMeasurementUnitStore(d.Queries)).Register(api, "/measurement-units")
+		NewMeasurementUnitStore(d.Queries)).Register(inventory, "/measurement-units")
 	crud.NewHandler[dto.PartResponse, dto.CreatePartRequest, dto.UpdatePartRequest](
-		NewPartStore(d.Queries)).Register(api, "/parts")
+		NewPartStore(d.Queries)).Register(parts, "/parts")
 	crud.NewHandler[dto.PartLocationResponse, dto.CreatePartLocationRequest, dto.UpdatePartLocationRequest](
-		NewPartLocationStore(d.Queries)).Register(api, "/part-locations")
+		NewPartLocationStore(d.Queries)).Register(inventory, "/part-locations")
 	crud.NewHandler[dto.InventoryAdjustmentReasonResponse, dto.CreateInventoryAdjustmentReasonRequest, dto.UpdateInventoryAdjustmentReasonRequest](
-		NewInventoryAdjustmentReasonStore(d.Queries)).Register(api, "/inventory-adjustment-reasons")
+		NewInventoryAdjustmentReasonStore(d.Queries)).Register(inventory, "/inventory-adjustment-reasons")
 	crud.NewHandler[dto.InventoryJournalEntryResponse, dto.CreateInventoryJournalEntryRequest, dto.UpdateInventoryJournalEntryRequest](
-		NewInventoryJournalEntryStore(d.Queries)).Register(api, "/inventory-journal-entries")
+		NewInventoryJournalEntryStore(d.Queries)).Register(inventory, "/inventory-journal-entries")
 
 	// Phase 4: vendors, work orders & issues
-	crud.NewHandler[dto.VendorResponse, dto.CreateVendorRequest, dto.UpdateVendorRequest](NewVendorStore(d.Queries)).Register(api, "/vendors")
-	crud.NewHandler[dto.WorkOrderStatusResponse, dto.CreateWorkOrderStatusRequest, dto.UpdateWorkOrderStatusRequest](NewWorkOrderStatusStore(d.Queries)).Register(api, "/work-order-statuses")
-	crud.NewHandler[dto.LocationResponse, dto.CreateLocationRequest, dto.UpdateLocationRequest](NewLocationStore(d.Queries)).Register(api, "/locations")
-	crud.NewHandler[dto.WorkOrderResponse, dto.CreateWorkOrderRequest, dto.UpdateWorkOrderRequest](NewWorkOrderStore(d.Queries)).Register(api, "/work-orders")
-	crud.NewHandler[dto.IssueResponse, dto.CreateIssueRequest, dto.UpdateIssueRequest](NewIssueStore(d.Queries)).Register(api, "/issues")
-	crud.NewHandler[dto.IssuePriorityResponse, dto.CreateIssuePriorityRequest, dto.UpdateIssuePriorityRequest](NewIssuePriorityStore(d.Queries)).Register(api, "/issue-priorities")
-	crud.NewHandler[dto.FaultResponse, dto.CreateFaultRequest, dto.UpdateFaultRequest](NewFaultStore(d.Queries)).Register(api, "/faults")
+	crud.NewHandler[dto.VendorResponse, dto.CreateVendorRequest, dto.UpdateVendorRequest](NewVendorStore(d.Queries)).Register(vendors, "/vendors")
+	crud.NewHandler[dto.WorkOrderStatusResponse, dto.CreateWorkOrderStatusRequest, dto.UpdateWorkOrderStatusRequest](NewWorkOrderStatusStore(d.Queries)).Register(workOrders, "/work-order-statuses")
+	// Django's LocationViewSet required membership only, no module entry.
+	crud.NewHandler[dto.LocationResponse, dto.CreateLocationRequest, dto.UpdateLocationRequest](NewLocationStore(d.Queries)).Register(member, "/locations")
+	crud.NewHandler[dto.WorkOrderResponse, dto.CreateWorkOrderRequest, dto.UpdateWorkOrderRequest](NewWorkOrderStore(d.Queries)).Register(workOrders, "/work-orders")
+	crud.NewHandler[dto.IssueResponse, dto.CreateIssueRequest, dto.UpdateIssueRequest](NewIssueStore(d.Queries)).Register(issues, "/issues")
+	crud.NewHandler[dto.IssuePriorityResponse, dto.CreateIssuePriorityRequest, dto.UpdateIssuePriorityRequest](NewIssuePriorityStore(d.Queries)).Register(issues, "/issue-priorities")
+	crud.NewHandler[dto.FaultResponse, dto.CreateFaultRequest, dto.UpdateFaultRequest](NewFaultStore(d.Queries)).Register(issues, "/faults")
 
 	// Phase 5: purchase orders & service
-	crud.NewHandler[dto.PurchaseOrderResponse, dto.CreatePurchaseOrderRequest, dto.UpdatePurchaseOrderRequest](NewPurchaseOrderStore(d.Queries)).Register(api, "/purchase-orders")
-	crud.NewHandler[dto.ServiceTaskResponse, dto.CreateServiceTaskRequest, dto.UpdateServiceTaskRequest](NewServiceTaskStore(d.Queries)).Register(api, "/service-tasks")
-	crud.NewHandler[dto.ServiceReminderResponse, dto.CreateServiceReminderRequest, dto.UpdateServiceReminderRequest](NewServiceReminderStore(d.Queries)).Register(api, "/service-reminders")
-	crud.NewHandler[dto.ServiceEntryResponse, dto.CreateServiceEntryRequest, dto.UpdateServiceEntryRequest](NewServiceEntryStore(d.Queries)).Register(api, "/service-entries")
+	crud.NewHandler[dto.PurchaseOrderResponse, dto.CreatePurchaseOrderRequest, dto.UpdatePurchaseOrderRequest](NewPurchaseOrderStore(d.Queries)).Register(inventory, "/purchase-orders")
+	crud.NewHandler[dto.ServiceTaskResponse, dto.CreateServiceTaskRequest, dto.UpdateServiceTaskRequest](NewServiceTaskStore(d.Queries)).Register(service, "/service-tasks")
+	crud.NewHandler[dto.ServiceReminderResponse, dto.CreateServiceReminderRequest, dto.UpdateServiceReminderRequest](NewServiceReminderStore(d.Queries)).Register(service, "/service-reminders")
+	crud.NewHandler[dto.ServiceEntryResponse, dto.CreateServiceEntryRequest, dto.UpdateServiceEntryRequest](NewServiceEntryStore(d.Queries)).Register(service, "/service-entries")
 
 	// Phase 6: tires
-	crud.NewHandler[dto.TireResponse, dto.CreateTireRequest, dto.UpdateTireRequest](NewTireStore(d.Queries)).Register(api, "/tires")
-	crud.NewHandler[dto.TireModelResponse, dto.CreateTireModelRequest, dto.UpdateTireModelRequest](NewTireModelStore(d.Queries)).Register(api, "/tire-models")
-	crud.NewHandler[dto.AxleTemplateResponse, dto.CreateAxleTemplateRequest, dto.UpdateAxleTemplateRequest](NewAxleTemplateStore(d.Queries)).Register(api, "/axle-templates")
-	crud.NewHandler[dto.TireAssignmentRequestResponse, dto.CreateTireAssignmentRequestRequest, dto.UpdateTireAssignmentRequestRequest](NewTireAssignmentRequestStore(d.Queries)).Register(api, "/tire-assignment-requests")
+	crud.NewHandler[dto.TireResponse, dto.CreateTireRequest, dto.UpdateTireRequest](NewTireStore(d.Queries)).Register(tires, "/tires")
+	crud.NewHandler[dto.TireModelResponse, dto.CreateTireModelRequest, dto.UpdateTireModelRequest](NewTireModelStore(d.Queries)).Register(tires, "/tire-models")
+	crud.NewHandler[dto.AxleTemplateResponse, dto.CreateAxleTemplateRequest, dto.UpdateAxleTemplateRequest](NewAxleTemplateStore(d.Queries)).Register(tires, "/axle-templates")
+	// Django's TireAssignmentRequestViewSet required membership only; its
+	// approve/reject actions carried the extra warehouse-role check.
+	crud.NewHandler[dto.TireAssignmentRequestResponse, dto.CreateTireAssignmentRequestRequest, dto.UpdateTireAssignmentRequestRequest](NewTireAssignmentRequestStore(d.Queries)).Register(member, "/tire-assignment-requests")
 
 	// Phase 7: fuel, inspections, org & misc
-	crud.NewHandler[dto.FuelTypeResponse, dto.CreateFuelTypeRequest, dto.UpdateFuelTypeRequest](NewFuelTypeStore(d.Queries)).Register(api, "/fuel-types")
-	crud.NewHandler[dto.InspectionFormResponse, dto.CreateInspectionFormRequest, dto.UpdateInspectionFormRequest](NewInspectionFormStore(d.Queries)).Register(api, "/inspection-forms")
-	crud.NewHandler[dto.InspectionSubmissionResponse, dto.CreateInspectionSubmissionRequest, dto.UpdateInspectionSubmissionRequest](NewInspectionSubmissionStore(d.Queries)).Register(api, "/inspection-submissions")
-	crud.NewHandler[dto.MediumResponse, dto.CreateMediumRequest, dto.UpdateMediumRequest](NewMediumStore(d.Queries)).Register(api, "/media")
-	crud.NewHandler[dto.CommentResponse, dto.CreateCommentRequest, dto.UpdateCommentRequest](NewCommentStore(d.Queries)).Register(api, "/comments")
-	crud.NewHandler[dto.WarrantyResponse, dto.CreateWarrantyRequest, dto.UpdateWarrantyRequest](NewWarrantyStore(d.Queries)).Register(api, "/warranties")
-	crud.NewHandler[dto.WeeklyMileageGoalResponse, dto.CreateWeeklyMileageGoalRequest, dto.UpdateWeeklyMileageGoalRequest](NewWeeklyMileageGoalStore(d.Queries)).Register(api, "/weekly-mileage-goals")
-	crud.NewHandler[dto.RoleResponse, dto.CreateRoleRequest, dto.UpdateRoleRequest](NewRoleStore(d.Queries)).Register(api, "/roles")
+	crud.NewHandler[dto.FuelTypeResponse, dto.CreateFuelTypeRequest, dto.UpdateFuelTypeRequest](NewFuelTypeStore(d.Queries)).Register(fuel, "/fuel-types")
+	crud.NewHandler[dto.InspectionFormResponse, dto.CreateInspectionFormRequest, dto.UpdateInspectionFormRequest](NewInspectionFormStore(d.Queries)).Register(inspections, "/inspection-forms")
+	crud.NewHandler[dto.InspectionSubmissionResponse, dto.CreateInspectionSubmissionRequest, dto.UpdateInspectionSubmissionRequest](NewInspectionSubmissionStore(d.Queries)).Register(inspections, "/inspection-submissions")
+	crud.NewHandler[dto.MediumResponse, dto.CreateMediumRequest, dto.UpdateMediumRequest](NewMediumStore(d.Queries)).Register(assets, "/media")
+	crud.NewHandler[dto.CommentResponse, dto.CreateCommentRequest, dto.UpdateCommentRequest](NewCommentStore(d.Queries)).Register(issues, "/comments")
+	crud.NewHandler[dto.WarrantyResponse, dto.CreateWarrantyRequest, dto.UpdateWarrantyRequest](NewWarrantyStore(d.Queries)).Register(warranties, "/warranties")
+	crud.NewHandler[dto.WeeklyMileageGoalResponse, dto.CreateWeeklyMileageGoalRequest, dto.UpdateWeeklyMileageGoalRequest](NewWeeklyMileageGoalStore(d.Queries)).Register(mileageGoals, "/weekly-mileage-goals")
+	crud.NewHandler[dto.RoleResponse, dto.CreateRoleRequest, dto.UpdateRoleRequest](NewRoleStore(d.Queries)).Register(roles, "/roles")
 	// employee: m2m-scoped, password_hash excluded, transactional create
-	crud.NewHandler[dto.EmployeeResponse, dto.CreateEmployeeRequest, dto.UpdateEmployeeRequest](NewEmployeeStore(d.Queries, d.Pool)).Register(api, "/employees")
+	crud.NewHandler[dto.EmployeeResponse, dto.CreateEmployeeRequest, dto.UpdateEmployeeRequest](NewEmployeeStore(d.Queries, d.Pool)).Register(employees, "/employees")
 
 	// Phase 1: asset catalogs & vehicle models (tenant-scoped)
 	crud.NewHandler[dto.AssetTypeResponse, dto.CreateAssetTypeRequest, dto.UpdateAssetTypeRequest](
-		NewAssetTypeStore(d.Queries)).Register(api, "/asset-types")
+		NewAssetTypeStore(d.Queries)).Register(assets, "/asset-types")
 	crud.NewHandler[dto.AssetStatusResponse, dto.CreateAssetStatusRequest, dto.UpdateAssetStatusRequest](
-		NewAssetStatusStore(d.Queries)).Register(api, "/asset-statuses")
+		NewAssetStatusStore(d.Queries)).Register(assets, "/asset-statuses")
 	crud.NewHandler[dto.CatalogOptionResponse, dto.CreateCatalogOptionRequest, dto.UpdateCatalogOptionRequest](
-		NewCatalogOptionStore(d.Queries)).Register(api, "/catalog-options")
+		NewCatalogOptionStore(d.Queries)).Register(assets, "/catalog-options")
+	// Django's vehicle make/model viewsets required membership only.
 	crud.NewHandler[dto.VehicleMakeResponse, dto.CreateVehicleMakeRequest, dto.UpdateVehicleMakeRequest](
-		NewVehicleMakeStore(d.Queries)).Register(api, "/vehicle-makes")
+		NewVehicleMakeStore(d.Queries)).Register(member, "/vehicle-makes")
 	crud.NewHandler[dto.VehicleModelResponse, dto.CreateVehicleModelRequest, dto.UpdateVehicleModelRequest](
-		NewVehicleModelStore(d.Queries)).Register(api, "/vehicle-models")
+		NewVehicleModelStore(d.Queries)).Register(member, "/vehicle-models")
 
-	api.POST("/uploads", NewUploadHandler(d.Storage).Upload)
+	member.POST("/uploads", NewUploadHandler(d.Storage).Upload)
 
 	// Phase 8: nested, parent-scoped child resources
-	crud.NewNestedHandler[dto.WorkOrderLineItemResponse, dto.CreateWorkOrderLineItemRequest, dto.UpdateWorkOrderLineItemRequest](NewWorkOrderLineItemStore(d.Queries)).Register(api, "/work-orders", "/line-items")
-	crud.NewNestedHandler[dto.WorkOrderStatusLogResponse, dto.CreateWorkOrderStatusLogRequest, dto.UpdateWorkOrderStatusLogRequest](NewWorkOrderStatusLogStore(d.Queries)).Register(api, "/work-orders", "/status-logs")
-	crud.NewNestedHandler[dto.PurchaseOrderLineItemResponse, dto.CreatePurchaseOrderLineItemRequest, dto.UpdatePurchaseOrderLineItemRequest](NewPurchaseOrderLineItemStore(d.Queries)).Register(api, "/purchase-orders", "/line-items")
-	crud.NewNestedHandler[dto.ServiceTaskPartResponse, dto.CreateServiceTaskPartRequest, dto.UpdateServiceTaskPartRequest](NewServiceTaskPartStore(d.Queries)).Register(api, "/service-tasks", "/parts")
-	crud.NewNestedHandler[dto.ServiceEntryLineItemResponse, dto.CreateServiceEntryLineItemRequest, dto.UpdateServiceEntryLineItemRequest](NewServiceEntryLineItemStore(d.Queries)).Register(api, "/service-entries", "/line-items")
-	crud.NewNestedHandler[dto.InspectionFormItemResponse, dto.CreateInspectionFormItemRequest, dto.UpdateInspectionFormItemRequest](NewInspectionFormItemStore(d.Queries)).Register(api, "/inspection-forms", "/items")
-	crud.NewNestedHandler[dto.InspectionSubmissionItemResponse, dto.CreateInspectionSubmissionItemRequest, dto.UpdateInspectionSubmissionItemRequest](NewInspectionSubmissionItemStore(d.Queries)).Register(api, "/inspection-submissions", "/items")
-	crud.NewNestedHandler[dto.AxleDefinitionResponse, dto.CreateAxleDefinitionRequest, dto.UpdateAxleDefinitionRequest](NewAxleDefinitionStore(d.Queries)).Register(api, "/axle-templates", "/definitions")
-	crud.NewNestedHandler[dto.AssetTrailerAssignmentResponse, dto.CreateAssetTrailerAssignmentRequest, dto.UpdateAssetTrailerAssignmentRequest](NewAssetTrailerAssignmentStore(d.Queries)).Register(api, "/assets", "/trailer-assignments")
-	crud.NewNestedHandler[dto.PartInventoryResponse, dto.CreatePartInventoryRequest, dto.UpdatePartInventoryRequest](NewPartInventoryStore(d.Queries)).Register(api, "/parts", "/inventory")
-	crud.NewNestedHandler[dto.FuelEntryResponse, dto.CreateFuelEntryRequest, dto.UpdateFuelEntryRequest](NewFuelEntryStore(d.Queries)).Register(api, "/assets", "/fuel-entries")
-	crud.NewNestedHandler[dto.TireInstallationResponse, dto.CreateTireInstallationRequest, dto.UpdateTireInstallationRequest](NewTireInstallationStore(d.Queries)).Register(api, "/tires", "/installations")
-	crud.NewNestedHandler[dto.TireInspectionResponse, dto.CreateTireInspectionRequest, dto.UpdateTireInspectionRequest](NewTireInspectionStore(d.Queries)).Register(api, "/tires", "/inspections")
-	crud.NewNestedHandler[dto.TireMountLogResponse, dto.CreateTireMountLogRequest, dto.UpdateTireMountLogRequest](NewTireMountLogStore(d.Queries)).Register(api, "/tires", "/mount-logs")
+	crud.NewNestedHandler[dto.WorkOrderLineItemResponse, dto.CreateWorkOrderLineItemRequest, dto.UpdateWorkOrderLineItemRequest](NewWorkOrderLineItemStore(d.Queries)).Register(workOrders, "/work-orders", "/line-items")
+	crud.NewNestedHandler[dto.WorkOrderStatusLogResponse, dto.CreateWorkOrderStatusLogRequest, dto.UpdateWorkOrderStatusLogRequest](NewWorkOrderStatusLogStore(d.Queries)).Register(workOrders, "/work-orders", "/status-logs")
+	crud.NewNestedHandler[dto.PurchaseOrderLineItemResponse, dto.CreatePurchaseOrderLineItemRequest, dto.UpdatePurchaseOrderLineItemRequest](NewPurchaseOrderLineItemStore(d.Queries)).Register(inventory, "/purchase-orders", "/line-items")
+	crud.NewNestedHandler[dto.ServiceTaskPartResponse, dto.CreateServiceTaskPartRequest, dto.UpdateServiceTaskPartRequest](NewServiceTaskPartStore(d.Queries)).Register(service, "/service-tasks", "/parts")
+	crud.NewNestedHandler[dto.ServiceEntryLineItemResponse, dto.CreateServiceEntryLineItemRequest, dto.UpdateServiceEntryLineItemRequest](NewServiceEntryLineItemStore(d.Queries)).Register(service, "/service-entries", "/line-items")
+	crud.NewNestedHandler[dto.InspectionFormItemResponse, dto.CreateInspectionFormItemRequest, dto.UpdateInspectionFormItemRequest](NewInspectionFormItemStore(d.Queries)).Register(inspections, "/inspection-forms", "/items")
+	crud.NewNestedHandler[dto.InspectionSubmissionItemResponse, dto.CreateInspectionSubmissionItemRequest, dto.UpdateInspectionSubmissionItemRequest](NewInspectionSubmissionItemStore(d.Queries)).Register(inspections, "/inspection-submissions", "/items")
+	crud.NewNestedHandler[dto.AxleDefinitionResponse, dto.CreateAxleDefinitionRequest, dto.UpdateAxleDefinitionRequest](NewAxleDefinitionStore(d.Queries)).Register(tires, "/axle-templates", "/definitions")
+	crud.NewNestedHandler[dto.AssetTrailerAssignmentResponse, dto.CreateAssetTrailerAssignmentRequest, dto.UpdateAssetTrailerAssignmentRequest](NewAssetTrailerAssignmentStore(d.Queries)).Register(assets, "/assets", "/trailer-assignments")
+	crud.NewNestedHandler[dto.PartInventoryResponse, dto.CreatePartInventoryRequest, dto.UpdatePartInventoryRequest](NewPartInventoryStore(d.Queries)).Register(inventory, "/parts", "/inventory")
+	crud.NewNestedHandler[dto.FuelEntryResponse, dto.CreateFuelEntryRequest, dto.UpdateFuelEntryRequest](NewFuelEntryStore(d.Queries)).Register(fuel, "/assets", "/fuel-entries")
+	crud.NewNestedHandler[dto.TireInstallationResponse, dto.CreateTireInstallationRequest, dto.UpdateTireInstallationRequest](NewTireInstallationStore(d.Queries)).Register(tires, "/tires", "/installations")
+	crud.NewNestedHandler[dto.TireInspectionResponse, dto.CreateTireInspectionRequest, dto.UpdateTireInspectionRequest](NewTireInspectionStore(d.Queries)).Register(tires, "/tires", "/inspections")
+	crud.NewNestedHandler[dto.TireMountLogResponse, dto.CreateTireMountLogRequest, dto.UpdateTireMountLogRequest](NewTireMountLogStore(d.Queries)).Register(tires, "/tires", "/mount-logs")
 
 	// Phase 8b: deeper (grandchild) nested resources, scoped up the chain to company
-	crud.NewNestedHandler[dto.WorkOrderSubLineItemResponse, dto.CreateWorkOrderSubLineItemRequest, dto.UpdateWorkOrderSubLineItemRequest](NewWorkOrderSubLineItemStore(d.Queries)).Register(api, "/work-order-line-items", "/sub-line-items")
-	crud.NewNestedHandler[dto.LaborTimeEntryResponse, dto.CreateLaborTimeEntryRequest, dto.UpdateLaborTimeEntryRequest](NewLaborTimeEntryStore(d.Queries)).Register(api, "/work-order-sub-line-items", "/labor-entries")
-	crud.NewNestedHandler[dto.WheelPositionDefinitionResponse, dto.CreateWheelPositionDefinitionRequest, dto.UpdateWheelPositionDefinitionRequest](NewWheelPositionDefinitionStore(d.Queries)).Register(api, "/axle-definitions", "/wheel-positions")
-	crud.NewNestedHandler[dto.FuelCommentResponse, dto.CreateFuelCommentRequest, dto.UpdateFuelCommentRequest](NewFuelCommentStore(d.Queries)).Register(api, "/fuel-entries", "/comments")
-	crud.NewNestedHandler[dto.FuelPhotoResponse, dto.CreateFuelPhotoRequest, dto.UpdateFuelPhotoRequest](NewFuelPhotoStore(d.Queries)).Register(api, "/fuel-entries", "/photos")
+	crud.NewNestedHandler[dto.WorkOrderSubLineItemResponse, dto.CreateWorkOrderSubLineItemRequest, dto.UpdateWorkOrderSubLineItemRequest](NewWorkOrderSubLineItemStore(d.Queries)).Register(workOrders, "/work-order-line-items", "/sub-line-items")
+	crud.NewNestedHandler[dto.LaborTimeEntryResponse, dto.CreateLaborTimeEntryRequest, dto.UpdateLaborTimeEntryRequest](NewLaborTimeEntryStore(d.Queries)).Register(workOrders, "/work-order-sub-line-items", "/labor-entries")
+	crud.NewNestedHandler[dto.WheelPositionDefinitionResponse, dto.CreateWheelPositionDefinitionRequest, dto.UpdateWheelPositionDefinitionRequest](NewWheelPositionDefinitionStore(d.Queries)).Register(tires, "/axle-definitions", "/wheel-positions")
+	crud.NewNestedHandler[dto.FuelCommentResponse, dto.CreateFuelCommentRequest, dto.UpdateFuelCommentRequest](NewFuelCommentStore(d.Queries)).Register(fuel, "/fuel-entries", "/comments")
+	crud.NewNestedHandler[dto.FuelPhotoResponse, dto.CreateFuelPhotoRequest, dto.UpdateFuelPhotoRequest](NewFuelPhotoStore(d.Queries)).Register(fuel, "/fuel-entries", "/photos")
 
-	// Phase 8c: shared-PK 1:1 sub-types (singleton under the asset)
-	crud.NewSingletonHandler[dto.VehicleResponse, dto.UpsertVehicleRequest](NewVehicleStore(d.Queries)).Register(api, "/assets", "/vehicle")
-	crud.NewSingletonHandler[dto.TrailerResponse, dto.UpsertTrailerRequest](NewTrailerStore(d.Queries)).Register(api, "/assets", "/trailer")
-	crud.NewSingletonHandler[dto.VehicleAxleConfigResponse, dto.UpsertVehicleAxleConfigRequest](NewVehicleAxleConfigStore(d.Queries)).Register(api, "/assets", "/axle-config")
+	// Phase 8c: shared-PK 1:1 sub-types (singleton under the asset). Django put
+	// vehicle/trailer under 'assets' but the axle config under 'tires'.
+	crud.NewSingletonHandler[dto.VehicleResponse, dto.UpsertVehicleRequest](NewVehicleStore(d.Queries)).Register(assets, "/assets", "/vehicle")
+	crud.NewSingletonHandler[dto.TrailerResponse, dto.UpsertTrailerRequest](NewTrailerStore(d.Queries)).Register(assets, "/assets", "/trailer")
+	crud.NewSingletonHandler[dto.VehicleAxleConfigResponse, dto.UpsertVehicleAxleConfigRequest](NewVehicleAxleConfigStore(d.Queries)).Register(tires, "/assets", "/axle-config")
+
 
 	return r
+}
+
+// registerCompanyRoutes wires /companies with Django's split gating: creating a
+// company requires account ownership (and no membership, since the first company
+// is what creates it), while reading and mutating one requires company admin.
+func registerCompanyRoutes(api, member *gin.RouterGroup, d Deps) {
+	h := crud.NewHandler[dto.CompanyResponse, dto.CreateCompanyRequest, dto.UpdateCompanyRequest](
+		NewCompanyStore(d.Queries, d.Pool))
+
+	api.POST("/companies", middleware.RequireAccountOwner(), h.Create)
+
+	admin := member.Group("", middleware.RequireAdminRole())
+	admin.GET("/companies", h.List)
+	admin.GET("/companies/:id", h.Get)
+	admin.PUT("/companies/:id", h.Update)
+	admin.DELETE("/companies/:id", h.Delete)
 }

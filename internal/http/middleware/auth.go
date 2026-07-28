@@ -33,21 +33,9 @@ func Auth(tokens *auth.TokenService) gin.HandlerFunc {
 		}
 
 		c.Set(claimsKey, claims)
-		c.Request = c.Request.WithContext(
-			context.WithValue(c.Request.Context(), companyContextKey{}, claims.CompanyID),
-		)
-		c.Next()
-	}
-}
-
-// RequireAdmin must run after Auth; it rejects non-admin identities.
-func RequireAdmin() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		claims, ok := ClaimsOf(c)
-		if !ok || !claims.IsAdmin {
-			apierr.Abort(c, apierr.Forbidden("admin privileges required"))
-			return
-		}
+		ctx := context.WithValue(c.Request.Context(), companyContextKey{}, claims.CompanyID)
+		ctx = context.WithValue(ctx, employeeContextKey{}, claims.EmployeeID())
+		c.Request = c.Request.WithContext(ctx)
 		c.Next()
 	}
 }

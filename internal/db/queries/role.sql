@@ -7,6 +7,9 @@ SELECT * FROM role WHERE company_id = $1 ORDER BY name LIMIT $2 OFFSET $3;
 -- name: CountRoles :one
 SELECT count(*) FROM role WHERE company_id = $1;
 
+-- name: FindRoleByName :one
+SELECT * FROM role WHERE company_id = $1 AND name = $2 LIMIT 1;
+
 -- name: CreateRole :one
 INSERT INTO role (
     company_id, name, is_admin, permissions

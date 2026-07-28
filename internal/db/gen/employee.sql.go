@@ -270,6 +270,57 @@ func (q *Queries) GetEmployeeAuthByEmail(ctx context.Context, email string) (Get
 	return i, err
 }
 
+const getEmployeeIdentity = `-- name: GetEmployeeIdentity :one
+SELECT
+    e.id,
+    e.is_active,
+    e.is_account_owner,
+    e.role_id,
+    COALESCE(r.is_admin, false)         AS is_admin,
+    COALESCE(r.permissions, '{}'::jsonb) AS permissions,
+    EXISTS (
+        SELECT 1 FROM employee_companies ec
+        WHERE ec.employee_id = e.id AND ec.company_id = $1
+    ) AS is_member
+FROM employee e
+LEFT JOIN role r ON r.id = e.role_id
+WHERE e.id = $2
+`
+
+type GetEmployeeIdentityParams struct {
+	CompanyID int64
+	ID        int64
+}
+
+type GetEmployeeIdentityRow struct {
+	ID             int64
+	IsActive       bool
+	IsAccountOwner bool
+	RoleID         *int64
+	IsAdmin        bool
+	Permissions    []byte
+	IsMember       bool
+}
+
+// GetEmployeeIdentity backs the authorization middleware. Django resolved
+// request.user.employee (and its role) from the database on every request, so
+// revoking a role or deactivating an employee takes effect immediately rather
+// than at the next token refresh; this query preserves that.
+func (q *Queries) GetEmployeeIdentity(ctx context.Context, arg GetEmployeeIdentityParams) (GetEmployeeIdentityRow, error) {
+	row := q.db.QueryRow(ctx, getEmployeeIdentity, arg.CompanyID, arg.ID)
+	var i GetEmployeeIdentityRow
+	err := row.Scan(
+		&i.ID,
+		&i.IsActive,
+		&i.IsAccountOwner,
+		&i.RoleID,
+		&i.IsAdmin,
+		&i.Permissions,
+		&i.IsMember,
+	)
+	return i, err
+}
+
 const listEmployees = `-- name: ListEmployees :many
 SELECT e.id, e.user_id, e.default_company_id, e.first_name, e.last_name, e.employee_id, e.role_id, e.is_active, e.email, e.mobile_phone, e.work_phone, e.job_title, e.start_date, e.leave_date, e.birth_date, e.hourly_labor_rate, e.is_technician, e.is_vehicle_operator, e.is_account_owner, e.license_class, e.license_number, e.license_state, e.license_expiry, e.street_address, e.city, e.region, e.postal_code, e.country, e.group_id, e.custom_fields, e.table_preferences, e.dashboard_preferences, e.updated_at, e.password_hash FROM employee e
 WHERE EXISTS (SELECT 1 FROM employee_companies ec WHERE ec.employee_id = e.id AND ec.company_id = $1)

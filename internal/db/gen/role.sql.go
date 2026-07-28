@@ -68,6 +68,28 @@ func (q *Queries) DeleteRole(ctx context.Context, arg DeleteRoleParams) error {
 	return err
 }
 
+const findRoleByName = `-- name: FindRoleByName :one
+SELECT id, company_id, name, is_admin, permissions FROM role WHERE company_id = $1 AND name = $2 LIMIT 1
+`
+
+type FindRoleByNameParams struct {
+	CompanyID int64
+	Name      string
+}
+
+func (q *Queries) FindRoleByName(ctx context.Context, arg FindRoleByNameParams) (Role, error) {
+	row := q.db.QueryRow(ctx, findRoleByName, arg.CompanyID, arg.Name)
+	var i Role
+	err := row.Scan(
+		&i.ID,
+		&i.CompanyID,
+		&i.Name,
+		&i.IsAdmin,
+		&i.Permissions,
+	)
+	return i, err
+}
+
 const getRole = `-- name: GetRole :one
 SELECT id, company_id, name, is_admin, permissions FROM role WHERE id = $1 AND company_id = $2
 `
