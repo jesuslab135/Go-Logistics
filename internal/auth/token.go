@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"strconv"
 	"time"
@@ -74,18 +76,36 @@ func (s *TokenService) Issue(employeeID, companyID int64, isAdmin bool) (TokenPa
 
 func (s *TokenService) sign(employeeID, companyID int64, isAdmin bool, typ string, ttl time.Duration) (string, error) {
 	now := s.now()
+	registered := jwt.RegisteredClaims{
+		Subject:   strconv.FormatInt(employeeID, 10),
+		Issuer:    s.issuer,
+		IssuedAt:  jwt.NewNumericDate(now),
+		ExpiresAt: jwt.NewNumericDate(now.Add(ttl)),
+	}
+	// Only refresh tokens are revocable, so only they need an identifier to
+	// denylist. Access tokens stay stateless and expire on their own.
+	if typ == TypeRefresh {
+		jti, err := newJTI()
+		if err != nil {
+			return "", err
+		}
+		registered.ID = jti
+	}
 	claims := Claims{
-		CompanyID: companyID,
-		IsAdmin:   isAdmin,
-		Type:      typ,
-		RegisteredClaims: jwt.RegisteredClaims{
-			Subject:   strconv.FormatInt(employeeID, 10),
-			Issuer:    s.issuer,
-			IssuedAt:  jwt.NewNumericDate(now),
-			ExpiresAt: jwt.NewNumericDate(now.Add(ttl)),
-		},
+		CompanyID:        companyID,
+		IsAdmin:          isAdmin,
+		Type:             typ,
+		RegisteredClaims: registered,
 	}
 	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(s.secret)
+}
+
+func newJTI() (string, error) {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
 }
 
 // Parse verifies signature, issuer, expiry, and the HS256 method, returning the

@@ -612,6 +612,12 @@ type PurchaseOrderLineItem struct {
 	UpdatedAt       time.Time
 }
 
+type RevokedToken struct {
+	Jti        string
+	EmployeeID int64
+	ExpiresAt  time.Time
+}
+
 type Role struct {
 	ID          int64
 	CompanyID   int64

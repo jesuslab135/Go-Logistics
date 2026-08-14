@@ -2977,6 +2977,13 @@ definitions:
     - email
     - password
     type: object
+  dto.LogoutRequest:
+    properties:
+      refresh_token:
+        type: string
+    required:
+    - refresh_token
+    type: object
   dto.MeCompany:
     properties:
       id:
@@ -15483,6 +15490,34 @@ paths:
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
       summary: Log in with email and password
+      tags:
+      - auth
+  /auth/logout:
+    post:
+      consumes:
+      - application/json
+      description: Adds the token's jti to the denylist until its natural expiry.
+      parameters:
+      - description: Refresh token
+        in: body
+        name: refresh
+        required: true
+        schema:
+          $ref: '#/definitions/dto.LogoutRequest'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: revoked
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Revoke a refresh token
       tags:
       - auth
   /auth/refresh:

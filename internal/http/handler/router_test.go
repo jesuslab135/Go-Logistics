@@ -34,6 +34,7 @@ func TestRouterRegistersRoutes(t *testing.T) {
 
 	for _, want := range []string{
 		"POST /auth/login",
+		"POST /auth/logout",
 		"GET /api/v1/companies",
 		"POST /api/v1/companies",
 		"DELETE /api/v1/companies/:id",

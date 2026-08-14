@@ -57,9 +57,10 @@ func NewRouter(d Deps) *gin.Engine {
 		r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	}
 
-	authH := NewAuthHandler(d.Tokens, d.Verifier)
+	authH := NewAuthHandler(d.Tokens, d.Verifier, d.Queries)
 	r.POST("/auth/login", authH.Login)
 	r.POST("/auth/refresh", authH.Refresh)
+	r.POST("/auth/logout", authH.Logout)
 
 	api := r.Group("/api/v1")
 	api.Use(middleware.Auth(d.Tokens), middleware.RequireIdentity(NewIdentityLoader(d.Queries)))

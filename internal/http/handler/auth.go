@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"fleet/internal/auth"
+	"fleet/internal/db/gen"
 	"fleet/internal/http/dto"
 	"fleet/internal/platform/apierr"
 )
@@ -33,10 +34,11 @@ type CredentialVerifier interface {
 type AuthHandler struct {
 	tokens   *auth.TokenService
 	verifier CredentialVerifier
+	q        *gen.Queries
 }
 
-func NewAuthHandler(tokens *auth.TokenService, verifier CredentialVerifier) *AuthHandler {
-	return &AuthHandler{tokens: tokens, verifier: verifier}
+func NewAuthHandler(tokens *auth.TokenService, verifier CredentialVerifier, q *gen.Queries) *AuthHandler {
+	return &AuthHandler{tokens: tokens, verifier: verifier, q: q}
 }
 
 // Login godoc
@@ -99,6 +101,21 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 		apierr.Abort(c, apierr.Unauthorized("invalid refresh token"))
 		return
 	}
+	// Tokens minted before BR-05 carry no jti and so can never be revoked;
+	// refuse them rather than honour an unrevocable credential.
+	if claims.ID == "" {
+		apierr.Abort(c, apierr.Unauthorized("invalid refresh token"))
+		return
+	}
+	revoked, err := h.q.IsRefreshTokenRevoked(c.Request.Context(), claims.ID)
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	if revoked {
+		apierr.Abort(c, apierr.Unauthorized("invalid refresh token"))
+		return
+	}
 
 	pair, err := h.tokens.Issue(claims.EmployeeID(), claims.CompanyID, claims.IsAdmin)
 	if err != nil {
@@ -106,4 +123,46 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, pair)
+}
+
+// Logout godoc
+//
+//	@Summary		Revoke a refresh token
+//	@Description	Adds the token's jti to the denylist until its natural expiry.
+//	@Tags			auth
+//	@Accept			json
+//	@Produce		json
+//	@Param			refresh	body	dto.LogoutRequest	true	"Refresh token"
+//	@Success		204		"revoked"
+//	@Failure		400		{object}	dto.ErrorResponse
+//	@Failure		401		{object}	dto.ErrorResponse
+//	@Router			/auth/logout [post]
+func (h *AuthHandler) Logout(c *gin.Context) {
+	var req dto.LogoutRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		apierr.Abort(c, apierr.BadRequest("invalid request body").Wrap(err))
+		return
+	}
+
+	claims, err := h.tokens.ParseRefresh(req.RefreshToken)
+	if err != nil || claims.ID == "" {
+		apierr.Abort(c, apierr.Unauthorized("invalid refresh token"))
+		return
+	}
+
+	ctx := c.Request.Context()
+	// The jti is bound to its own employee, so revoking only ever affects the
+	// presented token — a caller cannot revoke someone else's session.
+	if err := h.q.RevokeRefreshToken(ctx, gen.RevokeRefreshTokenParams{
+		Jti:        claims.ID,
+		EmployeeID: claims.EmployeeID(),
+		ExpiresAt:  claims.ExpiresAt.Time,
+	}); err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	// Opportunistic pruning; a failure here must not fail the logout.
+	_ = h.q.DeleteExpiredRevokedTokens(ctx)
+
+	c.Status(http.StatusNoContent)
 }
