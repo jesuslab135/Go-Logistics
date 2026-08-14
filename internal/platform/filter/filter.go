@@ -56,6 +56,25 @@ func (w *Where) Add(column string, op Op, value any) *Where {
 	return w
 }
 
+// Raw appends a hand-written condition for shapes Add cannot express, such as
+// an OR group across several columns. Each "?" becomes the next positional
+// placeholder, so the clause stays parameterized; args must match the number of
+// "?" occurrences. The clause itself is code-owned — never request input.
+func (w *Where) Raw(clause string, args ...any) *Where {
+	var b strings.Builder
+	for _, r := range clause {
+		if r == '?' {
+			fmt.Fprintf(&b, "$%d", w.next)
+			w.next++
+			continue
+		}
+		b.WriteRune(r)
+	}
+	w.clauses = append(w.clauses, b.String())
+	w.args = append(w.args, args...)
+	return w
+}
+
 // FromQuery adds one condition per (param -> Field) match found in values.
 // Params absent from allowed are ignored, so unknown or malicious keys are
 // silently dropped rather than reaching SQL.
