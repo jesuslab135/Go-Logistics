@@ -12,3 +12,7 @@ type RefreshRequest struct {
 type LogoutRequest struct {
 	RefreshToken string `json:"refresh_token" binding:"required"`
 }
+
+type SwitchCompanyRequest struct {
+	CompanyID int64 `json:"company_id" binding:"required,min=1"`
+}

@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -35,6 +36,7 @@ func TestRouterRegistersRoutes(t *testing.T) {
 	for _, want := range []string{
 		"POST /auth/login",
 		"POST /auth/logout",
+		"POST /auth/switch-company",
 		"GET /api/v1/companies",
 		"POST /api/v1/companies",
 		"DELETE /api/v1/companies/:id",
@@ -71,6 +73,21 @@ func TestRouterRegistersRoutes(t *testing.T) {
 // Every /api/v1 route must reject an anonymous caller. A resource wired outside
 // the authenticated groups would answer instead, which is how the pre-RBAC
 // router leaked every module to any valid token.
+// Switching companies lives outside /api/v1 but is still authenticated, so it
+// is not covered by the sweep below.
+func TestSwitchCompanyRequiresAuth(t *testing.T) {
+	r := newTestRouter(t)
+
+	req := httptest.NewRequest(http.MethodPost, "/auth/switch-company", strings.NewReader(`{"company_id":1}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("got %d, want %d", w.Code, http.StatusUnauthorized)
+	}
+}
+
 func TestAPIRoutesRequireAuth(t *testing.T) {
 	r := newTestRouter(t)
 

@@ -3806,6 +3806,14 @@ definitions:
       updated_at:
         type: string
     type: object
+  dto.SwitchCompanyRequest:
+    properties:
+      company_id:
+        minimum: 1
+        type: integer
+    required:
+    - company_id
+    type: object
   dto.TireAssignmentRequestPage:
     properties:
       data:
@@ -15547,6 +15555,43 @@ paths:
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
       summary: Exchange a refresh token for a new token pair
+      tags:
+      - auth
+  /auth/switch-company:
+    post:
+      consumes:
+      - application/json
+      description: Re-issues the token pair scoped to another company the caller belongs
+        to.
+      parameters:
+      - description: Target company
+        in: body
+        name: company
+        required: true
+        schema:
+          $ref: '#/definitions/dto.SwitchCompanyRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/auth.TokenPair'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Switch the active company
       tags:
       - auth
   /healthz:

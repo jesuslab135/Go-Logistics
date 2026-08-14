@@ -61,6 +61,9 @@ func NewRouter(d Deps) *gin.Engine {
 	r.POST("/auth/login", authH.Login)
 	r.POST("/auth/refresh", authH.Refresh)
 	r.POST("/auth/logout", authH.Logout)
+	// Switching tenants needs a valid access token but deliberately no company
+	// gate — the caller is leaving the company the token is scoped to.
+	r.POST("/auth/switch-company", middleware.Auth(d.Tokens), authH.SwitchCompany)
 
 	api := r.Group("/api/v1")
 	api.Use(middleware.Auth(d.Tokens), middleware.RequireIdentity(NewIdentityLoader(d.Queries)))

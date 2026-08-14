@@ -10,6 +10,7 @@ import (
 	"fleet/internal/auth"
 	"fleet/internal/db/gen"
 	"fleet/internal/http/dto"
+	"fleet/internal/http/middleware"
 	"fleet/internal/platform/apierr"
 )
 
@@ -118,6 +119,54 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 	}
 
 	pair, err := h.tokens.Issue(claims.EmployeeID(), claims.CompanyID, claims.IsAdmin)
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, pair)
+}
+
+// SwitchCompany godoc
+//
+//	@Summary		Switch the active company
+//	@Description	Re-issues the token pair scoped to another company the caller belongs to.
+//	@Tags			auth
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			company	body		dto.SwitchCompanyRequest	true	"Target company"
+//	@Success		200		{object}	auth.TokenPair
+//	@Failure		400		{object}	dto.ErrorResponse
+//	@Failure		401		{object}	dto.ErrorResponse
+//	@Failure		403		{object}	dto.ErrorResponse
+//	@Router			/auth/switch-company [post]
+func (h *AuthHandler) SwitchCompany(c *gin.Context) {
+	var req dto.SwitchCompanyRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		apierr.Abort(c, apierr.BadRequest("invalid request body").Wrap(err))
+		return
+	}
+
+	claims, ok := middleware.ClaimsOf(c)
+	if !ok {
+		apierr.Abort(c, apierr.Unauthorized("authentication required"))
+		return
+	}
+
+	// Membership is re-read from employee_companies rather than trusted from
+	// the presented token, so a stale claim cannot widen access.
+	row, err := h.q.GetEmployeeIdentity(c.Request.Context(), gen.GetEmployeeIdentityParams{
+		CompanyID: req.CompanyID,
+		ID:        claims.EmployeeID(),
+	})
+	if err != nil || !row.IsActive || !row.IsMember {
+		apierr.Abort(c, apierr.Forbidden("you are not a member of this company"))
+		return
+	}
+
+	// Both tokens are re-scoped: is_admin is resolved against the target
+	// company's role, not carried over from the previous tenant.
+	pair, err := h.tokens.Issue(claims.EmployeeID(), req.CompanyID, row.IsAdmin)
 	if err != nil {
 		apierr.Abort(c, err)
 		return
