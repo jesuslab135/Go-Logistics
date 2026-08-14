@@ -215,7 +215,7 @@ func NewRouter(d Deps) *gin.Engine {
 	crud.NewNestedHandler[dto.AxleDefinitionResponse, dto.CreateAxleDefinitionRequest, dto.UpdateAxleDefinitionRequest](NewAxleDefinitionStore(d.Queries)).Register(tires, "/axle-templates", "/definitions")
 	crud.NewNestedHandler[dto.AssetTrailerAssignmentResponse, dto.CreateAssetTrailerAssignmentRequest, dto.UpdateAssetTrailerAssignmentRequest](NewAssetTrailerAssignmentStore(d.Queries)).Register(assets, "/assets", "/trailer-assignments")
 	crud.NewNestedHandler[dto.PartInventoryResponse, dto.CreatePartInventoryRequest, dto.UpdatePartInventoryRequest](NewPartInventoryStore(d.Queries)).Register(inventory, "/parts", "/inventory")
-	crud.NewNestedHandler[dto.FuelEntryResponse, dto.CreateFuelEntryRequest, dto.UpdateFuelEntryRequest](NewFuelEntryStore(d.Queries)).Register(fuel, "/assets", "/fuel-entries")
+	crud.NewNestedHandler[dto.FuelEntryResponse, dto.CreateFuelEntryRequest, dto.UpdateFuelEntryRequest](NewFuelEntryStore(d.Queries, d.Pool)).Register(fuel, "/assets", "/fuel-entries")
 	// Cross-fleet register. Sits alongside /fuel-entries/{id}/comments and
 	// /photos, which are keyed by entry rather than by asset.
 	fuel.GET("/fuel-entries", lists.FuelEntries)

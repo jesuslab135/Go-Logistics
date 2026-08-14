@@ -30,40 +30,40 @@ func (q *Queries) CountFuelEntries(ctx context.Context, arg CountFuelEntriesPara
 
 const createFuelEntry = `-- name: CreateFuelEntry :one
 INSERT INTO fuel_entry (
-    asset_id, employee_id, date, fuel_type, quantity, unit_cost, total_cost, odometer, vendor_id, full_tank, miles_traveled, fuel_efficiency, state, reference, personal, reset, latitude, longitude, external_id, no_semana, estado_prov, operator_name, updated_at
+    asset_id, employee_id, date, fuel_type, quantity, unit_cost, total_cost, odometer, vendor_id, full_tank, state, reference, personal, reset, latitude, longitude, external_id, no_semana, estado_prov, operator_name, updated_at
 )
-SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23
-WHERE EXISTS (SELECT 1 FROM asset WHERE id = $1 AND company_id = $24)
+SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21
+WHERE EXISTS (SELECT 1 FROM asset WHERE id = $1 AND company_id = $22)
 RETURNING id, asset_id, employee_id, date, fuel_type, quantity, unit_cost, total_cost, odometer, vendor_id, full_tank, miles_traveled, fuel_efficiency, state, reference, personal, reset, latitude, longitude, external_id, updated_at, no_semana, estado_prov, operator_name
 `
 
 type CreateFuelEntryParams struct {
-	ParentID       int64
-	EmployeeID     int64
-	Date           time.Time
-	FuelType       string
-	Quantity       decimal.Decimal
-	UnitCost       decimal.Decimal
-	TotalCost      decimal.Decimal
-	Odometer       decimal.Decimal
-	VendorID       int64
-	FullTank       bool
-	MilesTraveled  *decimal.Decimal
-	FuelEfficiency *decimal.Decimal
-	State          string
-	Reference      string
-	Personal       bool
-	Reset          bool
-	Latitude       *decimal.Decimal
-	Longitude      *decimal.Decimal
-	ExternalID     string
-	NoSemana       *string
-	EstadoProv     *string
-	OperatorName   *string
-	UpdatedAt      time.Time
-	CompanyID      int64
+	ParentID     int64
+	EmployeeID   int64
+	Date         time.Time
+	FuelType     string
+	Quantity     decimal.Decimal
+	UnitCost     decimal.Decimal
+	TotalCost    decimal.Decimal
+	Odometer     decimal.Decimal
+	VendorID     int64
+	FullTank     bool
+	State        string
+	Reference    string
+	Personal     bool
+	Reset        bool
+	Latitude     *decimal.Decimal
+	Longitude    *decimal.Decimal
+	ExternalID   string
+	NoSemana     *string
+	EstadoProv   *string
+	OperatorName *string
+	UpdatedAt    time.Time
+	CompanyID    int64
 }
 
+// miles_traveled and fuel_efficiency are omitted on purpose: they are derived
+// by recalcFuelSeries after the write, never taken from the request.
 func (q *Queries) CreateFuelEntry(ctx context.Context, arg CreateFuelEntryParams) (FuelEntry, error) {
 	row := q.db.QueryRow(ctx, createFuelEntry,
 		arg.ParentID,
@@ -76,8 +76,6 @@ func (q *Queries) CreateFuelEntry(ctx context.Context, arg CreateFuelEntryParams
 		arg.Odometer,
 		arg.VendorID,
 		arg.FullTank,
-		arg.MilesTraveled,
-		arg.FuelEfficiency,
 		arg.State,
 		arg.Reference,
 		arg.Personal,
@@ -180,6 +178,86 @@ func (q *Queries) GetFuelEntry(ctx context.Context, arg GetFuelEntryParams) (Fue
 	return i, err
 }
 
+const getFuelEntrySeries = `-- name: GetFuelEntrySeries :one
+SELECT c.id, c.asset_id, c.fuel_type, c.date
+FROM fuel_entry c JOIN asset p ON p.id = c.asset_id
+WHERE c.id = $1 AND p.company_id = $2
+`
+
+type GetFuelEntrySeriesParams struct {
+	ID        int64
+	CompanyID int64
+}
+
+type GetFuelEntrySeriesRow struct {
+	ID       int64
+	AssetID  int64
+	FuelType string
+	Date     time.Time
+}
+
+// The series an entry belongs to, for recomputing after an edit or delete.
+func (q *Queries) GetFuelEntrySeries(ctx context.Context, arg GetFuelEntrySeriesParams) (GetFuelEntrySeriesRow, error) {
+	row := q.db.QueryRow(ctx, getFuelEntrySeries, arg.ID, arg.CompanyID)
+	var i GetFuelEntrySeriesRow
+	err := row.Scan(
+		&i.ID,
+		&i.AssetID,
+		&i.FuelType,
+		&i.Date,
+	)
+	return i, err
+}
+
+const getPreviousFuelEntry = `-- name: GetPreviousFuelEntry :one
+
+SELECT id, date, odometer, quantity, full_tank, reset
+FROM fuel_entry
+WHERE asset_id = $1 AND fuel_type = $2
+  AND (date, id) < ($3::timestamptz, $4::bigint)
+ORDER BY date DESC, id DESC
+LIMIT 1
+`
+
+type GetPreviousFuelEntryParams struct {
+	AssetID  int64
+	FuelType string
+	Date     time.Time
+	ID       int64
+}
+
+type GetPreviousFuelEntryRow struct {
+	ID       int64
+	Date     time.Time
+	Odometer decimal.Decimal
+	Quantity decimal.Decimal
+	FullTank bool
+	Reset    bool
+}
+
+// Fuel derivation works along a series: entries for one asset and one fuel
+// type, ordered by (date, id). The row tuple comparison makes that ordering
+// the identity of a position in the series, so an entry inserted between two
+// others is handled the same way as one appended at the end.
+func (q *Queries) GetPreviousFuelEntry(ctx context.Context, arg GetPreviousFuelEntryParams) (GetPreviousFuelEntryRow, error) {
+	row := q.db.QueryRow(ctx, getPreviousFuelEntry,
+		arg.AssetID,
+		arg.FuelType,
+		arg.Date,
+		arg.ID,
+	)
+	var i GetPreviousFuelEntryRow
+	err := row.Scan(
+		&i.ID,
+		&i.Date,
+		&i.Odometer,
+		&i.Quantity,
+		&i.FullTank,
+		&i.Reset,
+	)
+	return i, err
+}
+
 const listFuelEntries = `-- name: ListFuelEntries :many
 SELECT c.id, c.asset_id, c.employee_id, c.date, c.fuel_type, c.quantity, c.unit_cost, c.total_cost, c.odometer, c.vendor_id, c.full_tank, c.miles_traveled, c.fuel_efficiency, c.state, c.reference, c.personal, c.reset, c.latitude, c.longitude, c.external_id, c.updated_at, c.no_semana, c.estado_prov, c.operator_name FROM fuel_entry c JOIN asset p ON p.id = c.asset_id
 WHERE c.asset_id = $1 AND p.company_id = $2
@@ -243,39 +321,110 @@ func (q *Queries) ListFuelEntries(ctx context.Context, arg ListFuelEntriesParams
 	return items, nil
 }
 
+const listFuelEntriesFrom = `-- name: ListFuelEntriesFrom :many
+SELECT id, date, odometer, quantity, full_tank, reset
+FROM fuel_entry
+WHERE asset_id = $1 AND fuel_type = $2
+  AND (date, id) >= ($3::timestamptz, $4::bigint)
+ORDER BY date, id
+FOR UPDATE
+`
+
+type ListFuelEntriesFromParams struct {
+	AssetID  int64
+	FuelType string
+	Date     time.Time
+	ID       int64
+}
+
+type ListFuelEntriesFromRow struct {
+	ID       int64
+	Date     time.Time
+	Odometer decimal.Decimal
+	Quantity decimal.Decimal
+	FullTank bool
+	Reset    bool
+}
+
+func (q *Queries) ListFuelEntriesFrom(ctx context.Context, arg ListFuelEntriesFromParams) ([]ListFuelEntriesFromRow, error) {
+	rows, err := q.db.Query(ctx, listFuelEntriesFrom,
+		arg.AssetID,
+		arg.FuelType,
+		arg.Date,
+		arg.ID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListFuelEntriesFromRow{}
+	for rows.Next() {
+		var i ListFuelEntriesFromRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Date,
+			&i.Odometer,
+			&i.Quantity,
+			&i.FullTank,
+			&i.Reset,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const setFuelEntryDerived = `-- name: SetFuelEntryDerived :exec
+UPDATE fuel_entry SET miles_traveled = $1, fuel_efficiency = $2
+WHERE id = $3
+`
+
+type SetFuelEntryDerivedParams struct {
+	MilesTraveled  *decimal.Decimal
+	FuelEfficiency *decimal.Decimal
+	ID             int64
+}
+
+func (q *Queries) SetFuelEntryDerived(ctx context.Context, arg SetFuelEntryDerivedParams) error {
+	_, err := q.db.Exec(ctx, setFuelEntryDerived, arg.MilesTraveled, arg.FuelEfficiency, arg.ID)
+	return err
+}
+
 const updateFuelEntry = `-- name: UpdateFuelEntry :one
-UPDATE fuel_entry AS c SET employee_id = $1, date = $2, fuel_type = $3, quantity = $4, unit_cost = $5, total_cost = $6, odometer = $7, vendor_id = $8, full_tank = $9, miles_traveled = $10, fuel_efficiency = $11, state = $12, reference = $13, personal = $14, reset = $15, latitude = $16, longitude = $17, external_id = $18, updated_at = $19, no_semana = $20, estado_prov = $21, operator_name = $22
+UPDATE fuel_entry AS c SET employee_id = $1, date = $2, fuel_type = $3, quantity = $4, unit_cost = $5, total_cost = $6, odometer = $7, vendor_id = $8, full_tank = $9, state = $10, reference = $11, personal = $12, reset = $13, latitude = $14, longitude = $15, external_id = $16, updated_at = $17, no_semana = $18, estado_prov = $19, operator_name = $20
 FROM asset p
-WHERE c.id = $23 AND c.asset_id = $24 AND p.company_id = $25 AND p.id = c.asset_id
+WHERE c.id = $21 AND c.asset_id = $22 AND p.company_id = $23 AND p.id = c.asset_id
 RETURNING c.id, c.asset_id, c.employee_id, c.date, c.fuel_type, c.quantity, c.unit_cost, c.total_cost, c.odometer, c.vendor_id, c.full_tank, c.miles_traveled, c.fuel_efficiency, c.state, c.reference, c.personal, c.reset, c.latitude, c.longitude, c.external_id, c.updated_at, c.no_semana, c.estado_prov, c.operator_name
 `
 
 type UpdateFuelEntryParams struct {
-	EmployeeID     int64
-	Date           time.Time
-	FuelType       string
-	Quantity       decimal.Decimal
-	UnitCost       decimal.Decimal
-	TotalCost      decimal.Decimal
-	Odometer       decimal.Decimal
-	VendorID       int64
-	FullTank       bool
-	MilesTraveled  *decimal.Decimal
-	FuelEfficiency *decimal.Decimal
-	State          string
-	Reference      string
-	Personal       bool
-	Reset          bool
-	Latitude       *decimal.Decimal
-	Longitude      *decimal.Decimal
-	ExternalID     string
-	UpdatedAt      time.Time
-	NoSemana       *string
-	EstadoProv     *string
-	OperatorName   *string
-	ID             int64
-	ParentID       int64
-	CompanyID      int64
+	EmployeeID   int64
+	Date         time.Time
+	FuelType     string
+	Quantity     decimal.Decimal
+	UnitCost     decimal.Decimal
+	TotalCost    decimal.Decimal
+	Odometer     decimal.Decimal
+	VendorID     int64
+	FullTank     bool
+	State        string
+	Reference    string
+	Personal     bool
+	Reset        bool
+	Latitude     *decimal.Decimal
+	Longitude    *decimal.Decimal
+	ExternalID   string
+	UpdatedAt    time.Time
+	NoSemana     *string
+	EstadoProv   *string
+	OperatorName *string
+	ID           int64
+	ParentID     int64
+	CompanyID    int64
 }
 
 func (q *Queries) UpdateFuelEntry(ctx context.Context, arg UpdateFuelEntryParams) (FuelEntry, error) {
@@ -289,8 +438,6 @@ func (q *Queries) UpdateFuelEntry(ctx context.Context, arg UpdateFuelEntryParams
 		arg.Odometer,
 		arg.VendorID,
 		arg.FullTank,
-		arg.MilesTraveled,
-		arg.FuelEfficiency,
 		arg.State,
 		arg.Reference,
 		arg.Personal,

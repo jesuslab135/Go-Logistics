@@ -16142,9 +16142,6 @@ const docTemplate = `{
                     "type": "string",
                     "maxLength": 100
                 },
-                "fuel_efficiency": {
-                    "type": "number"
-                },
                 "fuel_type": {
                     "type": "string",
                     "maxLength": 20
@@ -16156,9 +16153,6 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "longitude": {
-                    "type": "number"
-                },
-                "miles_traveled": {
                     "type": "number"
                 },
                 "no_semana": {
@@ -16196,6 +16190,7 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "vendor_id": {
+                    "description": "miles_traveled and fuel_efficiency are derived by the server from the\nprevious entry in the series, so they are not accepted here.",
                     "type": "integer"
                 }
             }
@@ -21612,9 +21607,6 @@ const docTemplate = `{
                     "type": "string",
                     "maxLength": 100
                 },
-                "fuel_efficiency": {
-                    "type": "number"
-                },
                 "fuel_type": {
                     "type": "string",
                     "maxLength": 20
@@ -21626,9 +21618,6 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "longitude": {
-                    "type": "number"
-                },
-                "miles_traveled": {
                     "type": "number"
                 },
                 "no_semana": {

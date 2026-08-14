@@ -7,51 +7,49 @@ import (
 )
 
 type CreateFuelEntryRequest struct {
-	EmployeeID     int64            `json:"employee_id"`
-	Date           time.Time        `json:"date"`
-	FuelType       string           `json:"fuel_type" binding:"omitempty,max=20"`
-	Quantity       decimal.Decimal  `json:"quantity"`
-	UnitCost       decimal.Decimal  `json:"unit_cost"`
-	TotalCost      decimal.Decimal  `json:"total_cost"`
-	Odometer       decimal.Decimal  `json:"odometer"`
-	VendorID       int64            `json:"vendor_id"`
-	FullTank       *bool            `json:"full_tank"`
-	MilesTraveled  *decimal.Decimal `json:"miles_traveled"`
-	FuelEfficiency *decimal.Decimal `json:"fuel_efficiency"`
-	State          string           `json:"state" binding:"omitempty,max=50"`
-	Reference      string           `json:"reference" binding:"omitempty,max=100"`
-	Personal       bool             `json:"personal"`
-	Reset          bool             `json:"reset"`
-	Latitude       *decimal.Decimal `json:"latitude"`
-	Longitude      *decimal.Decimal `json:"longitude"`
-	ExternalID     string           `json:"external_id" binding:"omitempty,max=100"`
-	NoSemana       *string          `json:"no_semana" binding:"omitempty,max=50"`
-	EstadoProv     *string          `json:"estado_prov" binding:"omitempty,max=100"`
-	OperatorName   *string          `json:"operator_name" binding:"omitempty,max=200"`
+	EmployeeID int64           `json:"employee_id"`
+	Date       time.Time       `json:"date"`
+	FuelType   string          `json:"fuel_type" binding:"omitempty,max=20"`
+	Quantity   decimal.Decimal `json:"quantity"`
+	UnitCost   decimal.Decimal `json:"unit_cost"`
+	TotalCost  decimal.Decimal `json:"total_cost"`
+	Odometer   decimal.Decimal `json:"odometer"`
+	// miles_traveled and fuel_efficiency are derived by the server from the
+	// previous entry in the series, so they are not accepted here.
+	VendorID     int64            `json:"vendor_id"`
+	FullTank     *bool            `json:"full_tank"`
+	State        string           `json:"state" binding:"omitempty,max=50"`
+	Reference    string           `json:"reference" binding:"omitempty,max=100"`
+	Personal     bool             `json:"personal"`
+	Reset        bool             `json:"reset"`
+	Latitude     *decimal.Decimal `json:"latitude"`
+	Longitude    *decimal.Decimal `json:"longitude"`
+	ExternalID   string           `json:"external_id" binding:"omitempty,max=100"`
+	NoSemana     *string          `json:"no_semana" binding:"omitempty,max=50"`
+	EstadoProv   *string          `json:"estado_prov" binding:"omitempty,max=100"`
+	OperatorName *string          `json:"operator_name" binding:"omitempty,max=200"`
 }
 
 type UpdateFuelEntryRequest struct {
-	EmployeeID     int64            `json:"employee_id"`
-	Date           time.Time        `json:"date"`
-	FuelType       string           `json:"fuel_type" binding:"omitempty,max=20"`
-	Quantity       decimal.Decimal  `json:"quantity"`
-	UnitCost       decimal.Decimal  `json:"unit_cost"`
-	TotalCost      decimal.Decimal  `json:"total_cost"`
-	Odometer       decimal.Decimal  `json:"odometer"`
-	VendorID       int64            `json:"vendor_id"`
-	FullTank       bool             `json:"full_tank"`
-	MilesTraveled  *decimal.Decimal `json:"miles_traveled"`
-	FuelEfficiency *decimal.Decimal `json:"fuel_efficiency"`
-	State          string           `json:"state" binding:"omitempty,max=50"`
-	Reference      string           `json:"reference" binding:"omitempty,max=100"`
-	Personal       bool             `json:"personal"`
-	Reset          bool             `json:"reset"`
-	Latitude       *decimal.Decimal `json:"latitude"`
-	Longitude      *decimal.Decimal `json:"longitude"`
-	ExternalID     string           `json:"external_id" binding:"omitempty,max=100"`
-	NoSemana       *string          `json:"no_semana" binding:"omitempty,max=50"`
-	EstadoProv     *string          `json:"estado_prov" binding:"omitempty,max=100"`
-	OperatorName   *string          `json:"operator_name" binding:"omitempty,max=200"`
+	EmployeeID   int64            `json:"employee_id"`
+	Date         time.Time        `json:"date"`
+	FuelType     string           `json:"fuel_type" binding:"omitempty,max=20"`
+	Quantity     decimal.Decimal  `json:"quantity"`
+	UnitCost     decimal.Decimal  `json:"unit_cost"`
+	TotalCost    decimal.Decimal  `json:"total_cost"`
+	Odometer     decimal.Decimal  `json:"odometer"`
+	VendorID     int64            `json:"vendor_id"`
+	FullTank     bool             `json:"full_tank"`
+	State        string           `json:"state" binding:"omitempty,max=50"`
+	Reference    string           `json:"reference" binding:"omitempty,max=100"`
+	Personal     bool             `json:"personal"`
+	Reset        bool             `json:"reset"`
+	Latitude     *decimal.Decimal `json:"latitude"`
+	Longitude    *decimal.Decimal `json:"longitude"`
+	ExternalID   string           `json:"external_id" binding:"omitempty,max=100"`
+	NoSemana     *string          `json:"no_semana" binding:"omitempty,max=50"`
+	EstadoProv   *string          `json:"estado_prov" binding:"omitempty,max=100"`
+	OperatorName *string          `json:"operator_name" binding:"omitempty,max=200"`
 }
 
 type FuelEntryResponse struct {
