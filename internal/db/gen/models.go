@@ -492,6 +492,18 @@ type Medium struct {
 	Thumbnail    string
 }
 
+type Notification struct {
+	ID         int64
+	CompanyID  int64
+	EmployeeID int64
+	Kind       string
+	Title      string
+	Body       string
+	Url        string
+	ReadAt     *time.Time
+	CreatedAt  time.Time
+}
+
 type Part struct {
 	ID                     int64
 	CompanyID              int64

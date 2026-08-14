@@ -149,7 +149,7 @@ func NewRouter(d Deps) *gin.Engine {
 	crud.NewHandler[dto.AxleTemplateResponse, dto.CreateAxleTemplateRequest, dto.UpdateAxleTemplateRequest](NewAxleTemplateStore(d.Queries)).Register(tires, "/axle-templates")
 	// Django's TireAssignmentRequestViewSet required membership only; its
 	// approve/reject actions carried the extra warehouse-role check.
-	crud.NewHandler[dto.TireAssignmentRequestResponse, dto.CreateTireAssignmentRequestRequest, dto.UpdateTireAssignmentRequestRequest](NewTireAssignmentRequestStore(d.Queries)).Register(member, "/tire-assignment-requests")
+	crud.NewHandler[dto.TireAssignmentRequestResponse, dto.CreateTireAssignmentRequestRequest, dto.UpdateTireAssignmentRequestRequest](NewTireAssignmentRequestStore(d.Queries, d.Pool)).Register(member, "/tire-assignment-requests")
 	// Approving is the warehouse's act, not an ordinary write: Django gated it
 	// on tire_approvals/approve, which admins bypass.
 	member.POST("/tire-assignment-requests/:id/approve",
@@ -193,7 +193,9 @@ func NewRouter(d Deps) *gin.Engine {
 	api.GET("/me/permissions", NewMeHandler(d.Queries).Permissions)
 
 	// Notifications are per-caller, so membership is the only gate that applies.
-	member.GET("/notifications", NewNotificationHandler().List)
+	notifications := NewNotificationHandler(d.Queries)
+	member.GET("/notifications", notifications.List)
+	member.POST("/notifications/:id/read", notifications.MarkRead)
 
 	// The dashboard reads across every module, so it is gated on membership
 	// rather than on any one of them; the counts it returns are already scoped

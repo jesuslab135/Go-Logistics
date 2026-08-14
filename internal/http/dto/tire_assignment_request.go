@@ -6,17 +6,14 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+// A new request is always PENDING and always attributed to the caller. State,
+// requester, resolver and timestamps are stamped by the server, so a client
+// cannot file a request that is already approved.
 type CreateTireAssignmentRequestRequest struct {
-	TireID          int64      `json:"tire_id"`
-	VehicleID       int64      `json:"vehicle_id"`
-	PositionCode    string     `json:"position_code" binding:"omitempty,max=10"`
-	State           string     `json:"state" binding:"omitempty,max=10"`
-	RequestedByID   *int64     `json:"requested_by_id"`
-	RequestedAt     time.Time  `json:"requested_at"`
-	ApprovedByID    *int64     `json:"approved_by_id"`
-	ResolvedAt      *time.Time `json:"resolved_at"`
-	RejectionReason string     `json:"rejection_reason"`
-	Notes           string     `json:"notes"`
+	TireID       int64  `json:"tire_id" binding:"required,min=1"`
+	VehicleID    int64  `json:"vehicle_id" binding:"required,min=1"`
+	PositionCode string `json:"position_code" binding:"required,max=10"`
+	Notes        string `json:"notes"`
 }
 
 type UpdateTireAssignmentRequestRequest struct {

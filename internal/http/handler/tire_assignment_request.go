@@ -2,17 +2,25 @@ package handler
 
 import (
 	"context"
+	"fmt"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"fleet/internal/db/gen"
+	"fleet/internal/domain/tire"
 	"fleet/internal/http/dto"
 	"fleet/internal/http/middleware"
 	"fleet/internal/platform/paginate"
 )
 
-type TireAssignmentRequestStore struct{ q *gen.Queries }
+type TireAssignmentRequestStore struct {
+	q    *gen.Queries
+	pool *pgxpool.Pool
+}
 
-func NewTireAssignmentRequestStore(q *gen.Queries) *TireAssignmentRequestStore {
-	return &TireAssignmentRequestStore{q: q}
+func NewTireAssignmentRequestStore(q *gen.Queries, pool *pgxpool.Pool) *TireAssignmentRequestStore {
+	return &TireAssignmentRequestStore{q: q, pool: pool}
 }
 
 func (s *TireAssignmentRequestStore) List(ctx context.Context, p paginate.Params) ([]dto.TireAssignmentRequestResponse, int64, error) {
@@ -41,20 +49,44 @@ func (s *TireAssignmentRequestStore) Get(ctx context.Context, id int64) (dto.Tir
 }
 
 func (s *TireAssignmentRequestStore) Create(ctx context.Context, in dto.CreateTireAssignmentRequestRequest) (dto.TireAssignmentRequestResponse, error) {
-	r, err := s.q.CreateTireAssignmentRequest(ctx, gen.CreateTireAssignmentRequestParams{
-		CompanyID:       middleware.CompanyFromContext(ctx),
-		TireID:          in.TireID,
-		VehicleID:       in.VehicleID,
-		PositionCode:    in.PositionCode,
-		State:           orDefault(in.State, "PENDING"),
-		RequestedByID:   in.RequestedByID,
-		RequestedAt:     in.RequestedAt,
-		ApprovedByID:    in.ApprovedByID,
-		ResolvedAt:      in.ResolvedAt,
-		RejectionReason: in.RejectionReason,
-		Notes:           in.Notes,
+	company := middleware.CompanyFromContext(ctx)
+	now := time.Now().UTC()
+
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return dto.TireAssignmentRequestResponse{}, err
+	}
+	defer tx.Rollback(ctx)
+	qtx := s.q.WithTx(tx)
+
+	r, err := qtx.CreateTireAssignmentRequest(ctx, gen.CreateTireAssignmentRequestParams{
+		CompanyID:     company,
+		TireID:        in.TireID,
+		VehicleID:     in.VehicleID,
+		PositionCode:  in.PositionCode,
+		State:         tire.RequestPending,
+		RequestedByID: authorFromContext(ctx),
+		RequestedAt:   now,
+		Notes:         in.Notes,
 	})
 	if err != nil {
+		return dto.TireAssignmentRequestResponse{}, err
+	}
+
+	// A request sitting unseen in an inbox is the reason this endpoint exists,
+	// so everyone who can approve it is notified in the same transaction.
+	if err := qtx.NotifyTireApprovers(ctx, gen.NotifyTireApproversParams{
+		CompanyID: company,
+		Kind:      NotificationTireAssignmentPending,
+		Title:     "Tire assignment request",
+		Body:      fmt.Sprintf("Tire %d requested for vehicle %d at position %s.", in.TireID, in.VehicleID, in.PositionCode),
+		Url:       fmt.Sprintf("/tire-assignment-requests/%d", r.ID),
+		CreatedAt: now,
+	}); err != nil {
+		return dto.TireAssignmentRequestResponse{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
 		return dto.TireAssignmentRequestResponse{}, err
 	}
 	return toTireAssignmentRequestResponse(r), nil

@@ -58,6 +58,7 @@ func (h *TireAssignmentActionHandler) Approve(c *gin.Context) {
 
 	ctx := c.Request.Context()
 	company := middleware.CompanyFromContext(ctx)
+	employee := middleware.EmployeeFromContext(ctx)
 	now := time.Now().UTC()
 
 	tx, err := h.pool.Begin(ctx)
@@ -186,6 +187,23 @@ func (h *TireAssignmentActionHandler) Approve(c *gin.Context) {
 	}); err != nil {
 		apierr.Abort(c, err)
 		return
+	}
+
+	// Tell the requester their tire was approved. Sent in the same transaction
+	// as the approval, so a notification can never describe a rollback.
+	if resolved.RequestedByID != nil && *resolved.RequestedByID != employee {
+		if err := qtx.CreateNotification(ctx, gen.CreateNotificationParams{
+			CompanyID:  company,
+			EmployeeID: *resolved.RequestedByID,
+			Kind:       NotificationTireAssignmentApproved,
+			Title:      "Tire assignment approved",
+			Body:       fmt.Sprintf("Request #%d was approved.", id),
+			Url:        fmt.Sprintf("/tire-assignment-requests/%d", id),
+			CreatedAt:  now,
+		}); err != nil {
+			apierr.Abort(c, err)
+			return
+		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {

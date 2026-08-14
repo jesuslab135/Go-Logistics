@@ -1674,28 +1674,21 @@ definitions:
     type: object
   dto.CreateTireAssignmentRequestRequest:
     properties:
-      approved_by_id:
-        type: integer
       notes:
         type: string
       position_code:
         maxLength: 10
         type: string
-      rejection_reason:
-        type: string
-      requested_at:
-        type: string
-      requested_by_id:
-        type: integer
-      resolved_at:
-        type: string
-      state:
-        maxLength: 10
-        type: string
       tire_id:
+        minimum: 1
         type: integer
       vehicle_id:
+        minimum: 1
         type: integer
+    required:
+    - position_code
+    - tire_id
+    - vehicle_id
     type: object
   dto.CreateTireInspectionRequest:
     properties:
@@ -11381,6 +11374,18 @@ paths:
       - media
   /api/v1/notifications:
     get:
+      description: Scoped to the authenticated employee within the active company,
+        newest first. The unread count describes the whole inbox, not just the returned
+        page.
+      parameters:
+      - description: Page size
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
+        type: integer
       produces:
       - application/json
       responses:
@@ -11392,9 +11397,52 @@ paths:
           description: Unauthorized
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: List notifications (stub — always empty)
+      summary: List the caller's notifications
+      tags:
+      - notifications
+  /api/v1/notifications/{id}/read:
+    post:
+      description: 'Idempotent: marking an already-read notification keeps its original
+        read_at. A caller can only mark their own, so another employee''s id is indistinguishable
+        from a missing one.'
+      parameters:
+      - description: Notification id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.NotificationResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Mark a notification read
       tags:
       - notifications
   /api/v1/part-categories:

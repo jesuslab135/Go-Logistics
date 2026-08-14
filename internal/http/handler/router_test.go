@@ -46,6 +46,7 @@ func TestRouterRegistersRoutes(t *testing.T) {
 		"GET /api/v1/asset-trailer-assignments",
 		"GET /api/v1/fuel-entries",
 		"GET /api/v1/tire-mount-logs",
+		"POST /api/v1/notifications/:id/read",
 		"GET /api/v1/part-inventory",
 		"GET /api/v1/purchase-order-line-items",
 		"POST /api/v1/uploads",

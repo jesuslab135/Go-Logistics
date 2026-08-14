@@ -7144,13 +7144,28 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Scoped to the authenticated employee within the active company, newest first. The unread count describes the whole inbox, not just the returned page.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "notifications"
                 ],
-                "summary": "List notifications (stub — always empty)",
+                "summary": "List the caller's notifications",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page size",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Offset",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -7160,6 +7175,70 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/notifications/{id}/read": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Idempotent: marking an already-read notification keeps its original read_at. A caller can only mark their own, so another employee's id is indistinguishable from a missing one.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "notifications"
+                ],
+                "summary": "Mark a notification read",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Notification id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.NotificationResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -17374,10 +17453,12 @@ const docTemplate = `{
         },
         "dto.CreateTireAssignmentRequestRequest": {
             "type": "object",
+            "required": [
+                "position_code",
+                "tire_id",
+                "vehicle_id"
+            ],
             "properties": {
-                "approved_by_id": {
-                    "type": "integer"
-                },
                 "notes": {
                     "type": "string"
                 },
@@ -17385,27 +17466,13 @@ const docTemplate = `{
                     "type": "string",
                     "maxLength": 10
                 },
-                "rejection_reason": {
-                    "type": "string"
-                },
-                "requested_at": {
-                    "type": "string"
-                },
-                "requested_by_id": {
-                    "type": "integer"
-                },
-                "resolved_at": {
-                    "type": "string"
-                },
-                "state": {
-                    "type": "string",
-                    "maxLength": 10
-                },
                 "tire_id": {
-                    "type": "integer"
+                    "type": "integer",
+                    "minimum": 1
                 },
                 "vehicle_id": {
-                    "type": "integer"
+                    "type": "integer",
+                    "minimum": 1
                 }
             }
         },
