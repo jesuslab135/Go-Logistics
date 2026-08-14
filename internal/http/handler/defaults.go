@@ -1,6 +1,24 @@
 package handler
 
-import "github.com/shopspring/decimal"
+import (
+	"context"
+
+	"github.com/shopspring/decimal"
+
+	"fleet/internal/http/middleware"
+)
+
+// authorFromContext returns the authenticated employee to credit for a comment
+// or upload. Authorship is server-stamped rather than client-supplied; an
+// unauthenticated context (id 0) yields NULL — explicitly unattributed instead
+// of a false employee reference.
+func authorFromContext(ctx context.Context) *int64 {
+	id := middleware.EmployeeFromContext(ctx)
+	if id == 0 {
+		return nil
+	}
+	return &id
+}
 
 // Many columns carry a non-zero default in the schema (issue.state 'OPEN',
 // employee.is_active true, quantity 1, ...). A create request that omits such a

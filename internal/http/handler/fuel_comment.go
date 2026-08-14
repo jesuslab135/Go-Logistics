@@ -42,12 +42,12 @@ func (s *FuelCommentStore) Get(ctx context.Context, parentID, id int64) (dto.Fue
 func (s *FuelCommentStore) Create(ctx context.Context, parentID int64, in dto.CreateFuelCommentRequest) (dto.FuelCommentResponse, error) {
 	now := time.Now().UTC()
 	r, err := s.q.CreateFuelComment(ctx, gen.CreateFuelCommentParams{
-		ParentID:  parentID,
-		CompanyID: middleware.CompanyFromContext(ctx),
-		UserID:    in.UserID,
-		Text:      in.Text,
-		CreatedAt: now,
-		UpdatedAt: now,
+		ParentID:   parentID,
+		CompanyID:  middleware.CompanyFromContext(ctx),
+		EmployeeID: authorFromContext(ctx),
+		Text:       in.Text,
+		CreatedAt:  now,
+		UpdatedAt:  now,
 	})
 	if err != nil {
 		return dto.FuelCommentResponse{}, err
@@ -61,7 +61,6 @@ func (s *FuelCommentStore) Update(ctx context.Context, parentID, id int64, in dt
 		ID:        id,
 		ParentID:  parentID,
 		CompanyID: middleware.CompanyFromContext(ctx),
-		UserID:    in.UserID,
 		Text:      in.Text,
 		UpdatedAt: now,
 	})
@@ -77,11 +76,11 @@ func (s *FuelCommentStore) Delete(ctx context.Context, parentID, id int64) error
 
 func toFuelCommentResponse(r gen.FuelComment) dto.FuelCommentResponse {
 	return dto.FuelCommentResponse{
-		ID:        r.ID,
-		EntryID:   r.EntryID,
-		UserID:    r.UserID,
-		Text:      r.Text,
-		CreatedAt: r.CreatedAt,
-		UpdatedAt: r.UpdatedAt,
+		ID:         r.ID,
+		EntryID:    r.EntryID,
+		EmployeeID: r.EmployeeID,
+		Text:       r.Text,
+		CreatedAt:  r.CreatedAt,
+		UpdatedAt:  r.UpdatedAt,
 	}
 }

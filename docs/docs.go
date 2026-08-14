@@ -15336,12 +15336,12 @@ const docTemplate = `{
         },
         "dto.CreateFuelCommentRequest": {
             "type": "object",
+            "required": [
+                "text"
+            ],
             "properties": {
                 "text": {
                     "type": "string"
-                },
-                "user_id": {
-                    "type": "integer"
                 }
             }
         },
@@ -15446,9 +15446,6 @@ const docTemplate = `{
                 },
                 "uploaded_at": {
                     "type": "string"
-                },
-                "uploaded_by_id": {
-                    "type": "integer"
                 }
             }
         },
@@ -15935,9 +15932,6 @@ const docTemplate = `{
                 "title": {
                     "type": "string",
                     "maxLength": 255
-                },
-                "uploaded_by_id": {
-                    "type": "integer"
                 }
             }
         },
@@ -17378,6 +17372,9 @@ const docTemplate = `{
                 "created_at": {
                     "type": "string"
                 },
+                "employee_id": {
+                    "type": "integer"
+                },
                 "entry_id": {
                     "type": "integer"
                 },
@@ -17389,9 +17386,6 @@ const docTemplate = `{
                 },
                 "updated_at": {
                     "type": "string"
-                },
-                "user_id": {
-                    "type": "integer"
                 }
             }
         },
@@ -20812,12 +20806,12 @@ const docTemplate = `{
         },
         "dto.UpdateFuelCommentRequest": {
             "type": "object",
+            "required": [
+                "text"
+            ],
             "properties": {
                 "text": {
                     "type": "string"
-                },
-                "user_id": {
-                    "type": "integer"
                 }
             }
         },
@@ -20922,9 +20916,6 @@ const docTemplate = `{
                 },
                 "uploaded_at": {
                     "type": "string"
-                },
-                "uploaded_by_id": {
-                    "type": "integer"
                 }
             }
         },
@@ -21411,9 +21402,6 @@ const docTemplate = `{
                 "title": {
                     "type": "string",
                     "maxLength": 255
-                },
-                "uploaded_by_id": {
-                    "type": "integer"
                 }
             }
         },

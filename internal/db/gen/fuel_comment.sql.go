@@ -28,26 +28,26 @@ func (q *Queries) CountFuelComments(ctx context.Context, arg CountFuelCommentsPa
 
 const createFuelComment = `-- name: CreateFuelComment :one
 INSERT INTO fuel_comment (
-    entry_id, user_id, text, created_at, updated_at
+    entry_id, employee_id, text, created_at, updated_at
 )
 SELECT $1, $2, $3, $4, $5
 WHERE EXISTS (SELECT 1 FROM fuel_entry p0 JOIN asset p1 ON p1.id = p0.asset_id WHERE p0.id = $1 AND p1.company_id = $6)
-RETURNING id, entry_id, user_id, text, created_at, updated_at
+RETURNING id, entry_id, employee_id, text, created_at, updated_at
 `
 
 type CreateFuelCommentParams struct {
-	ParentID  int64
-	UserID    int64
-	Text      string
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	CompanyID int64
+	ParentID   int64
+	EmployeeID *int64
+	Text       string
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+	CompanyID  int64
 }
 
 func (q *Queries) CreateFuelComment(ctx context.Context, arg CreateFuelCommentParams) (FuelComment, error) {
 	row := q.db.QueryRow(ctx, createFuelComment,
 		arg.ParentID,
-		arg.UserID,
+		arg.EmployeeID,
 		arg.Text,
 		arg.CreatedAt,
 		arg.UpdatedAt,
@@ -57,7 +57,7 @@ func (q *Queries) CreateFuelComment(ctx context.Context, arg CreateFuelCommentPa
 	err := row.Scan(
 		&i.ID,
 		&i.EntryID,
-		&i.UserID,
+		&i.EmployeeID,
 		&i.Text,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -82,7 +82,7 @@ func (q *Queries) DeleteFuelComment(ctx context.Context, arg DeleteFuelCommentPa
 }
 
 const getFuelComment = `-- name: GetFuelComment :one
-SELECT c.id, c.entry_id, c.user_id, c.text, c.created_at, c.updated_at FROM fuel_comment c JOIN fuel_entry p0 ON p0.id = c.entry_id JOIN asset p1 ON p1.id = p0.asset_id
+SELECT c.id, c.entry_id, c.employee_id, c.text, c.created_at, c.updated_at FROM fuel_comment c JOIN fuel_entry p0 ON p0.id = c.entry_id JOIN asset p1 ON p1.id = p0.asset_id
 WHERE c.id = $1 AND c.entry_id = $2 AND p1.company_id = $3
 `
 
@@ -98,7 +98,7 @@ func (q *Queries) GetFuelComment(ctx context.Context, arg GetFuelCommentParams) 
 	err := row.Scan(
 		&i.ID,
 		&i.EntryID,
-		&i.UserID,
+		&i.EmployeeID,
 		&i.Text,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -107,7 +107,7 @@ func (q *Queries) GetFuelComment(ctx context.Context, arg GetFuelCommentParams) 
 }
 
 const listFuelComments = `-- name: ListFuelComments :many
-SELECT c.id, c.entry_id, c.user_id, c.text, c.created_at, c.updated_at FROM fuel_comment c JOIN fuel_entry p0 ON p0.id = c.entry_id JOIN asset p1 ON p1.id = p0.asset_id
+SELECT c.id, c.entry_id, c.employee_id, c.text, c.created_at, c.updated_at FROM fuel_comment c JOIN fuel_entry p0 ON p0.id = c.entry_id JOIN asset p1 ON p1.id = p0.asset_id
 WHERE c.entry_id = $1 AND p1.company_id = $2
 ORDER BY c.created_at DESC LIMIT $4 OFFSET $3
 `
@@ -136,7 +136,7 @@ func (q *Queries) ListFuelComments(ctx context.Context, arg ListFuelCommentsPara
 		if err := rows.Scan(
 			&i.ID,
 			&i.EntryID,
-			&i.UserID,
+			&i.EmployeeID,
 			&i.Text,
 			&i.CreatedAt,
 			&i.UpdatedAt,
@@ -152,14 +152,13 @@ func (q *Queries) ListFuelComments(ctx context.Context, arg ListFuelCommentsPara
 }
 
 const updateFuelComment = `-- name: UpdateFuelComment :one
-UPDATE fuel_comment AS c SET user_id = $1, text = $2, updated_at = $3
+UPDATE fuel_comment AS c SET text = $1, updated_at = $2
 FROM fuel_entry p0, asset p1
-WHERE c.id = $4 AND c.entry_id = $5 AND p1.company_id = $6 AND p0.id = c.entry_id AND p1.id = p0.asset_id
-RETURNING c.id, c.entry_id, c.user_id, c.text, c.created_at, c.updated_at
+WHERE c.id = $3 AND c.entry_id = $4 AND p1.company_id = $5 AND p0.id = c.entry_id AND p1.id = p0.asset_id
+RETURNING c.id, c.entry_id, c.employee_id, c.text, c.created_at, c.updated_at
 `
 
 type UpdateFuelCommentParams struct {
-	UserID    int64
 	Text      string
 	UpdatedAt time.Time
 	ID        int64
@@ -167,9 +166,9 @@ type UpdateFuelCommentParams struct {
 	CompanyID int64
 }
 
+// Authorship is stamped once at creation and never reassigned by an edit.
 func (q *Queries) UpdateFuelComment(ctx context.Context, arg UpdateFuelCommentParams) (FuelComment, error) {
 	row := q.db.QueryRow(ctx, updateFuelComment,
-		arg.UserID,
 		arg.Text,
 		arg.UpdatedAt,
 		arg.ID,
@@ -180,7 +179,7 @@ func (q *Queries) UpdateFuelComment(ctx context.Context, arg UpdateFuelCommentPa
 	err := row.Scan(
 		&i.ID,
 		&i.EntryID,
-		&i.UserID,
+		&i.EmployeeID,
 		&i.Text,
 		&i.CreatedAt,
 		&i.UpdatedAt,

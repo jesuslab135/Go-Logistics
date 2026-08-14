@@ -42,7 +42,7 @@ func (s *FuelPhotoStore) Create(ctx context.Context, parentID int64, in dto.Crea
 	r, err := s.q.CreateFuelPhoto(ctx, gen.CreateFuelPhotoParams{
 		ParentID:     parentID,
 		CompanyID:    middleware.CompanyFromContext(ctx),
-		UploadedByID: in.UploadedByID,
+		UploadedByID: authorFromContext(ctx),
 		File:         in.File,
 		FileName:     in.FileName,
 		FileSize:     in.FileSize,
@@ -59,17 +59,16 @@ func (s *FuelPhotoStore) Create(ctx context.Context, parentID int64, in dto.Crea
 
 func (s *FuelPhotoStore) Update(ctx context.Context, parentID, id int64, in dto.UpdateFuelPhotoRequest) (dto.FuelPhotoResponse, error) {
 	r, err := s.q.UpdateFuelPhoto(ctx, gen.UpdateFuelPhotoParams{
-		ID:           id,
-		ParentID:     parentID,
-		CompanyID:    middleware.CompanyFromContext(ctx),
-		UploadedByID: in.UploadedByID,
-		File:         in.File,
-		FileName:     in.FileName,
-		FileSize:     in.FileSize,
-		MimeType:     in.MimeType,
-		Description:  in.Description,
-		UploadedAt:   in.UploadedAt,
-		IsPrimary:    in.IsPrimary,
+		ID:          id,
+		ParentID:    parentID,
+		CompanyID:   middleware.CompanyFromContext(ctx),
+		File:        in.File,
+		FileName:    in.FileName,
+		FileSize:    in.FileSize,
+		MimeType:    in.MimeType,
+		Description: in.Description,
+		UploadedAt:  in.UploadedAt,
+		IsPrimary:   in.IsPrimary,
 	})
 	if err != nil {
 		return dto.FuelPhotoResponse{}, err

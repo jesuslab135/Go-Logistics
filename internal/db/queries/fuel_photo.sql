@@ -19,7 +19,8 @@ WHERE EXISTS (SELECT 1 FROM fuel_entry p0 JOIN asset p1 ON p1.id = p0.asset_id W
 RETURNING *;
 
 -- name: UpdateFuelPhoto :one
-UPDATE fuel_photo AS c SET uploaded_by_id = sqlc.arg(uploaded_by_id), file = sqlc.arg(file), file_name = sqlc.arg(file_name), file_size = sqlc.arg(file_size), mime_type = sqlc.arg(mime_type), description = sqlc.arg(description), uploaded_at = sqlc.arg(uploaded_at), is_primary = sqlc.arg(is_primary)
+-- Upload attribution is stamped once and never reassigned by an edit.
+UPDATE fuel_photo AS c SET file = sqlc.arg(file), file_name = sqlc.arg(file_name), file_size = sqlc.arg(file_size), mime_type = sqlc.arg(mime_type), description = sqlc.arg(description), uploaded_at = sqlc.arg(uploaded_at), is_primary = sqlc.arg(is_primary)
 FROM fuel_entry p0, asset p1
 WHERE c.id = sqlc.arg(id) AND c.entry_id = sqlc.arg(parent_id) AND p1.company_id = sqlc.arg(company_id) AND p0.id = c.entry_id AND p1.id = p0.asset_id
 RETURNING c.*;

@@ -7,20 +7,19 @@ import (
 // file_type and file_size are intentionally absent: Django derived both from the
 // stored file (editable=False), so they are resolved from object storage rather
 // than trusted from the client.
+// Upload attribution is taken from the authenticated context, not the body.
 type CreateMediumRequest struct {
-	AssetID      int64  `json:"asset_id"`
-	File         string `json:"file" binding:"required,max=500"`
-	Title        string `json:"title" binding:"omitempty,max=255"`
-	Description  string `json:"description"`
-	UploadedByID *int64 `json:"uploaded_by_id"`
+	AssetID     int64  `json:"asset_id"`
+	File        string `json:"file" binding:"required,max=500"`
+	Title       string `json:"title" binding:"omitempty,max=255"`
+	Description string `json:"description"`
 }
 
 type UpdateMediumRequest struct {
-	AssetID      int64  `json:"asset_id"`
-	File         string `json:"file" binding:"required,max=500"`
-	Title        string `json:"title" binding:"omitempty,max=255"`
-	Description  string `json:"description"`
-	UploadedByID *int64 `json:"uploaded_by_id"`
+	AssetID     int64  `json:"asset_id"`
+	File        string `json:"file" binding:"required,max=500"`
+	Title       string `json:"title" binding:"omitempty,max=255"`
+	Description string `json:"description"`
 }
 
 type MediumResponse struct {

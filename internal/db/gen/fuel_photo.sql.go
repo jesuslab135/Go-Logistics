@@ -37,7 +37,7 @@ RETURNING id, entry_id, uploaded_by_id, file, file_name, file_size, mime_type, d
 
 type CreateFuelPhotoParams struct {
 	ParentID     int64
-	UploadedByID int64
+	UploadedByID *int64
 	File         string
 	FileName     string
 	FileSize     int64
@@ -172,29 +172,28 @@ func (q *Queries) ListFuelPhotos(ctx context.Context, arg ListFuelPhotosParams) 
 }
 
 const updateFuelPhoto = `-- name: UpdateFuelPhoto :one
-UPDATE fuel_photo AS c SET uploaded_by_id = $1, file = $2, file_name = $3, file_size = $4, mime_type = $5, description = $6, uploaded_at = $7, is_primary = $8
+UPDATE fuel_photo AS c SET file = $1, file_name = $2, file_size = $3, mime_type = $4, description = $5, uploaded_at = $6, is_primary = $7
 FROM fuel_entry p0, asset p1
-WHERE c.id = $9 AND c.entry_id = $10 AND p1.company_id = $11 AND p0.id = c.entry_id AND p1.id = p0.asset_id
+WHERE c.id = $8 AND c.entry_id = $9 AND p1.company_id = $10 AND p0.id = c.entry_id AND p1.id = p0.asset_id
 RETURNING c.id, c.entry_id, c.uploaded_by_id, c.file, c.file_name, c.file_size, c.mime_type, c.description, c.uploaded_at, c.is_primary
 `
 
 type UpdateFuelPhotoParams struct {
-	UploadedByID int64
-	File         string
-	FileName     string
-	FileSize     int64
-	MimeType     string
-	Description  *string
-	UploadedAt   time.Time
-	IsPrimary    bool
-	ID           int64
-	ParentID     int64
-	CompanyID    int64
+	File        string
+	FileName    string
+	FileSize    int64
+	MimeType    string
+	Description *string
+	UploadedAt  time.Time
+	IsPrimary   bool
+	ID          int64
+	ParentID    int64
+	CompanyID   int64
 }
 
+// Upload attribution is stamped once and never reassigned by an edit.
 func (q *Queries) UpdateFuelPhoto(ctx context.Context, arg UpdateFuelPhotoParams) (FuelPhoto, error) {
 	row := q.db.QueryRow(ctx, updateFuelPhoto,
-		arg.UploadedByID,
 		arg.File,
 		arg.FileName,
 		arg.FileSize,

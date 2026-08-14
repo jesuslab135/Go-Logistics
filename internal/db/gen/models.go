@@ -219,12 +219,12 @@ type Fault struct {
 }
 
 type FuelComment struct {
-	ID        int64
-	EntryID   int64
-	UserID    int64
-	Text      string
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID         int64
+	EntryID    int64
+	EmployeeID *int64
+	Text       string
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
 }
 
 type FuelEntry struct {
@@ -257,7 +257,7 @@ type FuelEntry struct {
 type FuelPhoto struct {
 	ID           int64
 	EntryID      int64
-	UploadedByID int64
+	UploadedByID *int64
 	File         string
 	FileName     string
 	FileSize     int64

@@ -163,25 +163,25 @@ func (q *Queries) ListMediaItems(ctx context.Context, arg ListMediaItemsParams) 
 }
 
 const updateMedium = `-- name: UpdateMedium :one
-UPDATE media SET asset_id = $3, file = $4, title = $5, description = $6, file_type = $7, file_size = $8, thumbnail = $9, uploaded_by_id = $10, updated_at = $11
+UPDATE media SET asset_id = $3, file = $4, title = $5, description = $6, file_type = $7, file_size = $8, thumbnail = $9, updated_at = $10
 WHERE id = $1 AND company_id = $2
 RETURNING id, company_id, asset_id, file, title, description, file_type, file_size, uploaded_by_id, created_at, updated_at, thumbnail
 `
 
 type UpdateMediumParams struct {
-	ID           int64
-	CompanyID    int64
-	AssetID      int64
-	File         string
-	Title        string
-	Description  string
-	FileType     string
-	FileSize     int32
-	Thumbnail    string
-	UploadedByID *int64
-	UpdatedAt    time.Time
+	ID          int64
+	CompanyID   int64
+	AssetID     int64
+	File        string
+	Title       string
+	Description string
+	FileType    string
+	FileSize    int32
+	Thumbnail   string
+	UpdatedAt   time.Time
 }
 
+// Upload attribution is stamped once and never reassigned by an edit.
 func (q *Queries) UpdateMedium(ctx context.Context, arg UpdateMediumParams) (Medium, error) {
 	row := q.db.QueryRow(ctx, updateMedium,
 		arg.ID,
@@ -193,7 +193,6 @@ func (q *Queries) UpdateMedium(ctx context.Context, arg UpdateMediumParams) (Med
 		arg.FileType,
 		arg.FileSize,
 		arg.Thumbnail,
-		arg.UploadedByID,
 		arg.UpdatedAt,
 	)
 	var i Medium

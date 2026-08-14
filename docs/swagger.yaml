@@ -874,8 +874,8 @@ definitions:
     properties:
       text:
         type: string
-      user_id:
-        type: integer
+    required:
+    - text
     type: object
   dto.CreateFuelEntryRequest:
     properties:
@@ -948,8 +948,6 @@ definitions:
         type: string
       uploaded_at:
         type: string
-      uploaded_by_id:
-        type: integer
     type: object
   dto.CreateFuelTypeRequest:
     properties:
@@ -1279,8 +1277,6 @@ definitions:
       title:
         maxLength: 255
         type: string
-      uploaded_by_id:
-        type: integer
     required:
     - file
     type: object
@@ -2261,6 +2257,8 @@ definitions:
     properties:
       created_at:
         type: string
+      employee_id:
+        type: integer
       entry_id:
         type: integer
       id:
@@ -2269,8 +2267,6 @@ definitions:
         type: string
       updated_at:
         type: string
-      user_id:
-        type: integer
     type: object
   dto.FuelEntryPage:
     properties:
@@ -4589,8 +4585,8 @@ definitions:
     properties:
       text:
         type: string
-      user_id:
-        type: integer
+    required:
+    - text
     type: object
   dto.UpdateFuelEntryRequest:
     properties:
@@ -4663,8 +4659,6 @@ definitions:
         type: string
       uploaded_at:
         type: string
-      uploaded_by_id:
-        type: integer
     type: object
   dto.UpdateFuelTypeRequest:
     properties:
@@ -4994,8 +4988,6 @@ definitions:
       title:
         maxLength: 255
         type: string
-      uploaded_by_id:
-        type: integer
     required:
     - file
     type: object

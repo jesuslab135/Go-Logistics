@@ -118,7 +118,7 @@ func (s *MediumStore) Create(ctx context.Context, in dto.CreateMediumRequest) (d
 		FileType:     file.fileType,
 		FileSize:     file.size,
 		Thumbnail:    file.thumbnail,
-		UploadedByID: in.UploadedByID,
+		UploadedByID: authorFromContext(ctx),
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	})
@@ -136,17 +136,16 @@ func (s *MediumStore) Update(ctx context.Context, id int64, in dto.UpdateMediumR
 	}
 
 	r, err := s.q.UpdateMedium(ctx, gen.UpdateMediumParams{
-		ID:           id,
-		CompanyID:    middleware.CompanyFromContext(ctx),
-		AssetID:      in.AssetID,
-		File:         in.File,
-		Title:        in.Title,
-		Description:  in.Description,
-		FileType:     file.fileType,
-		FileSize:     file.size,
-		Thumbnail:    file.thumbnail,
-		UploadedByID: in.UploadedByID,
-		UpdatedAt:    now,
+		ID:          id,
+		CompanyID:   middleware.CompanyFromContext(ctx),
+		AssetID:     in.AssetID,
+		File:        in.File,
+		Title:       in.Title,
+		Description: in.Description,
+		FileType:    file.fileType,
+		FileSize:    file.size,
+		Thumbnail:   file.thumbnail,
+		UpdatedAt:   now,
 	})
 	if err != nil {
 		return dto.MediumResponse{}, err

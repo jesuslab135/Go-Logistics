@@ -16,7 +16,8 @@ INSERT INTO media (
 RETURNING *;
 
 -- name: UpdateMedium :one
-UPDATE media SET asset_id = $3, file = $4, title = $5, description = $6, file_type = $7, file_size = $8, thumbnail = $9, uploaded_by_id = $10, updated_at = $11
+-- Upload attribution is stamped once and never reassigned by an edit.
+UPDATE media SET asset_id = $3, file = $4, title = $5, description = $6, file_type = $7, file_size = $8, thumbnail = $9, updated_at = $10
 WHERE id = $1 AND company_id = $2
 RETURNING *;
 
