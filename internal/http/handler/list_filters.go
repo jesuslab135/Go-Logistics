@@ -7,6 +7,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"fleet/internal/db/gen"
+	"fleet/internal/domain/tire"
 	"fleet/internal/http/dto"
 	"fleet/internal/http/middleware"
 	"fleet/internal/platform/apierr"
@@ -522,6 +523,99 @@ func (h *FilteredListHandler) FuelEntries(c *gin.Context) {
 		return
 	}
 	renderPage(c, rows, total, p, toFuelEntryResponse)
+}
+
+// TireMountLogs godoc
+//
+//	@Summary		List tire movements across the fleet
+//	@Description	The mount log is the history of tire movement — installs, dismounts and rotations. It is not a TireInstallation collection: an installation records where a tire is now, a mount log records what happened.
+//	@Tags			tire-mount-logs
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			event_date_from	query		string	false	"Inclusive lower bound (RFC3339 or YYYY-MM-DD)"
+//	@Param			event_date_to	query		string	false	"Inclusive upper bound (RFC3339 or YYYY-MM-DD)"
+//	@Param			event_type		query		string	false	"INSTALL, DISMOUNT or ROTATION"
+//	@Param			tire_id			query		int		false	"Filter by tire"
+//	@Param			vehicle_id		query		int		false	"Filter by vehicle"
+//	@Param			position_code	query		string	false	"Filter by wheel position"
+//	@Param			performed_by_id	query		int		false	"Filter by the employee who performed it"
+//	@Param			limit			query		int		false	"Page size"
+//	@Param			offset			query		int		false	"Offset"
+//	@Success		200				{object}	dto.TireMountLogPage
+//	@Failure		400				{object}	dto.ErrorResponse
+//	@Failure		401				{object}	dto.ErrorResponse
+//	@Failure		403				{object}	dto.ErrorResponse
+//	@Router			/api/v1/tire-mount-logs [get]
+func (h *FilteredListHandler) TireMountLogs(c *gin.Context) {
+	ctx := c.Request.Context()
+	p := paginate.Parse(c)
+
+	// The log has no company of its own; it is scoped through its tire.
+	where := filter.NewWhere(1).Add("ti.company_id", filter.Eq, middleware.CompanyFromContext(ctx))
+
+	from, err := queryTime(c, "event_date_from")
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	if from != nil {
+		where.Add("tml.event_date", filter.Gte, *from)
+	}
+	to, err := queryTime(c, "event_date_to")
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	if to != nil {
+		where.Add("tml.event_date", filter.Lte, *to)
+	}
+	eventType, err := queryEnum(c, "event_type", tire.EventInstall, tire.EventDismount, tire.EventRotation)
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	if eventType != nil {
+		where.Add("tml.event_type", filter.Eq, *eventType)
+	}
+	tireID, err := queryInt64(c, "tire_id")
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	if tireID != nil {
+		where.Add("tml.tire_id", filter.Eq, *tireID)
+	}
+	vehicleID, err := queryInt64(c, "vehicle_id")
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	if vehicleID != nil {
+		where.Add("tml.vehicle_id", filter.Eq, *vehicleID)
+	}
+	if positionCode := queryStr(c, "position_code"); positionCode != nil {
+		where.Add("tml.position_code", filter.Eq, *positionCode)
+	}
+	performedBy, err := queryInt64(c, "performed_by_id")
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	if performedBy != nil {
+		where.Add("tml.performed_by_id", filter.Eq, *performedBy)
+	}
+
+	spec := newListSpec[gen.TireMountLog]("tire_mount_log", "tml").
+		join("JOIN tire ti ON ti.id = tml.tire_id").
+		filter(where).
+		orderBy("tml.event_date DESC, tml.id DESC")
+
+	rows, total, err := runList(ctx, h.pool, spec, p)
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	renderPage(c, rows, total, p, toTireMountLogResponse)
 }
 
 // Vocabularies accepted by the state filters, kept beside the routes that

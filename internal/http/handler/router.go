@@ -222,6 +222,8 @@ func NewRouter(d Deps) *gin.Engine {
 	crud.NewNestedHandler[dto.TireInstallationResponse, dto.CreateTireInstallationRequest, dto.UpdateTireInstallationRequest](NewTireInstallationStore(d.Queries)).Register(tires, "/tires", "/installations")
 	crud.NewNestedHandler[dto.TireInspectionResponse, dto.CreateTireInspectionRequest, dto.UpdateTireInspectionRequest](NewTireInspectionStore(d.Queries)).Register(tires, "/tires", "/inspections")
 	crud.NewNestedHandler[dto.TireMountLogResponse, dto.CreateTireMountLogRequest, dto.UpdateTireMountLogRequest](NewTireMountLogStore(d.Queries)).Register(tires, "/tires", "/mount-logs")
+	// Fleet-wide movement history, as opposed to one tire's log.
+	tires.GET("/tire-mount-logs", lists.TireMountLogs)
 
 	// Phase 8b: deeper (grandchild) nested resources, scoped up the chain to company
 	crud.NewNestedHandler[dto.WorkOrderSubLineItemResponse, dto.CreateWorkOrderSubLineItemRequest, dto.UpdateWorkOrderSubLineItemRequest](NewWorkOrderSubLineItemStore(d.Queries)).Register(workOrders, "/work-order-line-items", "/sub-line-items")

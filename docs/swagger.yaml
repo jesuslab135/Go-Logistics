@@ -13623,6 +13623,72 @@ paths:
       summary: Update tire-models
       tags:
       - tire-models
+  /api/v1/tire-mount-logs:
+    get:
+      description: 'The mount log is the history of tire movement — installs, dismounts
+        and rotations. It is not a TireInstallation collection: an installation records
+        where a tire is now, a mount log records what happened.'
+      parameters:
+      - description: Inclusive lower bound (RFC3339 or YYYY-MM-DD)
+        in: query
+        name: event_date_from
+        type: string
+      - description: Inclusive upper bound (RFC3339 or YYYY-MM-DD)
+        in: query
+        name: event_date_to
+        type: string
+      - description: INSTALL, DISMOUNT or ROTATION
+        in: query
+        name: event_type
+        type: string
+      - description: Filter by tire
+        in: query
+        name: tire_id
+        type: integer
+      - description: Filter by vehicle
+        in: query
+        name: vehicle_id
+        type: integer
+      - description: Filter by wheel position
+        in: query
+        name: position_code
+        type: string
+      - description: Filter by the employee who performed it
+        in: query
+        name: performed_by_id
+        type: integer
+      - description: Page size
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.TireMountLogPage'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List tire movements across the fleet
+      tags:
+      - tire-mount-logs
   /api/v1/tires:
     get:
       parameters:

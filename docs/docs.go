@@ -10730,6 +10730,105 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/tire-mount-logs": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "The mount log is the history of tire movement — installs, dismounts and rotations. It is not a TireInstallation collection: an installation records where a tire is now, a mount log records what happened.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "tire-mount-logs"
+                ],
+                "summary": "List tire movements across the fleet",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Inclusive lower bound (RFC3339 or YYYY-MM-DD)",
+                        "name": "event_date_from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Inclusive upper bound (RFC3339 or YYYY-MM-DD)",
+                        "name": "event_date_to",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "INSTALL, DISMOUNT or ROTATION",
+                        "name": "event_type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Filter by tire",
+                        "name": "tire_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Filter by vehicle",
+                        "name": "vehicle_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by wheel position",
+                        "name": "position_code",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Filter by the employee who performed it",
+                        "name": "performed_by_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Offset",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.TireMountLogPage"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/tires": {
             "get": {
                 "security": [
