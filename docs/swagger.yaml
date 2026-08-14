@@ -3806,6 +3806,15 @@ definitions:
       updated_at:
         type: string
     type: object
+  dto.SetEmployeePasswordRequest:
+    properties:
+      password:
+        maxLength: 128
+        minLength: 8
+        type: string
+    required:
+    - password
+    type: object
   dto.SwitchCompanyRequest:
     properties:
       company_id:
@@ -8742,6 +8751,54 @@ paths:
       security:
       - BearerAuth: []
       summary: Update employees
+      tags:
+      - employees
+  /api/v1/employees/{id}/set-password:
+    post:
+      consumes:
+      - application/json
+      description: Lets a company administrator provision login credentials without
+        running the CLI. password_hash is never accepted or returned.
+      parameters:
+      - description: Employee id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: New password
+        in: body
+        name: password
+        required: true
+        schema:
+          $ref: '#/definitions/dto.SetEmployeePasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: password updated
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Set an employee's password
       tags:
       - employees
   /api/v1/faults:

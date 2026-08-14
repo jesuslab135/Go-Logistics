@@ -147,6 +147,9 @@ func NewRouter(d Deps) *gin.Engine {
 	crud.NewHandler[dto.RoleResponse, dto.CreateRoleRequest, dto.UpdateRoleRequest](NewRoleStore(d.Queries)).Register(roles, "/roles")
 	// employee: m2m-scoped, password_hash excluded, transactional create
 	crud.NewHandler[dto.EmployeeResponse, dto.CreateEmployeeRequest, dto.UpdateEmployeeRequest](NewEmployeeStore(d.Queries, d.Pool)).Register(employees, "/employees")
+	// Credential provisioning is an admin act, so it sits above the module's
+	// ordinary write permission.
+	employees.POST("/employees/:id/set-password", middleware.RequireAdminRole(), NewEmployeeActionHandler(d.Queries).SetPassword)
 
 	// Phase 1: asset catalogs & vehicle models (tenant-scoped)
 	crud.NewHandler[dto.AssetTypeResponse, dto.CreateAssetTypeRequest, dto.UpdateAssetTypeRequest](

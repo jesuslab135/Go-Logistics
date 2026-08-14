@@ -118,3 +118,9 @@ type EmployeePage struct {
 	Offset  int                `json:"offset"`
 	HasNext bool               `json:"has_next"`
 }
+
+// SetEmployeePasswordRequest carries a new password for an employee. The
+// 8-character floor matches the CLI's setpass rule and Django's serializer.
+type SetEmployeePasswordRequest struct {
+	Password string `json:"password" binding:"required,min=8,max=128"`
+}
