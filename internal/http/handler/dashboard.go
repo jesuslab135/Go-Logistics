@@ -28,6 +28,7 @@ func NewDashboardHandler(q *gen.Queries) *DashboardHandler {
 // Stats godoc
 //
 //	@Summary		Aggregated dashboard KPIs
+//	@Description	Current-state counters for the caller's company. pending_inspections counts submissions with failed items and no issue raised from them; low_stock_parts counts inventory rows (a part at one location) at or below their reorder point, not distinct parts. upcoming_days reports the window upcoming_reminders was counted over.
 //	@Tags			dashboard
 //	@Security		BearerAuth
 //	@Produce		json
@@ -52,6 +53,7 @@ func (h *DashboardHandler) Stats(c *gin.Context) {
 		UpcomingReminders:  row.UpcomingReminders,
 		LowStockParts:      row.LowStockParts,
 		PendingInspections: row.PendingInspections,
+		UpcomingDays:       h.upcomingDays,
 	})
 }
 

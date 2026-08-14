@@ -18,6 +18,8 @@ SELECT
     e.email,
     e.job_title,
     e.is_active,
+    e.is_technician,
+    e.is_vehicle_operator,
     e.is_account_owner,
     e.default_company_id,
     e.role_id,
@@ -30,18 +32,20 @@ WHERE e.id = $1
 `
 
 type GetMeProfileRow struct {
-	ID               int64
-	FirstName        string
-	LastName         string
-	Email            string
-	JobTitle         string
-	IsActive         bool
-	IsAccountOwner   bool
-	DefaultCompanyID *int64
-	RoleID           *int64
-	RoleName         *string
-	RoleIsAdmin      bool
-	Permissions      []byte
+	ID                int64
+	FirstName         string
+	LastName          string
+	Email             string
+	JobTitle          string
+	IsActive          bool
+	IsTechnician      bool
+	IsVehicleOperator bool
+	IsAccountOwner    bool
+	DefaultCompanyID  *int64
+	RoleID            *int64
+	RoleName          *string
+	RoleIsAdmin       bool
+	Permissions       []byte
 }
 
 // Queries backing /api/v1/me/permissions. The authorization middleware already
@@ -58,6 +62,8 @@ func (q *Queries) GetMeProfile(ctx context.Context, id int64) (GetMeProfileRow, 
 		&i.Email,
 		&i.JobTitle,
 		&i.IsActive,
+		&i.IsTechnician,
+		&i.IsVehicleOperator,
 		&i.IsAccountOwner,
 		&i.DefaultCompanyID,
 		&i.RoleID,

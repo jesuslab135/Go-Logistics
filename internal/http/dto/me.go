@@ -19,14 +19,20 @@ type MePermissionsResponse struct {
 	Companies []MeCompany `json:"companies"`
 }
 
+// MeEmployee describes the signed-in employee. is_technician and
+// is_vehicle_operator are operational flags, not permissions: they say which
+// capture flows (assigning labor, logging fuel) apply to this person, which the
+// client cannot infer from the permission map.
 type MeEmployee struct {
-	ID               int64  `json:"id"`
-	FirstName        string `json:"first_name"`
-	LastName         string `json:"last_name"`
-	Email            string `json:"email"`
-	JobTitle         string `json:"job_title"`
-	IsActive         bool   `json:"is_active"`
-	DefaultCompanyID *int64 `json:"default_company_id"`
+	ID                int64  `json:"id"`
+	FirstName         string `json:"first_name"`
+	LastName          string `json:"last_name"`
+	Email             string `json:"email"`
+	JobTitle          string `json:"job_title"`
+	IsActive          bool   `json:"is_active"`
+	IsTechnician      bool   `json:"is_technician"`
+	IsVehicleOperator bool   `json:"is_vehicle_operator"`
+	DefaultCompanyID  *int64 `json:"default_company_id"`
 }
 
 type MeRole struct {

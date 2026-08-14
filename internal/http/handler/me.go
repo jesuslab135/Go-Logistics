@@ -50,13 +50,15 @@ func (h *MeHandler) Permissions(c *gin.Context) {
 
 	out := dto.MePermissionsResponse{
 		Employee: dto.MeEmployee{
-			ID:               profile.ID,
-			FirstName:        profile.FirstName,
-			LastName:         profile.LastName,
-			Email:            profile.Email,
-			JobTitle:         profile.JobTitle,
-			IsActive:         profile.IsActive,
-			DefaultCompanyID: profile.DefaultCompanyID,
+			ID:                profile.ID,
+			FirstName:         profile.FirstName,
+			LastName:          profile.LastName,
+			Email:             profile.Email,
+			JobTitle:          profile.JobTitle,
+			IsActive:          profile.IsActive,
+			IsTechnician:      profile.IsTechnician,
+			IsVehicleOperator: profile.IsVehicleOperator,
+			DefaultCompanyID:  profile.DefaultCompanyID,
 		},
 		CompanyID:      identity.CompanyID,
 		IsAdmin:        identity.IsAdmin,

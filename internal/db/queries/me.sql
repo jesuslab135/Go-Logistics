@@ -11,6 +11,8 @@ SELECT
     e.email,
     e.job_title,
     e.is_active,
+    e.is_technician,
+    e.is_vehicle_operator,
     e.is_account_owner,
     e.default_company_id,
     e.role_id,

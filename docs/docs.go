@@ -2934,6 +2934,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Current-state counters for the caller's company. pending_inspections counts submissions with failed items and no issue raised from them; low_stock_parts counts inventory rows (a part at one location) at or below their reorder point, not distinct parts. upcoming_days reports the window upcoming_reminders was counted over.",
                 "produces": [
                     "application/json"
                 ],
@@ -18091,6 +18092,10 @@ const docTemplate = `{
                 "total_assets": {
                     "type": "integer"
                 },
+                "upcoming_days": {
+                    "description": "The window upcoming_reminders was counted over, so UI copy can name the\nsame number the backend used instead of hardcoding one.",
+                    "type": "integer"
+                },
                 "upcoming_reminders": {
                     "type": "integer"
                 }
@@ -19464,6 +19469,12 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "is_active": {
+                    "type": "boolean"
+                },
+                "is_technician": {
+                    "type": "boolean"
+                },
+                "is_vehicle_operator": {
                     "type": "boolean"
                 },
                 "job_title": {
