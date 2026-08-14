@@ -276,14 +276,43 @@ Django id spaces they replace were never reproducible here.
 
 ---
 
+## Live verification
+
+Run against the compose stack (`fleet-pg` on 5433, `fleet-minio` on 9010) with all nine
+migrations applied, API on `:8099`. Every item below was exercised with real HTTP
+requests, not mocks.
+
+| Area | Result |
+|---|---|
+| BR-05 logout | login → refresh 200 → logout 204 → same refresh **401** |
+| BR-02 switch-company | member 200 with `company_id:2` in the new claim; non-member 403; anonymous 401 |
+| BR-01 set-password | weak password **422** naming `password`; unknown employee 404; valid 204; the employee then logs in |
+| BR-03 approve | 200; tire `MOUNTED` with vehicle+position set; installation (odometer 1200) and INSTALL log both written; retry **409 request_already_resolved**; mounted tire **409 tire_already_mounted**; taken position **409 position_occupied** |
+| BR-06/07/09 assets | `?q=`, `?vehicle_type=`, `?status_id=`, `?order=-name` all filter in SQL; `trailer_type`/`classification`/`size` and `operator` present on both list and detail; bad `status_id` 400 |
+| BR-08/10/11/12/19 | all nine collections return correct envelopes; bad `event_type` / PO `state` → 400 |
+| BR-13 uploads | PNG as `document` 415; PDF as `photo` 415; bogus purpose **400 invalid_upload_purpose**; 6 MB **413**; matching purposes 201 |
+| BR-14 comments | author stamped server-side; missing parent 404; bad `content_type` **422**; `?content_type=&object_id=` filters |
+| BR-15 notifications | filing a request notified the approver; approving notified the requester; mark-read idempotent (`read_at` unchanged on re-mark); another employee's row 404 |
+| BR-16/17 | `upcoming_days: 30`; `is_technician` / `is_vehicle_operator` present |
+| BR-18 fuel | 1st entry 0/null; 2nd 100 mi / 10; **backdated** entry between them → 50/10 and its successor recomputed to 50/5; **deleting** it restored the successor to 100/10 |
+| BR-20 storage | replaced object gone from MinIO, replacement intact; deleting the row removed its object too |
+| BR-04 | fuel comment and photo created by a Go-only path carry `employee_id` / `uploaded_by_id` = caller |
+
+The run found one real defect, fixed in `6032e12`: validation errors from the **generic
+CRUD** handlers returned a bare 400 while hand-wired routes returned a field-level 422.
+The binding rule moved to `internal/platform/reqbind` so every resource reports the same
+way.
+
+The dev database now carries smoke-test rows (tires `TIN-SMOKE-1..3`, an asset "Trailer
+Alpha", fuel entries on asset 1, notifications). `worker@example.com`'s password was
+changed to `newpass12345` by the BR-01 test.
+
 ## Follow-ups
 
-- **Live verification.** Every change is covered by unit tests and by the route-tree
-  tests, but the handoff's completion checklist also asks for a live request or browser
-  smoke test per item. That still needs to run against the compose stack (`fleet-pg` on
-  5433, `fleet-minio` on 9010) with migrations `000006`–`000009` applied.
 - **Client regeneration.** The frontend's generated client should be regenerated against
   the updated OpenAPI. Breaking response/request changes to check: comment
   `content_type`/`object_id`, fuel entry create/update (no `miles_traveled` /
   `fuel_efficiency`), fuel comment `employee_id`, fuel photo and media (no
   `uploaded_by_id` on create), tire assignment request create (four fields only).
+- **Browser smoke test.** The API-level behavior is confirmed; the UI has not been
+  exercised against these contracts.
