@@ -449,6 +449,81 @@ func (h *FilteredListHandler) PurchaseOrderLineItems(c *gin.Context) {
 	renderPage(c, rows, total, p, toPurchaseOrderLineItemResponse)
 }
 
+// FuelEntries godoc
+//
+//	@Summary		List fuel entries across the fleet
+//	@Description	Company-wide register, so a cross-fleet view does not need one request per asset.
+//	@Tags			fuel-entries
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			asset_id	query		int		false	"Filter by asset"
+//	@Param			fuel_type	query		string	false	"Filter by fuel type"
+//	@Param			date_from	query		string	false	"Inclusive lower bound (RFC3339 or YYYY-MM-DD)"
+//	@Param			date_to		query		string	false	"Inclusive upper bound (RFC3339 or YYYY-MM-DD)"
+//	@Param			order		query		string	false	"date, odometer, quantity, total_cost, updated_at, id (prefix with - for descending)"
+//	@Param			limit		query		int		false	"Page size"
+//	@Param			offset		query		int		false	"Offset"
+//	@Success		200			{object}	dto.FuelEntryPage
+//	@Failure		400			{object}	dto.ErrorResponse
+//	@Failure		401			{object}	dto.ErrorResponse
+//	@Failure		403			{object}	dto.ErrorResponse
+//	@Router			/api/v1/fuel-entries [get]
+func (h *FilteredListHandler) FuelEntries(c *gin.Context) {
+	ctx := c.Request.Context()
+	p := paginate.Parse(c)
+
+	// fuel_entry has no company of its own; it is scoped through its asset.
+	where := filter.NewWhere(1).Add("a.company_id", filter.Eq, middleware.CompanyFromContext(ctx))
+	assetID, err := queryInt64(c, "asset_id")
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	if assetID != nil {
+		where.Add("fe.asset_id", filter.Eq, *assetID)
+	}
+	// fuel_type is a free varchar in the schema, so it is matched as given
+	// rather than validated against a fixed vocabulary.
+	if fuelType := queryStr(c, "fuel_type"); fuelType != nil {
+		where.Add("fe.fuel_type", filter.Eq, *fuelType)
+	}
+	from, err := queryTime(c, "date_from")
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	if from != nil {
+		where.Add("fe.date", filter.Gte, *from)
+	}
+	to, err := queryTime(c, "date_to")
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	if to != nil {
+		where.Add("fe.date", filter.Lte, *to)
+	}
+
+	spec := newListSpec[gen.FuelEntry]("fuel_entry", "fe").
+		join("JOIN asset a ON a.id = fe.asset_id").
+		filter(where).
+		orderBy(orderClause(c, map[string]string{
+			"date":       "fe.date",
+			"odometer":   "fe.odometer",
+			"quantity":   "fe.quantity",
+			"total_cost": "fe.total_cost",
+			"updated_at": "fe.updated_at",
+			"id":         "fe.id",
+		}, []filter.Sort{{Column: "fe.date", Desc: true}}, "fe.id"))
+
+	rows, total, err := runList(ctx, h.pool, spec, p)
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	renderPage(c, rows, total, p, toFuelEntryResponse)
+}
+
 // Vocabularies accepted by the state filters, kept beside the routes that
 // validate them. Ported from the Django models the schema came from.
 var issueStates = []string{"OPEN", "RESOLVED", "CLOSED"}

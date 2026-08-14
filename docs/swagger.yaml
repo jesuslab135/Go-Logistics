@@ -9053,6 +9053,64 @@ paths:
       summary: Update faults
       tags:
       - faults
+  /api/v1/fuel-entries:
+    get:
+      description: Company-wide register, so a cross-fleet view does not need one
+        request per asset.
+      parameters:
+      - description: Filter by asset
+        in: query
+        name: asset_id
+        type: integer
+      - description: Filter by fuel type
+        in: query
+        name: fuel_type
+        type: string
+      - description: Inclusive lower bound (RFC3339 or YYYY-MM-DD)
+        in: query
+        name: date_from
+        type: string
+      - description: Inclusive upper bound (RFC3339 or YYYY-MM-DD)
+        in: query
+        name: date_to
+        type: string
+      - description: date, odometer, quantity, total_cost, updated_at, id (prefix
+          with - for descending)
+        in: query
+        name: order
+        type: string
+      - description: Page size
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.FuelEntryPage'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List fuel entries across the fleet
+      tags:
+      - fuel-entries
   /api/v1/fuel-entries/{id}/comments:
     get:
       parameters:
