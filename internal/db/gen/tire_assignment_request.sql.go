@@ -119,6 +119,36 @@ func (q *Queries) GetTireAssignmentRequest(ctx context.Context, arg GetTireAssig
 	return i, err
 }
 
+const getTireAssignmentRequestForUpdate = `-- name: GetTireAssignmentRequestForUpdate :one
+SELECT id, company_id, tire_id, vehicle_id, position_code, state, requested_by_id, requested_at, approved_by_id, resolved_at, rejection_reason, notes FROM tire_assignment_request WHERE id = $1 AND company_id = $2 FOR UPDATE
+`
+
+type GetTireAssignmentRequestForUpdateParams struct {
+	ID        int64
+	CompanyID int64
+}
+
+// Locks the request row so two concurrent approvals cannot both see PENDING.
+func (q *Queries) GetTireAssignmentRequestForUpdate(ctx context.Context, arg GetTireAssignmentRequestForUpdateParams) (TireAssignmentRequest, error) {
+	row := q.db.QueryRow(ctx, getTireAssignmentRequestForUpdate, arg.ID, arg.CompanyID)
+	var i TireAssignmentRequest
+	err := row.Scan(
+		&i.ID,
+		&i.CompanyID,
+		&i.TireID,
+		&i.VehicleID,
+		&i.PositionCode,
+		&i.State,
+		&i.RequestedByID,
+		&i.RequestedAt,
+		&i.ApprovedByID,
+		&i.ResolvedAt,
+		&i.RejectionReason,
+		&i.Notes,
+	)
+	return i, err
+}
+
 const listTireAssignmentRequests = `-- name: ListTireAssignmentRequests :many
 SELECT id, company_id, tire_id, vehicle_id, position_code, state, requested_by_id, requested_at, approved_by_id, resolved_at, rejection_reason, notes FROM tire_assignment_request WHERE company_id = $1 ORDER BY requested_at DESC LIMIT $2 OFFSET $3
 `
@@ -160,6 +190,49 @@ func (q *Queries) ListTireAssignmentRequests(ctx context.Context, arg ListTireAs
 		return nil, err
 	}
 	return items, nil
+}
+
+const resolveTireAssignmentRequest = `-- name: ResolveTireAssignmentRequest :one
+UPDATE tire_assignment_request
+SET state = $1, approved_by_id = $2, resolved_at = $3
+WHERE id = $4 AND company_id = $5 AND state = 'PENDING'
+RETURNING id, company_id, tire_id, vehicle_id, position_code, state, requested_by_id, requested_at, approved_by_id, resolved_at, rejection_reason, notes
+`
+
+type ResolveTireAssignmentRequestParams struct {
+	State        string
+	ApprovedByID *int64
+	ResolvedAt   *time.Time
+	ID           int64
+	CompanyID    int64
+}
+
+// The state guard makes the resolution itself the idempotency barrier: a retry
+// matches no row and the caller learns the request was already resolved.
+func (q *Queries) ResolveTireAssignmentRequest(ctx context.Context, arg ResolveTireAssignmentRequestParams) (TireAssignmentRequest, error) {
+	row := q.db.QueryRow(ctx, resolveTireAssignmentRequest,
+		arg.State,
+		arg.ApprovedByID,
+		arg.ResolvedAt,
+		arg.ID,
+		arg.CompanyID,
+	)
+	var i TireAssignmentRequest
+	err := row.Scan(
+		&i.ID,
+		&i.CompanyID,
+		&i.TireID,
+		&i.VehicleID,
+		&i.PositionCode,
+		&i.State,
+		&i.RequestedByID,
+		&i.RequestedAt,
+		&i.ApprovedByID,
+		&i.ResolvedAt,
+		&i.RejectionReason,
+		&i.Notes,
+	)
+	return i, err
 }
 
 const updateTireAssignmentRequest = `-- name: UpdateTireAssignmentRequest :one

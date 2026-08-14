@@ -22,3 +22,11 @@ RETURNING *;
 
 -- name: DeleteTire :exec
 DELETE FROM tire WHERE id = $1 AND company_id = $2;
+
+-- name: GetTireForUpdate :one
+SELECT * FROM tire WHERE id = $1 AND company_id = $2 FOR UPDATE;
+
+-- name: MountTire :exec
+-- Denormalized pointers on tire; TireInstallation stays authoritative.
+UPDATE tire SET status = 'MOUNTED', current_vehicle_id = sqlc.arg(current_vehicle_id), current_position_code = sqlc.arg(current_position_code)
+WHERE id = sqlc.arg(id);

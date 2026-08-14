@@ -150,3 +150,47 @@ func TestEffectivePermissionsAdminGrantsCustomAction(t *testing.T) {
 		t.Error("admin reported approve = false, but the gate would allow it")
 	}
 }
+
+func TestIdentityCanAction(t *testing.T) {
+	warehouse := Identity{
+		IsActive: true,
+		HasRole:  true,
+		Permissions: map[string]ModulePermissions{
+			"tire_approvals": {Actions: map[string]bool{"approve": true}},
+		},
+	}
+	reader := Identity{
+		IsActive: true,
+		HasRole:  true,
+		Permissions: map[string]ModulePermissions{
+			"tire_approvals": {Actions: map[string]bool{"read": true}},
+		},
+	}
+	admin := Identity{IsActive: true, HasRole: true, IsAdmin: true}
+	wholeModule := Identity{
+		IsActive:    true,
+		HasRole:     true,
+		Permissions: map[string]ModulePermissions{"tire_approvals": {All: true}},
+	}
+
+	tests := []struct {
+		name     string
+		identity Identity
+		want     bool
+	}{
+		{"explicit approve grant", warehouse, true},
+		{"read only cannot approve", reader, false},
+		{"admin bypasses", admin, true},
+		{"whole-module grant covers approve", wholeModule, true},
+		{"inactive is refused", Identity{IsActive: false, IsAdmin: true}, false},
+		{"no role is refused", Identity{IsActive: true}, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.identity.CanAction("tire_approvals", "approve"); got != tt.want {
+				t.Errorf("CanAction = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

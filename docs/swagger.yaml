@@ -11,6 +11,19 @@ definitions:
       token_type:
         type: string
     type: object
+  dto.ApproveTireAssignmentRequestRequest:
+    properties:
+      notes:
+        type: string
+      odometer_at_install:
+        minimum: 0
+        type: integer
+      psi_at_install:
+        type: number
+      tread_depth_at_install_32nds:
+        minimum: 0
+        type: integer
+    type: object
   dto.AssetPage:
     properties:
       data:
@@ -13053,6 +13066,60 @@ paths:
       security:
       - BearerAuth: []
       summary: Update tire-assignment-requests
+      tags:
+      - tire-assignment-requests
+  /api/v1/tire-assignment-requests/{id}/approve:
+    post:
+      consumes:
+      - application/json
+      description: Resolves the request, creates the installation, appends an INSTALL
+        mount log and updates the tire — all in one transaction.
+      parameters:
+      - description: Request id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Installation readings
+        in: body
+        name: installation
+        required: true
+        schema:
+          $ref: '#/definitions/dto.ApproveTireAssignmentRequestRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.TireAssignmentRequestResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Approve a tire assignment request
       tags:
       - tire-assignment-requests
   /api/v1/tire-models:

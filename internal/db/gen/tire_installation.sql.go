@@ -173,6 +173,33 @@ func (q *Queries) ListTireInstallations(ctx context.Context, arg ListTireInstall
 	return items, nil
 }
 
+const tireHasInstallation = `-- name: TireHasInstallation :one
+SELECT EXISTS(SELECT 1 FROM tire_installation WHERE tire_id = $1)::boolean AS installed
+`
+
+func (q *Queries) TireHasInstallation(ctx context.Context, tireID int64) (bool, error) {
+	row := q.db.QueryRow(ctx, tireHasInstallation, tireID)
+	var installed bool
+	err := row.Scan(&installed)
+	return installed, err
+}
+
+const tirePositionOccupied = `-- name: TirePositionOccupied :one
+SELECT EXISTS(SELECT 1 FROM tire_installation WHERE vehicle_id = $1 AND position_code = $2)::boolean AS occupied
+`
+
+type TirePositionOccupiedParams struct {
+	VehicleID    int64
+	PositionCode string
+}
+
+func (q *Queries) TirePositionOccupied(ctx context.Context, arg TirePositionOccupiedParams) (bool, error) {
+	row := q.db.QueryRow(ctx, tirePositionOccupied, arg.VehicleID, arg.PositionCode)
+	var occupied bool
+	err := row.Scan(&occupied)
+	return occupied, err
+}
+
 const updateTireInstallation = `-- name: UpdateTireInstallation :one
 UPDATE tire_installation AS c SET vehicle_id = $1, position_code = $2, install_date = $3, odometer_at_install = $4, tread_depth_at_install_32nds = $5, psi_at_install = $6, installed_by_id = $7, notes = $8
 FROM tire p

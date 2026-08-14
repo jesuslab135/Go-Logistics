@@ -9900,6 +9900,88 @@
                 }
             }
         },
+        "/api/v1/tire-assignment-requests/{id}/approve": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Resolves the request, creates the installation, appends an INSTALL mount log and updates the tire — all in one transaction.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "tire-assignment-requests"
+                ],
+                "summary": "Approve a tire assignment request",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Request id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Installation readings",
+                        "name": "installation",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.ApproveTireAssignmentRequestRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.TireAssignmentRequestResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/tire-models": {
             "get": {
                 "security": [
@@ -14067,6 +14149,25 @@
                 },
                 "token_type": {
                     "type": "string"
+                }
+            }
+        },
+        "dto.ApproveTireAssignmentRequestRequest": {
+            "type": "object",
+            "properties": {
+                "notes": {
+                    "type": "string"
+                },
+                "odometer_at_install": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "psi_at_install": {
+                    "type": "number"
+                },
+                "tread_depth_at_install_32nds": {
+                    "type": "integer",
+                    "minimum": 0
                 }
             }
         },

@@ -129,6 +129,37 @@ func (q *Queries) GetTire(ctx context.Context, arg GetTireParams) (Tire, error) 
 	return i, err
 }
 
+const getTireForUpdate = `-- name: GetTireForUpdate :one
+SELECT id, company_id, tire_identification_number, tire_model_id, status, current_tread_depth_32nds, current_psi, total_miles, current_vehicle_id, current_position_code, purchase_date, purchase_cost, vendor_id, created_at FROM tire WHERE id = $1 AND company_id = $2 FOR UPDATE
+`
+
+type GetTireForUpdateParams struct {
+	ID        int64
+	CompanyID int64
+}
+
+func (q *Queries) GetTireForUpdate(ctx context.Context, arg GetTireForUpdateParams) (Tire, error) {
+	row := q.db.QueryRow(ctx, getTireForUpdate, arg.ID, arg.CompanyID)
+	var i Tire
+	err := row.Scan(
+		&i.ID,
+		&i.CompanyID,
+		&i.TireIdentificationNumber,
+		&i.TireModelID,
+		&i.Status,
+		&i.CurrentTreadDepth32nds,
+		&i.CurrentPsi,
+		&i.TotalMiles,
+		&i.CurrentVehicleID,
+		&i.CurrentPositionCode,
+		&i.PurchaseDate,
+		&i.PurchaseCost,
+		&i.VendorID,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const listTires = `-- name: ListTires :many
 SELECT id, company_id, tire_identification_number, tire_model_id, status, current_tread_depth_32nds, current_psi, total_miles, current_vehicle_id, current_position_code, purchase_date, purchase_cost, vendor_id, created_at FROM tire WHERE company_id = $1 ORDER BY tire_identification_number LIMIT $2 OFFSET $3
 `
@@ -172,6 +203,23 @@ func (q *Queries) ListTires(ctx context.Context, arg ListTiresParams) ([]Tire, e
 		return nil, err
 	}
 	return items, nil
+}
+
+const mountTire = `-- name: MountTire :exec
+UPDATE tire SET status = 'MOUNTED', current_vehicle_id = $1, current_position_code = $2
+WHERE id = $3
+`
+
+type MountTireParams struct {
+	CurrentVehicleID    *int64
+	CurrentPositionCode string
+	ID                  int64
+}
+
+// Denormalized pointers on tire; TireInstallation stays authoritative.
+func (q *Queries) MountTire(ctx context.Context, arg MountTireParams) error {
+	_, err := q.db.Exec(ctx, mountTire, arg.CurrentVehicleID, arg.CurrentPositionCode, arg.ID)
+	return err
 }
 
 const updateTire = `-- name: UpdateTire :one

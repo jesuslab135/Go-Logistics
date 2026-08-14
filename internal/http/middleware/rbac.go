@@ -89,6 +89,12 @@ func (i Identity) Can(module, method string) bool {
 	return i.allows(module, methodAction[method])
 }
 
+// CanAction checks a named action directly, for permissions that do not
+// correspond to an HTTP method (tire_approvals/approve).
+func (i Identity) CanAction(module, action string) bool {
+	return i.allows(module, action)
+}
+
 // allows is the single rule behind both the request gate and the permissions
 // report, so what /me/permissions promises cannot drift from what is enforced.
 func (i Identity) allows(module, action string) bool {
@@ -204,6 +210,14 @@ func RequireAccountOwner() gin.HandlerFunc {
 func RequireModule(module string) gin.HandlerFunc {
 	return gate(func(i Identity, c *gin.Context) bool { return i.Can(module, c.Request.Method) },
 		"you do not have access to this module")
+}
+
+// RequireAction gates a route on a named action rather than the HTTP method's
+// implied one. Approving a tire assignment is a POST, but "create" is not the
+// permission it should need — Django guarded it with tire_approvals/approve.
+func RequireAction(module, action string) gin.HandlerFunc {
+	return gate(func(i Identity, _ *gin.Context) bool { return i.CanAction(module, action) },
+		"you do not have permission to perform this action")
 }
 
 func gate(allowed func(Identity, *gin.Context) bool, message string) gin.HandlerFunc {

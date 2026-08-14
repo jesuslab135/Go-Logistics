@@ -22,3 +22,15 @@ RETURNING *;
 
 -- name: DeleteTireAssignmentRequest :exec
 DELETE FROM tire_assignment_request WHERE id = $1 AND company_id = $2;
+
+-- name: GetTireAssignmentRequestForUpdate :one
+-- Locks the request row so two concurrent approvals cannot both see PENDING.
+SELECT * FROM tire_assignment_request WHERE id = $1 AND company_id = $2 FOR UPDATE;
+
+-- name: ResolveTireAssignmentRequest :one
+-- The state guard makes the resolution itself the idempotency barrier: a retry
+-- matches no row and the caller learns the request was already resolved.
+UPDATE tire_assignment_request
+SET state = sqlc.arg(state), approved_by_id = sqlc.arg(approved_by_id), resolved_at = sqlc.arg(resolved_at)
+WHERE id = sqlc.arg(id) AND company_id = sqlc.arg(company_id) AND state = 'PENDING'
+RETURNING *;

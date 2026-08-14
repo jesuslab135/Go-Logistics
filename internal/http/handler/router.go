@@ -135,6 +135,11 @@ func NewRouter(d Deps) *gin.Engine {
 	// Django's TireAssignmentRequestViewSet required membership only; its
 	// approve/reject actions carried the extra warehouse-role check.
 	crud.NewHandler[dto.TireAssignmentRequestResponse, dto.CreateTireAssignmentRequestRequest, dto.UpdateTireAssignmentRequestRequest](NewTireAssignmentRequestStore(d.Queries)).Register(member, "/tire-assignment-requests")
+	// Approving is the warehouse's act, not an ordinary write: Django gated it
+	// on tire_approvals/approve, which admins bypass.
+	member.POST("/tire-assignment-requests/:id/approve",
+		middleware.RequireAction("tire_approvals", "approve"),
+		NewTireAssignmentActionHandler(d.Queries, d.Pool).Approve)
 
 	// Phase 7: fuel, inspections, org & misc
 	crud.NewHandler[dto.FuelTypeResponse, dto.CreateFuelTypeRequest, dto.UpdateFuelTypeRequest](NewFuelTypeStore(d.Queries)).Register(fuel, "/fuel-types")

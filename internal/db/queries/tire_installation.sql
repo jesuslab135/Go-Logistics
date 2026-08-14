@@ -27,3 +27,9 @@ RETURNING c.*;
 -- name: DeleteTireInstallation :exec
 DELETE FROM tire_installation AS c USING tire p
 WHERE c.id = sqlc.arg(id) AND c.tire_id = sqlc.arg(parent_id) AND p.company_id = sqlc.arg(company_id) AND p.id = c.tire_id;
+
+-- name: TirePositionOccupied :one
+SELECT EXISTS(SELECT 1 FROM tire_installation WHERE vehicle_id = $1 AND position_code = $2)::boolean AS occupied;
+
+-- name: TireHasInstallation :one
+SELECT EXISTS(SELECT 1 FROM tire_installation WHERE tire_id = $1)::boolean AS installed;

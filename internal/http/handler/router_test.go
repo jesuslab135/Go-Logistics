@@ -42,6 +42,7 @@ func TestRouterRegistersRoutes(t *testing.T) {
 		"DELETE /api/v1/companies/:id",
 		"GET /api/v1/assets",
 		"POST /api/v1/employees/:id/set-password",
+		"POST /api/v1/tire-assignment-requests/:id/approve",
 		"POST /api/v1/uploads",
 		"GET /api/v1/assets/:id/fuel-entries",
 		"GET /api/v1/assets/:id/vehicle",

@@ -2,6 +2,8 @@ package dto
 
 import (
 	"time"
+
+	"github.com/shopspring/decimal"
 )
 
 type CreateTireAssignmentRequestRequest struct {
@@ -51,4 +53,13 @@ type TireAssignmentRequestPage struct {
 	Limit   int                             `json:"limit"`
 	Offset  int                             `json:"offset"`
 	HasNext bool                            `json:"has_next"`
+}
+
+// ApproveTireAssignmentRequestRequest carries the installation readings taken
+// at approval time. State, resolver and timestamps are stamped by the server.
+type ApproveTireAssignmentRequestRequest struct {
+	OdometerAtInstall        int32            `json:"odometer_at_install" binding:"min=0"`
+	TreadDepthAtInstall32nds *int32           `json:"tread_depth_at_install_32nds" binding:"omitempty,min=0"`
+	PsiAtInstall             *decimal.Decimal `json:"psi_at_install"`
+	Notes                    *string          `json:"notes"`
 }
