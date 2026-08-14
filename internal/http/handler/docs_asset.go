@@ -1,18 +1,5 @@
 package handler
 
-// docListAssets godoc
-//
-//	@Summary	List assets
-//	@Tags	assets
-//	@Security	BearerAuth
-//	@Produce	json
-//	@Param	page	query	int	false	"Page"
-//	@Param	page_size	query	int	false	"Size"
-//	@Success	200	{object}	dto.AssetPage
-//	@Failure	401	{object}	dto.ErrorResponse
-//	@Router	/api/v1/assets [get]
-func docListAssets() {}
-
 // docCreateAsset godoc
 //
 //	@Summary	Create assets

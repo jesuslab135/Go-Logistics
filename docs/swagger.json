@@ -431,6 +431,7 @@
                         "BearerAuth": []
                     }
                 ],
+                "description": "Includes the vehicle operator and trailer subtype columns, so a registry (including its DRY_VAN, CONTAINER, CHASSIS and DOLLY tabs) can be drawn from one paginated request.",
                 "produces": [
                     "application/json"
                 ],
@@ -440,15 +441,39 @@
                 "summary": "List assets",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "Page",
-                        "name": "page",
+                        "type": "string",
+                        "description": "Search name, VIN/serial and license plate",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by vehicle type",
+                        "name": "vehicle_type",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "description": "Size",
-                        "name": "page_size",
+                        "description": "Filter by status",
+                        "name": "status_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "name, vin_sn, vehicle_type, updated_at, id (prefix with - for descending)",
+                        "name": "order",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Offset",
+                        "name": "offset",
                         "in": "query"
                     }
                 ],
@@ -459,8 +484,20 @@
                             "$ref": "#/definitions/dto.AssetPage"
                         }
                     },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -14468,6 +14505,10 @@
                 "number_of_payments": {
                     "type": "integer"
                 },
+                "operator": {
+                    "description": "Denormalized from the 1:1 subtype rows so a registry can be drawn from\none paginated request. Null for assets without that subtype; the\nauthoritative records stay at /assets/{id}/vehicle and /assets/{id}/trailer.",
+                    "type": "string"
+                },
                 "out_of_service_date": {
                     "type": "string"
                 },
@@ -14514,6 +14555,15 @@
                 },
                 "status_id": {
                     "type": "integer"
+                },
+                "trailer_classification": {
+                    "type": "string"
+                },
+                "trailer_size": {
+                    "type": "string"
+                },
+                "trailer_type": {
+                    "type": "string"
                 },
                 "trim": {
                     "type": "string",

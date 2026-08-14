@@ -22,3 +22,13 @@ RETURNING *;
 
 -- name: DeleteAsset :exec
 DELETE FROM asset WHERE id = $1 AND company_id = $2;
+
+-- name: GetAssetSubtypeFields :one
+-- The trailer registry and the asset list need a handful of subtype columns.
+-- Fetching them per row would be one request per registry line, so they are
+-- read alongside the asset instead. Both joins are 1:1 on a shared primary key.
+SELECT v.operator, t.trailer_type, t.classification AS trailer_classification, t.size AS trailer_size
+FROM asset a
+LEFT JOIN vehicle v ON v.asset_id = a.id
+LEFT JOIN trailer t ON t.asset_id = a.id
+WHERE a.id = $1 AND a.company_id = $2;

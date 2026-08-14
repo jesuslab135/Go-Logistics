@@ -7,6 +7,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"fleet/internal/db/gen"
+	"fleet/internal/http/dto"
 	"fleet/internal/http/middleware"
 	"fleet/internal/platform/apierr"
 	"fleet/internal/platform/filter"
@@ -196,6 +197,82 @@ func (h *FilteredListHandler) InventoryJournalEntries(c *gin.Context) {
 		return
 	}
 	renderPage(c, rows, total, p, toInventoryJournalEntryResponse)
+}
+
+// assetListRow is an asset plus its 1:1 subtype columns. The embedded row must
+// stay first: the projection is built from it, in field order.
+type assetListRow struct {
+	gen.Asset
+	Operator              *string
+	TrailerType           *string
+	TrailerClassification *string
+	TrailerSize           *string
+}
+
+// Assets godoc
+//
+//	@Summary		List assets
+//	@Description	Includes the vehicle operator and trailer subtype columns, so a registry (including its DRY_VAN, CONTAINER, CHASSIS and DOLLY tabs) can be drawn from one paginated request.
+//	@Tags			assets
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			q				query		string	false	"Search name, VIN/serial and license plate"
+//	@Param			vehicle_type	query		string	false	"Filter by vehicle type"
+//	@Param			status_id		query		int		false	"Filter by status"
+//	@Param			order			query		string	false	"name, vin_sn, vehicle_type, updated_at, id (prefix with - for descending)"
+//	@Param			limit			query		int		false	"Page size"
+//	@Param			offset			query		int		false	"Offset"
+//	@Success		200				{object}	dto.AssetPage
+//	@Failure		400				{object}	dto.ErrorResponse
+//	@Failure		401				{object}	dto.ErrorResponse
+//	@Failure		403				{object}	dto.ErrorResponse
+//	@Router			/api/v1/assets [get]
+func (h *FilteredListHandler) Assets(c *gin.Context) {
+	ctx := c.Request.Context()
+	p := paginate.Parse(c)
+
+	where := filter.NewWhere(1).Add("a.company_id", filter.Eq, middleware.CompanyFromContext(ctx))
+	if vehicleType := queryStr(c, "vehicle_type"); vehicleType != nil {
+		where.Add("a.vehicle_type", filter.Eq, *vehicleType)
+	}
+	statusID, err := queryInt64(c, "status_id")
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	if statusID != nil {
+		where.Add("a.status_id", filter.Eq, *statusID)
+	}
+	if q := queryStr(c, "q"); q != nil {
+		pattern := "%" + *q + "%"
+		where.Raw("(a.name ILIKE ? OR a.vin_sn ILIKE ? OR a.license_plate ILIKE ?)", pattern, pattern, pattern)
+	}
+
+	spec := newListSpec[assetListRow]("asset", "a").
+		join("LEFT JOIN vehicle v ON v.asset_id = a.id", "LEFT JOIN trailer t ON t.asset_id = a.id").
+		selecting("v.operator", "t.trailer_type", "t.classification", "t.size").
+		filter(where).
+		orderBy(orderClause(c, map[string]string{
+			"name":         "a.name",
+			"vin_sn":       "a.vin_sn",
+			"vehicle_type": "a.vehicle_type",
+			"updated_at":   "a.updated_at",
+			"id":           "a.id",
+		}, []filter.Sort{{Column: "a.name"}}, "a.id"))
+
+	rows, total, err := runList(ctx, h.pool, spec, p)
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	renderPage(c, rows, total, p, func(r assetListRow) dto.AssetResponse {
+		out := toAssetResponse(r.Asset)
+		out.Operator = r.Operator
+		out.TrailerType = r.TrailerType
+		out.TrailerClassification = r.TrailerClassification
+		out.TrailerSize = r.TrailerSize
+		return out
+	})
 }
 
 // Vocabularies accepted by the state filters, kept beside the routes that

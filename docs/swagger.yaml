@@ -166,6 +166,12 @@ definitions:
         type: string
       number_of_payments:
         type: integer
+      operator:
+        description: |-
+          Denormalized from the 1:1 subtype rows so a registry can be drawn from
+          one paginated request. Null for assets without that subtype; the
+          authoritative records stay at /assets/{id}/vehicle and /assets/{id}/trailer.
+        type: string
       out_of_service_date:
         type: string
       out_of_service_meter:
@@ -199,6 +205,12 @@ definitions:
         type: number
       status_id:
         type: integer
+      trailer_classification:
+        type: string
+      trailer_size:
+        type: string
+      trailer_type:
+        type: string
       trim:
         maxLength: 100
         type: string
@@ -7158,14 +7170,34 @@ paths:
       - asset-types
   /api/v1/assets:
     get:
+      description: Includes the vehicle operator and trailer subtype columns, so a
+        registry (including its DRY_VAN, CONTAINER, CHASSIS and DOLLY tabs) can be
+        drawn from one paginated request.
       parameters:
-      - description: Page
+      - description: Search name, VIN/serial and license plate
         in: query
-        name: page
+        name: q
+        type: string
+      - description: Filter by vehicle type
+        in: query
+        name: vehicle_type
+        type: string
+      - description: Filter by status
+        in: query
+        name: status_id
         type: integer
-      - description: Size
+      - description: name, vin_sn, vehicle_type, updated_at, id (prefix with - for
+          descending)
         in: query
-        name: page_size
+        name: order
+        type: string
+      - description: Page size
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
         type: integer
       produces:
       - application/json
@@ -7174,8 +7206,16 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/dto.AssetPage'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
         "401":
           description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
       security:

@@ -221,6 +221,14 @@ type AssetResponse struct {
 	LoanStartedAt               *time.Time       `json:"loan_started_at"`
 	LoanEndedAt                 *time.Time       `json:"loan_ended_at"`
 	UpdatedAt                   time.Time        `json:"updated_at"`
+
+	// Denormalized from the 1:1 subtype rows so a registry can be drawn from
+	// one paginated request. Null for assets without that subtype; the
+	// authoritative records stay at /assets/{id}/vehicle and /assets/{id}/trailer.
+	Operator              *string `json:"operator"`
+	TrailerType           *string `json:"trailer_type"`
+	TrailerClassification *string `json:"trailer_classification"`
+	TrailerSize           *string `json:"trailer_size"`
 }
 
 type AssetPage struct {

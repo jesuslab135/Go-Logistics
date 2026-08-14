@@ -37,7 +37,25 @@ func (s *AssetStore) Get(ctx context.Context, id int64) (dto.AssetResponse, erro
 	if err != nil {
 		return dto.AssetResponse{}, err
 	}
-	return toAssetResponse(r), nil
+	return s.withSubtypes(ctx, toAssetResponse(r))
+}
+
+// withSubtypes fills the denormalized vehicle/trailer columns so a single asset
+// carries the same shape the list projection returns. The lookup is a primary
+// key hit on two 1:1 tables; a missing subtype simply leaves the fields null.
+func (s *AssetStore) withSubtypes(ctx context.Context, resp dto.AssetResponse) (dto.AssetResponse, error) {
+	sub, err := s.q.GetAssetSubtypeFields(ctx, gen.GetAssetSubtypeFieldsParams{
+		ID:        resp.ID,
+		CompanyID: middleware.CompanyFromContext(ctx),
+	})
+	if err != nil {
+		return dto.AssetResponse{}, err
+	}
+	resp.Operator = sub.Operator
+	resp.TrailerType = sub.TrailerType
+	resp.TrailerClassification = sub.TrailerClassification
+	resp.TrailerSize = sub.TrailerSize
+	return resp, nil
 }
 
 func (s *AssetStore) Create(ctx context.Context, in dto.CreateAssetRequest) (dto.AssetResponse, error) {
@@ -117,7 +135,7 @@ func (s *AssetStore) Create(ctx context.Context, in dto.CreateAssetRequest) (dto
 	if err != nil {
 		return dto.AssetResponse{}, err
 	}
-	return toAssetResponse(r), nil
+	return s.withSubtypes(ctx, toAssetResponse(r))
 }
 
 func (s *AssetStore) Update(ctx context.Context, id int64, in dto.UpdateAssetRequest) (dto.AssetResponse, error) {
@@ -198,7 +216,7 @@ func (s *AssetStore) Update(ctx context.Context, id int64, in dto.UpdateAssetReq
 	if err != nil {
 		return dto.AssetResponse{}, err
 	}
-	return toAssetResponse(r), nil
+	return s.withSubtypes(ctx, toAssetResponse(r))
 }
 
 func (s *AssetStore) Delete(ctx context.Context, id int64) error {

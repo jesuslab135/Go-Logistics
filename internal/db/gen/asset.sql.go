@@ -357,6 +357,41 @@ func (q *Queries) GetAsset(ctx context.Context, arg GetAssetParams) (Asset, erro
 	return i, err
 }
 
+const getAssetSubtypeFields = `-- name: GetAssetSubtypeFields :one
+SELECT v.operator, t.trailer_type, t.classification AS trailer_classification, t.size AS trailer_size
+FROM asset a
+LEFT JOIN vehicle v ON v.asset_id = a.id
+LEFT JOIN trailer t ON t.asset_id = a.id
+WHERE a.id = $1 AND a.company_id = $2
+`
+
+type GetAssetSubtypeFieldsParams struct {
+	ID        int64
+	CompanyID int64
+}
+
+type GetAssetSubtypeFieldsRow struct {
+	Operator              *string
+	TrailerType           *string
+	TrailerClassification *string
+	TrailerSize           *string
+}
+
+// The trailer registry and the asset list need a handful of subtype columns.
+// Fetching them per row would be one request per registry line, so they are
+// read alongside the asset instead. Both joins are 1:1 on a shared primary key.
+func (q *Queries) GetAssetSubtypeFields(ctx context.Context, arg GetAssetSubtypeFieldsParams) (GetAssetSubtypeFieldsRow, error) {
+	row := q.db.QueryRow(ctx, getAssetSubtypeFields, arg.ID, arg.CompanyID)
+	var i GetAssetSubtypeFieldsRow
+	err := row.Scan(
+		&i.Operator,
+		&i.TrailerType,
+		&i.TrailerClassification,
+		&i.TrailerSize,
+	)
+	return i, err
+}
+
 const listAssets = `-- name: ListAssets :many
 SELECT id, company_id, name, vin_sn, msrp, generate_expenses, asset_type_id, status_id, lease_vendor_id, vehicle_type, ownership_type, labels, linked_vehicles, loan_start_date, loan_end_date, monthly_payment, number_of_payments, lease_number, lease_start_date, lease_end_date, excess_mileage_charge, owner_company_id, year, make, model, trim, color, license_plate, "group", photo, meter_unit, current_meter, secondary_meter_unit, secondary_meter_value, fuel_type, body_type, body_subtype, registration_state, purchase_date, purchase_price, purchase_vendor, purchase_meter, in_service_date, in_service_meter, out_of_service_date, out_of_service_meter, estimated_service_months, estimated_replacement_mileage, estimated_resale_price, acquisition_type, monthly_cost, acquisition_date, loan_amount, capitalized_cost, down_payment, annual_percentage_rate, first_payment_date, residual_value, mileage_cap, notes, archived_at, external_id, custom_fields, fuel_volume_units, current_meter_date, loan_account_number, loan_notes, loan_vendor_id, loan_started_at, loan_ended_at, updated_at FROM asset WHERE company_id = $1 ORDER BY name LIMIT $2 OFFSET $3
 `

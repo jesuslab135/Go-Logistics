@@ -97,8 +97,9 @@ func NewRouter(d Deps) *gin.Engine {
 	lists := NewFilteredListHandler(d.Pool)
 
 	// Phase 2: assets
-	crud.NewHandler[dto.AssetResponse, dto.CreateAssetRequest, dto.UpdateAssetRequest](
-		NewAssetStore(d.Queries)).Register(assets, "/assets")
+	registerCrudWithList(assets, "/assets",
+		crud.NewHandler[dto.AssetResponse, dto.CreateAssetRequest, dto.UpdateAssetRequest](
+			NewAssetStore(d.Queries)), lists.Assets)
 
 	// Phase 3: parts & inventory
 	crud.NewHandler[dto.PartCategoryResponse, dto.CreatePartCategoryRequest, dto.UpdatePartCategoryRequest](
