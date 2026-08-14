@@ -9,6 +9,7 @@ import (
 
 	"fleet/internal/platform/apierr"
 	"fleet/internal/platform/paginate"
+	"fleet/internal/platform/reqbind"
 )
 
 // LinkStore is the contract for a many-to-many join table exposed under its
@@ -73,8 +74,8 @@ func (h *LinkHandler[T, C]) Link(c *gin.Context) {
 		return
 	}
 	var in C
-	if err := c.ShouldBindJSON(&in); err != nil {
-		apierr.Abort(c, apierr.BadRequest("invalid request body").Wrap(err))
+	if err := reqbind.JSON(c, &in); err != nil {
+		apierr.Abort(c, err)
 		return
 	}
 	item, err := h.store.Link(c.Request.Context(), parentID, in)

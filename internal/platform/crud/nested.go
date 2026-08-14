@@ -9,6 +9,7 @@ import (
 
 	"fleet/internal/platform/apierr"
 	"fleet/internal/platform/paginate"
+	"fleet/internal/platform/reqbind"
 )
 
 // NestedStore is the contract for a child resource nested under a parent. Every
@@ -79,8 +80,8 @@ func (h *NestedHandler[T, C, U]) Create(c *gin.Context) {
 		return
 	}
 	var in C
-	if err := c.ShouldBindJSON(&in); err != nil {
-		apierr.Abort(c, apierr.BadRequest("invalid request body").Wrap(err))
+	if err := reqbind.JSON(c, &in); err != nil {
+		apierr.Abort(c, err)
 		return
 	}
 	item, err := h.store.Create(c.Request.Context(), parentID, in)
@@ -98,8 +99,8 @@ func (h *NestedHandler[T, C, U]) Update(c *gin.Context) {
 		return
 	}
 	var in U
-	if err := c.ShouldBindJSON(&in); err != nil {
-		apierr.Abort(c, apierr.BadRequest("invalid request body").Wrap(err))
+	if err := reqbind.JSON(c, &in); err != nil {
+		apierr.Abort(c, err)
 		return
 	}
 	item, err := h.store.Update(c.Request.Context(), parentID, id, in)

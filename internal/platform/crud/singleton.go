@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"fleet/internal/platform/apierr"
+	"fleet/internal/platform/reqbind"
 )
 
 // SingletonStore is a 1:1 child of a parent (e.g. a Vehicle for an Asset). There
@@ -55,8 +56,8 @@ func (h *SingletonHandler[T, U]) Upsert(c *gin.Context) {
 		return
 	}
 	var in U
-	if err := c.ShouldBindJSON(&in); err != nil {
-		apierr.Abort(c, apierr.BadRequest("invalid request body").Wrap(err))
+	if err := reqbind.JSON(c, &in); err != nil {
+		apierr.Abort(c, err)
 		return
 	}
 	item, err := h.store.Upsert(c.Request.Context(), parentID, in)

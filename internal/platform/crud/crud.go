@@ -9,6 +9,7 @@ import (
 
 	"fleet/internal/platform/apierr"
 	"fleet/internal/platform/paginate"
+	"fleet/internal/platform/reqbind"
 )
 
 // Store is the persistence contract a resource must satisfy to get generic REST
@@ -68,8 +69,8 @@ func (h *Handler[T, C, U]) Get(c *gin.Context) {
 
 func (h *Handler[T, C, U]) Create(c *gin.Context) {
 	var in C
-	if err := c.ShouldBindJSON(&in); err != nil {
-		apierr.Abort(c, apierr.BadRequest("invalid request body").Wrap(err))
+	if err := reqbind.JSON(c, &in); err != nil {
+		apierr.Abort(c, err)
 		return
 	}
 	item, err := h.store.Create(c.Request.Context(), in)
@@ -87,8 +88,8 @@ func (h *Handler[T, C, U]) Update(c *gin.Context) {
 		return
 	}
 	var in U
-	if err := c.ShouldBindJSON(&in); err != nil {
-		apierr.Abort(c, apierr.BadRequest("invalid request body").Wrap(err))
+	if err := reqbind.JSON(c, &in); err != nil {
+		apierr.Abort(c, err)
 		return
 	}
 	item, err := h.store.Update(c.Request.Context(), id, in)
