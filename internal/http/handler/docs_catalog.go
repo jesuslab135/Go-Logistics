@@ -134,21 +134,6 @@ func docUpdateAssetStatus() {}
 //	@Router		/api/v1/asset-statuses/{id} [delete]
 func docDeleteAssetStatus() {}
 
-// catalog-options
-
-// docListCatalogOptions godoc
-//
-//	@Summary	List catalog options
-//	@Tags		catalog-options
-//	@Security	BearerAuth
-//	@Produce	json
-//	@Param		page		query		int	false	"Page number"
-//	@Param		page_size	query		int	false	"Items per page"
-//	@Success	200			{object}	dto.CatalogOptionPage
-//	@Failure	401			{object}	dto.ErrorResponse
-//	@Router		/api/v1/catalog-options [get]
-func docListCatalogOptions() {}
-
 // docCreateCatalogOption godoc
 //
 //	@Summary	Create a catalog option

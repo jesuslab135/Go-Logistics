@@ -1,18 +1,5 @@
 package handler
 
-// docListMediaItems godoc
-//
-//	@Summary	List media
-//	@Tags	media
-//	@Security	BearerAuth
-//	@Produce	json
-//	@Param	limit	query	int	false	"Page size"
-//	@Param	offset	query	int	false	"Offset"
-//	@Success	200	{object}	dto.MediumPage
-//	@Failure	401	{object}	dto.ErrorResponse
-//	@Router	/api/v1/media [get]
-func docListMediaItems() {}
-
 // docCreateMedium godoc
 //
 //	@Summary	Create media

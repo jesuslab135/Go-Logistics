@@ -1,18 +1,5 @@
 package handler
 
-// docListTireAssignmentRequests godoc
-//
-//	@Summary	List tire-assignment-requests
-//	@Tags	tire-assignment-requests
-//	@Security	BearerAuth
-//	@Produce	json
-//	@Param	limit	query	int	false	"Page size"
-//	@Param	offset	query	int	false	"Offset"
-//	@Success	200	{object}	dto.TireAssignmentRequestPage
-//	@Failure	401	{object}	dto.ErrorResponse
-//	@Router	/api/v1/tire-assignment-requests [get]
-func docListTireAssignmentRequests() {}
-
 // docCreateTireAssignmentRequest godoc
 //
 //	@Summary	Create tire-assignment-requests

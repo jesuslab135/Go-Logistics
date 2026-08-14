@@ -8331,14 +8331,20 @@ paths:
       - axle-definitions
   /api/v1/catalog-options:
     get:
+      description: Catalog options are grouped by category, so a form filling one
+        dropdown filters to its own category rather than fetching the whole catalog.
       parameters:
-      - description: Page number
+      - description: Filter by category
         in: query
-        name: page
+        name: category
+        type: string
+      - description: Page size
+        in: query
+        name: limit
         type: integer
-      - description: Items per page
+      - description: Offset
         in: query
-        name: page_size
+        name: offset
         type: integer
       produces:
       - application/json
@@ -8347,8 +8353,16 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/dto.CatalogOptionPage'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
         "401":
           description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
       security:
@@ -11262,6 +11276,10 @@ paths:
   /api/v1/media:
     get:
       parameters:
+      - description: Filter by asset
+        in: query
+        name: asset_id
+        type: integer
       - description: Page size
         in: query
         name: limit
@@ -11277,8 +11295,16 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/dto.MediumPage'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
         "401":
           description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
       security:
@@ -12209,6 +12235,19 @@ paths:
   /api/v1/purchase-orders:
     get:
       parameters:
+      - description: Filter by vendor
+        in: query
+        name: vendor_id
+        type: integer
+      - description: DRAFT, PENDING_APPROVAL, REJECTED, APPROVED, PURCHASED, RECEIVED_PARTIAL,
+          RECEIVED_FULL or CLOSED
+        in: query
+        name: state
+        type: string
+      - description: created_at, state, id (prefix with - for descending)
+        in: query
+        name: order
+        type: string
       - description: Page size
         in: query
         name: limit
@@ -12224,13 +12263,21 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/dto.PurchaseOrderPage'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: List purchase-orders
+      summary: List purchase orders
       tags:
       - purchase-orders
     post:
@@ -13399,7 +13446,32 @@ paths:
       - service-task-parts
   /api/v1/tire-assignment-requests:
     get:
+      description: 'The approval inbox: filter to PENDING for work waiting on someone.'
       parameters:
+      - description: PENDING, APPROVED or REJECTED
+        in: query
+        name: state
+        type: string
+      - description: Filter by tire
+        in: query
+        name: tire_id
+        type: integer
+      - description: Filter by vehicle
+        in: query
+        name: vehicle_id
+        type: integer
+      - description: Inclusive lower bound (RFC3339 or YYYY-MM-DD)
+        in: query
+        name: requested_from
+        type: string
+      - description: Inclusive upper bound (RFC3339 or YYYY-MM-DD)
+        in: query
+        name: requested_to
+        type: string
+      - description: requested_at, resolved_at, id (prefix with - for descending)
+        in: query
+        name: order
+        type: string
       - description: Page size
         in: query
         name: limit
@@ -13415,13 +13487,21 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/dto.TireAssignmentRequestPage'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: List tire-assignment-requests
+      summary: List tire assignment requests
       tags:
       - tire-assignment-requests
     post:

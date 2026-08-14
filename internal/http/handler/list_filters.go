@@ -667,10 +667,226 @@ func (h *FilteredListHandler) Comments(c *gin.Context) {
 	renderPage(c, rows, total, p, toCommentResponse)
 }
 
+// CatalogOptions godoc
+//
+//	@Summary		List catalog options
+//	@Description	Catalog options are grouped by category, so a form filling one dropdown filters to its own category rather than fetching the whole catalog.
+//	@Tags			catalog-options
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			category	query		string	false	"Filter by category"
+//	@Param			limit		query		int		false	"Page size"
+//	@Param			offset		query		int		false	"Offset"
+//	@Success		200			{object}	dto.CatalogOptionPage
+//	@Failure		400			{object}	dto.ErrorResponse
+//	@Failure		401			{object}	dto.ErrorResponse
+//	@Failure		403			{object}	dto.ErrorResponse
+//	@Router			/api/v1/catalog-options [get]
+func (h *FilteredListHandler) CatalogOptions(c *gin.Context) {
+	ctx := c.Request.Context()
+	p := paginate.Parse(c)
+
+	where := filter.NewWhere(1).Add("co.company_id", filter.Eq, middleware.CompanyFromContext(ctx))
+	if category := queryStr(c, "category"); category != nil {
+		where.Add("co.category", filter.Eq, *category)
+	}
+
+	spec := newListSpec[gen.CatalogOption]("catalog_option", "co").
+		filter(where).
+		orderBy("co.category ASC, co.value ASC, co.id ASC")
+
+	rows, total, err := runList(ctx, h.pool, spec, p)
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	renderPage(c, rows, total, p, toCatalogOptionResponse)
+}
+
+// Media godoc
+//
+//	@Summary	List media
+//	@Tags		media
+//	@Produce	json
+//	@Security	BearerAuth
+//	@Param		asset_id	query		int	false	"Filter by asset"
+//	@Param		limit		query		int	false	"Page size"
+//	@Param		offset		query		int	false	"Offset"
+//	@Success	200			{object}	dto.MediumPage
+//	@Failure	400			{object}	dto.ErrorResponse
+//	@Failure	401			{object}	dto.ErrorResponse
+//	@Failure	403			{object}	dto.ErrorResponse
+//	@Router		/api/v1/media [get]
+func (h *FilteredListHandler) Media(c *gin.Context) {
+	ctx := c.Request.Context()
+	p := paginate.Parse(c)
+
+	where := filter.NewWhere(1).Add("m.company_id", filter.Eq, middleware.CompanyFromContext(ctx))
+	assetID, err := queryInt64(c, "asset_id")
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	if assetID != nil {
+		where.Add("m.asset_id", filter.Eq, *assetID)
+	}
+
+	spec := newListSpec[gen.Medium]("media", "m").
+		filter(where).
+		orderBy("m.created_at DESC, m.id DESC")
+
+	rows, total, err := runList(ctx, h.pool, spec, p)
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	renderPage(c, rows, total, p, toMediumResponse)
+}
+
+// PurchaseOrders godoc
+//
+//	@Summary	List purchase orders
+//	@Tags		purchase-orders
+//	@Produce	json
+//	@Security	BearerAuth
+//	@Param		vendor_id	query		int		false	"Filter by vendor"
+//	@Param		state		query		string	false	"DRAFT, PENDING_APPROVAL, REJECTED, APPROVED, PURCHASED, RECEIVED_PARTIAL, RECEIVED_FULL or CLOSED"
+//	@Param		order		query		string	false	"created_at, state, id (prefix with - for descending)"
+//	@Param		limit		query		int		false	"Page size"
+//	@Param		offset		query		int		false	"Offset"
+//	@Success	200			{object}	dto.PurchaseOrderPage
+//	@Failure	400			{object}	dto.ErrorResponse
+//	@Failure	401			{object}	dto.ErrorResponse
+//	@Failure	403			{object}	dto.ErrorResponse
+//	@Router		/api/v1/purchase-orders [get]
+func (h *FilteredListHandler) PurchaseOrders(c *gin.Context) {
+	ctx := c.Request.Context()
+	p := paginate.Parse(c)
+
+	where := filter.NewWhere(1).Add("po.company_id", filter.Eq, middleware.CompanyFromContext(ctx))
+	vendorID, err := queryInt64(c, "vendor_id")
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	if vendorID != nil {
+		where.Add("po.vendor_id", filter.Eq, *vendorID)
+	}
+	state, err := queryEnum(c, "state", purchaseOrderStates...)
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	if state != nil {
+		where.Add("po.state", filter.Eq, *state)
+	}
+
+	spec := newListSpec[gen.PurchaseOrder]("purchase_order", "po").
+		filter(where).
+		orderBy(orderClause(c, map[string]string{
+			"created_at": "po.created_at",
+			"state":      "po.state",
+			"id":         "po.id",
+		}, []filter.Sort{{Column: "po.created_at", Desc: true}}, "po.id"))
+
+	rows, total, err := runList(ctx, h.pool, spec, p)
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	renderPage(c, rows, total, p, toPurchaseOrderResponse)
+}
+
+// TireAssignmentRequests godoc
+//
+//	@Summary		List tire assignment requests
+//	@Description	The approval inbox: filter to PENDING for work waiting on someone.
+//	@Tags			tire-assignment-requests
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			state			query		string	false	"PENDING, APPROVED or REJECTED"
+//	@Param			tire_id			query		int		false	"Filter by tire"
+//	@Param			vehicle_id		query		int		false	"Filter by vehicle"
+//	@Param			requested_from	query		string	false	"Inclusive lower bound (RFC3339 or YYYY-MM-DD)"
+//	@Param			requested_to	query		string	false	"Inclusive upper bound (RFC3339 or YYYY-MM-DD)"
+//	@Param			order			query		string	false	"requested_at, resolved_at, id (prefix with - for descending)"
+//	@Param			limit			query		int		false	"Page size"
+//	@Param			offset			query		int		false	"Offset"
+//	@Success		200				{object}	dto.TireAssignmentRequestPage
+//	@Failure		400				{object}	dto.ErrorResponse
+//	@Failure		401				{object}	dto.ErrorResponse
+//	@Failure		403				{object}	dto.ErrorResponse
+//	@Router			/api/v1/tire-assignment-requests [get]
+func (h *FilteredListHandler) TireAssignmentRequests(c *gin.Context) {
+	ctx := c.Request.Context()
+	p := paginate.Parse(c)
+
+	where := filter.NewWhere(1).Add("tar.company_id", filter.Eq, middleware.CompanyFromContext(ctx))
+	state, err := queryEnum(c, "state", tire.RequestPending, tire.RequestApproved, tire.RequestRejected)
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	if state != nil {
+		where.Add("tar.state", filter.Eq, *state)
+	}
+	tireID, err := queryInt64(c, "tire_id")
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	if tireID != nil {
+		where.Add("tar.tire_id", filter.Eq, *tireID)
+	}
+	vehicleID, err := queryInt64(c, "vehicle_id")
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	if vehicleID != nil {
+		where.Add("tar.vehicle_id", filter.Eq, *vehicleID)
+	}
+	from, err := queryTime(c, "requested_from")
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	if from != nil {
+		where.Add("tar.requested_at", filter.Gte, *from)
+	}
+	to, err := queryTime(c, "requested_to")
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	if to != nil {
+		where.Add("tar.requested_at", filter.Lte, *to)
+	}
+
+	spec := newListSpec[gen.TireAssignmentRequest]("tire_assignment_request", "tar").
+		filter(where).
+		orderBy(orderClause(c, map[string]string{
+			"requested_at": "tar.requested_at",
+			"resolved_at":  "tar.resolved_at",
+			"id":           "tar.id",
+		}, []filter.Sort{{Column: "tar.requested_at", Desc: true}}, "tar.id"))
+
+	rows, total, err := runList(ctx, h.pool, spec, p)
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	renderPage(c, rows, total, p, toTireAssignmentRequestResponse)
+}
+
 // Vocabularies accepted by the state filters, kept beside the routes that
 // validate them. Ported from the Django models the schema came from.
 var (
 	issueStates         = []string{"OPEN", "RESOLVED", "CLOSED"}
+	purchaseOrderStates = []string{
+		"DRAFT", "PENDING_APPROVAL", "REJECTED", "APPROVED",
+		"PURCHASED", "RECEIVED_PARTIAL", "RECEIVED_FULL", "CLOSED",
+	}
 	commentContentTypes = []string{
 		dto.CommentContentTypeAsset,
 		dto.CommentContentTypeIssue,

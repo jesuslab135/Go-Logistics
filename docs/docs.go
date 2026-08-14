@@ -2265,6 +2265,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Catalog options are grouped by category, so a form filling one dropdown filters to its own category rather than fetching the whole catalog.",
                 "produces": [
                     "application/json"
                 ],
@@ -2274,15 +2275,21 @@ const docTemplate = `{
                 "summary": "List catalog options",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "Page number",
-                        "name": "page",
+                        "type": "string",
+                        "description": "Filter by category",
+                        "name": "category",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "description": "Items per page",
-                        "name": "page_size",
+                        "description": "Page size",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Offset",
+                        "name": "offset",
                         "in": "query"
                     }
                 ],
@@ -2293,8 +2300,20 @@ const docTemplate = `{
                             "$ref": "#/definitions/dto.CatalogOptionPage"
                         }
                     },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -6950,6 +6969,12 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "integer",
+                        "description": "Filter by asset",
+                        "name": "asset_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
                         "description": "Page size",
                         "name": "limit",
                         "in": "query"
@@ -6968,8 +6993,20 @@ const docTemplate = `{
                             "$ref": "#/definitions/dto.MediumPage"
                         }
                     },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -8452,8 +8489,26 @@ const docTemplate = `{
                 "tags": [
                     "purchase-orders"
                 ],
-                "summary": "List purchase-orders",
+                "summary": "List purchase orders",
                 "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Filter by vendor",
+                        "name": "vendor_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "DRAFT, PENDING_APPROVAL, REJECTED, APPROVED, PURCHASED, RECEIVED_PARTIAL, RECEIVED_FULL or CLOSED",
+                        "name": "state",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "created_at, state, id (prefix with - for descending)",
+                        "name": "order",
+                        "in": "query"
+                    },
                     {
                         "type": "integer",
                         "description": "Page size",
@@ -8474,8 +8529,20 @@ const docTemplate = `{
                             "$ref": "#/definitions/dto.PurchaseOrderPage"
                         }
                     },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -10349,14 +10416,51 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "The approval inbox: filter to PENDING for work waiting on someone.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "tire-assignment-requests"
                 ],
-                "summary": "List tire-assignment-requests",
+                "summary": "List tire assignment requests",
                 "parameters": [
+                    {
+                        "type": "string",
+                        "description": "PENDING, APPROVED or REJECTED",
+                        "name": "state",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Filter by tire",
+                        "name": "tire_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Filter by vehicle",
+                        "name": "vehicle_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Inclusive lower bound (RFC3339 or YYYY-MM-DD)",
+                        "name": "requested_from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Inclusive upper bound (RFC3339 or YYYY-MM-DD)",
+                        "name": "requested_to",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "requested_at, resolved_at, id (prefix with - for descending)",
+                        "name": "order",
+                        "in": "query"
+                    },
                     {
                         "type": "integer",
                         "description": "Page size",
@@ -10377,8 +10481,20 @@ const docTemplate = `{
                             "$ref": "#/definitions/dto.TireAssignmentRequestPage"
                         }
                     },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }

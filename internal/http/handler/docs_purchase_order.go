@@ -1,18 +1,5 @@
 package handler
 
-// docListPurchaseOrders godoc
-//
-//	@Summary	List purchase-orders
-//	@Tags	purchase-orders
-//	@Security	BearerAuth
-//	@Produce	json
-//	@Param	limit	query	int	false	"Page size"
-//	@Param	offset	query	int	false	"Offset"
-//	@Success	200	{object}	dto.PurchaseOrderPage
-//	@Failure	401	{object}	dto.ErrorResponse
-//	@Router	/api/v1/purchase-orders [get]
-func docListPurchaseOrders() {}
-
 // docCreatePurchaseOrder godoc
 //
 //	@Summary	Create purchase-orders

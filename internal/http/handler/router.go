@@ -138,7 +138,8 @@ func NewRouter(d Deps) *gin.Engine {
 	crud.NewHandler[dto.FaultResponse, dto.CreateFaultRequest, dto.UpdateFaultRequest](NewFaultStore(d.Queries)).Register(issues, "/faults")
 
 	// Phase 5: purchase orders & service
-	crud.NewHandler[dto.PurchaseOrderResponse, dto.CreatePurchaseOrderRequest, dto.UpdatePurchaseOrderRequest](NewPurchaseOrderStore(d.Queries)).Register(inventory, "/purchase-orders")
+	registerCrudWithList(inventory, "/purchase-orders",
+		crud.NewHandler[dto.PurchaseOrderResponse, dto.CreatePurchaseOrderRequest, dto.UpdatePurchaseOrderRequest](NewPurchaseOrderStore(d.Queries)), lists.PurchaseOrders)
 	crud.NewHandler[dto.ServiceTaskResponse, dto.CreateServiceTaskRequest, dto.UpdateServiceTaskRequest](NewServiceTaskStore(d.Queries)).Register(service, "/service-tasks")
 	crud.NewHandler[dto.ServiceReminderResponse, dto.CreateServiceReminderRequest, dto.UpdateServiceReminderRequest](NewServiceReminderStore(d.Queries)).Register(service, "/service-reminders")
 	crud.NewHandler[dto.ServiceEntryResponse, dto.CreateServiceEntryRequest, dto.UpdateServiceEntryRequest](NewServiceEntryStore(d.Queries)).Register(service, "/service-entries")
@@ -149,7 +150,8 @@ func NewRouter(d Deps) *gin.Engine {
 	crud.NewHandler[dto.AxleTemplateResponse, dto.CreateAxleTemplateRequest, dto.UpdateAxleTemplateRequest](NewAxleTemplateStore(d.Queries)).Register(tires, "/axle-templates")
 	// Django's TireAssignmentRequestViewSet required membership only; its
 	// approve/reject actions carried the extra warehouse-role check.
-	crud.NewHandler[dto.TireAssignmentRequestResponse, dto.CreateTireAssignmentRequestRequest, dto.UpdateTireAssignmentRequestRequest](NewTireAssignmentRequestStore(d.Queries, d.Pool)).Register(member, "/tire-assignment-requests")
+	registerCrudWithList(member, "/tire-assignment-requests",
+		crud.NewHandler[dto.TireAssignmentRequestResponse, dto.CreateTireAssignmentRequestRequest, dto.UpdateTireAssignmentRequestRequest](NewTireAssignmentRequestStore(d.Queries, d.Pool)), lists.TireAssignmentRequests)
 	// Approving is the warehouse's act, not an ordinary write: Django gated it
 	// on tire_approvals/approve, which admins bypass.
 	member.POST("/tire-assignment-requests/:id/approve",
@@ -160,7 +162,8 @@ func NewRouter(d Deps) *gin.Engine {
 	crud.NewHandler[dto.FuelTypeResponse, dto.CreateFuelTypeRequest, dto.UpdateFuelTypeRequest](NewFuelTypeStore(d.Queries)).Register(fuel, "/fuel-types")
 	crud.NewHandler[dto.InspectionFormResponse, dto.CreateInspectionFormRequest, dto.UpdateInspectionFormRequest](NewInspectionFormStore(d.Queries)).Register(inspections, "/inspection-forms")
 	crud.NewHandler[dto.InspectionSubmissionResponse, dto.CreateInspectionSubmissionRequest, dto.UpdateInspectionSubmissionRequest](NewInspectionSubmissionStore(d.Queries)).Register(inspections, "/inspection-submissions")
-	crud.NewHandler[dto.MediumResponse, dto.CreateMediumRequest, dto.UpdateMediumRequest](NewMediumStore(d.Queries, d.Storage)).Register(assets, "/media")
+	registerCrudWithList(assets, "/media",
+		crud.NewHandler[dto.MediumResponse, dto.CreateMediumRequest, dto.UpdateMediumRequest](NewMediumStore(d.Queries, d.Storage)), lists.Media)
 	registerCrudWithList(issues, "/comments",
 		crud.NewHandler[dto.CommentResponse, dto.CreateCommentRequest, dto.UpdateCommentRequest](NewCommentStore(d.Queries)), lists.Comments)
 	crud.NewHandler[dto.WarrantyResponse, dto.CreateWarrantyRequest, dto.UpdateWarrantyRequest](NewWarrantyStore(d.Queries)).Register(warranties, "/warranties")
@@ -177,8 +180,9 @@ func NewRouter(d Deps) *gin.Engine {
 		NewAssetTypeStore(d.Queries)).Register(assets, "/asset-types")
 	crud.NewHandler[dto.AssetStatusResponse, dto.CreateAssetStatusRequest, dto.UpdateAssetStatusRequest](
 		NewAssetStatusStore(d.Queries)).Register(assets, "/asset-statuses")
-	crud.NewHandler[dto.CatalogOptionResponse, dto.CreateCatalogOptionRequest, dto.UpdateCatalogOptionRequest](
-		NewCatalogOptionStore(d.Queries)).Register(assets, "/catalog-options")
+	registerCrudWithList(assets, "/catalog-options",
+		crud.NewHandler[dto.CatalogOptionResponse, dto.CreateCatalogOptionRequest, dto.UpdateCatalogOptionRequest](
+			NewCatalogOptionStore(d.Queries)), lists.CatalogOptions)
 	// Django's vehicle make/model viewsets required membership only.
 	crud.NewHandler[dto.VehicleMakeResponse, dto.CreateVehicleMakeRequest, dto.UpdateVehicleMakeRequest](
 		NewVehicleMakeStore(d.Queries)).Register(member, "/vehicle-makes")
