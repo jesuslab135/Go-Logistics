@@ -14282,6 +14282,11 @@ paths:
         name: file
         required: true
         type: file
+      - description: photo, document or generic (default). Narrows the accepted media
+          types.
+        in: formData
+        name: purpose
+        type: string
       produces:
       - application/json
       responses:

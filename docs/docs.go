@@ -11778,6 +11778,12 @@ const docTemplate = `{
                         "name": "file",
                         "in": "formData",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "photo, document or generic (default). Narrows the accepted media types.",
+                        "name": "purpose",
+                        "in": "formData"
                     }
                 ],
                 "responses": {

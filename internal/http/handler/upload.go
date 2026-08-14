@@ -68,6 +68,7 @@ func NewUploadHandler(store storage.Storage, log *slog.Logger) *UploadHandler {
 //	@Accept		multipart/form-data
 //	@Produce	json
 //	@Param		file	formData	file	true	"File to upload"
+//	@Param		purpose	formData	string	false	"photo, document or generic (default). Narrows the accepted media types."
 //	@Success	201		{object}	dto.UploadResponse
 //	@Failure	400		{object}	dto.ErrorResponse
 //	@Failure	401		{object}	dto.ErrorResponse
@@ -106,7 +107,12 @@ func (h *UploadHandler) Upload(c *gin.Context) {
 		apierr.Abort(c, apierr.BadRequest("could not read the uploaded file").Wrap(err))
 		return
 	}
-	if !h.allowed[contentType] {
+	allowed, err := h.allowedFor(c.PostForm("purpose"))
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	if !allowed[contentType] {
 		apierr.Abort(c, apierr.UnsupportedMediaType(
 			fmt.Sprintf("file type %q is not allowed", contentType)))
 		return
@@ -164,6 +170,44 @@ func (h *UploadHandler) saveThumbnail(c *gin.Context, key, contentType string, f
 		return storage.Object{}, false
 	}
 	return obj, true
+}
+
+// Upload purposes. One endpoint serves photos and documents alike, so the
+// caller declares what the file is for and the allowlist narrows accordingly:
+// nothing should be able to store a PDF where a gallery expects an image.
+const (
+	purposeGeneric  = "generic"
+	purposePhoto    = "photo"
+	purposeDocument = "document"
+)
+
+// allowedFor narrows the configured allowlist to the declared purpose. An
+// unrecognised purpose is refused rather than silently treated as generic,
+// since that would quietly widen the policy the caller asked for.
+func (h *UploadHandler) allowedFor(purpose string) (map[string]bool, error) {
+	switch strings.ToLower(strings.TrimSpace(purpose)) {
+	case "", purposeGeneric:
+		return h.allowed, nil
+	case purposePhoto:
+		return h.subset(func(mediaType string) bool { return strings.HasPrefix(mediaType, "image/") }), nil
+	case purposeDocument:
+		return h.subset(func(mediaType string) bool { return !strings.HasPrefix(mediaType, "image/") }), nil
+	default:
+		return nil, apierr.New(http.StatusBadRequest, "invalid_upload_purpose",
+			fmt.Sprintf("purpose must be one of %s, %s or %s", purposePhoto, purposeDocument, purposeGeneric))
+	}
+}
+
+// subset keeps a purpose from widening the configured allowlist: it can only
+// ever remove types from it, never add one.
+func (h *UploadHandler) subset(keep func(string) bool) map[string]bool {
+	out := make(map[string]bool, len(h.allowed))
+	for mediaType, ok := range h.allowed {
+		if ok && keep(mediaType) {
+			out[mediaType] = true
+		}
+	}
+	return out
 }
 
 func (h *UploadHandler) tooLargeErr() *apierr.Error {
