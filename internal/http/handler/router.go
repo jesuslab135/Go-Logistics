@@ -99,7 +99,7 @@ func NewRouter(d Deps) *gin.Engine {
 	// Phase 2: assets
 	registerCrudWithList(assets, "/assets",
 		crud.NewHandler[dto.AssetResponse, dto.CreateAssetRequest, dto.UpdateAssetRequest](
-			NewAssetStore(d.Queries)), lists.Assets)
+			NewAssetStore(d.Queries, d.Storage, d.Logger)), lists.Assets)
 	// Read-only reverse view of the nested /assets/{id}/trailer-assignments;
 	// mutations stay on the nested route that owns the parent scope.
 	assets.GET("/asset-trailer-assignments", lists.AssetTrailerAssignments)
@@ -161,9 +161,9 @@ func NewRouter(d Deps) *gin.Engine {
 	// Phase 7: fuel, inspections, org & misc
 	crud.NewHandler[dto.FuelTypeResponse, dto.CreateFuelTypeRequest, dto.UpdateFuelTypeRequest](NewFuelTypeStore(d.Queries)).Register(fuel, "/fuel-types")
 	crud.NewHandler[dto.InspectionFormResponse, dto.CreateInspectionFormRequest, dto.UpdateInspectionFormRequest](NewInspectionFormStore(d.Queries)).Register(inspections, "/inspection-forms")
-	crud.NewHandler[dto.InspectionSubmissionResponse, dto.CreateInspectionSubmissionRequest, dto.UpdateInspectionSubmissionRequest](NewInspectionSubmissionStore(d.Queries)).Register(inspections, "/inspection-submissions")
+	crud.NewHandler[dto.InspectionSubmissionResponse, dto.CreateInspectionSubmissionRequest, dto.UpdateInspectionSubmissionRequest](NewInspectionSubmissionStore(d.Queries, d.Storage, d.Logger)).Register(inspections, "/inspection-submissions")
 	registerCrudWithList(assets, "/media",
-		crud.NewHandler[dto.MediumResponse, dto.CreateMediumRequest, dto.UpdateMediumRequest](NewMediumStore(d.Queries, d.Storage)), lists.Media)
+		crud.NewHandler[dto.MediumResponse, dto.CreateMediumRequest, dto.UpdateMediumRequest](NewMediumStore(d.Queries, d.Storage, d.Logger)), lists.Media)
 	registerCrudWithList(issues, "/comments",
 		crud.NewHandler[dto.CommentResponse, dto.CreateCommentRequest, dto.UpdateCommentRequest](NewCommentStore(d.Queries)), lists.Comments)
 	crud.NewHandler[dto.WarrantyResponse, dto.CreateWarrantyRequest, dto.UpdateWarrantyRequest](NewWarrantyStore(d.Queries)).Register(warranties, "/warranties")
@@ -218,7 +218,7 @@ func NewRouter(d Deps) *gin.Engine {
 	crud.NewNestedHandler[dto.ServiceTaskPartResponse, dto.CreateServiceTaskPartRequest, dto.UpdateServiceTaskPartRequest](NewServiceTaskPartStore(d.Queries)).Register(service, "/service-tasks", "/parts")
 	crud.NewNestedHandler[dto.ServiceEntryLineItemResponse, dto.CreateServiceEntryLineItemRequest, dto.UpdateServiceEntryLineItemRequest](NewServiceEntryLineItemStore(d.Queries)).Register(service, "/service-entries", "/line-items")
 	crud.NewNestedHandler[dto.InspectionFormItemResponse, dto.CreateInspectionFormItemRequest, dto.UpdateInspectionFormItemRequest](NewInspectionFormItemStore(d.Queries)).Register(inspections, "/inspection-forms", "/items")
-	crud.NewNestedHandler[dto.InspectionSubmissionItemResponse, dto.CreateInspectionSubmissionItemRequest, dto.UpdateInspectionSubmissionItemRequest](NewInspectionSubmissionItemStore(d.Queries)).Register(inspections, "/inspection-submissions", "/items")
+	crud.NewNestedHandler[dto.InspectionSubmissionItemResponse, dto.CreateInspectionSubmissionItemRequest, dto.UpdateInspectionSubmissionItemRequest](NewInspectionSubmissionItemStore(d.Queries, d.Storage, d.Logger)).Register(inspections, "/inspection-submissions", "/items")
 	crud.NewNestedHandler[dto.AxleDefinitionResponse, dto.CreateAxleDefinitionRequest, dto.UpdateAxleDefinitionRequest](NewAxleDefinitionStore(d.Queries)).Register(tires, "/axle-templates", "/definitions")
 	crud.NewNestedHandler[dto.AssetTrailerAssignmentResponse, dto.CreateAssetTrailerAssignmentRequest, dto.UpdateAssetTrailerAssignmentRequest](NewAssetTrailerAssignmentStore(d.Queries)).Register(assets, "/assets", "/trailer-assignments")
 	crud.NewNestedHandler[dto.PartInventoryResponse, dto.CreatePartInventoryRequest, dto.UpdatePartInventoryRequest](NewPartInventoryStore(d.Queries)).Register(inventory, "/parts", "/inventory")
@@ -237,7 +237,7 @@ func NewRouter(d Deps) *gin.Engine {
 	crud.NewNestedHandler[dto.LaborTimeEntryResponse, dto.CreateLaborTimeEntryRequest, dto.UpdateLaborTimeEntryRequest](NewLaborTimeEntryStore(d.Queries)).Register(workOrders, "/work-order-sub-line-items", "/labor-entries")
 	crud.NewNestedHandler[dto.WheelPositionDefinitionResponse, dto.CreateWheelPositionDefinitionRequest, dto.UpdateWheelPositionDefinitionRequest](NewWheelPositionDefinitionStore(d.Queries)).Register(tires, "/axle-definitions", "/wheel-positions")
 	crud.NewNestedHandler[dto.FuelCommentResponse, dto.CreateFuelCommentRequest, dto.UpdateFuelCommentRequest](NewFuelCommentStore(d.Queries)).Register(fuel, "/fuel-entries", "/comments")
-	crud.NewNestedHandler[dto.FuelPhotoResponse, dto.CreateFuelPhotoRequest, dto.UpdateFuelPhotoRequest](NewFuelPhotoStore(d.Queries)).Register(fuel, "/fuel-entries", "/photos")
+	crud.NewNestedHandler[dto.FuelPhotoResponse, dto.CreateFuelPhotoRequest, dto.UpdateFuelPhotoRequest](NewFuelPhotoStore(d.Queries, d.Storage, d.Logger)).Register(fuel, "/fuel-entries", "/photos")
 
 	// Phase 8c: shared-PK 1:1 sub-types (singleton under the asset). Django put
 	// vehicle/trailer under 'assets' but the axle config under 'tires'.
@@ -275,7 +275,7 @@ func registerCrudWithList[T, C, U any](r gin.IRouter, path string, h *crud.Handl
 // is what creates it), while reading and mutating one requires company admin.
 func registerCompanyRoutes(api, member *gin.RouterGroup, d Deps) {
 	h := crud.NewHandler[dto.CompanyResponse, dto.CreateCompanyRequest, dto.UpdateCompanyRequest](
-		NewCompanyStore(d.Queries, d.Pool))
+		NewCompanyStore(d.Queries, d.Pool, d.Storage, d.Logger))
 
 	api.POST("/companies", middleware.RequireAccountOwner(), h.Create)
 

@@ -2,18 +2,23 @@ package handler
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
 	"fleet/internal/db/gen"
 	"fleet/internal/http/dto"
 	"fleet/internal/http/middleware"
 	"fleet/internal/platform/paginate"
+	"fleet/internal/platform/storage"
 )
 
-type InspectionSubmissionStore struct{ q *gen.Queries }
+type InspectionSubmissionStore struct {
+	fileOwner
+	q *gen.Queries
+}
 
-func NewInspectionSubmissionStore(q *gen.Queries) *InspectionSubmissionStore {
-	return &InspectionSubmissionStore{q: q}
+func NewInspectionSubmissionStore(q *gen.Queries, files storage.Storage, log *slog.Logger) *InspectionSubmissionStore {
+	return &InspectionSubmissionStore{fileOwner: newFileOwner(files, log), q: q}
 }
 
 func (s *InspectionSubmissionStore) List(ctx context.Context, p paginate.Params) ([]dto.InspectionSubmissionResponse, int64, error) {
@@ -72,6 +77,11 @@ func (s *InspectionSubmissionStore) Create(ctx context.Context, in dto.CreateIns
 }
 
 func (s *InspectionSubmissionStore) Update(ctx context.Context, id int64, in dto.UpdateInspectionSubmissionRequest) (dto.InspectionSubmissionResponse, error) {
+	previous, err := s.q.GetInspectionSubmission(ctx, gen.GetInspectionSubmissionParams{ID: id, CompanyID: middleware.CompanyFromContext(ctx)})
+	if err != nil {
+		return dto.InspectionSubmissionResponse{}, err
+	}
+
 	r, err := s.q.UpdateInspectionSubmission(ctx, gen.UpdateInspectionSubmissionParams{
 		ID:                 id,
 		CompanyID:          middleware.CompanyFromContext(ctx),
@@ -97,11 +107,24 @@ func (s *InspectionSubmissionStore) Update(ctx context.Context, id int64, in dto
 	if err != nil {
 		return dto.InspectionSubmissionResponse{}, err
 	}
+	s.reclaimReplaced(ctx, previous.Signature, r.Signature)
 	return toInspectionSubmissionResponse(r), nil
 }
 
 func (s *InspectionSubmissionStore) Delete(ctx context.Context, id int64) error {
-	return s.q.DeleteInspectionSubmission(ctx, gen.DeleteInspectionSubmissionParams{ID: id, CompanyID: middleware.CompanyFromContext(ctx)})
+	company := middleware.CompanyFromContext(ctx)
+
+	previous, err := s.q.GetInspectionSubmission(ctx, gen.GetInspectionSubmissionParams{ID: id, CompanyID: company})
+	if err != nil {
+		return err
+	}
+	if err := s.q.DeleteInspectionSubmission(ctx, gen.DeleteInspectionSubmissionParams{ID: id, CompanyID: company}); err != nil {
+		return err
+	}
+	if previous.Signature != nil {
+		s.reclaim(ctx, *previous.Signature)
+	}
+	return nil
 }
 
 func toInspectionSubmissionResponse(r gen.InspectionSubmission) dto.InspectionSubmissionResponse {

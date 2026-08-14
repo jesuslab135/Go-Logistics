@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -11,6 +12,7 @@ import (
 	"fleet/internal/http/dto"
 	"fleet/internal/http/middleware"
 	"fleet/internal/platform/paginate"
+	"fleet/internal/platform/storage"
 )
 
 // CompanyStore adapts the sqlc-generated queries to crud.Store, translating
@@ -18,12 +20,13 @@ import (
 // scoped to the caller's company memberships; Create additionally bootstraps the
 // new company (see Create) inside one transaction.
 type CompanyStore struct {
+	fileOwner
 	q    *gen.Queries
 	pool *pgxpool.Pool
 }
 
-func NewCompanyStore(q *gen.Queries, pool *pgxpool.Pool) *CompanyStore {
-	return &CompanyStore{q: q, pool: pool}
+func NewCompanyStore(q *gen.Queries, pool *pgxpool.Pool, files storage.Storage, log *slog.Logger) *CompanyStore {
+	return &CompanyStore{fileOwner: newFileOwner(files, log), q: q, pool: pool}
 }
 
 func (s *CompanyStore) List(ctx context.Context, p paginate.Params) ([]dto.CompanyResponse, int64, error) {
@@ -102,6 +105,14 @@ func (s *CompanyStore) Create(ctx context.Context, in dto.CreateCompanyRequest) 
 }
 
 func (s *CompanyStore) Update(ctx context.Context, id int64, in dto.UpdateCompanyRequest) (dto.CompanyResponse, error) {
+	previous, err := s.q.GetCompany(ctx, gen.GetCompanyParams{
+		ID:         id,
+		EmployeeID: middleware.EmployeeFromContext(ctx),
+	})
+	if err != nil {
+		return dto.CompanyResponse{}, err
+	}
+
 	row, err := s.q.UpdateCompany(ctx, gen.UpdateCompanyParams{
 		ID:                  id,
 		EmployeeID:          middleware.EmployeeFromContext(ctx),
@@ -123,14 +134,24 @@ func (s *CompanyStore) Update(ctx context.Context, id int64, in dto.UpdateCompan
 	if err != nil {
 		return dto.CompanyResponse{}, err
 	}
+	s.reclaimReplaced(ctx, previous.Logo, row.Logo)
 	return toCompanyResponse(row), nil
 }
 
 func (s *CompanyStore) Delete(ctx context.Context, id int64) error {
-	return s.q.DeleteCompany(ctx, gen.DeleteCompanyParams{
-		ID:         id,
-		EmployeeID: middleware.EmployeeFromContext(ctx),
-	})
+	employee := middleware.EmployeeFromContext(ctx)
+
+	previous, err := s.q.GetCompany(ctx, gen.GetCompanyParams{ID: id, EmployeeID: employee})
+	if err != nil {
+		return err
+	}
+	if err := s.q.DeleteCompany(ctx, gen.DeleteCompanyParams{ID: id, EmployeeID: employee}); err != nil {
+		return err
+	}
+	if previous.Logo != nil {
+		s.reclaim(ctx, *previous.Logo)
+	}
+	return nil
 }
 
 func toCompanyResponse(c gen.Company) dto.CompanyResponse {

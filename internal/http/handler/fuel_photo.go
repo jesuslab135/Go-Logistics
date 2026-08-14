@@ -2,16 +2,23 @@ package handler
 
 import (
 	"context"
+	"log/slog"
 
 	"fleet/internal/db/gen"
 	"fleet/internal/http/dto"
 	"fleet/internal/http/middleware"
 	"fleet/internal/platform/paginate"
+	"fleet/internal/platform/storage"
 )
 
-type FuelPhotoStore struct{ q *gen.Queries }
+type FuelPhotoStore struct {
+	fileOwner
+	q *gen.Queries
+}
 
-func NewFuelPhotoStore(q *gen.Queries) *FuelPhotoStore { return &FuelPhotoStore{q: q} }
+func NewFuelPhotoStore(q *gen.Queries, files storage.Storage, log *slog.Logger) *FuelPhotoStore {
+	return &FuelPhotoStore{fileOwner: newFileOwner(files, log), q: q}
+}
 
 func (s *FuelPhotoStore) List(ctx context.Context, parentID int64, p paginate.Params) ([]dto.FuelPhotoResponse, int64, error) {
 	company := middleware.CompanyFromContext(ctx)
@@ -58,6 +65,11 @@ func (s *FuelPhotoStore) Create(ctx context.Context, parentID int64, in dto.Crea
 }
 
 func (s *FuelPhotoStore) Update(ctx context.Context, parentID, id int64, in dto.UpdateFuelPhotoRequest) (dto.FuelPhotoResponse, error) {
+	previous, err := s.q.GetFuelPhoto(ctx, gen.GetFuelPhotoParams{ID: id, ParentID: parentID, CompanyID: middleware.CompanyFromContext(ctx)})
+	if err != nil {
+		return dto.FuelPhotoResponse{}, err
+	}
+
 	r, err := s.q.UpdateFuelPhoto(ctx, gen.UpdateFuelPhotoParams{
 		ID:          id,
 		ParentID:    parentID,
@@ -73,11 +85,22 @@ func (s *FuelPhotoStore) Update(ctx context.Context, parentID, id int64, in dto.
 	if err != nil {
 		return dto.FuelPhotoResponse{}, err
 	}
+	s.reclaimReplaced(ctx, &previous.File, &r.File)
 	return toFuelPhotoResponse(r), nil
 }
 
 func (s *FuelPhotoStore) Delete(ctx context.Context, parentID, id int64) error {
-	return s.q.DeleteFuelPhoto(ctx, gen.DeleteFuelPhotoParams{ID: id, ParentID: parentID, CompanyID: middleware.CompanyFromContext(ctx)})
+	company := middleware.CompanyFromContext(ctx)
+
+	previous, err := s.q.GetFuelPhoto(ctx, gen.GetFuelPhotoParams{ID: id, ParentID: parentID, CompanyID: company})
+	if err != nil {
+		return err
+	}
+	if err := s.q.DeleteFuelPhoto(ctx, gen.DeleteFuelPhotoParams{ID: id, ParentID: parentID, CompanyID: company}); err != nil {
+		return err
+	}
+	s.reclaim(ctx, previous.File)
+	return nil
 }
 
 func toFuelPhotoResponse(r gen.FuelPhoto) dto.FuelPhotoResponse {

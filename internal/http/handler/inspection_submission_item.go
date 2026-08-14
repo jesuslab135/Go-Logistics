@@ -3,17 +3,22 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 
 	"fleet/internal/db/gen"
 	"fleet/internal/http/dto"
 	"fleet/internal/http/middleware"
 	"fleet/internal/platform/paginate"
+	"fleet/internal/platform/storage"
 )
 
-type InspectionSubmissionItemStore struct{ q *gen.Queries }
+type InspectionSubmissionItemStore struct {
+	fileOwner
+	q *gen.Queries
+}
 
-func NewInspectionSubmissionItemStore(q *gen.Queries) *InspectionSubmissionItemStore {
-	return &InspectionSubmissionItemStore{q: q}
+func NewInspectionSubmissionItemStore(q *gen.Queries, files storage.Storage, log *slog.Logger) *InspectionSubmissionItemStore {
+	return &InspectionSubmissionItemStore{fileOwner: newFileOwner(files, log), q: q}
 }
 
 func (s *InspectionSubmissionItemStore) List(ctx context.Context, parentID int64, p paginate.Params) ([]dto.InspectionSubmissionItemResponse, int64, error) {
@@ -61,6 +66,11 @@ func (s *InspectionSubmissionItemStore) Create(ctx context.Context, parentID int
 }
 
 func (s *InspectionSubmissionItemStore) Update(ctx context.Context, parentID, id int64, in dto.UpdateInspectionSubmissionItemRequest) (dto.InspectionSubmissionItemResponse, error) {
+	previous, err := s.q.GetInspectionSubmissionItem(ctx, gen.GetInspectionSubmissionItemParams{ID: id, ParentID: parentID, CompanyID: middleware.CompanyFromContext(ctx)})
+	if err != nil {
+		return dto.InspectionSubmissionItemResponse{}, err
+	}
+
 	r, err := s.q.UpdateInspectionSubmissionItem(ctx, gen.UpdateInspectionSubmissionItemParams{
 		ID:               id,
 		ParentID:         parentID,
@@ -77,11 +87,24 @@ func (s *InspectionSubmissionItemStore) Update(ctx context.Context, parentID, id
 	if err != nil {
 		return dto.InspectionSubmissionItemResponse{}, err
 	}
+	s.reclaimReplaced(ctx, previous.Photo, r.Photo)
 	return toInspectionSubmissionItemResponse(r), nil
 }
 
 func (s *InspectionSubmissionItemStore) Delete(ctx context.Context, parentID, id int64) error {
-	return s.q.DeleteInspectionSubmissionItem(ctx, gen.DeleteInspectionSubmissionItemParams{ID: id, ParentID: parentID, CompanyID: middleware.CompanyFromContext(ctx)})
+	company := middleware.CompanyFromContext(ctx)
+
+	previous, err := s.q.GetInspectionSubmissionItem(ctx, gen.GetInspectionSubmissionItemParams{ID: id, ParentID: parentID, CompanyID: company})
+	if err != nil {
+		return err
+	}
+	if err := s.q.DeleteInspectionSubmissionItem(ctx, gen.DeleteInspectionSubmissionItemParams{ID: id, ParentID: parentID, CompanyID: company}); err != nil {
+		return err
+	}
+	if previous.Photo != nil {
+		s.reclaim(ctx, *previous.Photo)
+	}
+	return nil
 }
 
 func toInspectionSubmissionItemResponse(r gen.InspectionSubmissionItem) dto.InspectionSubmissionItemResponse {

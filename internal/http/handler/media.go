@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"path"
 	"strings"
 	"time"
@@ -17,12 +18,13 @@ import (
 )
 
 type MediumStore struct {
+	fileOwner
 	q     *gen.Queries
 	files storage.Storage
 }
 
-func NewMediumStore(q *gen.Queries, files storage.Storage) *MediumStore {
-	return &MediumStore{q: q, files: files}
+func NewMediumStore(q *gen.Queries, files storage.Storage, log *slog.Logger) *MediumStore {
+	return &MediumStore{fileOwner: newFileOwner(files, log), q: q, files: files}
 }
 
 // resolvedFile is the server's own view of a client-supplied file URL.
@@ -135,6 +137,11 @@ func (s *MediumStore) Update(ctx context.Context, id int64, in dto.UpdateMediumR
 		return dto.MediumResponse{}, err
 	}
 
+	previous, err := s.q.GetMedium(ctx, gen.GetMediumParams{ID: id, CompanyID: middleware.CompanyFromContext(ctx)})
+	if err != nil {
+		return dto.MediumResponse{}, err
+	}
+
 	r, err := s.q.UpdateMedium(ctx, gen.UpdateMediumParams{
 		ID:          id,
 		CompanyID:   middleware.CompanyFromContext(ctx),
@@ -150,11 +157,26 @@ func (s *MediumStore) Update(ctx context.Context, id int64, in dto.UpdateMediumR
 	if err != nil {
 		return dto.MediumResponse{}, err
 	}
+	// The row now points elsewhere, so the file it used to reference — and its
+	// derived thumbnail — are unreachable.
+	if previous.File != r.File {
+		s.reclaim(ctx, previous.File, previous.Thumbnail)
+	}
 	return toMediumResponse(r), nil
 }
 
 func (s *MediumStore) Delete(ctx context.Context, id int64) error {
-	return s.q.DeleteMedium(ctx, gen.DeleteMediumParams{ID: id, CompanyID: middleware.CompanyFromContext(ctx)})
+	company := middleware.CompanyFromContext(ctx)
+
+	previous, err := s.q.GetMedium(ctx, gen.GetMediumParams{ID: id, CompanyID: company})
+	if err != nil {
+		return err
+	}
+	if err := s.q.DeleteMedium(ctx, gen.DeleteMediumParams{ID: id, CompanyID: company}); err != nil {
+		return err
+	}
+	s.reclaim(ctx, previous.File, previous.Thumbnail)
+	return nil
 }
 
 func toMediumResponse(r gen.Medium) dto.MediumResponse {

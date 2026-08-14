@@ -3,17 +3,24 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"time"
 
 	"fleet/internal/db/gen"
 	"fleet/internal/http/dto"
 	"fleet/internal/http/middleware"
 	"fleet/internal/platform/paginate"
+	"fleet/internal/platform/storage"
 )
 
-type AssetStore struct{ q *gen.Queries }
+type AssetStore struct {
+	fileOwner
+	q *gen.Queries
+}
 
-func NewAssetStore(q *gen.Queries) *AssetStore { return &AssetStore{q: q} }
+func NewAssetStore(q *gen.Queries, files storage.Storage, log *slog.Logger) *AssetStore {
+	return &AssetStore{fileOwner: newFileOwner(files, log), q: q}
+}
 
 func (s *AssetStore) List(ctx context.Context, p paginate.Params) ([]dto.AssetResponse, int64, error) {
 	company := middleware.CompanyFromContext(ctx)
@@ -140,6 +147,12 @@ func (s *AssetStore) Create(ctx context.Context, in dto.CreateAssetRequest) (dto
 
 func (s *AssetStore) Update(ctx context.Context, id int64, in dto.UpdateAssetRequest) (dto.AssetResponse, error) {
 	now := time.Now().UTC()
+
+	previous, err := s.q.GetAsset(ctx, gen.GetAssetParams{ID: id, CompanyID: middleware.CompanyFromContext(ctx)})
+	if err != nil {
+		return dto.AssetResponse{}, err
+	}
+
 	r, err := s.q.UpdateAsset(ctx, gen.UpdateAssetParams{
 		ID:                          id,
 		CompanyID:                   middleware.CompanyFromContext(ctx),
@@ -216,11 +229,24 @@ func (s *AssetStore) Update(ctx context.Context, id int64, in dto.UpdateAssetReq
 	if err != nil {
 		return dto.AssetResponse{}, err
 	}
+	s.reclaimReplaced(ctx, previous.Photo, r.Photo)
 	return s.withSubtypes(ctx, toAssetResponse(r))
 }
 
 func (s *AssetStore) Delete(ctx context.Context, id int64) error {
-	return s.q.DeleteAsset(ctx, gen.DeleteAssetParams{ID: id, CompanyID: middleware.CompanyFromContext(ctx)})
+	company := middleware.CompanyFromContext(ctx)
+
+	previous, err := s.q.GetAsset(ctx, gen.GetAssetParams{ID: id, CompanyID: company})
+	if err != nil {
+		return err
+	}
+	if err := s.q.DeleteAsset(ctx, gen.DeleteAssetParams{ID: id, CompanyID: company}); err != nil {
+		return err
+	}
+	if previous.Photo != nil {
+		s.reclaim(ctx, *previous.Photo)
+	}
+	return nil
 }
 
 func toAssetResponse(r gen.Asset) dto.AssetResponse {
