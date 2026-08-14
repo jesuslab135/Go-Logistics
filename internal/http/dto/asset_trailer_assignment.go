@@ -34,6 +34,10 @@ type AssetTrailerAssignmentResponse struct {
 	AssignedByID   *int64     `json:"assigned_by_id"`
 	IsActive       bool       `json:"is_active"`
 	Notes          string     `json:"notes"`
+
+	// Denormalized from the trailer asset so a row renders without a second
+	// request per assignment.
+	TrailerName string `json:"trailer_name"`
 }
 
 type AssetTrailerAssignmentPage struct {

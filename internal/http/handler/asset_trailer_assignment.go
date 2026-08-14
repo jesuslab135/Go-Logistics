@@ -27,7 +27,18 @@ func (s *AssetTrailerAssignmentStore) List(ctx context.Context, parentID int64, 
 	}
 	out := make([]dto.AssetTrailerAssignmentResponse, len(rows))
 	for i, r := range rows {
-		out[i] = toAssetTrailerAssignmentResponse(r)
+		out[i] = dto.AssetTrailerAssignmentResponse{
+			ID:             r.ID,
+			AssetID:        r.AssetID,
+			TrailerID:      r.TrailerID,
+			Position:       r.Position,
+			AssignedDate:   r.AssignedDate,
+			UnassignedDate: r.UnassignedDate,
+			AssignedByID:   r.AssignedByID,
+			IsActive:       r.IsActive,
+			Notes:          r.Notes,
+			TrailerName:    r.TrailerName,
+		}
 	}
 	return out, total, nil
 }
@@ -37,7 +48,18 @@ func (s *AssetTrailerAssignmentStore) Get(ctx context.Context, parentID, id int6
 	if err != nil {
 		return dto.AssetTrailerAssignmentResponse{}, err
 	}
-	return toAssetTrailerAssignmentResponse(r), nil
+	return dto.AssetTrailerAssignmentResponse{
+		ID:             r.ID,
+		AssetID:        r.AssetID,
+		TrailerID:      r.TrailerID,
+		Position:       r.Position,
+		AssignedDate:   r.AssignedDate,
+		UnassignedDate: r.UnassignedDate,
+		AssignedByID:   r.AssignedByID,
+		IsActive:       r.IsActive,
+		Notes:          r.Notes,
+		TrailerName:    r.TrailerName,
+	}, nil
 }
 
 func (s *AssetTrailerAssignmentStore) Create(ctx context.Context, parentID int64, in dto.CreateAssetTrailerAssignmentRequest) (dto.AssetTrailerAssignmentResponse, error) {
@@ -55,11 +77,13 @@ func (s *AssetTrailerAssignmentStore) Create(ctx context.Context, parentID int64
 	if err != nil {
 		return dto.AssetTrailerAssignmentResponse{}, err
 	}
-	return toAssetTrailerAssignmentResponse(r), nil
+	// Re-read so the response carries the joined trailer name, which the
+	// INSERT itself cannot return.
+	return s.Get(ctx, parentID, r.ID)
 }
 
 func (s *AssetTrailerAssignmentStore) Update(ctx context.Context, parentID, id int64, in dto.UpdateAssetTrailerAssignmentRequest) (dto.AssetTrailerAssignmentResponse, error) {
-	r, err := s.q.UpdateAssetTrailerAssignment(ctx, gen.UpdateAssetTrailerAssignmentParams{
+	if _, err := s.q.UpdateAssetTrailerAssignment(ctx, gen.UpdateAssetTrailerAssignmentParams{
 		ID:             id,
 		ParentID:       parentID,
 		CompanyID:      middleware.CompanyFromContext(ctx),
@@ -70,27 +94,12 @@ func (s *AssetTrailerAssignmentStore) Update(ctx context.Context, parentID, id i
 		AssignedByID:   in.AssignedByID,
 		IsActive:       in.IsActive,
 		Notes:          in.Notes,
-	})
-	if err != nil {
+	}); err != nil {
 		return dto.AssetTrailerAssignmentResponse{}, err
 	}
-	return toAssetTrailerAssignmentResponse(r), nil
+	return s.Get(ctx, parentID, id)
 }
 
 func (s *AssetTrailerAssignmentStore) Delete(ctx context.Context, parentID, id int64) error {
 	return s.q.DeleteAssetTrailerAssignment(ctx, gen.DeleteAssetTrailerAssignmentParams{ID: id, ParentID: parentID, CompanyID: middleware.CompanyFromContext(ctx)})
-}
-
-func toAssetTrailerAssignmentResponse(r gen.AssetTrailerAssignment) dto.AssetTrailerAssignmentResponse {
-	return dto.AssetTrailerAssignmentResponse{
-		ID:             r.ID,
-		AssetID:        r.AssetID,
-		TrailerID:      r.TrailerID,
-		Position:       r.Position,
-		AssignedDate:   r.AssignedDate,
-		UnassignedDate: r.UnassignedDate,
-		AssignedByID:   r.AssignedByID,
-		IsActive:       r.IsActive,
-		Notes:          r.Notes,
-	}
 }

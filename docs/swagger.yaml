@@ -284,6 +284,11 @@ definitions:
         type: integer
       trailer_id:
         type: integer
+      trailer_name:
+        description: |-
+          Denormalized from the trailer asset so a row renders without a second
+          request per assignment.
+        type: string
       unassigned_date:
         type: string
     type: object
@@ -7037,6 +7042,57 @@ paths:
       summary: Update an asset status
       tags:
       - asset-statuses
+  /api/v1/asset-trailer-assignments:
+    get:
+      description: Answers "what is towing this trailer?" without draining every asset's
+        nested assignments. A partial unique index allows at most one active assignment
+        per trailer, so trailer_id with is_active=true identifies the current one
+        unambiguously.
+      parameters:
+      - description: Filter by trailer
+        in: query
+        name: trailer_id
+        type: integer
+      - description: Filter by towing asset
+        in: query
+        name: asset_id
+        type: integer
+      - description: Filter by active state
+        in: query
+        name: is_active
+        type: boolean
+      - description: Page size
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.AssetTrailerAssignmentPage'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List trailer assignments across the fleet
+      tags:
+      - asset-trailer-assignments
   /api/v1/asset-types:
     get:
       parameters:

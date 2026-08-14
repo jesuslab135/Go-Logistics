@@ -275,6 +275,87 @@ func (h *FilteredListHandler) Assets(c *gin.Context) {
 	})
 }
 
+// assetTrailerAssignmentListRow is an assignment plus the trailer's name.
+type assetTrailerAssignmentListRow struct {
+	gen.AssetTrailerAssignment
+	TrailerName string
+}
+
+// AssetTrailerAssignments godoc
+//
+//	@Summary		List trailer assignments across the fleet
+//	@Description	Answers "what is towing this trailer?" without draining every asset's nested assignments. A partial unique index allows at most one active assignment per trailer, so trailer_id with is_active=true identifies the current one unambiguously.
+//	@Tags			asset-trailer-assignments
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			trailer_id	query		int		false	"Filter by trailer"
+//	@Param			asset_id	query		int		false	"Filter by towing asset"
+//	@Param			is_active	query		bool	false	"Filter by active state"
+//	@Param			limit		query		int		false	"Page size"
+//	@Param			offset		query		int		false	"Offset"
+//	@Success		200			{object}	dto.AssetTrailerAssignmentPage
+//	@Failure		400			{object}	dto.ErrorResponse
+//	@Failure		401			{object}	dto.ErrorResponse
+//	@Failure		403			{object}	dto.ErrorResponse
+//	@Router			/api/v1/asset-trailer-assignments [get]
+func (h *FilteredListHandler) AssetTrailerAssignments(c *gin.Context) {
+	ctx := c.Request.Context()
+	p := paginate.Parse(c)
+
+	// Scope follows the towing asset; the trailer is joined only for its name.
+	where := filter.NewWhere(1).Add("owner.company_id", filter.Eq, middleware.CompanyFromContext(ctx))
+	trailerID, err := queryInt64(c, "trailer_id")
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	if trailerID != nil {
+		where.Add("ata.trailer_id", filter.Eq, *trailerID)
+	}
+	assetID, err := queryInt64(c, "asset_id")
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	if assetID != nil {
+		where.Add("ata.asset_id", filter.Eq, *assetID)
+	}
+	isActive, err := queryBool(c, "is_active")
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	if isActive != nil {
+		where.Add("ata.is_active", filter.Eq, *isActive)
+	}
+
+	spec := newListSpec[assetTrailerAssignmentListRow]("asset_trailer_assignment", "ata").
+		join("JOIN asset owner ON owner.id = ata.asset_id", "JOIN asset t ON t.id = ata.trailer_id").
+		selecting("t.name").
+		filter(where).
+		orderBy("ata.assigned_date DESC, ata.id DESC")
+
+	rows, total, err := runList(ctx, h.pool, spec, p)
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	renderPage(c, rows, total, p, func(r assetTrailerAssignmentListRow) dto.AssetTrailerAssignmentResponse {
+		return dto.AssetTrailerAssignmentResponse{
+			ID:             r.ID,
+			AssetID:        r.AssetID,
+			TrailerID:      r.TrailerID,
+			Position:       r.Position,
+			AssignedDate:   r.AssignedDate,
+			UnassignedDate: r.UnassignedDate,
+			AssignedByID:   r.AssignedByID,
+			IsActive:       r.IsActive,
+			Notes:          r.Notes,
+			TrailerName:    r.TrailerName,
+		}
+	})
+}
+
 // Vocabularies accepted by the state filters, kept beside the routes that
 // validate them. Ported from the Django models the schema came from.
 var issueStates = []string{"OPEN", "RESOLVED", "CLOSED"}

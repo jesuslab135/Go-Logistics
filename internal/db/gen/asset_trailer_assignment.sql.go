@@ -91,7 +91,9 @@ func (q *Queries) DeleteAssetTrailerAssignment(ctx context.Context, arg DeleteAs
 }
 
 const getAssetTrailerAssignment = `-- name: GetAssetTrailerAssignment :one
-SELECT c.id, c.asset_id, c.trailer_id, c.position, c.assigned_date, c.unassigned_date, c.assigned_by_id, c.is_active, c.notes FROM asset_trailer_assignment c JOIN asset p ON p.id = c.asset_id
+SELECT c.id, c.asset_id, c.trailer_id, c.position, c.assigned_date, c.unassigned_date, c.assigned_by_id, c.is_active, c.notes, t.name AS trailer_name FROM asset_trailer_assignment c
+JOIN asset p ON p.id = c.asset_id
+JOIN asset t ON t.id = c.trailer_id
 WHERE c.id = $1 AND c.asset_id = $2 AND p.company_id = $3
 `
 
@@ -101,9 +103,22 @@ type GetAssetTrailerAssignmentParams struct {
 	CompanyID int64
 }
 
-func (q *Queries) GetAssetTrailerAssignment(ctx context.Context, arg GetAssetTrailerAssignmentParams) (AssetTrailerAssignment, error) {
+type GetAssetTrailerAssignmentRow struct {
+	ID             int64
+	AssetID        int64
+	TrailerID      int64
+	Position       int32
+	AssignedDate   time.Time
+	UnassignedDate *time.Time
+	AssignedByID   *int64
+	IsActive       bool
+	Notes          string
+	TrailerName    string
+}
+
+func (q *Queries) GetAssetTrailerAssignment(ctx context.Context, arg GetAssetTrailerAssignmentParams) (GetAssetTrailerAssignmentRow, error) {
 	row := q.db.QueryRow(ctx, getAssetTrailerAssignment, arg.ID, arg.ParentID, arg.CompanyID)
-	var i AssetTrailerAssignment
+	var i GetAssetTrailerAssignmentRow
 	err := row.Scan(
 		&i.ID,
 		&i.AssetID,
@@ -114,14 +129,18 @@ func (q *Queries) GetAssetTrailerAssignment(ctx context.Context, arg GetAssetTra
 		&i.AssignedByID,
 		&i.IsActive,
 		&i.Notes,
+		&i.TrailerName,
 	)
 	return i, err
 }
 
 const listAssetTrailerAssignments = `-- name: ListAssetTrailerAssignments :many
-SELECT c.id, c.asset_id, c.trailer_id, c.position, c.assigned_date, c.unassigned_date, c.assigned_by_id, c.is_active, c.notes FROM asset_trailer_assignment c JOIN asset p ON p.id = c.asset_id
+
+SELECT c.id, c.asset_id, c.trailer_id, c.position, c.assigned_date, c.unassigned_date, c.assigned_by_id, c.is_active, c.notes, t.name AS trailer_name FROM asset_trailer_assignment c
+JOIN asset p ON p.id = c.asset_id
+JOIN asset t ON t.id = c.trailer_id
 WHERE c.asset_id = $1 AND p.company_id = $2
-ORDER BY c.position LIMIT $4 OFFSET $3
+ORDER BY c.position, c.id LIMIT $4 OFFSET $3
 `
 
 type ListAssetTrailerAssignmentsParams struct {
@@ -131,7 +150,22 @@ type ListAssetTrailerAssignmentsParams struct {
 	Lim       int32
 }
 
-func (q *Queries) ListAssetTrailerAssignments(ctx context.Context, arg ListAssetTrailerAssignmentsParams) ([]AssetTrailerAssignment, error) {
+type ListAssetTrailerAssignmentsRow struct {
+	ID             int64
+	AssetID        int64
+	TrailerID      int64
+	Position       int32
+	AssignedDate   time.Time
+	UnassignedDate *time.Time
+	AssignedByID   *int64
+	IsActive       bool
+	Notes          string
+	TrailerName    string
+}
+
+// The trailer's name is joined in so a registry row does not need a second
+// request per assignment just to render which trailer is attached.
+func (q *Queries) ListAssetTrailerAssignments(ctx context.Context, arg ListAssetTrailerAssignmentsParams) ([]ListAssetTrailerAssignmentsRow, error) {
 	rows, err := q.db.Query(ctx, listAssetTrailerAssignments,
 		arg.ParentID,
 		arg.CompanyID,
@@ -142,9 +176,9 @@ func (q *Queries) ListAssetTrailerAssignments(ctx context.Context, arg ListAsset
 		return nil, err
 	}
 	defer rows.Close()
-	items := []AssetTrailerAssignment{}
+	items := []ListAssetTrailerAssignmentsRow{}
 	for rows.Next() {
-		var i AssetTrailerAssignment
+		var i ListAssetTrailerAssignmentsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.AssetID,
@@ -155,6 +189,7 @@ func (q *Queries) ListAssetTrailerAssignments(ctx context.Context, arg ListAsset
 			&i.AssignedByID,
 			&i.IsActive,
 			&i.Notes,
+			&i.TrailerName,
 		); err != nil {
 			return nil, err
 		}

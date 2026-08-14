@@ -1,13 +1,20 @@
+-- The trailer's name is joined in so a registry row does not need a second
+-- request per assignment just to render which trailer is attached.
+
 -- name: ListAssetTrailerAssignments :many
-SELECT c.* FROM asset_trailer_assignment c JOIN asset p ON p.id = c.asset_id
+SELECT c.*, t.name AS trailer_name FROM asset_trailer_assignment c
+JOIN asset p ON p.id = c.asset_id
+JOIN asset t ON t.id = c.trailer_id
 WHERE c.asset_id = sqlc.arg(parent_id) AND p.company_id = sqlc.arg(company_id)
-ORDER BY c.position LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off);
+ORDER BY c.position, c.id LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off);
 
 -- name: CountAssetTrailerAssignments :one
 SELECT count(*) FROM asset_trailer_assignment c JOIN asset p ON p.id = c.asset_id WHERE c.asset_id = sqlc.arg(parent_id) AND p.company_id = sqlc.arg(company_id);
 
 -- name: GetAssetTrailerAssignment :one
-SELECT c.* FROM asset_trailer_assignment c JOIN asset p ON p.id = c.asset_id
+SELECT c.*, t.name AS trailer_name FROM asset_trailer_assignment c
+JOIN asset p ON p.id = c.asset_id
+JOIN asset t ON t.id = c.trailer_id
 WHERE c.id = sqlc.arg(id) AND c.asset_id = sqlc.arg(parent_id) AND p.company_id = sqlc.arg(company_id);
 
 -- name: CreateAssetTrailerAssignment :one

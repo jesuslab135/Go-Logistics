@@ -220,6 +220,81 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/asset-trailer-assignments": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Answers \"what is towing this trailer?\" without draining every asset's nested assignments. A partial unique index allows at most one active assignment per trailer, so trailer_id with is_active=true identifies the current one unambiguously.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "asset-trailer-assignments"
+                ],
+                "summary": "List trailer assignments across the fleet",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Filter by trailer",
+                        "name": "trailer_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Filter by towing asset",
+                        "name": "asset_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Filter by active state",
+                        "name": "is_active",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Offset",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.AssetTrailerAssignmentPage"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/asset-types": {
             "get": {
                 "security": [
@@ -14681,6 +14756,10 @@ const docTemplate = `{
                 },
                 "trailer_id": {
                     "type": "integer"
+                },
+                "trailer_name": {
+                    "description": "Denormalized from the trailer asset so a row renders without a second\nrequest per assignment.",
+                    "type": "string"
                 },
                 "unassigned_date": {
                     "type": "string"
