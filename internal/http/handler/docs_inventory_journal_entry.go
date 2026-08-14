@@ -1,18 +1,5 @@
 package handler
 
-// docListInventoryJournalEntries godoc
-//
-//	@Summary	List inventory-journal-entries
-//	@Tags	inventory-journal-entries
-//	@Security	BearerAuth
-//	@Produce	json
-//	@Param	page	query	int	false	"Page"
-//	@Param	page_size	query	int	false	"Size"
-//	@Success	200	{object}	dto.InventoryJournalEntryPage
-//	@Failure	401	{object}	dto.ErrorResponse
-//	@Router	/api/v1/inventory-journal-entries [get]
-func docListInventoryJournalEntries() {}
-
 // docCreateInventoryJournalEntry godoc
 //
 //	@Summary	Create inventory-journal-entries

@@ -5218,24 +5218,43 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "The ledger grows forever, so it is filtered in SQL and always returned newest first.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "inventory-journal-entries"
                 ],
-                "summary": "List inventory-journal-entries",
+                "summary": "List inventory journal entries",
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Page",
-                        "name": "page",
+                        "description": "Filter by part",
+                        "name": "part_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Inclusive lower bound (RFC3339 or YYYY-MM-DD)",
+                        "name": "created_from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Inclusive upper bound (RFC3339 or YYYY-MM-DD)",
+                        "name": "created_to",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "description": "Size",
-                        "name": "page_size",
+                        "description": "Page size",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Offset",
+                        "name": "offset",
                         "in": "query"
                     }
                 ],
@@ -5246,8 +5265,20 @@ const docTemplate = `{
                             "$ref": "#/definitions/dto.InventoryJournalEntryPage"
                         }
                     },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -5638,14 +5669,32 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Page",
-                        "name": "page",
+                        "description": "Filter by asset",
+                        "name": "asset_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "OPEN, RESOLVED or CLOSED",
+                        "name": "state",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "created_at, due_date, state, id (prefix with - for descending)",
+                        "name": "order",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "description": "Size",
-                        "name": "page_size",
+                        "description": "Page size",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Offset",
+                        "name": "offset",
                         "in": "query"
                     }
                 ],
@@ -5656,8 +5705,20 @@ const docTemplate = `{
                             "$ref": "#/definitions/dto.IssuePage"
                         }
                     },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -12988,18 +13049,36 @@ const docTemplate = `{
                 "tags": [
                     "work-orders"
                 ],
-                "summary": "List work-orders",
+                "summary": "List work orders",
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Page",
-                        "name": "page",
+                        "description": "Filter by asset",
+                        "name": "asset_id",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "description": "Size",
-                        "name": "page_size",
+                        "description": "Filter by status",
+                        "name": "status_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "issued_at, id (prefix with - for descending)",
+                        "name": "order",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Offset",
+                        "name": "offset",
                         "in": "query"
                     }
                 ],
@@ -13010,8 +13089,20 @@ const docTemplate = `{
                             "$ref": "#/definitions/dto.WorkOrderPage"
                         }
                     },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }

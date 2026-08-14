@@ -1,18 +1,5 @@
 package handler
 
-// docListIssues godoc
-//
-//	@Summary	List issues
-//	@Tags	issues
-//	@Security	BearerAuth
-//	@Produce	json
-//	@Param	page	query	int	false	"Page"
-//	@Param	page_size	query	int	false	"Size"
-//	@Success	200	{object}	dto.IssuePage
-//	@Failure	401	{object}	dto.ErrorResponse
-//	@Router	/api/v1/issues [get]
-func docListIssues() {}
-
 // docCreateIssue godoc
 //
 //	@Summary	Create issues

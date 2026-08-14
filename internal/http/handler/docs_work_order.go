@@ -1,18 +1,5 @@
 package handler
 
-// docListWorkOrders godoc
-//
-//	@Summary	List work-orders
-//	@Tags	work-orders
-//	@Security	BearerAuth
-//	@Produce	json
-//	@Param	page	query	int	false	"Page"
-//	@Param	page_size	query	int	false	"Size"
-//	@Success	200	{object}	dto.WorkOrderPage
-//	@Failure	401	{object}	dto.ErrorResponse
-//	@Router	/api/v1/work-orders [get]
-func docListWorkOrders() {}
-
 // docCreateWorkOrder godoc
 //
 //	@Summary	Create work-orders

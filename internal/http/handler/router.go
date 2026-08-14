@@ -92,6 +92,10 @@ func NewRouter(d Deps) *gin.Engine {
 	// Django gated roles on IsAdminRole rather than on a module entry.
 	roles := member.Group("", middleware.RequireAdminRole())
 
+	// Collections whose filters vary per request take their List verb from
+	// here instead of from the generic CRUD handler.
+	lists := NewFilteredListHandler(d.Pool)
+
 	// Phase 2: assets
 	crud.NewHandler[dto.AssetResponse, dto.CreateAssetRequest, dto.UpdateAssetRequest](
 		NewAssetStore(d.Queries)).Register(assets, "/assets")
@@ -109,16 +113,19 @@ func NewRouter(d Deps) *gin.Engine {
 		NewPartLocationStore(d.Queries)).Register(inventory, "/part-locations")
 	crud.NewHandler[dto.InventoryAdjustmentReasonResponse, dto.CreateInventoryAdjustmentReasonRequest, dto.UpdateInventoryAdjustmentReasonRequest](
 		NewInventoryAdjustmentReasonStore(d.Queries)).Register(inventory, "/inventory-adjustment-reasons")
-	crud.NewHandler[dto.InventoryJournalEntryResponse, dto.CreateInventoryJournalEntryRequest, dto.UpdateInventoryJournalEntryRequest](
-		NewInventoryJournalEntryStore(d.Queries)).Register(inventory, "/inventory-journal-entries")
+	registerCrudWithList(inventory, "/inventory-journal-entries",
+		crud.NewHandler[dto.InventoryJournalEntryResponse, dto.CreateInventoryJournalEntryRequest, dto.UpdateInventoryJournalEntryRequest](
+			NewInventoryJournalEntryStore(d.Queries)), lists.InventoryJournalEntries)
 
 	// Phase 4: vendors, work orders & issues
 	crud.NewHandler[dto.VendorResponse, dto.CreateVendorRequest, dto.UpdateVendorRequest](NewVendorStore(d.Queries)).Register(vendors, "/vendors")
 	crud.NewHandler[dto.WorkOrderStatusResponse, dto.CreateWorkOrderStatusRequest, dto.UpdateWorkOrderStatusRequest](NewWorkOrderStatusStore(d.Queries)).Register(workOrders, "/work-order-statuses")
 	// Django's LocationViewSet required membership only, no module entry.
 	crud.NewHandler[dto.LocationResponse, dto.CreateLocationRequest, dto.UpdateLocationRequest](NewLocationStore(d.Queries)).Register(member, "/locations")
-	crud.NewHandler[dto.WorkOrderResponse, dto.CreateWorkOrderRequest, dto.UpdateWorkOrderRequest](NewWorkOrderStore(d.Queries)).Register(workOrders, "/work-orders")
-	crud.NewHandler[dto.IssueResponse, dto.CreateIssueRequest, dto.UpdateIssueRequest](NewIssueStore(d.Queries)).Register(issues, "/issues")
+	registerCrudWithList(workOrders, "/work-orders",
+		crud.NewHandler[dto.WorkOrderResponse, dto.CreateWorkOrderRequest, dto.UpdateWorkOrderRequest](NewWorkOrderStore(d.Queries)), lists.WorkOrders)
+	registerCrudWithList(issues, "/issues",
+		crud.NewHandler[dto.IssueResponse, dto.CreateIssueRequest, dto.UpdateIssueRequest](NewIssueStore(d.Queries)), lists.Issues)
 	crud.NewHandler[dto.IssuePriorityResponse, dto.CreateIssuePriorityRequest, dto.UpdateIssuePriorityRequest](NewIssuePriorityStore(d.Queries)).Register(issues, "/issue-priorities")
 	crud.NewHandler[dto.FaultResponse, dto.CreateFaultRequest, dto.UpdateFaultRequest](NewFaultStore(d.Queries)).Register(issues, "/faults")
 
@@ -229,6 +236,18 @@ func NewRouter(d Deps) *gin.Engine {
 	crud.NewLinkHandler[dto.IssueResponse, dto.LinkIssueRequest](NewWorkOrderLineItemIssueStore(d.Queries)).Register(workOrders, "/work-order-line-items", "/issues", "issue_id")
 
 	return r
+}
+
+// registerCrudWithList wires the standard CRUD shape but serves the collection
+// from a custom handler, for resources whose list takes filters the generic one
+// cannot express. crud's own doc comment points here: "for read-only or partial
+// resources, wire the exported handlers individually".
+func registerCrudWithList[T, C, U any](r gin.IRouter, path string, h *crud.Handler[T, C, U], list gin.HandlerFunc) {
+	r.GET(path, list)
+	r.POST(path, h.Create)
+	r.GET(path+"/:id", h.Get)
+	r.PUT(path+"/:id", h.Update)
+	r.DELETE(path+"/:id", h.Delete)
 }
 
 // registerCompanyRoutes wires /companies with Django's split gating: creating a

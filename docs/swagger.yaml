@@ -10146,14 +10146,28 @@ paths:
       - inventory-adjustment-reasons
   /api/v1/inventory-journal-entries:
     get:
+      description: The ledger grows forever, so it is filtered in SQL and always returned
+        newest first.
       parameters:
-      - description: Page
+      - description: Filter by part
         in: query
-        name: page
+        name: part_id
         type: integer
-      - description: Size
+      - description: Inclusive lower bound (RFC3339 or YYYY-MM-DD)
         in: query
-        name: page_size
+        name: created_from
+        type: string
+      - description: Inclusive upper bound (RFC3339 or YYYY-MM-DD)
+        in: query
+        name: created_to
+        type: string
+      - description: Page size
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
         type: integer
       produces:
       - application/json
@@ -10162,13 +10176,21 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/dto.InventoryJournalEntryPage'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: List inventory-journal-entries
+      summary: List inventory journal entries
       tags:
       - inventory-journal-entries
     post:
@@ -10401,13 +10423,25 @@ paths:
   /api/v1/issues:
     get:
       parameters:
-      - description: Page
+      - description: Filter by asset
         in: query
-        name: page
+        name: asset_id
         type: integer
-      - description: Size
+      - description: OPEN, RESOLVED or CLOSED
         in: query
-        name: page_size
+        name: state
+        type: string
+      - description: created_at, due_date, state, id (prefix with - for descending)
+        in: query
+        name: order
+        type: string
+      - description: Page size
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
         type: integer
       produces:
       - application/json
@@ -10416,8 +10450,16 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/dto.IssuePage'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
         "401":
           description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
       security:
@@ -14991,13 +15033,25 @@ paths:
   /api/v1/work-orders:
     get:
       parameters:
-      - description: Page
+      - description: Filter by asset
         in: query
-        name: page
+        name: asset_id
         type: integer
-      - description: Size
+      - description: Filter by status
         in: query
-        name: page_size
+        name: status_id
+        type: integer
+      - description: issued_at, id (prefix with - for descending)
+        in: query
+        name: order
+        type: string
+      - description: Page size
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
         type: integer
       produces:
       - application/json
@@ -15006,13 +15060,21 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/dto.WorkOrderPage'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: List work-orders
+      summary: List work orders
       tags:
       - work-orders
     post:
