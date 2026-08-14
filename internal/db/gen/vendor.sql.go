@@ -178,7 +178,7 @@ func (q *Queries) GetVendor(ctx context.Context, arg GetVendorParams) (Vendor, e
 }
 
 const listVendors = `-- name: ListVendors :many
-SELECT id, company_id, name, is_mobile_service, street_address, street_address_line_2, city, region, postal_code, country, phone, website, contact_name, contact_phone, contact_email, external_id, latitude, longitude, is_fuel_vendor, is_service_vendor, is_parts_vendor, labels, archived_at, custom_fields, created_at, updated_at FROM vendor WHERE company_id = $1 ORDER BY name LIMIT $2 OFFSET $3
+SELECT id, company_id, name, is_mobile_service, street_address, street_address_line_2, city, region, postal_code, country, phone, website, contact_name, contact_phone, contact_email, external_id, latitude, longitude, is_fuel_vendor, is_service_vendor, is_parts_vendor, labels, archived_at, custom_fields, created_at, updated_at FROM vendor WHERE company_id = $1 ORDER BY name, id LIMIT $2 OFFSET $3
 `
 
 type ListVendorsParams struct {

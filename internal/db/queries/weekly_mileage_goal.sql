@@ -2,7 +2,7 @@
 SELECT * FROM weekly_mileage_goal WHERE id = $1 AND company_id = $2;
 
 -- name: ListWeeklyMileageGoals :many
-SELECT * FROM weekly_mileage_goal WHERE company_id = $1 ORDER BY sort_order LIMIT $2 OFFSET $3;
+SELECT * FROM weekly_mileage_goal WHERE company_id = $1 ORDER BY sort_order, id LIMIT $2 OFFSET $3;
 
 -- name: CountWeeklyMileageGoals :one
 SELECT count(*) FROM weekly_mileage_goal WHERE company_id = $1;

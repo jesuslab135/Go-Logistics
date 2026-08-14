@@ -127,7 +127,7 @@ func (q *Queries) GetTireInstallation(ctx context.Context, arg GetTireInstallati
 const listTireInstallations = `-- name: ListTireInstallations :many
 SELECT c.id, c.vehicle_id, c.tire_id, c.position_code, c.install_date, c.odometer_at_install, c.tread_depth_at_install_32nds, c.psi_at_install, c.installed_by_id, c.notes FROM tire_installation c JOIN tire p ON p.id = c.tire_id
 WHERE c.tire_id = $1 AND p.company_id = $2
-ORDER BY c.install_date DESC LIMIT $4 OFFSET $3
+ORDER BY c.install_date DESC, c.id LIMIT $4 OFFSET $3
 `
 
 type ListTireInstallationsParams struct {

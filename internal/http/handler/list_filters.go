@@ -356,6 +356,99 @@ func (h *FilteredListHandler) AssetTrailerAssignments(c *gin.Context) {
 	})
 }
 
+// PartInventory godoc
+//
+//	@Summary		List part inventory rows
+//	@Description	Flat, filterable view of the rows nested under /parts/{id}/inventory, so a form can offer inventory rows as a foreign-key source without knowing the part up front.
+//	@Tags			part-inventory
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			part_id	query		int	false	"Filter by part"
+//	@Param			limit	query		int	false	"Page size"
+//	@Param			offset	query		int	false	"Offset"
+//	@Success		200		{object}	dto.PartInventoryPage
+//	@Failure		400		{object}	dto.ErrorResponse
+//	@Failure		401		{object}	dto.ErrorResponse
+//	@Failure		403		{object}	dto.ErrorResponse
+//	@Router			/api/v1/part-inventory [get]
+func (h *FilteredListHandler) PartInventory(c *gin.Context) {
+	ctx := c.Request.Context()
+	p := paginate.Parse(c)
+
+	where := filter.NewWhere(1).Add("prt.company_id", filter.Eq, middleware.CompanyFromContext(ctx))
+	partID, err := queryInt64(c, "part_id")
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	if partID != nil {
+		where.Add("pi.part_id", filter.Eq, *partID)
+	}
+
+	spec := newListSpec[gen.PartInventory]("part_inventory", "pi").
+		join("JOIN part prt ON prt.id = pi.part_id").
+		filter(where).
+		orderBy("pi.id ASC")
+
+	rows, total, err := runList(ctx, h.pool, spec, p)
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	renderPage(c, rows, total, p, toPartInventoryResponse)
+}
+
+// PurchaseOrderLineItems godoc
+//
+//	@Summary		List purchase order line items
+//	@Description	Flat, filterable view of the rows nested under /purchase-orders/{id}/line-items, so a form can reference a line item without draining every order.
+//	@Tags			purchase-order-line-items
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			purchase_order_id	query		int	false	"Filter by purchase order"
+//	@Param			part_id				query		int	false	"Filter by part"
+//	@Param			limit				query		int	false	"Page size"
+//	@Param			offset				query		int	false	"Offset"
+//	@Success		200					{object}	dto.PurchaseOrderLineItemPage
+//	@Failure		400					{object}	dto.ErrorResponse
+//	@Failure		401					{object}	dto.ErrorResponse
+//	@Failure		403					{object}	dto.ErrorResponse
+//	@Router			/api/v1/purchase-order-line-items [get]
+func (h *FilteredListHandler) PurchaseOrderLineItems(c *gin.Context) {
+	ctx := c.Request.Context()
+	p := paginate.Parse(c)
+
+	where := filter.NewWhere(1).Add("po.company_id", filter.Eq, middleware.CompanyFromContext(ctx))
+	orderID, err := queryInt64(c, "purchase_order_id")
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	if orderID != nil {
+		where.Add("li.purchase_order_id", filter.Eq, *orderID)
+	}
+	partID, err := queryInt64(c, "part_id")
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	if partID != nil {
+		where.Add("li.part_id", filter.Eq, *partID)
+	}
+
+	spec := newListSpec[gen.PurchaseOrderLineItem]("purchase_order_line_item", "li").
+		join("JOIN purchase_order po ON po.id = li.purchase_order_id").
+		filter(where).
+		orderBy("li.position ASC, li.id ASC")
+
+	rows, total, err := runList(ctx, h.pool, spec, p)
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	renderPage(c, rows, total, p, toPurchaseOrderLineItemResponse)
+}
+
 // Vocabularies accepted by the state filters, kept beside the routes that
 // validate them. Ported from the Django models the schema came from.
 var issueStates = []string{"OPEN", "RESOLVED", "CLOSED"}

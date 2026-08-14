@@ -92,7 +92,7 @@ func (q *Queries) GetPartManufacturer(ctx context.Context, arg GetPartManufactur
 }
 
 const listPartManufacturers = `-- name: ListPartManufacturers :many
-SELECT id, company_id, name, website, created_at FROM part_manufacturer WHERE company_id = $1 ORDER BY name LIMIT $2 OFFSET $3
+SELECT id, company_id, name, website, created_at FROM part_manufacturer WHERE company_id = $1 ORDER BY name, id LIMIT $2 OFFSET $3
 `
 
 type ListPartManufacturersParams struct {

@@ -91,7 +91,7 @@ func (q *Queries) GetIssuePriority(ctx context.Context, arg GetIssuePriorityPara
 }
 
 const listIssuePriorities = `-- name: ListIssuePriorities :many
-SELECT id, company_id, name, color, position FROM issue_priority WHERE company_id = $1 ORDER BY position LIMIT $2 OFFSET $3
+SELECT id, company_id, name, color, position FROM issue_priority WHERE company_id = $1 ORDER BY position, id LIMIT $2 OFFSET $3
 `
 
 type ListIssuePrioritiesParams struct {

@@ -11,7 +11,7 @@ WHERE c.id = sqlc.arg(id)
 -- name: ListCompanies :many
 SELECT c.* FROM company c
 WHERE EXISTS (SELECT 1 FROM employee_companies ec WHERE ec.company_id = c.id AND ec.employee_id = sqlc.arg(employee_id))
-ORDER BY c.name
+ORDER BY c.name, c.id
 LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off);
 
 -- name: CountCompanies :one

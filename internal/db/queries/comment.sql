@@ -2,7 +2,7 @@
 SELECT * FROM comment WHERE id = $1 AND company_id = $2;
 
 -- name: ListComments :many
-SELECT * FROM comment WHERE company_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3;
+SELECT * FROM comment WHERE company_id = $1 ORDER BY created_at DESC, id LIMIT $2 OFFSET $3;
 
 -- name: CountComments :one
 SELECT count(*) FROM comment WHERE company_id = $1;

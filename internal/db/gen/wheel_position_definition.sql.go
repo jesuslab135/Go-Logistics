@@ -104,7 +104,7 @@ func (q *Queries) GetWheelPositionDefinition(ctx context.Context, arg GetWheelPo
 const listWheelPositionDefinitions = `-- name: ListWheelPositionDefinitions :many
 SELECT c.id, c.axle_id, c.code, c.side, c.slot FROM wheel_position_definition c JOIN axle_definition p0 ON p0.id = c.axle_id JOIN axle_template p1 ON p1.id = p0.template_id
 WHERE c.axle_id = $1 AND p1.company_id = $2
-ORDER BY c.slot LIMIT $4 OFFSET $3
+ORDER BY c.slot, c.id LIMIT $4 OFFSET $3
 `
 
 type ListWheelPositionDefinitionsParams struct {

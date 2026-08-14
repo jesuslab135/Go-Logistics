@@ -132,7 +132,7 @@ func (q *Queries) GetGroup(ctx context.Context, arg GetGroupParams) (Group, erro
 
 const listGroups = `-- name: ListGroups :many
 SELECT id, company_id, name, parent_id, ancestry, is_default, created_at, updated_at FROM "group" WHERE company_id = $1
-ORDER BY ancestry, name
+ORDER BY ancestry, name, id
 LIMIT $3 OFFSET $2
 `
 

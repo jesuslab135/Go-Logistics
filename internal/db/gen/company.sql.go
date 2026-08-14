@@ -175,7 +175,7 @@ func (q *Queries) GetCompany(ctx context.Context, arg GetCompanyParams) (Company
 const listCompanies = `-- name: ListCompanies :many
 SELECT c.id, c.name, c.tax_id, c.address, c.created_at, c.phone, c.email, c.website, c.logo, c.city, c.region, c.postal_code, c.country, c.timezone, c.currency, c.system_of_measurement FROM company c
 WHERE EXISTS (SELECT 1 FROM employee_companies ec WHERE ec.company_id = c.id AND ec.employee_id = $1)
-ORDER BY c.name
+ORDER BY c.name, c.id
 LIMIT $3 OFFSET $2
 `
 

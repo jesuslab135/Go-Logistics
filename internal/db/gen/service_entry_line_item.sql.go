@@ -155,7 +155,7 @@ func (q *Queries) GetServiceEntryLineItem(ctx context.Context, arg GetServiceEnt
 const listServiceEntryLineItems = `-- name: ListServiceEntryLineItems :many
 SELECT c.id, c.service_entry_id, c.line_item_type, c.description, c.service_task_id, c.part_id, c.technician_id, c.tire_id, c.service_reminder_id, c.unit_cost, c.quantity, c.parts_cost, c.labor_cost, c.subtotal, c.position, c.created_at, c.updated_at FROM service_entry_line_item c JOIN service_entry p ON p.id = c.service_entry_id
 WHERE c.service_entry_id = $1 AND p.company_id = $2
-ORDER BY c.position LIMIT $4 OFFSET $3
+ORDER BY c.position, c.id LIMIT $4 OFFSET $3
 `
 
 type ListServiceEntryLineItemsParams struct {

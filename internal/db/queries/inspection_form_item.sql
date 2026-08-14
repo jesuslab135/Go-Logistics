@@ -1,7 +1,7 @@
 -- name: ListInspectionFormItems :many
 SELECT c.* FROM inspection_form_item c JOIN inspection_form p ON p.id = c.form_id
 WHERE c.form_id = sqlc.arg(parent_id) AND p.company_id = sqlc.arg(company_id)
-ORDER BY c.position LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off);
+ORDER BY c.position, c.id LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off);
 
 -- name: CountInspectionFormItems :one
 SELECT count(*) FROM inspection_form_item c JOIN inspection_form p ON p.id = c.form_id WHERE c.form_id = sqlc.arg(parent_id) AND p.company_id = sqlc.arg(company_id);

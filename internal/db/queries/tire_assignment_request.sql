@@ -2,7 +2,7 @@
 SELECT * FROM tire_assignment_request WHERE id = $1 AND company_id = $2;
 
 -- name: ListTireAssignmentRequests :many
-SELECT * FROM tire_assignment_request WHERE company_id = $1 ORDER BY requested_at DESC LIMIT $2 OFFSET $3;
+SELECT * FROM tire_assignment_request WHERE company_id = $1 ORDER BY requested_at DESC, id LIMIT $2 OFFSET $3;
 
 -- name: CountTireAssignmentRequests :one
 SELECT count(*) FROM tire_assignment_request WHERE company_id = $1;

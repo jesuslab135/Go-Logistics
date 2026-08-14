@@ -158,7 +158,7 @@ func (q *Queries) GetInspectionSubmission(ctx context.Context, arg GetInspection
 }
 
 const listInspectionSubmissions = `-- name: ListInspectionSubmissions :many
-SELECT id, company_id, form_id, asset_id, submitted_by_id, started_at, submitted_at, duration_seconds, starting_latitude, starting_longitude, submitted_latitude, submitted_longitude, signature, odometer, total_items, failed_items_count, passed_items_count, comments_count, images_count, general_notes, created_at FROM inspection_submission WHERE company_id = $1 ORDER BY submitted_at DESC LIMIT $2 OFFSET $3
+SELECT id, company_id, form_id, asset_id, submitted_by_id, started_at, submitted_at, duration_seconds, starting_latitude, starting_longitude, submitted_latitude, submitted_longitude, signature, odometer, total_items, failed_items_count, passed_items_count, comments_count, images_count, general_notes, created_at FROM inspection_submission WHERE company_id = $1 ORDER BY submitted_at DESC, id LIMIT $2 OFFSET $3
 `
 
 type ListInspectionSubmissionsParams struct {

@@ -117,6 +117,10 @@ func NewRouter(d Deps) *gin.Engine {
 		NewPartLocationStore(d.Queries)).Register(inventory, "/part-locations")
 	crud.NewHandler[dto.InventoryAdjustmentReasonResponse, dto.CreateInventoryAdjustmentReasonRequest, dto.UpdateInventoryAdjustmentReasonRequest](
 		NewInventoryAdjustmentReasonStore(d.Queries)).Register(inventory, "/inventory-adjustment-reasons")
+	// Flat, filterable views of rows that are otherwise reachable only under a
+	// parent. Forms need them as foreign-key sources; mutations stay nested.
+	inventory.GET("/part-inventory", lists.PartInventory)
+	inventory.GET("/purchase-order-line-items", lists.PurchaseOrderLineItems)
 	registerCrudWithList(inventory, "/inventory-journal-entries",
 		crud.NewHandler[dto.InventoryJournalEntryResponse, dto.CreateInventoryJournalEntryRequest, dto.UpdateInventoryJournalEntryRequest](
 			NewInventoryJournalEntryStore(d.Queries)), lists.InventoryJournalEntries)

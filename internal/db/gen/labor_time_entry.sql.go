@@ -135,7 +135,7 @@ func (q *Queries) GetLaborTimeEntry(ctx context.Context, arg GetLaborTimeEntryPa
 const listLaborTimeEntries = `-- name: ListLaborTimeEntries :many
 SELECT c.id, c.sub_line_item_id, c.technician_id, c.started_at, c.ended_at, c.duration_seconds, c.is_active, c.clock_in_latitude, c.clock_in_longitude, c.clock_out_latitude, c.clock_out_longitude, c.created_at FROM labor_time_entry c JOIN work_order_sub_line_item p0 ON p0.id = c.sub_line_item_id JOIN work_order_line_item p1 ON p1.id = p0.line_item_id JOIN work_order p2 ON p2.id = p1.work_order_id
 WHERE c.sub_line_item_id = $1 AND p2.company_id = $2
-ORDER BY c.started_at DESC LIMIT $4 OFFSET $3
+ORDER BY c.started_at DESC, c.id LIMIT $4 OFFSET $3
 `
 
 type ListLaborTimeEntriesParams struct {

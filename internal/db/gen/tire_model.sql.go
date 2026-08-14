@@ -109,7 +109,7 @@ func (q *Queries) GetTireModel(ctx context.Context, arg GetTireModelParams) (Tir
 }
 
 const listTireModels = `-- name: ListTireModels :many
-SELECT id, company_id, brand, model_name, size, factory_tread_depth_32nds, minimum_tread_depth_32nds, life_expectancy_miles, recommended_psi FROM tire_model WHERE company_id = $1 ORDER BY brand LIMIT $2 OFFSET $3
+SELECT id, company_id, brand, model_name, size, factory_tread_depth_32nds, minimum_tread_depth_32nds, life_expectancy_miles, recommended_psi FROM tire_model WHERE company_id = $1 ORDER BY brand, id LIMIT $2 OFFSET $3
 `
 
 type ListTireModelsParams struct {

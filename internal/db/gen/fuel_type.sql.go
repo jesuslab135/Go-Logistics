@@ -84,7 +84,7 @@ func (q *Queries) GetFuelType(ctx context.Context, arg GetFuelTypeParams) (FuelT
 }
 
 const listFuelTypes = `-- name: ListFuelTypes :many
-SELECT id, company_id, name, created_at FROM fuel_type WHERE company_id = $1 ORDER BY name LIMIT $2 OFFSET $3
+SELECT id, company_id, name, created_at FROM fuel_type WHERE company_id = $1 ORDER BY name, id LIMIT $2 OFFSET $3
 `
 
 type ListFuelTypesParams struct {

@@ -262,7 +262,7 @@ func (q *Queries) GetWorkOrder(ctx context.Context, arg GetWorkOrderParams) (Wor
 }
 
 const listWorkOrders = `-- name: ListWorkOrders :many
-SELECT id, location_id, company_id, number, description, asset_id, status_id, vendor_id, assigned_to_id, issued_by_id, fault_id, issued_at, scheduled_at, started_at, expected_completed_at, completed_at, starting_meter, ending_meter, duration_seconds, labor_time_seconds, parts_markup_type, parts_markup, parts_markup_percentage, labor_markup_type, labor_markup, labor_markup_percentage, parts_subtotal, labor_subtotal, subtotal, discount, discount_type, tax_1, tax_1_type, tax_1_percentage, tax_2, tax_2_type, tax_2_percentage, total_amount, invoice_number, purchase_order_number, comments_count, images_count, documents_count, labels, custom_fields, created_at, updated_at FROM work_order WHERE company_id = $1 ORDER BY issued_at DESC LIMIT $2 OFFSET $3
+SELECT id, location_id, company_id, number, description, asset_id, status_id, vendor_id, assigned_to_id, issued_by_id, fault_id, issued_at, scheduled_at, started_at, expected_completed_at, completed_at, starting_meter, ending_meter, duration_seconds, labor_time_seconds, parts_markup_type, parts_markup, parts_markup_percentage, labor_markup_type, labor_markup, labor_markup_percentage, parts_subtotal, labor_subtotal, subtotal, discount, discount_type, tax_1, tax_1_type, tax_1_percentage, tax_2, tax_2_type, tax_2_percentage, total_amount, invoice_number, purchase_order_number, comments_count, images_count, documents_count, labels, custom_fields, created_at, updated_at FROM work_order WHERE company_id = $1 ORDER BY issued_at DESC, id LIMIT $2 OFFSET $3
 `
 
 type ListWorkOrdersParams struct {

@@ -83,7 +83,7 @@ func (q *Queries) GetLocation(ctx context.Context, arg GetLocationParams) (Locat
 }
 
 const listLocations = `-- name: ListLocations :many
-SELECT id, company_id, name, is_active FROM location WHERE company_id = $1 ORDER BY name LIMIT $2 OFFSET $3
+SELECT id, company_id, name, is_active FROM location WHERE company_id = $1 ORDER BY name, id LIMIT $2 OFFSET $3
 `
 
 type ListLocationsParams struct {

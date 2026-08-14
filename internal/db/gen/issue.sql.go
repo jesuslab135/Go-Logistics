@@ -226,7 +226,7 @@ func (q *Queries) GetIssue(ctx context.Context, arg GetIssueParams) (Issue, erro
 }
 
 const listIssues = `-- name: ListIssues :many
-SELECT id, company_id, number, asset_id, asset_type, name, summary, description, state, priority_id, fault_id, source_type, inspection_submission_id, reported_at, reported_by_id, due_date, due_meter_value, due_secondary_meter_value, overdue, resolved_at, resolved_by_id, resolution_note, reopened_at, reopened_by_id, resolvable_type, resolvable_id, closed_at, closed_by_id, closed_note, external_id, created_by_workflow, comments_count, images_count, documents_count, labels, custom_fields, created_at, updated_at FROM issue WHERE company_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3
+SELECT id, company_id, number, asset_id, asset_type, name, summary, description, state, priority_id, fault_id, source_type, inspection_submission_id, reported_at, reported_by_id, due_date, due_meter_value, due_secondary_meter_value, overdue, resolved_at, resolved_by_id, resolution_note, reopened_at, reopened_by_id, resolvable_type, resolvable_id, closed_at, closed_by_id, closed_note, external_id, created_by_workflow, comments_count, images_count, documents_count, labels, custom_fields, created_at, updated_at FROM issue WHERE company_id = $1 ORDER BY created_at DESC, id LIMIT $2 OFFSET $3
 `
 
 type ListIssuesParams struct {

@@ -142,7 +142,7 @@ func (q *Queries) GetInventoryJournalEntry(ctx context.Context, arg GetInventory
 }
 
 const listInventoryJournalEntries = `-- name: ListInventoryJournalEntries :many
-SELECT id, company_id, part_id, part_location_detail_id, user_id, previous_quantity, adjustment_quantity, current_quantity, unit_cost, reason_id, work_order_id, purchase_order_line_id, vendor_id, adjustment_type, transfer_part_location_id, notes, created_at FROM inventory_journal_entry WHERE company_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3
+SELECT id, company_id, part_id, part_location_detail_id, user_id, previous_quantity, adjustment_quantity, current_quantity, unit_cost, reason_id, work_order_id, purchase_order_line_id, vendor_id, adjustment_type, transfer_part_location_id, notes, created_at FROM inventory_journal_entry WHERE company_id = $1 ORDER BY created_at DESC, id LIMIT $2 OFFSET $3
 `
 
 type ListInventoryJournalEntriesParams struct {

@@ -2,7 +2,7 @@
 SELECT * FROM issue WHERE id = $1 AND company_id = $2;
 
 -- name: ListIssues :many
-SELECT * FROM issue WHERE company_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3;
+SELECT * FROM issue WHERE company_id = $1 ORDER BY created_at DESC, id LIMIT $2 OFFSET $3;
 
 -- name: CountIssues :one
 SELECT count(*) FROM issue WHERE company_id = $1;

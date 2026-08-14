@@ -171,7 +171,7 @@ func (q *Queries) GetVehicleModel(ctx context.Context, arg GetVehicleModelParams
 }
 
 const listVehicleMakes = `-- name: ListVehicleMakes :many
-SELECT id, company_id, name, created_at, updated_at FROM vehicle_make WHERE company_id = $1 ORDER BY name LIMIT $2 OFFSET $3
+SELECT id, company_id, name, created_at, updated_at FROM vehicle_make WHERE company_id = $1 ORDER BY name, id LIMIT $2 OFFSET $3
 `
 
 type ListVehicleMakesParams struct {
@@ -207,7 +207,7 @@ func (q *Queries) ListVehicleMakes(ctx context.Context, arg ListVehicleMakesPara
 }
 
 const listVehicleModels = `-- name: ListVehicleModels :many
-SELECT id, company_id, name, make_id, created_at, updated_at FROM vehicle_model WHERE company_id = $1 ORDER BY name LIMIT $2 OFFSET $3
+SELECT id, company_id, name, make_id, created_at, updated_at FROM vehicle_model WHERE company_id = $1 ORDER BY name, id LIMIT $2 OFFSET $3
 `
 
 type ListVehicleModelsParams struct {

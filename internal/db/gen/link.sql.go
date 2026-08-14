@@ -541,7 +541,7 @@ SELECT e.id, e.user_id, e.default_company_id, e.first_name, e.last_name, e.emplo
 JOIN issue_assigned_to ia ON ia.employee_id = e.id
 JOIN issue i ON i.id = ia.issue_id
 WHERE ia.issue_id = $1 AND i.company_id = $2
-ORDER BY e.last_name, e.first_name
+ORDER BY e.last_name, e.first_name, e.id
 LIMIT $4 OFFSET $3
 `
 
@@ -630,7 +630,7 @@ SELECT e.id, e.user_id, e.default_company_id, e.first_name, e.last_name, e.emplo
 JOIN issue_watchers iw ON iw.employee_id = e.id
 JOIN issue i ON i.id = iw.issue_id
 WHERE iw.issue_id = $1 AND i.company_id = $2
-ORDER BY e.last_name, e.first_name
+ORDER BY e.last_name, e.first_name, e.id
 LIMIT $4 OFFSET $3
 `
 

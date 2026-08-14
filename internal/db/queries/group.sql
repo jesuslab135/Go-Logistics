@@ -17,7 +17,7 @@ SELECT * FROM "group" WHERE id = sqlc.arg(id) AND company_id = sqlc.arg(company_
 
 -- name: ListGroups :many
 SELECT * FROM "group" WHERE company_id = sqlc.arg(company_id)
-ORDER BY ancestry, name
+ORDER BY ancestry, name, id
 LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off);
 
 -- name: CountGroups :one

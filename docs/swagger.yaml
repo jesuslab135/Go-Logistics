@@ -7461,6 +7461,14 @@ paths:
         name: id
         required: true
         type: integer
+      - description: Page size
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
+        type: integer
       produces:
       - application/json
       responses:
@@ -7678,6 +7686,14 @@ paths:
         in: path
         name: id
         required: true
+        type: integer
+      - description: Page size
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
         type: integer
       produces:
       - application/json
@@ -8036,13 +8052,13 @@ paths:
   /api/v1/axle-templates:
     get:
       parameters:
-      - description: Page
+      - description: Page size
         in: query
-        name: page
+        name: limit
         type: integer
-      - description: Size
+      - description: Offset
         in: query
-        name: page_size
+        name: offset
         type: integer
       produces:
       - application/json
@@ -8167,6 +8183,14 @@ paths:
         in: path
         name: id
         required: true
+        type: integer
+      - description: Page size
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
         type: integer
       produces:
       - application/json
@@ -8434,13 +8458,13 @@ paths:
   /api/v1/comments:
     get:
       parameters:
-      - description: Page
+      - description: Page size
         in: query
-        name: page
+        name: limit
         type: integer
-      - description: Size
+      - description: Offset
         in: query
-        name: page_size
+        name: offset
         type: integer
       produces:
       - application/json
@@ -8730,13 +8754,13 @@ paths:
   /api/v1/employees:
     get:
       parameters:
-      - description: Page
+      - description: Page size
         in: query
-        name: page
+        name: limit
         type: integer
-      - description: Size
+      - description: Offset
         in: query
-        name: page_size
+        name: offset
         type: integer
       produces:
       - application/json
@@ -8905,13 +8929,13 @@ paths:
   /api/v1/faults:
     get:
       parameters:
-      - description: Page
+      - description: Page size
         in: query
-        name: page
+        name: limit
         type: integer
-      - description: Size
+      - description: Offset
         in: query
-        name: page_size
+        name: offset
         type: integer
       produces:
       - application/json
@@ -9320,13 +9344,13 @@ paths:
   /api/v1/fuel-types:
     get:
       parameters:
-      - description: Page
+      - description: Page size
         in: query
-        name: page
+        name: limit
         type: integer
-      - description: Size
+      - description: Offset
         in: query
-        name: page_size
+        name: offset
         type: integer
       produces:
       - application/json
@@ -9447,13 +9471,13 @@ paths:
   /api/v1/groups:
     get:
       parameters:
-      - description: Page
+      - description: Page size
         in: query
-        name: page
+        name: limit
         type: integer
-      - description: Size
+      - description: Offset
         in: query
-        name: page_size
+        name: offset
         type: integer
       produces:
       - application/json
@@ -9574,13 +9598,13 @@ paths:
   /api/v1/inspection-forms:
     get:
       parameters:
-      - description: Page
+      - description: Page size
         in: query
-        name: page
+        name: limit
         type: integer
-      - description: Size
+      - description: Offset
         in: query
-        name: page_size
+        name: offset
         type: integer
       produces:
       - application/json
@@ -9705,6 +9729,14 @@ paths:
         in: path
         name: id
         required: true
+        type: integer
+      - description: Page size
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
         type: integer
       produces:
       - application/json
@@ -9845,13 +9877,13 @@ paths:
   /api/v1/inspection-submissions:
     get:
       parameters:
-      - description: Page
+      - description: Page size
         in: query
-        name: page
+        name: limit
         type: integer
-      - description: Size
+      - description: Offset
         in: query
-        name: page_size
+        name: offset
         type: integer
       produces:
       - application/json
@@ -9976,6 +10008,14 @@ paths:
         in: path
         name: id
         required: true
+        type: integer
+      - description: Page size
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
         type: integer
       produces:
       - application/json
@@ -10116,13 +10156,13 @@ paths:
   /api/v1/inventory-adjustment-reasons:
     get:
       parameters:
-      - description: Page
+      - description: Page size
         in: query
-        name: page
+        name: limit
         type: integer
-      - description: Size
+      - description: Offset
         in: query
-        name: page_size
+        name: offset
         type: integer
       produces:
       - application/json
@@ -10392,13 +10432,13 @@ paths:
   /api/v1/issue-priorities:
     get:
       parameters:
-      - description: Page
+      - description: Page size
         in: query
-        name: page
+        name: limit
         type: integer
-      - description: Size
+      - description: Offset
         in: query
-        name: page_size
+        name: offset
         type: integer
       produces:
       - application/json
@@ -10671,13 +10711,21 @@ paths:
         name: id
         required: true
         type: integer
-      - description: Page
+      - description: Page size
         in: query
-        name: page
+        name: limit
         type: integer
-      - description: Size
+      - description: Offset
         in: query
-        name: page_size
+        name: offset
+        type: integer
+      - description: Page size
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
         type: integer
       produces:
       - application/json
@@ -10763,13 +10811,21 @@ paths:
         name: id
         required: true
         type: integer
-      - description: Page
+      - description: Page size
         in: query
-        name: page
+        name: limit
         type: integer
-      - description: Size
+      - description: Offset
         in: query
-        name: page_size
+        name: offset
+        type: integer
+      - description: Page size
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
         type: integer
       produces:
       - application/json
@@ -10850,13 +10906,13 @@ paths:
   /api/v1/locations:
     get:
       parameters:
-      - description: Page
+      - description: Page size
         in: query
-        name: page
+        name: limit
         type: integer
-      - description: Size
+      - description: Offset
         in: query
-        name: page_size
+        name: offset
         type: integer
       produces:
       - application/json
@@ -10999,13 +11055,13 @@ paths:
   /api/v1/measurement-units:
     get:
       parameters:
-      - description: Page
+      - description: Page size
         in: query
-        name: page
+        name: limit
         type: integer
-      - description: Size
+      - description: Offset
         in: query
-        name: page_size
+        name: offset
         type: integer
       produces:
       - application/json
@@ -11126,13 +11182,13 @@ paths:
   /api/v1/media:
     get:
       parameters:
-      - description: Page
+      - description: Page size
         in: query
-        name: page
+        name: limit
         type: integer
-      - description: Size
+      - description: Offset
         in: query
-        name: page_size
+        name: offset
         type: integer
       produces:
       - application/json
@@ -11271,13 +11327,13 @@ paths:
   /api/v1/part-categories:
     get:
       parameters:
-      - description: Page
+      - description: Page size
         in: query
-        name: page
+        name: limit
         type: integer
-      - description: Size
+      - description: Offset
         in: query
-        name: page_size
+        name: offset
         type: integer
       produces:
       - application/json
@@ -11395,16 +11451,58 @@ paths:
       summary: Update part-categories
       tags:
       - part-categories
+  /api/v1/part-inventory:
+    get:
+      description: Flat, filterable view of the rows nested under /parts/{id}/inventory,
+        so a form can offer inventory rows as a foreign-key source without knowing
+        the part up front.
+      parameters:
+      - description: Filter by part
+        in: query
+        name: part_id
+        type: integer
+      - description: Page size
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PartInventoryPage'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List part inventory rows
+      tags:
+      - part-inventory
   /api/v1/part-locations:
     get:
       parameters:
-      - description: Page
+      - description: Page size
         in: query
-        name: page
+        name: limit
         type: integer
-      - description: Size
+      - description: Offset
         in: query
-        name: page_size
+        name: offset
         type: integer
       produces:
       - application/json
@@ -11525,13 +11623,13 @@ paths:
   /api/v1/part-manufacturers:
     get:
       parameters:
-      - description: Page
+      - description: Page size
         in: query
-        name: page
+        name: limit
         type: integer
-      - description: Size
+      - description: Offset
         in: query
-        name: page_size
+        name: offset
         type: integer
       produces:
       - application/json
@@ -11652,13 +11750,13 @@ paths:
   /api/v1/parts:
     get:
       parameters:
-      - description: Page
+      - description: Page size
         in: query
-        name: page
+        name: limit
         type: integer
-      - description: Size
+      - description: Offset
         in: query
-        name: page_size
+        name: offset
         type: integer
       produces:
       - application/json
@@ -11783,6 +11881,14 @@ paths:
         in: path
         name: id
         required: true
+        type: integer
+      - description: Page size
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
         type: integer
       produces:
       - application/json
@@ -11920,16 +12026,61 @@ paths:
       summary: Update part-inventory
       tags:
       - part-inventory
+  /api/v1/purchase-order-line-items:
+    get:
+      description: Flat, filterable view of the rows nested under /purchase-orders/{id}/line-items,
+        so a form can reference a line item without draining every order.
+      parameters:
+      - description: Filter by purchase order
+        in: query
+        name: purchase_order_id
+        type: integer
+      - description: Filter by part
+        in: query
+        name: part_id
+        type: integer
+      - description: Page size
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PurchaseOrderLineItemPage'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List purchase order line items
+      tags:
+      - purchase-order-line-items
   /api/v1/purchase-orders:
     get:
       parameters:
-      - description: Page
+      - description: Page size
         in: query
-        name: page
+        name: limit
         type: integer
-      - description: Size
+      - description: Offset
         in: query
-        name: page_size
+        name: offset
         type: integer
       produces:
       - application/json
@@ -12054,6 +12205,14 @@ paths:
         in: path
         name: id
         required: true
+        type: integer
+      - description: Page size
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
         type: integer
       produces:
       - application/json
@@ -12194,13 +12353,13 @@ paths:
   /api/v1/roles:
     get:
       parameters:
-      - description: Page
+      - description: Page size
         in: query
-        name: page
+        name: limit
         type: integer
-      - description: Size
+      - description: Offset
         in: query
-        name: page_size
+        name: offset
         type: integer
       produces:
       - application/json
@@ -12321,13 +12480,13 @@ paths:
   /api/v1/service-entries:
     get:
       parameters:
-      - description: Page
+      - description: Page size
         in: query
-        name: page
+        name: limit
         type: integer
-      - description: Size
+      - description: Offset
         in: query
-        name: page_size
+        name: offset
         type: integer
       produces:
       - application/json
@@ -12452,6 +12611,14 @@ paths:
         in: path
         name: id
         required: true
+        type: integer
+      - description: Page size
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
         type: integer
       produces:
       - application/json
@@ -12597,13 +12764,21 @@ paths:
         name: id
         required: true
         type: integer
-      - description: Page
+      - description: Page size
         in: query
-        name: page
+        name: limit
         type: integer
-      - description: Size
+      - description: Offset
         in: query
-        name: page_size
+        name: offset
+        type: integer
+      - description: Page size
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
         type: integer
       produces:
       - application/json
@@ -12684,13 +12859,13 @@ paths:
   /api/v1/service-reminders:
     get:
       parameters:
-      - description: Page
+      - description: Page size
         in: query
-        name: page
+        name: limit
         type: integer
-      - description: Size
+      - description: Offset
         in: query
-        name: page_size
+        name: offset
         type: integer
       produces:
       - application/json
@@ -12811,13 +12986,13 @@ paths:
   /api/v1/service-tasks:
     get:
       parameters:
-      - description: Page
+      - description: Page size
         in: query
-        name: page
+        name: limit
         type: integer
-      - description: Size
+      - description: Offset
         in: query
-        name: page_size
+        name: offset
         type: integer
       produces:
       - application/json
@@ -12942,6 +13117,14 @@ paths:
         in: path
         name: id
         required: true
+        type: integer
+      - description: Page size
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
         type: integer
       produces:
       - application/json
@@ -13082,13 +13265,13 @@ paths:
   /api/v1/tire-assignment-requests:
     get:
       parameters:
-      - description: Page
+      - description: Page size
         in: query
-        name: page
+        name: limit
         type: integer
-      - description: Size
+      - description: Offset
         in: query
-        name: page_size
+        name: offset
         type: integer
       produces:
       - application/json
@@ -13263,13 +13446,13 @@ paths:
   /api/v1/tire-models:
     get:
       parameters:
-      - description: Page
+      - description: Page size
         in: query
-        name: page
+        name: limit
         type: integer
-      - description: Size
+      - description: Offset
         in: query
-        name: page_size
+        name: offset
         type: integer
       produces:
       - application/json
@@ -13390,13 +13573,13 @@ paths:
   /api/v1/tires:
     get:
       parameters:
-      - description: Page
+      - description: Page size
         in: query
-        name: page
+        name: limit
         type: integer
-      - description: Size
+      - description: Offset
         in: query
-        name: page_size
+        name: offset
         type: integer
       produces:
       - application/json
@@ -13521,6 +13704,14 @@ paths:
         in: path
         name: id
         required: true
+        type: integer
+      - description: Page size
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
         type: integer
       produces:
       - application/json
@@ -13666,6 +13857,14 @@ paths:
         name: id
         required: true
         type: integer
+      - description: Page size
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
+        type: integer
       produces:
       - application/json
       responses:
@@ -13809,6 +14008,14 @@ paths:
         in: path
         name: id
         required: true
+        type: integer
+      - description: Page size
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
         type: integer
       produces:
       - application/json
@@ -14241,13 +14448,13 @@ paths:
   /api/v1/vendors:
     get:
       parameters:
-      - description: Page
+      - description: Page size
         in: query
-        name: page
+        name: limit
         type: integer
-      - description: Size
+      - description: Offset
         in: query
-        name: page_size
+        name: offset
         type: integer
       produces:
       - application/json
@@ -14368,13 +14575,13 @@ paths:
   /api/v1/warranties:
     get:
       parameters:
-      - description: Page
+      - description: Page size
         in: query
-        name: page
+        name: limit
         type: integer
-      - description: Size
+      - description: Offset
         in: query
-        name: page_size
+        name: offset
         type: integer
       produces:
       - application/json
@@ -14495,13 +14702,13 @@ paths:
   /api/v1/weekly-mileage-goals:
     get:
       parameters:
-      - description: Page
+      - description: Page size
         in: query
-        name: page
+        name: limit
         type: integer
-      - description: Size
+      - description: Offset
         in: query
-        name: page_size
+        name: offset
         type: integer
       produces:
       - application/json
@@ -14627,13 +14834,21 @@ paths:
         name: id
         required: true
         type: integer
-      - description: Page
+      - description: Page size
         in: query
-        name: page
+        name: limit
         type: integer
-      - description: Size
+      - description: Offset
         in: query
-        name: page_size
+        name: offset
+        type: integer
+      - description: Page size
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
         type: integer
       produces:
       - application/json
@@ -14858,13 +15073,13 @@ paths:
   /api/v1/work-order-statuses:
     get:
       parameters:
-      - description: Page
+      - description: Page size
         in: query
-        name: page
+        name: limit
         type: integer
-      - description: Size
+      - description: Offset
         in: query
-        name: page_size
+        name: offset
         type: integer
       produces:
       - application/json
@@ -15281,13 +15496,21 @@ paths:
         name: id
         required: true
         type: integer
-      - description: Page
+      - description: Page size
         in: query
-        name: page
+        name: limit
         type: integer
-      - description: Size
+      - description: Offset
         in: query
-        name: page_size
+        name: offset
+        type: integer
+      - description: Page size
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
         type: integer
       produces:
       - application/json
@@ -15373,13 +15596,21 @@ paths:
         name: id
         required: true
         type: integer
-      - description: Page
+      - description: Page size
         in: query
-        name: page
+        name: limit
         type: integer
-      - description: Size
+      - description: Offset
         in: query
-        name: page_size
+        name: offset
+        type: integer
+      - description: Page size
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
         type: integer
       produces:
       - application/json
@@ -15464,6 +15695,14 @@ paths:
         in: path
         name: id
         required: true
+        type: integer
+      - description: Page size
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
         type: integer
       produces:
       - application/json
@@ -15608,6 +15847,14 @@ paths:
         in: path
         name: id
         required: true
+        type: integer
+      - description: Page size
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
         type: integer
       produces:
       - application/json

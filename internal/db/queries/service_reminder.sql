@@ -2,7 +2,7 @@
 SELECT * FROM service_reminder WHERE id = $1 AND company_id = $2;
 
 -- name: ListServiceReminders :many
-SELECT * FROM service_reminder WHERE company_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3;
+SELECT * FROM service_reminder WHERE company_id = $1 ORDER BY created_at DESC, id LIMIT $2 OFFSET $3;
 
 -- name: CountServiceReminders :one
 SELECT count(*) FROM service_reminder WHERE company_id = $1;

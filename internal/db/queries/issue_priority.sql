@@ -2,7 +2,7 @@
 SELECT * FROM issue_priority WHERE id = $1 AND company_id = $2;
 
 -- name: ListIssuePriorities :many
-SELECT * FROM issue_priority WHERE company_id = $1 ORDER BY position LIMIT $2 OFFSET $3;
+SELECT * FROM issue_priority WHERE company_id = $1 ORDER BY position, id LIMIT $2 OFFSET $3;
 
 -- name: CountIssuePriorities :one
 SELECT count(*) FROM issue_priority WHERE company_id = $1;

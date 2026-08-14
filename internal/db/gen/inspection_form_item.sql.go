@@ -165,7 +165,7 @@ func (q *Queries) GetInspectionFormItem(ctx context.Context, arg GetInspectionFo
 const listInspectionFormItems = `-- name: ListInspectionFormItems :many
 SELECT c.id, c.form_id, c.item_type, c.label, c.short_description, c.instructions, c.position, c.is_required, c.pass_label, c.fail_label, c.na_label, c.enable_na_option, c.require_remark_on_fail, c.require_remark_on_pass, c.require_photo_on_fail, c.require_meter_entry_photo_verification, c.require_secondary_meter_if_one_exists, c.type_config, c.created_at, c.updated_at FROM inspection_form_item c JOIN inspection_form p ON p.id = c.form_id
 WHERE c.form_id = $1 AND p.company_id = $2
-ORDER BY c.position LIMIT $4 OFFSET $3
+ORDER BY c.position, c.id LIMIT $4 OFFSET $3
 `
 
 type ListInspectionFormItemsParams struct {

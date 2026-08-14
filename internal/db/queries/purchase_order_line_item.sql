@@ -1,7 +1,7 @@
 -- name: ListPurchaseOrderLineItems :many
 SELECT c.* FROM purchase_order_line_item c JOIN purchase_order p ON p.id = c.purchase_order_id
 WHERE c.purchase_order_id = sqlc.arg(parent_id) AND p.company_id = sqlc.arg(company_id)
-ORDER BY c.position LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off);
+ORDER BY c.position, c.id LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off);
 
 -- name: CountPurchaseOrderLineItems :one
 SELECT count(*) FROM purchase_order_line_item c JOIN purchase_order p ON p.id = c.purchase_order_id WHERE c.purchase_order_id = sqlc.arg(parent_id) AND p.company_id = sqlc.arg(company_id);

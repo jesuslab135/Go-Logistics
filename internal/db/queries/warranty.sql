@@ -2,7 +2,7 @@
 SELECT * FROM warranty WHERE id = $1 AND company_id = $2;
 
 -- name: ListWarranties :many
-SELECT * FROM warranty WHERE company_id = $1 ORDER BY end_date DESC LIMIT $2 OFFSET $3;
+SELECT * FROM warranty WHERE company_id = $1 ORDER BY end_date DESC, id LIMIT $2 OFFSET $3;
 
 -- name: CountWarranties :one
 SELECT count(*) FROM warranty WHERE company_id = $1;

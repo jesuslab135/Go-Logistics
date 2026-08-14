@@ -108,7 +108,7 @@ func (q *Queries) GetAxleDefinition(ctx context.Context, arg GetAxleDefinitionPa
 const listAxleDefinitions = `-- name: ListAxleDefinitions :many
 SELECT c.id, c.template_id, c.position_index, c.label, c.axle_role, c.positions_per_side FROM axle_definition c JOIN axle_template p ON p.id = c.template_id
 WHERE c.template_id = $1 AND p.company_id = $2
-ORDER BY c.position_index LIMIT $4 OFFSET $3
+ORDER BY c.position_index, c.id LIMIT $4 OFFSET $3
 `
 
 type ListAxleDefinitionsParams struct {

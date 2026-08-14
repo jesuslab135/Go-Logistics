@@ -228,7 +228,7 @@ func (q *Queries) GetCatalogOption(ctx context.Context, arg GetCatalogOptionPara
 }
 
 const listAssetStatuses = `-- name: ListAssetStatuses :many
-SELECT id, company_id, name, color_code FROM asset_status WHERE company_id = $1 ORDER BY name LIMIT $2 OFFSET $3
+SELECT id, company_id, name, color_code FROM asset_status WHERE company_id = $1 ORDER BY name, id LIMIT $2 OFFSET $3
 `
 
 type ListAssetStatusesParams struct {
@@ -263,7 +263,7 @@ func (q *Queries) ListAssetStatuses(ctx context.Context, arg ListAssetStatusesPa
 }
 
 const listAssetTypes = `-- name: ListAssetTypes :many
-SELECT id, company_id, name, category, description FROM asset_type WHERE company_id = $1 ORDER BY name LIMIT $2 OFFSET $3
+SELECT id, company_id, name, category, description FROM asset_type WHERE company_id = $1 ORDER BY name, id LIMIT $2 OFFSET $3
 `
 
 type ListAssetTypesParams struct {
@@ -299,7 +299,7 @@ func (q *Queries) ListAssetTypes(ctx context.Context, arg ListAssetTypesParams) 
 }
 
 const listCatalogOptions = `-- name: ListCatalogOptions :many
-SELECT id, company_id, category, value FROM catalog_option WHERE company_id = $1 ORDER BY category, value LIMIT $2 OFFSET $3
+SELECT id, company_id, category, value FROM catalog_option WHERE company_id = $1 ORDER BY category, value, id LIMIT $2 OFFSET $3
 `
 
 type ListCatalogOptionsParams struct {

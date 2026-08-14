@@ -2,7 +2,7 @@
 SELECT * FROM media WHERE id = $1 AND company_id = $2;
 
 -- name: ListMediaItems :many
-SELECT * FROM media WHERE company_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3;
+SELECT * FROM media WHERE company_id = $1 ORDER BY created_at DESC, id LIMIT $2 OFFSET $3;
 
 -- name: CountMediaItems :one
 SELECT count(*) FROM media WHERE company_id = $1;

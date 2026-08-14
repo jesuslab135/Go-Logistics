@@ -126,7 +126,7 @@ func (q *Queries) GetWeeklyMileageGoal(ctx context.Context, arg GetWeeklyMileage
 }
 
 const listWeeklyMileageGoals = `-- name: ListWeeklyMileageGoals :many
-SELECT id, company_id, service_type, rate_per_mile, weekly_mileage_goal, mpg_goal, units_per_service, machines_in_workshop, missing_miles, sort_order, is_active, created_at, updated_at FROM weekly_mileage_goal WHERE company_id = $1 ORDER BY sort_order LIMIT $2 OFFSET $3
+SELECT id, company_id, service_type, rate_per_mile, weekly_mileage_goal, mpg_goal, units_per_service, machines_in_workshop, missing_miles, sort_order, is_active, created_at, updated_at FROM weekly_mileage_goal WHERE company_id = $1 ORDER BY sort_order, id LIMIT $2 OFFSET $3
 `
 
 type ListWeeklyMileageGoalsParams struct {

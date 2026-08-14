@@ -135,7 +135,7 @@ func (q *Queries) GetWorkOrderSubLineItem(ctx context.Context, arg GetWorkOrderS
 const listWorkOrderSubLineItems = `-- name: ListWorkOrderSubLineItems :many
 SELECT c.id, c.line_item_id, c.item_type, c.description, c.position, c.part_id, c.part_location_detail_id, c.technician_id, c.unit_cost, c.quantity, c.created_at, c.updated_at FROM work_order_sub_line_item c JOIN work_order_line_item p0 ON p0.id = c.line_item_id JOIN work_order p1 ON p1.id = p0.work_order_id
 WHERE c.line_item_id = $1 AND p1.company_id = $2
-ORDER BY c.position LIMIT $4 OFFSET $3
+ORDER BY c.position, c.id LIMIT $4 OFFSET $3
 `
 
 type ListWorkOrderSubLineItemsParams struct {

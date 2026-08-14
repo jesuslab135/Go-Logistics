@@ -183,7 +183,7 @@ func (q *Queries) GetFuelEntry(ctx context.Context, arg GetFuelEntryParams) (Fue
 const listFuelEntries = `-- name: ListFuelEntries :many
 SELECT c.id, c.asset_id, c.employee_id, c.date, c.fuel_type, c.quantity, c.unit_cost, c.total_cost, c.odometer, c.vendor_id, c.full_tank, c.miles_traveled, c.fuel_efficiency, c.state, c.reference, c.personal, c.reset, c.latitude, c.longitude, c.external_id, c.updated_at, c.no_semana, c.estado_prov, c.operator_name FROM fuel_entry c JOIN asset p ON p.id = c.asset_id
 WHERE c.asset_id = $1 AND p.company_id = $2
-ORDER BY c.date DESC LIMIT $4 OFFSET $3
+ORDER BY c.date DESC, c.id LIMIT $4 OFFSET $3
 `
 
 type ListFuelEntriesParams struct {

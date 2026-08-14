@@ -2,7 +2,7 @@
 SELECT * FROM inspection_submission WHERE id = $1 AND company_id = $2;
 
 -- name: ListInspectionSubmissions :many
-SELECT * FROM inspection_submission WHERE company_id = $1 ORDER BY submitted_at DESC LIMIT $2 OFFSET $3;
+SELECT * FROM inspection_submission WHERE company_id = $1 ORDER BY submitted_at DESC, id LIMIT $2 OFFSET $3;
 
 -- name: CountInspectionSubmissions :one
 SELECT count(*) FROM inspection_submission WHERE company_id = $1;

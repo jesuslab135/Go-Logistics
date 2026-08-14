@@ -150,7 +150,7 @@ func (q *Queries) GetServiceReminder(ctx context.Context, arg GetServiceReminder
 }
 
 const listServiceReminders = `-- name: ListServiceReminders :many
-SELECT id, company_id, asset_id, service_task_id, is_active, status, time_interval, time_frequency, next_due_at, due_soon_at, due_soon_time_threshold, meter_interval, next_due_meter_value, due_soon_meter_value, due_soon_meter_threshold, snooze_until, last_service_entry_id, created_at, updated_at FROM service_reminder WHERE company_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3
+SELECT id, company_id, asset_id, service_task_id, is_active, status, time_interval, time_frequency, next_due_at, due_soon_at, due_soon_time_threshold, meter_interval, next_due_meter_value, due_soon_meter_value, due_soon_meter_threshold, snooze_until, last_service_entry_id, created_at, updated_at FROM service_reminder WHERE company_id = $1 ORDER BY created_at DESC, id LIMIT $2 OFFSET $3
 `
 
 type ListServiceRemindersParams struct {

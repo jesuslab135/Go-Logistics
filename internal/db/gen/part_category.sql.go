@@ -92,7 +92,7 @@ func (q *Queries) GetPartCategory(ctx context.Context, arg GetPartCategoryParams
 }
 
 const listPartCategories = `-- name: ListPartCategories :many
-SELECT id, company_id, name, description, created_at FROM part_category WHERE company_id = $1 ORDER BY name LIMIT $2 OFFSET $3
+SELECT id, company_id, name, description, created_at FROM part_category WHERE company_id = $1 ORDER BY name, id LIMIT $2 OFFSET $3
 `
 
 type ListPartCategoriesParams struct {

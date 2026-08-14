@@ -103,7 +103,7 @@ func (q *Queries) GetWorkOrderStatus(ctx context.Context, arg GetWorkOrderStatus
 }
 
 const listWorkOrderStatuses = `-- name: ListWorkOrderStatuses :many
-SELECT id, company_id, name, description, color, is_default, marks_as_completed, position FROM work_order_status WHERE company_id = $1 ORDER BY position LIMIT $2 OFFSET $3
+SELECT id, company_id, name, description, color, is_default, marks_as_completed, position FROM work_order_status WHERE company_id = $1 ORDER BY position, id LIMIT $2 OFFSET $3
 `
 
 type ListWorkOrderStatusesParams struct {

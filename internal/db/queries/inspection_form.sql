@@ -2,7 +2,7 @@
 SELECT * FROM inspection_form WHERE id = $1 AND company_id = $2;
 
 -- name: ListInspectionForms :many
-SELECT * FROM inspection_form WHERE company_id = $1 ORDER BY title LIMIT $2 OFFSET $3;
+SELECT * FROM inspection_form WHERE company_id = $1 ORDER BY title, id LIMIT $2 OFFSET $3;
 
 -- name: CountInspectionForms :one
 SELECT count(*) FROM inspection_form WHERE company_id = $1;

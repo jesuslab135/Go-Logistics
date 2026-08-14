@@ -1,7 +1,7 @@
 -- name: ListFuelPhotos :many
 SELECT c.* FROM fuel_photo c JOIN fuel_entry p0 ON p0.id = c.entry_id JOIN asset p1 ON p1.id = p0.asset_id
 WHERE c.entry_id = sqlc.arg(parent_id) AND p1.company_id = sqlc.arg(company_id)
-ORDER BY c.uploaded_at DESC LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off);
+ORDER BY c.uploaded_at DESC, c.id LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off);
 
 -- name: CountFuelPhotos :one
 SELECT count(*) FROM fuel_photo c JOIN fuel_entry p0 ON p0.id = c.entry_id JOIN asset p1 ON p1.id = p0.asset_id WHERE c.entry_id = sqlc.arg(parent_id) AND p1.company_id = sqlc.arg(company_id);

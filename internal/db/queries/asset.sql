@@ -2,7 +2,7 @@
 SELECT * FROM asset WHERE id = $1 AND company_id = $2;
 
 -- name: ListAssets :many
-SELECT * FROM asset WHERE company_id = $1 ORDER BY name LIMIT $2 OFFSET $3;
+SELECT * FROM asset WHERE company_id = $1 ORDER BY name, id LIMIT $2 OFFSET $3;
 
 -- name: CountAssets :one
 SELECT count(*) FROM asset WHERE company_id = $1;

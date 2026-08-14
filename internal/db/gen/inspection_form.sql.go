@@ -116,7 +116,7 @@ func (q *Queries) GetInspectionForm(ctx context.Context, arg GetInspectionFormPa
 }
 
 const listInspectionForms = `-- name: ListInspectionForms :many
-SELECT id, company_id, title, description, version, require_live_photo, auto_create_issues, color, archived_at, created_at, updated_at FROM inspection_form WHERE company_id = $1 ORDER BY title LIMIT $2 OFFSET $3
+SELECT id, company_id, title, description, version, require_live_photo, auto_create_issues, color, archived_at, created_at, updated_at FROM inspection_form WHERE company_id = $1 ORDER BY title, id LIMIT $2 OFFSET $3
 `
 
 type ListInspectionFormsParams struct {

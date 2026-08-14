@@ -127,7 +127,7 @@ func (q *Queries) GetPurchaseOrderLineItem(ctx context.Context, arg GetPurchaseO
 const listPurchaseOrderLineItems = `-- name: ListPurchaseOrderLineItems :many
 SELECT c.id, c.purchase_order_id, c.part_id, c.quantity, c.total_received, c.unit_cost, c.subtotal, c.position, c.created_at, c.updated_at FROM purchase_order_line_item c JOIN purchase_order p ON p.id = c.purchase_order_id
 WHERE c.purchase_order_id = $1 AND p.company_id = $2
-ORDER BY c.position LIMIT $4 OFFSET $3
+ORDER BY c.position, c.id LIMIT $4 OFFSET $3
 `
 
 type ListPurchaseOrderLineItemsParams struct {

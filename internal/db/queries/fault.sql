@@ -2,7 +2,7 @@
 SELECT * FROM fault WHERE id = $1 AND company_id = $2;
 
 -- name: ListFaults :many
-SELECT * FROM fault WHERE company_id = $1 ORDER BY code LIMIT $2 OFFSET $3;
+SELECT * FROM fault WHERE company_id = $1 ORDER BY code, id LIMIT $2 OFFSET $3;
 
 -- name: CountFaults :one
 SELECT count(*) FROM fault WHERE company_id = $1;

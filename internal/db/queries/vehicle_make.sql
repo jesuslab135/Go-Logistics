@@ -2,7 +2,7 @@
 SELECT * FROM vehicle_make WHERE id = $1 AND company_id = $2;
 
 -- name: ListVehicleMakes :many
-SELECT * FROM vehicle_make WHERE company_id = $1 ORDER BY name LIMIT $2 OFFSET $3;
+SELECT * FROM vehicle_make WHERE company_id = $1 ORDER BY name, id LIMIT $2 OFFSET $3;
 
 -- name: CountVehicleMakes :one
 SELECT count(*) FROM vehicle_make WHERE company_id = $1;
@@ -24,7 +24,7 @@ DELETE FROM vehicle_make WHERE id = $1 AND company_id = $2;
 SELECT * FROM vehicle_model WHERE id = $1 AND company_id = $2;
 
 -- name: ListVehicleModels :many
-SELECT * FROM vehicle_model WHERE company_id = $1 ORDER BY name LIMIT $2 OFFSET $3;
+SELECT * FROM vehicle_model WHERE company_id = $1 ORDER BY name, id LIMIT $2 OFFSET $3;
 
 -- name: CountVehicleModels :one
 SELECT count(*) FROM vehicle_model WHERE company_id = $1;

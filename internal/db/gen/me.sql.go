@@ -73,7 +73,7 @@ SELECT c.id, c.name, c.logo
 FROM company c
 JOIN employee_companies ec ON ec.company_id = c.id
 WHERE ec.employee_id = $1
-ORDER BY c.name
+ORDER BY c.name, c.id
 `
 
 type ListMyCompaniesRow struct {

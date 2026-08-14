@@ -108,7 +108,7 @@ func (q *Queries) GetServiceTask(ctx context.Context, arg GetServiceTaskParams) 
 }
 
 const listServiceTasks = `-- name: ListServiceTasks :many
-SELECT id, company_id, name, description, expected_duration_seconds, parent_task_id, archived_at, created_at, updated_at FROM service_task WHERE company_id = $1 ORDER BY name LIMIT $2 OFFSET $3
+SELECT id, company_id, name, description, expected_duration_seconds, parent_task_id, archived_at, created_at, updated_at FROM service_task WHERE company_id = $1 ORDER BY name, id LIMIT $2 OFFSET $3
 `
 
 type ListServiceTasksParams struct {

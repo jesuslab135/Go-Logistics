@@ -101,7 +101,7 @@ func (q *Queries) GetWorkOrderStatusLog(ctx context.Context, arg GetWorkOrderSta
 const listWorkOrderStatusLogs = `-- name: ListWorkOrderStatusLogs :many
 SELECT c.id, c.work_order_id, c.status_id, c.changed_at FROM work_order_status_log c JOIN work_order p ON p.id = c.work_order_id
 WHERE c.work_order_id = $1 AND p.company_id = $2
-ORDER BY c.changed_at DESC LIMIT $4 OFFSET $3
+ORDER BY c.changed_at DESC, c.id LIMIT $4 OFFSET $3
 `
 
 type ListWorkOrderStatusLogsParams struct {

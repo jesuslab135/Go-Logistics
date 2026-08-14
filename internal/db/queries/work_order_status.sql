@@ -2,7 +2,7 @@
 SELECT * FROM work_order_status WHERE id = $1 AND company_id = $2;
 
 -- name: ListWorkOrderStatuses :many
-SELECT * FROM work_order_status WHERE company_id = $1 ORDER BY position LIMIT $2 OFFSET $3;
+SELECT * FROM work_order_status WHERE company_id = $1 ORDER BY position, id LIMIT $2 OFFSET $3;
 
 -- name: CountWorkOrderStatuses :one
 SELECT count(*) FROM work_order_status WHERE company_id = $1;

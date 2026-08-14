@@ -146,7 +146,7 @@ func (q *Queries) GetPart(ctx context.Context, arg GetPartParams) (Part, error) 
 }
 
 const listParts = `-- name: ListParts :many
-SELECT id, company_id, part_number, description, useful_life_months, useful_life_distance, part_category_id, part_manufacturer_id, measurement_unit_id, manufacturer_part_number, supplier_part_number, upc, unit_cost, inventory_item, archived_at, custom_fields, created_at, updated_at FROM part WHERE company_id = $1 ORDER BY part_number LIMIT $2 OFFSET $3
+SELECT id, company_id, part_number, description, useful_life_months, useful_life_distance, part_category_id, part_manufacturer_id, measurement_unit_id, manufacturer_part_number, supplier_part_number, upc, unit_cost, inventory_item, archived_at, custom_fields, created_at, updated_at FROM part WHERE company_id = $1 ORDER BY part_number, id LIMIT $2 OFFSET $3
 `
 
 type ListPartsParams struct {

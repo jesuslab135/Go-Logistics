@@ -1,7 +1,7 @@
 -- name: ListFuelEntries :many
 SELECT c.* FROM fuel_entry c JOIN asset p ON p.id = c.asset_id
 WHERE c.asset_id = sqlc.arg(parent_id) AND p.company_id = sqlc.arg(company_id)
-ORDER BY c.date DESC LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off);
+ORDER BY c.date DESC, c.id LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off);
 
 -- name: CountFuelEntries :one
 SELECT count(*) FROM fuel_entry c JOIN asset p ON p.id = c.asset_id WHERE c.asset_id = sqlc.arg(parent_id) AND p.company_id = sqlc.arg(company_id);

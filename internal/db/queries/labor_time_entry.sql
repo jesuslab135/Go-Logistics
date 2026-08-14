@@ -1,7 +1,7 @@
 -- name: ListLaborTimeEntries :many
 SELECT c.* FROM labor_time_entry c JOIN work_order_sub_line_item p0 ON p0.id = c.sub_line_item_id JOIN work_order_line_item p1 ON p1.id = p0.line_item_id JOIN work_order p2 ON p2.id = p1.work_order_id
 WHERE c.sub_line_item_id = sqlc.arg(parent_id) AND p2.company_id = sqlc.arg(company_id)
-ORDER BY c.started_at DESC LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off);
+ORDER BY c.started_at DESC, c.id LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off);
 
 -- name: CountLaborTimeEntries :one
 SELECT count(*) FROM labor_time_entry c JOIN work_order_sub_line_item p0 ON p0.id = c.sub_line_item_id JOIN work_order_line_item p1 ON p1.id = p0.line_item_id JOIN work_order p2 ON p2.id = p1.work_order_id WHERE c.sub_line_item_id = sqlc.arg(parent_id) AND p2.company_id = sqlc.arg(company_id);

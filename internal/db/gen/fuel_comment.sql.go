@@ -109,7 +109,7 @@ func (q *Queries) GetFuelComment(ctx context.Context, arg GetFuelCommentParams) 
 const listFuelComments = `-- name: ListFuelComments :many
 SELECT c.id, c.entry_id, c.employee_id, c.text, c.created_at, c.updated_at FROM fuel_comment c JOIN fuel_entry p0 ON p0.id = c.entry_id JOIN asset p1 ON p1.id = p0.asset_id
 WHERE c.entry_id = $1 AND p1.company_id = $2
-ORDER BY c.created_at DESC LIMIT $4 OFFSET $3
+ORDER BY c.created_at DESC, c.id LIMIT $4 OFFSET $3
 `
 
 type ListFuelCommentsParams struct {

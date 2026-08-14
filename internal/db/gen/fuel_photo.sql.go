@@ -125,7 +125,7 @@ func (q *Queries) GetFuelPhoto(ctx context.Context, arg GetFuelPhotoParams) (Fue
 const listFuelPhotos = `-- name: ListFuelPhotos :many
 SELECT c.id, c.entry_id, c.uploaded_by_id, c.file, c.file_name, c.file_size, c.mime_type, c.description, c.uploaded_at, c.is_primary FROM fuel_photo c JOIN fuel_entry p0 ON p0.id = c.entry_id JOIN asset p1 ON p1.id = p0.asset_id
 WHERE c.entry_id = $1 AND p1.company_id = $2
-ORDER BY c.uploaded_at DESC LIMIT $4 OFFSET $3
+ORDER BY c.uploaded_at DESC, c.id LIMIT $4 OFFSET $3
 `
 
 type ListFuelPhotosParams struct {

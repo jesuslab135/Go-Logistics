@@ -39,7 +39,7 @@ WHERE e.id = sqlc.arg(id)
 -- name: ListEmployees :many
 SELECT e.* FROM employee e
 WHERE EXISTS (SELECT 1 FROM employee_companies ec WHERE ec.employee_id = e.id AND ec.company_id = sqlc.arg(company_id))
-ORDER BY e.last_name, e.first_name
+ORDER BY e.last_name, e.first_name, e.id
 LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off);
 
 -- name: CountEmployees :one

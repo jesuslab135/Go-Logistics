@@ -104,7 +104,7 @@ func (q *Queries) GetComment(ctx context.Context, arg GetCommentParams) (Comment
 }
 
 const listComments = `-- name: ListComments :many
-SELECT id, company_id, content_type_id, object_id, body, author_id, created_at, updated_at FROM comment WHERE company_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3
+SELECT id, company_id, content_type_id, object_id, body, author_id, created_at, updated_at FROM comment WHERE company_id = $1 ORDER BY created_at DESC, id LIMIT $2 OFFSET $3
 `
 
 type ListCommentsParams struct {

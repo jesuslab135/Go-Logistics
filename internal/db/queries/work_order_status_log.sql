@@ -1,7 +1,7 @@
 -- name: ListWorkOrderStatusLogs :many
 SELECT c.* FROM work_order_status_log c JOIN work_order p ON p.id = c.work_order_id
 WHERE c.work_order_id = sqlc.arg(parent_id) AND p.company_id = sqlc.arg(company_id)
-ORDER BY c.changed_at DESC LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off);
+ORDER BY c.changed_at DESC, c.id LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off);
 
 -- name: CountWorkOrderStatusLogs :one
 SELECT count(*) FROM work_order_status_log c JOIN work_order p ON p.id = c.work_order_id WHERE c.work_order_id = sqlc.arg(parent_id) AND p.company_id = sqlc.arg(company_id);

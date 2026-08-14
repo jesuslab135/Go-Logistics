@@ -92,7 +92,7 @@ func (q *Queries) GetMeasurementUnit(ctx context.Context, arg GetMeasurementUnit
 }
 
 const listMeasurementUnits = `-- name: ListMeasurementUnits :many
-SELECT id, company_id, name, abbreviation, created_at FROM measurement_unit WHERE company_id = $1 ORDER BY name LIMIT $2 OFFSET $3
+SELECT id, company_id, name, abbreviation, created_at FROM measurement_unit WHERE company_id = $1 ORDER BY name, id LIMIT $2 OFFSET $3
 `
 
 type ListMeasurementUnitsParams struct {

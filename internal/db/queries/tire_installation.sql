@@ -1,7 +1,7 @@
 -- name: ListTireInstallations :many
 SELECT c.* FROM tire_installation c JOIN tire p ON p.id = c.tire_id
 WHERE c.tire_id = sqlc.arg(parent_id) AND p.company_id = sqlc.arg(company_id)
-ORDER BY c.install_date DESC LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off);
+ORDER BY c.install_date DESC, c.id LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off);
 
 -- name: CountTireInstallations :one
 SELECT count(*) FROM tire_installation c JOIN tire p ON p.id = c.tire_id WHERE c.tire_id = sqlc.arg(parent_id) AND p.company_id = sqlc.arg(company_id);

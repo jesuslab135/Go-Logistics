@@ -113,7 +113,7 @@ func (q *Queries) GetRole(ctx context.Context, arg GetRoleParams) (Role, error) 
 }
 
 const listRoles = `-- name: ListRoles :many
-SELECT id, company_id, name, is_admin, permissions FROM role WHERE company_id = $1 ORDER BY name LIMIT $2 OFFSET $3
+SELECT id, company_id, name, is_admin, permissions FROM role WHERE company_id = $1 ORDER BY name, id LIMIT $2 OFFSET $3
 `
 
 type ListRolesParams struct {

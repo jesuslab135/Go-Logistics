@@ -6,8 +6,8 @@ package handler
 //	@Tags	parts
 //	@Security	BearerAuth
 //	@Produce	json
-//	@Param	page	query	int	false	"Page"
-//	@Param	page_size	query	int	false	"Size"
+//	@Param	limit	query	int	false	"Page size"
+//	@Param	offset	query	int	false	"Offset"
 //	@Success	200	{object}	dto.PartPage
 //	@Failure	401	{object}	dto.ErrorResponse
 //	@Router	/api/v1/parts [get]

@@ -106,7 +106,7 @@ func (q *Queries) GetServiceTaskPart(ctx context.Context, arg GetServiceTaskPart
 const listServiceTaskParts = `-- name: ListServiceTaskParts :many
 SELECT c.id, c.service_task_id, c.part_id, c.quantity, c.position FROM service_task_part c JOIN service_task p ON p.id = c.service_task_id
 WHERE c.service_task_id = $1 AND p.company_id = $2
-ORDER BY c.position LIMIT $4 OFFSET $3
+ORDER BY c.position, c.id LIMIT $4 OFFSET $3
 `
 
 type ListServiceTaskPartsParams struct {

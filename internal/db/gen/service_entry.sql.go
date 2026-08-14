@@ -190,7 +190,7 @@ func (q *Queries) GetServiceEntry(ctx context.Context, arg GetServiceEntryParams
 }
 
 const listServiceEntries = `-- name: ListServiceEntries :many
-SELECT id, company_id, reference, status, asset_id, vendor_id, work_order_id, started_at, completed_at, meter_value, parts_subtotal, labor_subtotal, subtotal, discount, discount_type, tax_1, tax_1_type, tax_1_percentage, tax_2, tax_2_type, tax_2_percentage, total_amount, general_notes, is_roadside_assistance, labor_time_seconds, labels, custom_fields, created_at, updated_at FROM service_entry WHERE company_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3
+SELECT id, company_id, reference, status, asset_id, vendor_id, work_order_id, started_at, completed_at, meter_value, parts_subtotal, labor_subtotal, subtotal, discount, discount_type, tax_1, tax_1_type, tax_1_percentage, tax_2, tax_2_type, tax_2_percentage, total_amount, general_notes, is_roadside_assistance, labor_time_seconds, labels, custom_fields, created_at, updated_at FROM service_entry WHERE company_id = $1 ORDER BY created_at DESC, id LIMIT $2 OFFSET $3
 `
 
 type ListServiceEntriesParams struct {

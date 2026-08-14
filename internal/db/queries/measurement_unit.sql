@@ -2,7 +2,7 @@
 SELECT * FROM measurement_unit WHERE id = $1 AND company_id = $2;
 
 -- name: ListMeasurementUnits :many
-SELECT * FROM measurement_unit WHERE company_id = $1 ORDER BY name LIMIT $2 OFFSET $3;
+SELECT * FROM measurement_unit WHERE company_id = $1 ORDER BY name, id LIMIT $2 OFFSET $3;
 
 -- name: CountMeasurementUnits :one
 SELECT count(*) FROM measurement_unit WHERE company_id = $1;

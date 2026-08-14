@@ -1,7 +1,7 @@
 -- name: ListWheelPositionDefinitions :many
 SELECT c.* FROM wheel_position_definition c JOIN axle_definition p0 ON p0.id = c.axle_id JOIN axle_template p1 ON p1.id = p0.template_id
 WHERE c.axle_id = sqlc.arg(parent_id) AND p1.company_id = sqlc.arg(company_id)
-ORDER BY c.slot LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off);
+ORDER BY c.slot, c.id LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off);
 
 -- name: CountWheelPositionDefinitions :one
 SELECT count(*) FROM wheel_position_definition c JOIN axle_definition p0 ON p0.id = c.axle_id JOIN axle_template p1 ON p1.id = p0.template_id WHERE c.axle_id = sqlc.arg(parent_id) AND p1.company_id = sqlc.arg(company_id);

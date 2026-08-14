@@ -108,7 +108,7 @@ func (q *Queries) GetPartLocation(ctx context.Context, arg GetPartLocationParams
 }
 
 const listPartLocations = `-- name: ListPartLocations :many
-SELECT id, company_id, name, address, city, region, location_id, created_at, updated_at FROM part_location WHERE company_id = $1 ORDER BY name LIMIT $2 OFFSET $3
+SELECT id, company_id, name, address, city, region, location_id, created_at, updated_at FROM part_location WHERE company_id = $1 ORDER BY name, id LIMIT $2 OFFSET $3
 `
 
 type ListPartLocationsParams struct {

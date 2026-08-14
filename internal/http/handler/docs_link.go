@@ -12,8 +12,10 @@ package handler
 //	@Security	BearerAuth
 //	@Produce	json
 //	@Param	id	path	int	true	"issue id"
-//	@Param	page	query	int	false	"Page"
-//	@Param	page_size	query	int	false	"Size"
+//	@Param	limit	query	int	false	"Page size"
+//	@Param	offset	query	int	false	"Offset"
+//	@Param	limit	query	int	false	"Page size"
+//	@Param	offset	query	int	false	"Offset"
 //	@Success	200	{object}	dto.EmployeePage
 //	@Failure	401	{object}	dto.ErrorResponse
 //	@Router	/api/v1/issues/{id}/assigned-to [get]
@@ -53,8 +55,10 @@ func docRemoveIssueAssignee() {}
 //	@Security	BearerAuth
 //	@Produce	json
 //	@Param	id	path	int	true	"issue id"
-//	@Param	page	query	int	false	"Page"
-//	@Param	page_size	query	int	false	"Size"
+//	@Param	limit	query	int	false	"Page size"
+//	@Param	offset	query	int	false	"Offset"
+//	@Param	limit	query	int	false	"Page size"
+//	@Param	offset	query	int	false	"Offset"
 //	@Success	200	{object}	dto.EmployeePage
 //	@Failure	401	{object}	dto.ErrorResponse
 //	@Router	/api/v1/issues/{id}/watchers [get]
@@ -94,8 +98,10 @@ func docRemoveIssueWatcher() {}
 //	@Security	BearerAuth
 //	@Produce	json
 //	@Param	id	path	int	true	"work order id"
-//	@Param	page	query	int	false	"Page"
-//	@Param	page_size	query	int	false	"Size"
+//	@Param	limit	query	int	false	"Page size"
+//	@Param	offset	query	int	false	"Offset"
+//	@Param	limit	query	int	false	"Page size"
+//	@Param	offset	query	int	false	"Offset"
 //	@Success	200	{object}	dto.IssuePage
 //	@Failure	401	{object}	dto.ErrorResponse
 //	@Router	/api/v1/work-orders/{id}/issues [get]
@@ -135,8 +141,10 @@ func docRemoveWorkOrderIssue() {}
 //	@Security	BearerAuth
 //	@Produce	json
 //	@Param	id	path	int	true	"work order id"
-//	@Param	page	query	int	false	"Page"
-//	@Param	page_size	query	int	false	"Size"
+//	@Param	limit	query	int	false	"Page size"
+//	@Param	offset	query	int	false	"Offset"
+//	@Param	limit	query	int	false	"Page size"
+//	@Param	offset	query	int	false	"Offset"
 //	@Success	200	{object}	dto.FaultPage
 //	@Failure	401	{object}	dto.ErrorResponse
 //	@Router	/api/v1/work-orders/{id}/faults [get]
@@ -176,8 +184,10 @@ func docRemoveWorkOrderFault() {}
 //	@Security	BearerAuth
 //	@Produce	json
 //	@Param	id	path	int	true	"service entry line item id"
-//	@Param	page	query	int	false	"Page"
-//	@Param	page_size	query	int	false	"Size"
+//	@Param	limit	query	int	false	"Page size"
+//	@Param	offset	query	int	false	"Offset"
+//	@Param	limit	query	int	false	"Page size"
+//	@Param	offset	query	int	false	"Offset"
 //	@Success	200	{object}	dto.IssuePage
 //	@Failure	401	{object}	dto.ErrorResponse
 //	@Router	/api/v1/service-entry-line-items/{id}/issues [get]
@@ -217,8 +227,10 @@ func docRemoveServiceEntryLineItemIssue() {}
 //	@Security	BearerAuth
 //	@Produce	json
 //	@Param	id	path	int	true	"work order line item id"
-//	@Param	page	query	int	false	"Page"
-//	@Param	page_size	query	int	false	"Size"
+//	@Param	limit	query	int	false	"Page size"
+//	@Param	offset	query	int	false	"Offset"
+//	@Param	limit	query	int	false	"Page size"
+//	@Param	offset	query	int	false	"Offset"
 //	@Success	200	{object}	dto.IssuePage
 //	@Failure	401	{object}	dto.ErrorResponse
 //	@Router	/api/v1/work-order-line-items/{id}/issues [get]

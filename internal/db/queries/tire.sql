@@ -2,7 +2,7 @@
 SELECT * FROM tire WHERE id = $1 AND company_id = $2;
 
 -- name: ListTires :many
-SELECT * FROM tire WHERE company_id = $1 ORDER BY tire_identification_number LIMIT $2 OFFSET $3;
+SELECT * FROM tire WHERE company_id = $1 ORDER BY tire_identification_number, id LIMIT $2 OFFSET $3;
 
 -- name: CountTires :one
 SELECT count(*) FROM tire WHERE company_id = $1;

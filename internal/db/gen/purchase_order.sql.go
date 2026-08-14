@@ -210,7 +210,7 @@ func (q *Queries) GetPurchaseOrder(ctx context.Context, arg GetPurchaseOrderPara
 }
 
 const listPurchaseOrders = `-- name: ListPurchaseOrders :many
-SELECT id, company_id, number, description, state, vendor_id, destination_id, discount_type, discount, discount_percentage, tax_1_type, tax_1, tax_1_percentage, tax_2_type, tax_2, tax_2_percentage, shipping, subtotal, total_amount, created_by_id, submitted_at, submitted_by_id, rejected_at, rejected_by_id, approved_at, approved_by_id, purchased_at, received_partial_at, received_full_at, closed_at, labels, custom_fields, created_at, updated_at FROM purchase_order WHERE company_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3
+SELECT id, company_id, number, description, state, vendor_id, destination_id, discount_type, discount, discount_percentage, tax_1_type, tax_1, tax_1_percentage, tax_2_type, tax_2, tax_2_percentage, shipping, subtotal, total_amount, created_by_id, submitted_at, submitted_by_id, rejected_at, rejected_by_id, approved_at, approved_by_id, purchased_at, received_partial_at, received_full_at, closed_at, labels, custom_fields, created_at, updated_at FROM purchase_order WHERE company_id = $1 ORDER BY created_at DESC, id LIMIT $2 OFFSET $3
 `
 
 type ListPurchaseOrdersParams struct {

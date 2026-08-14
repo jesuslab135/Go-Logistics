@@ -120,7 +120,7 @@ func (q *Queries) GetMedium(ctx context.Context, arg GetMediumParams) (Medium, e
 }
 
 const listMediaItems = `-- name: ListMediaItems :many
-SELECT id, company_id, asset_id, file, title, description, file_type, file_size, uploaded_by_id, created_at, updated_at, thumbnail FROM media WHERE company_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3
+SELECT id, company_id, asset_id, file, title, description, file_type, file_size, uploaded_by_id, created_at, updated_at, thumbnail FROM media WHERE company_id = $1 ORDER BY created_at DESC, id LIMIT $2 OFFSET $3
 `
 
 type ListMediaItemsParams struct {

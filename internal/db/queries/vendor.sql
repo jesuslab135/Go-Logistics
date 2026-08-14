@@ -2,7 +2,7 @@
 SELECT * FROM vendor WHERE id = $1 AND company_id = $2;
 
 -- name: ListVendors :many
-SELECT * FROM vendor WHERE company_id = $1 ORDER BY name LIMIT $2 OFFSET $3;
+SELECT * FROM vendor WHERE company_id = $1 ORDER BY name, id LIMIT $2 OFFSET $3;
 
 -- name: CountVendors :one
 SELECT count(*) FROM vendor WHERE company_id = $1;

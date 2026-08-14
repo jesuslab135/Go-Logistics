@@ -1,7 +1,7 @@
 -- name: ListAxleDefinitions :many
 SELECT c.* FROM axle_definition c JOIN axle_template p ON p.id = c.template_id
 WHERE c.template_id = sqlc.arg(parent_id) AND p.company_id = sqlc.arg(company_id)
-ORDER BY c.position_index LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off);
+ORDER BY c.position_index, c.id LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off);
 
 -- name: CountAxleDefinitions :one
 SELECT count(*) FROM axle_definition c JOIN axle_template p ON p.id = c.template_id WHERE c.template_id = sqlc.arg(parent_id) AND p.company_id = sqlc.arg(company_id);

@@ -2,7 +2,7 @@
 SELECT * FROM purchase_order WHERE id = $1 AND company_id = $2;
 
 -- name: ListPurchaseOrders :many
-SELECT * FROM purchase_order WHERE company_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3;
+SELECT * FROM purchase_order WHERE company_id = $1 ORDER BY created_at DESC, id LIMIT $2 OFFSET $3;
 
 -- name: CountPurchaseOrders :one
 SELECT count(*) FROM purchase_order WHERE company_id = $1;

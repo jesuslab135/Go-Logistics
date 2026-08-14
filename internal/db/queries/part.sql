@@ -2,7 +2,7 @@
 SELECT * FROM part WHERE id = $1 AND company_id = $2;
 
 -- name: ListParts :many
-SELECT * FROM part WHERE company_id = $1 ORDER BY part_number LIMIT $2 OFFSET $3;
+SELECT * FROM part WHERE company_id = $1 ORDER BY part_number, id LIMIT $2 OFFSET $3;
 
 -- name: CountParts :one
 SELECT count(*) FROM part WHERE company_id = $1;

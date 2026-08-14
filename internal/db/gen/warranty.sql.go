@@ -108,7 +108,7 @@ func (q *Queries) GetWarranty(ctx context.Context, arg GetWarrantyParams) (Warra
 }
 
 const listWarranties = `-- name: ListWarranties :many
-SELECT id, company_id, provider_id, asset_id, part_id, start_date, end_date, terms, is_active FROM warranty WHERE company_id = $1 ORDER BY end_date DESC LIMIT $2 OFFSET $3
+SELECT id, company_id, provider_id, asset_id, part_id, start_date, end_date, terms, is_active FROM warranty WHERE company_id = $1 ORDER BY end_date DESC, id LIMIT $2 OFFSET $3
 `
 
 type ListWarrantiesParams struct {

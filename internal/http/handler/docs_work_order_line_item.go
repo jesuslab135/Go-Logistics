@@ -7,6 +7,8 @@ package handler
 //	@Security	BearerAuth
 //	@Produce	json
 //	@Param	id	path	int	true	"parent id"
+//	@Param	limit	query	int	false	"Page size"
+//	@Param	offset	query	int	false	"Offset"
 //	@Success	200	{object}	dto.WorkOrderLineItemPage
 //	@Failure	401	{object}	dto.ErrorResponse
 //	@Router	/api/v1/work-orders/{id}/line-items [get]

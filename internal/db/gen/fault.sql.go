@@ -99,7 +99,7 @@ func (q *Queries) GetFault(ctx context.Context, arg GetFaultParams) (Fault, erro
 }
 
 const listFaults = `-- name: ListFaults :many
-SELECT id, company_id, family, code, name, description, applies_to_asset_types FROM fault WHERE company_id = $1 ORDER BY code LIMIT $2 OFFSET $3
+SELECT id, company_id, family, code, name, description, applies_to_asset_types FROM fault WHERE company_id = $1 ORDER BY code, id LIMIT $2 OFFSET $3
 `
 
 type ListFaultsParams struct {

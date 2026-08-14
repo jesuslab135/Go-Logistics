@@ -2,7 +2,7 @@
 SELECT * FROM work_order WHERE id = $1 AND company_id = $2;
 
 -- name: ListWorkOrders :many
-SELECT * FROM work_order WHERE company_id = $1 ORDER BY issued_at DESC LIMIT $2 OFFSET $3;
+SELECT * FROM work_order WHERE company_id = $1 ORDER BY issued_at DESC, id LIMIT $2 OFFSET $3;
 
 -- name: CountWorkOrders :one
 SELECT count(*) FROM work_order WHERE company_id = $1;

@@ -1,7 +1,7 @@
 -- name: ListServiceTaskParts :many
 SELECT c.* FROM service_task_part c JOIN service_task p ON p.id = c.service_task_id
 WHERE c.service_task_id = sqlc.arg(parent_id) AND p.company_id = sqlc.arg(company_id)
-ORDER BY c.position LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off);
+ORDER BY c.position, c.id LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off);
 
 -- name: CountServiceTaskParts :one
 SELECT count(*) FROM service_task_part c JOIN service_task p ON p.id = c.service_task_id WHERE c.service_task_id = sqlc.arg(parent_id) AND p.company_id = sqlc.arg(company_id);

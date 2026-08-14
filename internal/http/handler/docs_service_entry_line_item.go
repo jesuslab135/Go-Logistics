@@ -7,6 +7,8 @@ package handler
 //	@Security	BearerAuth
 //	@Produce	json
 //	@Param	id	path	int	true	"parent id"
+//	@Param	limit	query	int	false	"Page size"
+//	@Param	offset	query	int	false	"Offset"
 //	@Success	200	{object}	dto.ServiceEntryLineItemPage
 //	@Failure	401	{object}	dto.ErrorResponse
 //	@Router	/api/v1/service-entries/{id}/line-items [get]

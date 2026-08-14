@@ -150,7 +150,7 @@ func (q *Queries) GetTireAssignmentRequestForUpdate(ctx context.Context, arg Get
 }
 
 const listTireAssignmentRequests = `-- name: ListTireAssignmentRequests :many
-SELECT id, company_id, tire_id, vehicle_id, position_code, state, requested_by_id, requested_at, approved_by_id, resolved_at, rejection_reason, notes FROM tire_assignment_request WHERE company_id = $1 ORDER BY requested_at DESC LIMIT $2 OFFSET $3
+SELECT id, company_id, tire_id, vehicle_id, position_code, state, requested_by_id, requested_at, approved_by_id, resolved_at, rejection_reason, notes FROM tire_assignment_request WHERE company_id = $1 ORDER BY requested_at DESC, id LIMIT $2 OFFSET $3
 `
 
 type ListTireAssignmentRequestsParams struct {

@@ -91,7 +91,7 @@ func (q *Queries) GetAxleTemplate(ctx context.Context, arg GetAxleTemplateParams
 }
 
 const listAxleTemplates = `-- name: ListAxleTemplates :many
-SELECT id, company_id, name, description, total_positions FROM axle_template WHERE company_id = $1 ORDER BY name LIMIT $2 OFFSET $3
+SELECT id, company_id, name, description, total_positions FROM axle_template WHERE company_id = $1 ORDER BY name, id LIMIT $2 OFFSET $3
 `
 
 type ListAxleTemplatesParams struct {

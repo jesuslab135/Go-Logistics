@@ -1,7 +1,7 @@
 -- name: ListWorkOrderSubLineItems :many
 SELECT c.* FROM work_order_sub_line_item c JOIN work_order_line_item p0 ON p0.id = c.line_item_id JOIN work_order p1 ON p1.id = p0.work_order_id
 WHERE c.line_item_id = sqlc.arg(parent_id) AND p1.company_id = sqlc.arg(company_id)
-ORDER BY c.position LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off);
+ORDER BY c.position, c.id LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off);
 
 -- name: CountWorkOrderSubLineItems :one
 SELECT count(*) FROM work_order_sub_line_item c JOIN work_order_line_item p0 ON p0.id = c.line_item_id JOIN work_order p1 ON p1.id = p0.work_order_id WHERE c.line_item_id = sqlc.arg(parent_id) AND p1.company_id = sqlc.arg(company_id);

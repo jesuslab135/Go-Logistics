@@ -84,7 +84,7 @@ func (q *Queries) GetInventoryAdjustmentReason(ctx context.Context, arg GetInven
 }
 
 const listInventoryAdjustmentReasons = `-- name: ListInventoryAdjustmentReasons :many
-SELECT id, company_id, name, created_at FROM inventory_adjustment_reason WHERE company_id = $1 ORDER BY name LIMIT $2 OFFSET $3
+SELECT id, company_id, name, created_at FROM inventory_adjustment_reason WHERE company_id = $1 ORDER BY name, id LIMIT $2 OFFSET $3
 `
 
 type ListInventoryAdjustmentReasonsParams struct {

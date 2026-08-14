@@ -161,7 +161,7 @@ func (q *Queries) GetTireForUpdate(ctx context.Context, arg GetTireForUpdatePara
 }
 
 const listTires = `-- name: ListTires :many
-SELECT id, company_id, tire_identification_number, tire_model_id, status, current_tread_depth_32nds, current_psi, total_miles, current_vehicle_id, current_position_code, purchase_date, purchase_cost, vendor_id, created_at FROM tire WHERE company_id = $1 ORDER BY tire_identification_number LIMIT $2 OFFSET $3
+SELECT id, company_id, tire_identification_number, tire_model_id, status, current_tread_depth_32nds, current_psi, total_miles, current_vehicle_id, current_position_code, purchase_date, purchase_cost, vendor_id, created_at FROM tire WHERE company_id = $1 ORDER BY tire_identification_number, id LIMIT $2 OFFSET $3
 `
 
 type ListTiresParams struct {

@@ -2,7 +2,7 @@
 SELECT * FROM part_category WHERE id = $1 AND company_id = $2;
 
 -- name: ListPartCategories :many
-SELECT * FROM part_category WHERE company_id = $1 ORDER BY name LIMIT $2 OFFSET $3;
+SELECT * FROM part_category WHERE company_id = $1 ORDER BY name, id LIMIT $2 OFFSET $3;
 
 -- name: CountPartCategories :one
 SELECT count(*) FROM part_category WHERE company_id = $1;
