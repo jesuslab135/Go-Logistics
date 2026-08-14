@@ -618,6 +618,63 @@ func (h *FilteredListHandler) TireMountLogs(c *gin.Context) {
 	renderPage(c, rows, total, p, toTireMountLogResponse)
 }
 
+// Comments godoc
+//
+//	@Summary	List comments
+//	@Tags		comments
+//	@Produce	json
+//	@Security	BearerAuth
+//	@Param		content_type	query		string	false	"asset, issue, work_order or service_entry"
+//	@Param		object_id		query		int		false	"Filter by parent id"
+//	@Param		limit			query		int		false	"Page size"
+//	@Param		offset			query		int		false	"Offset"
+//	@Success	200				{object}	dto.CommentPage
+//	@Failure	400				{object}	dto.ErrorResponse
+//	@Failure	401				{object}	dto.ErrorResponse
+//	@Failure	403				{object}	dto.ErrorResponse
+//	@Router		/api/v1/comments [get]
+func (h *FilteredListHandler) Comments(c *gin.Context) {
+	ctx := c.Request.Context()
+	p := paginate.Parse(c)
+
+	where := filter.NewWhere(1).Add("cm.company_id", filter.Eq, middleware.CompanyFromContext(ctx))
+	contentType, err := queryEnum(c, "content_type", commentContentTypes...)
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	if contentType != nil {
+		where.Add("cm.content_type", filter.Eq, *contentType)
+	}
+	objectID, err := queryInt64(c, "object_id")
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	if objectID != nil {
+		where.Add("cm.object_id", filter.Eq, *objectID)
+	}
+
+	spec := newListSpec[gen.Comment]("comment", "cm").
+		filter(where).
+		orderBy("cm.created_at DESC, cm.id DESC")
+
+	rows, total, err := runList(ctx, h.pool, spec, p)
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	renderPage(c, rows, total, p, toCommentResponse)
+}
+
 // Vocabularies accepted by the state filters, kept beside the routes that
 // validate them. Ported from the Django models the schema came from.
-var issueStates = []string{"OPEN", "RESOLVED", "CLOSED"}
+var (
+	issueStates         = []string{"OPEN", "RESOLVED", "CLOSED"}
+	commentContentTypes = []string{
+		dto.CommentContentTypeAsset,
+		dto.CommentContentTypeIssue,
+		dto.CommentContentTypeWorkOrder,
+		dto.CommentContentTypeServiceEntry,
+	}
+)

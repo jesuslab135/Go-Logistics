@@ -2479,6 +2479,18 @@ const docTemplate = `{
                 "summary": "List comments",
                 "parameters": [
                     {
+                        "type": "string",
+                        "description": "asset, issue, work_order or service_entry",
+                        "name": "content_type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Filter by parent id",
+                        "name": "object_id",
+                        "in": "query"
+                    },
+                    {
                         "type": "integer",
                         "description": "Page size",
                         "name": "limit",
@@ -2498,8 +2510,20 @@ const docTemplate = `{
                             "$ref": "#/definitions/dto.CommentPage"
                         }
                     },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -15540,8 +15564,8 @@ const docTemplate = `{
                 "company_id": {
                     "type": "integer"
                 },
-                "content_type_id": {
-                    "type": "integer"
+                "content_type": {
+                    "type": "string"
                 },
                 "created_at": {
                     "type": "string"
@@ -15988,18 +16012,27 @@ const docTemplate = `{
         },
         "dto.CreateCommentRequest": {
             "type": "object",
+            "required": [
+                "body",
+                "content_type",
+                "object_id"
+            ],
             "properties": {
-                "author_id": {
-                    "type": "integer"
-                },
                 "body": {
                     "type": "string"
                 },
-                "content_type_id": {
-                    "type": "integer"
+                "content_type": {
+                    "type": "string",
+                    "enum": [
+                        "asset",
+                        "issue",
+                        "work_order",
+                        "service_entry"
+                    ]
                 },
                 "object_id": {
-                    "type": "integer"
+                    "type": "integer",
+                    "minimum": 1
                 }
             }
         },
@@ -21453,18 +21486,12 @@ const docTemplate = `{
         },
         "dto.UpdateCommentRequest": {
             "type": "object",
+            "required": [
+                "body"
+            ],
             "properties": {
-                "author_id": {
-                    "type": "integer"
-                },
                 "body": {
                     "type": "string"
-                },
-                "content_type_id": {
-                    "type": "integer"
-                },
-                "object_id": {
-                    "type": "integer"
                 }
             }
         },

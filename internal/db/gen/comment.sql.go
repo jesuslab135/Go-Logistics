@@ -10,6 +10,32 @@ import (
 	"time"
 )
 
+const commentParentExists = `-- name: CommentParentExists :one
+SELECT CASE $1::text
+    WHEN 'asset'         THEN EXISTS(SELECT 1 FROM asset a          WHERE a.id  = $2::bigint AND a.company_id  = $3::bigint)
+    WHEN 'issue'         THEN EXISTS(SELECT 1 FROM issue i          WHERE i.id  = $2::bigint AND i.company_id  = $3::bigint)
+    WHEN 'work_order'    THEN EXISTS(SELECT 1 FROM work_order wo    WHERE wo.id = $2::bigint AND wo.company_id = $3::bigint)
+    WHEN 'service_entry' THEN EXISTS(SELECT 1 FROM service_entry se WHERE se.id = $2::bigint AND se.company_id = $3::bigint)
+    ELSE false
+END::boolean AS ok
+`
+
+type CommentParentExistsParams struct {
+	ContentType    string
+	ObjectID       int64
+	ScopeCompanyID int64
+}
+
+// Confirms the parent exists AND belongs to the caller's company, so a comment
+// cannot be attached to another tenant's record. An unknown content type
+// yields false rather than an error, and is reported as a missing parent.
+func (q *Queries) CommentParentExists(ctx context.Context, arg CommentParentExistsParams) (bool, error) {
+	row := q.db.QueryRow(ctx, commentParentExists, arg.ContentType, arg.ObjectID, arg.ScopeCompanyID)
+	var ok bool
+	err := row.Scan(&ok)
+	return ok, err
+}
+
 const countComments = `-- name: CountComments :one
 SELECT count(*) FROM comment WHERE company_id = $1
 `
@@ -23,27 +49,27 @@ func (q *Queries) CountComments(ctx context.Context, companyID int64) (int64, er
 
 const createComment = `-- name: CreateComment :one
 INSERT INTO comment (
-    company_id, content_type_id, object_id, body, author_id, created_at, updated_at
+    company_id, content_type, object_id, body, author_id, created_at, updated_at
 ) VALUES (
     $1, $2, $3, $4, $5, $6, $7
 )
-RETURNING id, company_id, content_type_id, object_id, body, author_id, created_at, updated_at
+RETURNING id, company_id, object_id, body, author_id, created_at, updated_at, content_type
 `
 
 type CreateCommentParams struct {
-	CompanyID     int64
-	ContentTypeID int64
-	ObjectID      int32
-	Body          string
-	AuthorID      *int64
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	CompanyID   int64
+	ContentType string
+	ObjectID    int64
+	Body        string
+	AuthorID    *int64
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 }
 
 func (q *Queries) CreateComment(ctx context.Context, arg CreateCommentParams) (Comment, error) {
 	row := q.db.QueryRow(ctx, createComment,
 		arg.CompanyID,
-		arg.ContentTypeID,
+		arg.ContentType,
 		arg.ObjectID,
 		arg.Body,
 		arg.AuthorID,
@@ -54,12 +80,12 @@ func (q *Queries) CreateComment(ctx context.Context, arg CreateCommentParams) (C
 	err := row.Scan(
 		&i.ID,
 		&i.CompanyID,
-		&i.ContentTypeID,
 		&i.ObjectID,
 		&i.Body,
 		&i.AuthorID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ContentType,
 	)
 	return i, err
 }
@@ -79,7 +105,7 @@ func (q *Queries) DeleteComment(ctx context.Context, arg DeleteCommentParams) er
 }
 
 const getComment = `-- name: GetComment :one
-SELECT id, company_id, content_type_id, object_id, body, author_id, created_at, updated_at FROM comment WHERE id = $1 AND company_id = $2
+SELECT id, company_id, object_id, body, author_id, created_at, updated_at, content_type FROM comment WHERE id = $1 AND company_id = $2
 `
 
 type GetCommentParams struct {
@@ -93,18 +119,18 @@ func (q *Queries) GetComment(ctx context.Context, arg GetCommentParams) (Comment
 	err := row.Scan(
 		&i.ID,
 		&i.CompanyID,
-		&i.ContentTypeID,
 		&i.ObjectID,
 		&i.Body,
 		&i.AuthorID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ContentType,
 	)
 	return i, err
 }
 
 const listComments = `-- name: ListComments :many
-SELECT id, company_id, content_type_id, object_id, body, author_id, created_at, updated_at FROM comment WHERE company_id = $1 ORDER BY created_at DESC, id LIMIT $2 OFFSET $3
+SELECT id, company_id, object_id, body, author_id, created_at, updated_at, content_type FROM comment WHERE company_id = $1 ORDER BY created_at DESC, id LIMIT $2 OFFSET $3
 `
 
 type ListCommentsParams struct {
@@ -125,12 +151,12 @@ func (q *Queries) ListComments(ctx context.Context, arg ListCommentsParams) ([]C
 		if err := rows.Scan(
 			&i.ID,
 			&i.CompanyID,
-			&i.ContentTypeID,
 			&i.ObjectID,
 			&i.Body,
 			&i.AuthorID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.ContentType,
 		); err != nil {
 			return nil, err
 		}
@@ -143,41 +169,36 @@ func (q *Queries) ListComments(ctx context.Context, arg ListCommentsParams) ([]C
 }
 
 const updateComment = `-- name: UpdateComment :one
-UPDATE comment SET content_type_id = $3, object_id = $4, body = $5, author_id = $6, updated_at = $7
+UPDATE comment SET body = $3, updated_at = $4
 WHERE id = $1 AND company_id = $2
-RETURNING id, company_id, content_type_id, object_id, body, author_id, created_at, updated_at
+RETURNING id, company_id, object_id, body, author_id, created_at, updated_at, content_type
 `
 
 type UpdateCommentParams struct {
-	ID            int64
-	CompanyID     int64
-	ContentTypeID int64
-	ObjectID      int32
-	Body          string
-	AuthorID      *int64
-	UpdatedAt     time.Time
+	ID        int64
+	CompanyID int64
+	Body      string
+	UpdatedAt time.Time
 }
 
+// The parent and the author are fixed at creation; an edit changes only the body.
 func (q *Queries) UpdateComment(ctx context.Context, arg UpdateCommentParams) (Comment, error) {
 	row := q.db.QueryRow(ctx, updateComment,
 		arg.ID,
 		arg.CompanyID,
-		arg.ContentTypeID,
-		arg.ObjectID,
 		arg.Body,
-		arg.AuthorID,
 		arg.UpdatedAt,
 	)
 	var i Comment
 	err := row.Scan(
 		&i.ID,
 		&i.CompanyID,
-		&i.ContentTypeID,
 		&i.ObjectID,
 		&i.Body,
 		&i.AuthorID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ContentType,
 	)
 	return i, err
 }

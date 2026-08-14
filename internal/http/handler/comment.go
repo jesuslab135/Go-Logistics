@@ -7,6 +7,7 @@ import (
 	"fleet/internal/db/gen"
 	"fleet/internal/http/dto"
 	"fleet/internal/http/middleware"
+	"fleet/internal/platform/apierr"
 	"fleet/internal/platform/paginate"
 )
 
@@ -41,14 +42,31 @@ func (s *CommentStore) Get(ctx context.Context, id int64) (dto.CommentResponse, 
 
 func (s *CommentStore) Create(ctx context.Context, in dto.CreateCommentRequest) (dto.CommentResponse, error) {
 	now := time.Now().UTC()
+	company := middleware.CompanyFromContext(ctx)
+
+	// The parent is verified to exist and to belong to the caller's company
+	// before anything is written, so a comment cannot be filed against another
+	// tenant's record — or against nothing at all.
+	ok, err := s.q.CommentParentExists(ctx, gen.CommentParentExistsParams{
+		ContentType:    in.ContentType,
+		ObjectID:       in.ObjectID,
+		ScopeCompanyID: company,
+	})
+	if err != nil {
+		return dto.CommentResponse{}, err
+	}
+	if !ok {
+		return dto.CommentResponse{}, apierr.NotFound("the comment's parent does not exist")
+	}
+
 	r, err := s.q.CreateComment(ctx, gen.CreateCommentParams{
-		CompanyID:     middleware.CompanyFromContext(ctx),
-		ContentTypeID: in.ContentTypeID,
-		ObjectID:      in.ObjectID,
-		Body:          in.Body,
-		AuthorID:      in.AuthorID,
-		CreatedAt:     now,
-		UpdatedAt:     now,
+		CompanyID:   company,
+		ContentType: in.ContentType,
+		ObjectID:    in.ObjectID,
+		Body:        in.Body,
+		AuthorID:    authorFromContext(ctx),
+		CreatedAt:   now,
+		UpdatedAt:   now,
 	})
 	if err != nil {
 		return dto.CommentResponse{}, err
@@ -57,15 +75,11 @@ func (s *CommentStore) Create(ctx context.Context, in dto.CreateCommentRequest) 
 }
 
 func (s *CommentStore) Update(ctx context.Context, id int64, in dto.UpdateCommentRequest) (dto.CommentResponse, error) {
-	now := time.Now().UTC()
 	r, err := s.q.UpdateComment(ctx, gen.UpdateCommentParams{
-		ID:            id,
-		CompanyID:     middleware.CompanyFromContext(ctx),
-		ContentTypeID: in.ContentTypeID,
-		ObjectID:      in.ObjectID,
-		Body:          in.Body,
-		AuthorID:      in.AuthorID,
-		UpdatedAt:     now,
+		ID:        id,
+		CompanyID: middleware.CompanyFromContext(ctx),
+		Body:      in.Body,
+		UpdatedAt: time.Now().UTC(),
 	})
 	if err != nil {
 		return dto.CommentResponse{}, err
@@ -79,13 +93,13 @@ func (s *CommentStore) Delete(ctx context.Context, id int64) error {
 
 func toCommentResponse(r gen.Comment) dto.CommentResponse {
 	return dto.CommentResponse{
-		ID:            r.ID,
-		CompanyID:     r.CompanyID,
-		ContentTypeID: r.ContentTypeID,
-		ObjectID:      r.ObjectID,
-		Body:          r.Body,
-		AuthorID:      r.AuthorID,
-		CreatedAt:     r.CreatedAt,
-		UpdatedAt:     r.UpdatedAt,
+		ID:          r.ID,
+		CompanyID:   r.CompanyID,
+		ContentType: r.ContentType,
+		ObjectID:    r.ObjectID,
+		Body:        r.Body,
+		AuthorID:    r.AuthorID,
+		CreatedAt:   r.CreatedAt,
+		UpdatedAt:   r.UpdatedAt,
 	}
 }

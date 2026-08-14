@@ -1,18 +1,5 @@
 package handler
 
-// docListComments godoc
-//
-//	@Summary	List comments
-//	@Tags	comments
-//	@Security	BearerAuth
-//	@Produce	json
-//	@Param	limit	query	int	false	"Page size"
-//	@Param	offset	query	int	false	"Offset"
-//	@Success	200	{object}	dto.CommentPage
-//	@Failure	401	{object}	dto.ErrorResponse
-//	@Router	/api/v1/comments [get]
-func docListComments() {}
-
 // docCreateComment godoc
 //
 //	@Summary	Create comments

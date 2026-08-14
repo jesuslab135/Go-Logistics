@@ -430,8 +430,8 @@ definitions:
         type: string
       company_id:
         type: integer
-      content_type_id:
-        type: integer
+      content_type:
+        type: string
       created_at:
         type: string
       id:
@@ -737,14 +737,22 @@ definitions:
     type: object
   dto.CreateCommentRequest:
     properties:
-      author_id:
-        type: integer
       body:
         type: string
-      content_type_id:
-        type: integer
+      content_type:
+        enum:
+        - asset
+        - issue
+        - work_order
+        - service_entry
+        type: string
       object_id:
+        minimum: 1
         type: integer
+    required:
+    - body
+    - content_type
+    - object_id
     type: object
   dto.CreateCompanyRequest:
     properties:
@@ -4447,14 +4455,10 @@ definitions:
     type: object
   dto.UpdateCommentRequest:
     properties:
-      author_id:
-        type: integer
       body:
         type: string
-      content_type_id:
-        type: integer
-      object_id:
-        type: integer
+    required:
+    - body
     type: object
   dto.UpdateCompanyRequest:
     properties:
@@ -8453,6 +8457,14 @@ paths:
   /api/v1/comments:
     get:
       parameters:
+      - description: asset, issue, work_order or service_entry
+        in: query
+        name: content_type
+        type: string
+      - description: Filter by parent id
+        in: query
+        name: object_id
+        type: integer
       - description: Page size
         in: query
         name: limit
@@ -8468,8 +8480,16 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/dto.CommentPage'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
         "401":
           description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
       security:

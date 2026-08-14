@@ -136,14 +136,14 @@ type CatalogOption struct {
 }
 
 type Comment struct {
-	ID            int64
-	CompanyID     int64
-	ContentTypeID int64
-	ObjectID      int32
-	Body          string
-	AuthorID      *int64
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	ID          int64
+	CompanyID   int64
+	ObjectID    int64
+	Body        string
+	AuthorID    *int64
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	ContentType string
 }
 
 type Company struct {
