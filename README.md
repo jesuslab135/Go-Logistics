@@ -93,6 +93,10 @@ migrate -path internal/db/migrations -database "$DATABASE_URL" up
 
 (Windows PowerShell: use `$env:DATABASE_URL` or paste the DSN inline.)
 
+`000007` and `000008` rewrite columns inherited from Django and are lossy in the
+down direction — the `auth_user` and `django_content_type` id spaces they replace
+were never reproducible here. Each says so in its header.
+
 ### 6. Run the API
 
 ```sh
@@ -294,15 +298,20 @@ mutations requiring an admin role and `POST` requiring `is_account_owner`.
 | GET    | `/swagger/*`             | no   | Swagger UI (dev only)          |
 | POST   | `/auth/login`            | no   | Email + password → tokens      |
 | POST   | `/auth/refresh`          | no   | Refresh token → new tokens     |
-| GET    | `/api/v1/companies`      | admin | List own memberships (`?page`, `?page_size`) |
+| POST   | `/auth/logout`           | no   | Revoke a refresh token         |
+| POST   | `/auth/switch-company`   | token | Re-scope tokens to another company you belong to |
+| GET    | `/api/v1/companies`      | admin | List own memberships (`?limit`, `?offset`) |
 | POST   | `/api/v1/companies`      | owner | Create + bootstrap defaults    |
 | GET    | `/api/v1/companies/:id`  | admin | Get by id                      |
 | PUT    | `/api/v1/companies/:id`  | admin | Update                         |
 | DELETE | `/api/v1/companies/:id`  | admin | Delete                         |
-| POST   | `/api/v1/uploads`        | member | Upload a file/image           |
+| POST   | `/api/v1/employees/:id/set-password` | admin | Provision an employee's login credentials |
+| POST   | `/api/v1/tire-assignment-requests/:id/approve` | tire_approvals/approve | Approve a request, transactionally |
+| POST   | `/api/v1/uploads`        | member | Upload a file/image (`purpose=photo\|document\|generic`) |
 | GET    | `/api/v1/me/permissions` | identity | Caller's profile, effective permissions, companies |
-| GET    | `/api/v1/dashboard/stats` | member | Six aggregated KPIs in one query |
-| GET    | `/api/v1/notifications`  | member | Stub — always an empty page    |
+| GET    | `/api/v1/dashboard/stats` | member | Aggregated KPIs in one query   |
+| GET    | `/api/v1/notifications`  | member | The caller's notifications + unread count |
+| POST   | `/api/v1/notifications/:id/read` | member | Mark one read (idempotent)     |
 
 Every other `/api/v1/*` resource needs membership plus its module — see
 [Authorization](#authorization).
@@ -316,10 +325,27 @@ same rule the request gates use, so the report cannot promise access that a
 request would then be denied.
 
 `/dashboard/stats` returns `total_assets`, `active_work_orders`, `overdue_issues`,
-`upcoming_reminders`, `low_stock_parts` and `pending_inspections`. Django had no
-equivalent endpoint, so those definitions are choices rather than a port — they
-are spelled out at the top of `internal/db/queries/dashboard.sql`, and the
-reminder window is `DASHBOARD_UPCOMING_DAYS`.
+`upcoming_reminders`, `low_stock_parts` and `pending_inspections`, plus
+`upcoming_days` so UI copy can name the window the backend actually counted over.
+Django had no equivalent endpoint, so those definitions are choices rather than a
+port — they are spelled out at the top of `internal/db/queries/dashboard.sql`, and
+the reminder window is `DASHBOARD_UPCOMING_DAYS`. Two names are narrower than they
+sound: `pending_inspections` counts submissions with failed items and no issue
+raised from them, and `low_stock_parts` counts inventory rows (a part at one
+location) rather than distinct parts.
+
+### Filtering and ordering
+
+Collections page with `?limit` and `?offset` (`?page` / `?page_size` are also
+accepted). Filterable collections take their filters in SQL, before the count, so
+`total` always describes the filtered set; the full per-route list is in
+[`docs/2026-08-14_backend-requirements-implementation.md`](docs/2026-08-14_backend-requirements-implementation.md).
+
+Where a route accepts `?order=`, it takes comma-separated field names with a `-`
+prefix for descending (`?order=-issued_at`). Only allow-listed fields are honoured
+and the row id is always appended, so paging is stable across rows that tie on the
+sort key. Filter values outside a documented vocabulary are a `400` rather than a
+silently empty page.
 
 ### Many-to-many links
 
