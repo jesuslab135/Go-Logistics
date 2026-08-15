@@ -84,10 +84,14 @@ ssh deploy@74.208.73.82 '/opt/fleet/deploy.sh ghcr.io/jesuslab135/go-logistics:<
 curl -fsS https://go-logistics.jesuslab135.com/healthz
 ```
 
-Get `<old-sha>` from `git log` or the Actions run list. Only the three most
-recent tags stay on disk; older ones re-pull from GHCR, which needs a
-`docker login ghcr.io` first (a classic PAT with `read:packages`, created
-ad hoc — do not store one on the server).
+Get `<old-sha>` from `git log` or the Actions run list.
+
+The registry credential the pipeline leaves behind expires with its run, so a
+by-hand rollback cannot pull. `deploy.sh` handles that: a denied pull is only
+fatal when the image is not already on disk, and for a rollback it usually is.
+Only the three most recent tags are kept, though — going further back needs
+`docker login ghcr.io -u <user>` with an ad-hoc classic PAT scoped
+`read:packages`. Do not store one on the server.
 
 Rollback runs the old image against the **current** schema. Migrations are
 forward-only, so a rollback across a destructive migration needs a restore, not

@@ -8,13 +8,30 @@ set -euo pipefail
 IMAGE="${1:?usage: deploy.sh <image-ref>}"
 cd "$(dirname "$0")"
 
+# Get the image BEFORE recording it: a failed pull must not leave .env pointing
+# at something the host does not have, or the next reboot comes up broken.
+#
+# The registry credential the pipeline installs is scoped to its own run and
+# expires with it, so a rollback done by hand hours later WILL be denied. That
+# is fine as long as the image is already on disk — which for a rollback it
+# normally is — so a denied pull is only fatal when there is no local copy.
+if ! docker pull --quiet "${IMAGE}" >/dev/null 2>&1; then
+    if docker image inspect "${IMAGE}" >/dev/null 2>&1; then
+        echo "registry unavailable; using the local copy of ${IMAGE}"
+    else
+        echo "deploy.sh: cannot pull ${IMAGE} and there is no local copy." >&2
+        echo "  Authenticate, then retry:" >&2
+        echo "    docker login ghcr.io -u <github-user>   # PAT with read:packages" >&2
+        exit 1
+    fi
+fi
+
 if grep -q '^API_IMAGE=' .env; then
     sed -i "s|^API_IMAGE=.*|API_IMAGE=${IMAGE}|" .env
 else
     echo "API_IMAGE=${IMAGE}" >> .env
 fi
 
-docker compose pull --quiet
 docker compose up -d --remove-orphans
 
 # Reclaim disk WITHOUT a blanket `docker image prune`: this host also runs the
