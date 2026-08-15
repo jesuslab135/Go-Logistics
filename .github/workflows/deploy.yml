@@ -58,6 +58,11 @@ jobs:
     needs: build-push
     runs-on: ubuntu-latest
     environment: production
+    permissions:
+      contents: read
+      # Lets the server authenticate to GHCR with this run's own GITHUB_TOKEN,
+      # so no long-lived registry PAT has to be stored anywhere.
+      packages: read
     steps:
       - uses: actions/checkout@v4
 
@@ -89,13 +94,17 @@ jobs:
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-          GHCR_PULL_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
+          # Scoped to this run and expires with it — nothing to rotate, and a
+          # leak from the server buys an attacker minutes, not months.
+          GHCR_PULL_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
         run: |
           HOST="$DEPLOY_USER@$DEPLOY_HOST"
           # --password-stdin over the SSH channel: the token never appears in
           # the server's process list.
+          # shellcheck disable=SC2029  # the username must expand here, on the runner
           printf '%s' "$GHCR_PULL_TOKEN" \
-            | ssh "$HOST" 'docker login ghcr.io -u jesuslab135 --password-stdin'
+            | ssh "$HOST" "docker login ghcr.io -u '$GHCR_USER' --password-stdin"
           IMAGE_REF="${IMAGE}:${GITHUB_SHA}"
           # shellcheck disable=SC2029  # the ref must expand here, on the runner
           ssh "$HOST" "chmod +x /opt/fleet/deploy.sh /opt/fleet/backup.sh \
