@@ -16,6 +16,14 @@ fi
 
 docker compose pull --quiet
 docker compose up -d --remove-orphans
-docker image prune -f >/dev/null
+
+# Reclaim disk WITHOUT a blanket `docker image prune`: this host also runs the
+# unrelated `sga` project, and a global prune would eat its images too. Keep the
+# three most recent tags of our own repository and drop the rest; docker refuses
+# to remove an image still in use, so the running release is safe either way.
+docker images --filter "reference=${IMAGE%:*}" --format '{{.Repository}}:{{.Tag}}' \
+    | grep -v ':latest$' \
+    | tail -n +4 \
+    | xargs -r docker rmi >/dev/null 2>&1 || true
 
 echo "deployed ${IMAGE}"

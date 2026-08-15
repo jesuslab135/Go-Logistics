@@ -1,0 +1,115 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Never two deploys interleaved; queue instead of cancel so every main commit lands.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/jesuslab135/go-logistics
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go build ./...
+      - run: go vet ./...
+      - run: test -z "$(gofmt -l .)"
+      - run: go test ./...
+
+  build-push:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ github.sha }}
+            ${{ env.IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build-push
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      # Secrets go through env, never inline in run: scripts — an inline
+      # ${{ }} is substituted into the shell source before it executes.
+      - name: Set up SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+
+      - name: Ship the deploy bundle
+        # Everything the server needs EXCEPT .env, which is server-owned.
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          HOST="$DEPLOY_USER@$DEPLOY_HOST"
+          ssh "$HOST" 'mkdir -p /opt/fleet/migrations'
+          scp deploy/docker-compose.prod.yml "$HOST:/opt/fleet/docker-compose.yml"
+          scp deploy/deploy.sh deploy/backup.sh "$HOST:/opt/fleet/"
+          scp internal/db/migrations/* "$HOST:/opt/fleet/migrations/"
+
+      - name: Roll the stack
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          GHCR_PULL_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
+        run: |
+          HOST="$DEPLOY_USER@$DEPLOY_HOST"
+          # --password-stdin over the SSH channel: the token never appears in
+          # the server's process list.
+          printf '%s' "$GHCR_PULL_TOKEN" \
+            | ssh "$HOST" 'docker login ghcr.io -u jesuslab135 --password-stdin'
+          IMAGE_REF="${IMAGE}:${GITHUB_SHA}"
+          # shellcheck disable=SC2029  # the ref must expand here, on the runner
+          ssh "$HOST" "chmod +x /opt/fleet/deploy.sh /opt/fleet/backup.sh \
+            && /opt/fleet/deploy.sh '$IMAGE_REF'"
+
+      - name: Health gate
+        env:
+          API_DOMAIN: ${{ vars.API_DOMAIN }}
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS "https://${API_DOMAIN}/healthz" >/dev/null 2>&1; then
+              echo "healthy after ${i} attempts"; exit 0
+            fi
+            sleep 2
+          done
+          echo "API never became healthy — check: ssh deploy@<host> 'cd /opt/fleet && docker compose logs api migrate'"
+          exit 1
