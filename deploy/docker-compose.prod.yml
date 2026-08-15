@@ -1,0 +1,122 @@
+# Production stack for the IONOS VPS. Lives at /opt/fleet/docker-compose.yml.
+#
+# This stack publishes NO host ports except the loopback-bound MinIO console.
+# The VPS already runs an unrelated site (the `sga` project at /opt/sga) whose
+# nginx owns 80/443, so that nginx is the shared edge: it terminates TLS for
+# go-logistics.jesuslab135.com and proxies into the aliases `fleet-api` and
+# `fleet-minio` on the external `edge` network. See deploy/nginx/go-logistics.conf.
+#
+# Derived values (DATABASE_URL, the MinIO endpoint) are assembled HERE from the
+# raw secrets in .env — compose interpolates ${...} in this file; it does NOT
+# expand references inside .env values.
+name: fleet
+
+networks:
+  # Internal: db, minio, migrate, api, cli talk to each other here.
+  default:
+  # Shared with the sga nginx. Created once by hand:
+  #   docker network create edge
+  edge:
+    external: true
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: fleet
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d fleet"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    command: server /data --console-address ":9001"
+    ports:
+      # Console on loopback only — reach it with:
+      #   ssh -L 9001:127.0.0.1:9001 deploy@74.208.73.82   then http://localhost:9001
+      - "127.0.0.1:9001:9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      default:
+      edge:
+        # The edge nginx proxies /fleet/ here. Aliased rather than reachable as
+        # bare "minio" so the shared network cannot collide with another stack.
+        aliases: [fleet-minio]
+    healthcheck:
+      test: ["CMD-SHELL", "mc ready local || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  migrate:
+    image: migrate/migrate:v4.17.1
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      # The deploy bundle ships the repo's internal/db/migrations as ./migrations.
+      - ./migrations:/migrations:ro
+    entrypoint:
+      [
+        "migrate",
+        "-path", "/migrations",
+        "-database", "postgres://postgres:${POSTGRES_PASSWORD}@db:5432/fleet?sslmode=disable",
+        "up",
+      ]
+    restart: "no"
+
+  api:
+    image: ${API_IMAGE}
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/fleet?sslmode=disable
+      STORAGE_MINIO_ENDPOINT: minio:9000
+      STORAGE_MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      STORAGE_MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      STORAGE_MINIO_USE_SSL: "false"   # internal hop; TLS terminates at the edge nginx
+      # Must end with the bucket name: the public-read policy covers /fleet/*,
+      # and the edge nginx maps exactly that path prefix to MinIO.
+      STORAGE_MINIO_PUBLIC_URL: https://${API_DOMAIN}/fleet
+    networks:
+      default:
+      edge:
+        aliases: [fleet-api]
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  # Admin CLI from the same image (distroless, so no shell — entrypoint only):
+  #   docker compose run --rm cli setpass --email a@b.c --password secret123
+  cli:
+    image: ${API_IMAGE}
+    entrypoint: ["/cli"]
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/fleet?sslmode=disable
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles: ["tools"]
+
+volumes:
+  pg_data:
+  minio_data:

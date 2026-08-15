@@ -1,0 +1,4 @@
+# The deploy bundle is scp'd to a Linux VPS and executed there, so these files
+# must keep LF endings even when checked out on Windows (core.autocrlf=true).
+*.sh            text eol=lf
+deploy/**       text eol=lf
