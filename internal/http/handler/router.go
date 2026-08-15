@@ -28,6 +28,9 @@ type Deps struct {
 	Logger      *slog.Logger
 	CORSOrigins []string
 	Production  bool
+	// Swagger serves the interactive docs at /swagger/*. Independent of
+	// Production: the docs are a disclosure choice, not a runtime mode.
+	Swagger bool
 }
 
 // NewRouter assembles the Gin engine: global middleware, public auth/health
@@ -52,8 +55,9 @@ func NewRouter(d Deps) *gin.Engine {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 
-	// Interactive API docs. Disabled in production to avoid exposing the schema.
-	if !d.Production {
+	// Interactive API docs. Off by default in production (SWAGGER_ENABLED)
+	// because serving them publishes the whole schema.
+	if d.Swagger {
 		r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	}
 

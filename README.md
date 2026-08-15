@@ -112,7 +112,7 @@ go run ./cmd/api
 |--------------------|----------------------------------------------|-----------------------------------------|
 | API                | http://localhost:8080                        |                                         |
 | Health             | http://localhost:8080/healthz                |                                         |
-| **Swagger UI**     | http://localhost:8080/swagger/index.html     | interactive docs (dev only)             |
+| **Swagger UI**     | http://localhost:8080/swagger/index.html     | interactive docs (`SWAGGER_ENABLED`)    |
 | OpenAPI JSON       | http://localhost:8080/swagger/doc.json       | raw spec                                |
 | MinIO S3 API       | http://localhost:9000                        | object storage endpoint                 |
 | MinIO Console      | http://localhost:9001                        | web UI — `minioadmin` / `minioadmin`    |
@@ -295,7 +295,7 @@ mutations requiring an admin role and `POST` requiring `is_account_owner`.
 | Method | Path                     | Auth | Description                    |
 |--------|--------------------------|------|--------------------------------|
 | GET    | `/healthz`               | no   | Liveness                       |
-| GET    | `/swagger/*`             | no   | Swagger UI (dev only)          |
+| GET    | `/swagger/*`             | no   | Swagger UI (`SWAGGER_ENABLED`) |
 | POST   | `/auth/login`            | no   | Email + password → tokens      |
 | POST   | `/auth/refresh`          | no   | Refresh token → new tokens     |
 | POST   | `/auth/logout`           | no   | Revoke a refresh token         |

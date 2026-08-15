@@ -249,6 +249,27 @@ SSH is ever lost entirely.
 `deploy` is in the `docker` group, which is root-equivalent on this host — the
 pipeline's SSH key is effectively a root key. Treat `DEPLOY_SSH_KEY` as such.
 
+## Swagger
+
+The interactive docs are served at
+<https://go-logistics.jesuslab135.com/swagger/index.html>, enabled by
+`SWAGGER_ENABLED=true` in `/opt/fleet/.env`. Production defaults to off, so
+this is a deliberate opt-in.
+
+It is unauthenticated and lists every route, model and field. That is not a
+vulnerability on its own — the endpoints still require a token — but it does
+hand an attacker a map. To close it again:
+
+```sh
+ssh deploy@74.208.73.82
+sed -i 's/^SWAGGER_ENABLED=.*/SWAGGER_ENABLED=false/' /opt/fleet/.env
+cd /opt/fleet && docker compose up -d api
+```
+
+The spec is generated with an empty `host`, so the UI targets whatever origin
+serves it and "Try it out" hits production for real. Treat it as a live console,
+not a sandbox.
+
 ## Known follow-ups
 
 - `CORS_ORIGINS` is `https://go-logistics.jesuslab135.com`, a placeholder.

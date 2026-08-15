@@ -12,6 +12,7 @@ type Config struct {
 	HTTPAddr    string
 	DatabaseURL string
 	CORSOrigins []string
+	Swagger     bool
 	JWT         JWTConfig
 }
 
@@ -38,6 +39,12 @@ func Load() (Config, error) {
 		},
 	}
 
+	// Serving the docs publishes the entire API surface, so production defaults
+	// to off — but that is a judgement call, not a safety property, and it is
+	// separate from APP_ENV so turning the docs on does not also drop the app
+	// out of Gin's release mode.
+	cfg.Swagger = envBool("SWAGGER_ENABLED", !cfg.IsProduction())
+
 	if cfg.DatabaseURL == "" {
 		return Config{}, fmt.Errorf("config: DATABASE_URL is required")
 	}
@@ -54,6 +61,19 @@ func env(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+// envBool accepts the values people actually type. Anything unrecognised falls
+// back rather than silently reading as false.
+func envBool(key string, fallback bool) bool {
+	switch strings.ToLower(env(key, "")) {
+	case "1", "true", "yes", "on":
+		return true
+	case "0", "false", "no", "off":
+		return false
+	default:
+		return fallback
+	}
 }
 
 func envDuration(key string, fallback time.Duration) time.Duration {

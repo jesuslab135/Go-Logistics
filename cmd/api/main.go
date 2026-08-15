@@ -71,6 +71,7 @@ func run(logger *slog.Logger) error {
 		Logger:      logger,
 		CORSOrigins: cfg.CORSOrigins,
 		Production:  cfg.IsProduction(),
+		Swagger:     cfg.Swagger,
 	})
 
 	srv := &http.Server{
