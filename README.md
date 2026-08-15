@@ -423,3 +423,16 @@ Roll a migration back:
 ```sh
 migrate -path internal/db/migrations -database "$DATABASE_URL" down 1
 ```
+
+## Deployment
+
+Production runs on an IONOS VPS at <https://go-logistics.jesuslab135.com>: push
+to `main` and GitHub Actions tests, builds
+`ghcr.io/jesuslab135/go-logistics:<sha>`, and rolls the stack over SSH, failing
+the run unless `/healthz` answers.
+
+TLS is terminated by the nginx of an unrelated site already on that host, which
+also proxies public objects at `/fleet/`, so this stack publishes no ports of
+its own. Operations — first boot, secrets, rollback, backups, restore, and the
+sharp edges of editing that shared nginx — are in
+[`deploy/README.md`](deploy/README.md).
