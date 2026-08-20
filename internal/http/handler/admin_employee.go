@@ -67,8 +67,8 @@ func validateMembershipReplace(companyIDs []int64, defaultCompanyID *int64) erro
 //	@Tags			admin
 //	@Produce		json
 //	@Security		BearerAuth
-//	@Param			page		query		int	false	"Page number"
-//	@Param			page_size	query		int	false	"Page size"
+//	@Param		limit		query		int	false	"Page size"
+//	@Param		offset		query		int	false	"Offset"
 //	@Success		200			{object}	dto.EmployeePage
 //	@Failure		400			{object}	dto.ErrorResponse
 //	@Failure		401			{object}	dto.ErrorResponse

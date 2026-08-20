@@ -307,14 +307,14 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Page number",
-                        "name": "page",
+                        "description": "Page size",
+                        "name": "limit",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "description": "Page size",
-                        "name": "page_size",
+                        "description": "Offset",
+                        "name": "offset",
                         "in": "query"
                     }
                 ],
@@ -495,14 +495,14 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Page number",
-                        "name": "page",
+                        "description": "Page size",
+                        "name": "limit",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "description": "Items per page",
-                        "name": "page_size",
+                        "description": "Offset",
+                        "name": "offset",
                         "in": "query"
                     }
                 ],
@@ -775,14 +775,14 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Page number",
-                        "name": "page",
+                        "description": "Page size",
+                        "name": "limit",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "description": "Items per page",
-                        "name": "page_size",
+                        "description": "Offset",
+                        "name": "offset",
                         "in": "query"
                     }
                 ],
@@ -3191,14 +3191,14 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Page number (1-based)",
-                        "name": "page",
+                        "description": "Page size",
+                        "name": "limit",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "description": "Items per page",
-                        "name": "page_size",
+                        "description": "Offset",
+                        "name": "offset",
                         "in": "query"
                     }
                 ],
@@ -6686,18 +6686,6 @@ const docTemplate = `{
                         "description": "Offset",
                         "name": "offset",
                         "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Page size",
-                        "name": "limit",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Offset",
-                        "name": "offset",
-                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -6832,18 +6820,6 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Page size",
-                        "name": "limit",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Offset",
-                        "name": "offset",
-                        "in": "query"
                     },
                     {
                         "type": "integer",
@@ -10097,18 +10073,6 @@ const docTemplate = `{
                         "description": "Offset",
                         "name": "offset",
                         "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Page size",
-                        "name": "limit",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Offset",
-                        "name": "offset",
-                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -12520,14 +12484,14 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Page number",
-                        "name": "page",
+                        "description": "Page size",
+                        "name": "limit",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "description": "Items per page",
-                        "name": "page_size",
+                        "description": "Offset",
+                        "name": "offset",
                         "in": "query"
                     }
                 ],
@@ -12725,14 +12689,14 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Page number",
-                        "name": "page",
+                        "description": "Page size",
+                        "name": "limit",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "description": "Items per page",
-                        "name": "page_size",
+                        "description": "Offset",
+                        "name": "offset",
                         "in": "query"
                     }
                 ],
@@ -13549,18 +13513,6 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Page size",
-                        "name": "limit",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Offset",
-                        "name": "offset",
-                        "in": "query"
                     },
                     {
                         "type": "integer",
@@ -14615,18 +14567,6 @@ const docTemplate = `{
                         "description": "Offset",
                         "name": "offset",
                         "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Page size",
-                        "name": "limit",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Offset",
-                        "name": "offset",
-                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -14761,18 +14701,6 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Page size",
-                        "name": "limit",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Offset",
-                        "name": "offset",
-                        "in": "query"
                     },
                     {
                         "type": "integer",

@@ -11,8 +11,8 @@ package handler
 //	@Tags		asset-types
 //	@Security	BearerAuth
 //	@Produce	json
-//	@Param		page		query		int	false	"Page number"
-//	@Param		page_size	query		int	false	"Items per page"
+//	@Param		limit		query		int	false	"Page size"
+//	@Param		offset		query		int	false	"Offset"
 //	@Success	200			{object}	dto.AssetTypePage
 //	@Failure	401			{object}	dto.ErrorResponse
 //	@Router		/api/v1/asset-types [get]
@@ -77,8 +77,8 @@ func docDeleteAssetType() {}
 //	@Tags		asset-statuses
 //	@Security	BearerAuth
 //	@Produce	json
-//	@Param		page		query		int	false	"Page number"
-//	@Param		page_size	query		int	false	"Items per page"
+//	@Param		limit		query		int	false	"Page size"
+//	@Param		offset		query		int	false	"Offset"
 //	@Success	200			{object}	dto.AssetStatusPage
 //	@Failure	401			{object}	dto.ErrorResponse
 //	@Router		/api/v1/asset-statuses [get]
@@ -192,8 +192,8 @@ func docDeleteCatalogOption() {}
 //	@Tags		vehicle-makes
 //	@Security	BearerAuth
 //	@Produce	json
-//	@Param		page		query		int	false	"Page number"
-//	@Param		page_size	query		int	false	"Items per page"
+//	@Param		limit		query		int	false	"Page size"
+//	@Param		offset		query		int	false	"Offset"
 //	@Success	200			{object}	dto.VehicleMakePage
 //	@Failure	401			{object}	dto.ErrorResponse
 //	@Router		/api/v1/vehicle-makes [get]
@@ -257,8 +257,8 @@ func docDeleteVehicleMake() {}
 //	@Tags		vehicle-models
 //	@Security	BearerAuth
 //	@Produce	json
-//	@Param		page		query		int	false	"Page number"
-//	@Param		page_size	query		int	false	"Items per page"
+//	@Param		limit		query		int	false	"Page size"
+//	@Param		offset		query		int	false	"Offset"
 //	@Success	200			{object}	dto.VehicleModelPage
 //	@Failure	401			{object}	dto.ErrorResponse
 //	@Router		/api/v1/vehicle-models [get]

@@ -300,14 +300,14 @@
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Page number",
-                        "name": "page",
+                        "description": "Page size",
+                        "name": "limit",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "description": "Page size",
-                        "name": "page_size",
+                        "description": "Offset",
+                        "name": "offset",
                         "in": "query"
                     }
                 ],
@@ -488,14 +488,14 @@
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Page number",
-                        "name": "page",
+                        "description": "Page size",
+                        "name": "limit",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "description": "Items per page",
-                        "name": "page_size",
+                        "description": "Offset",
+                        "name": "offset",
                         "in": "query"
                     }
                 ],
@@ -768,14 +768,14 @@
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Page number",
-                        "name": "page",
+                        "description": "Page size",
+                        "name": "limit",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "description": "Items per page",
-                        "name": "page_size",
+                        "description": "Offset",
+                        "name": "offset",
                         "in": "query"
                     }
                 ],
@@ -3184,14 +3184,14 @@
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Page number (1-based)",
-                        "name": "page",
+                        "description": "Page size",
+                        "name": "limit",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "description": "Items per page",
-                        "name": "page_size",
+                        "description": "Offset",
+                        "name": "offset",
                         "in": "query"
                     }
                 ],
@@ -6679,18 +6679,6 @@
                         "description": "Offset",
                         "name": "offset",
                         "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Page size",
-                        "name": "limit",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Offset",
-                        "name": "offset",
-                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -6825,18 +6813,6 @@
                         "name": "id",
                         "in": "path",
                         "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Page size",
-                        "name": "limit",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Offset",
-                        "name": "offset",
-                        "in": "query"
                     },
                     {
                         "type": "integer",
@@ -10090,18 +10066,6 @@
                         "description": "Offset",
                         "name": "offset",
                         "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Page size",
-                        "name": "limit",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Offset",
-                        "name": "offset",
-                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -12513,14 +12477,14 @@
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Page number",
-                        "name": "page",
+                        "description": "Page size",
+                        "name": "limit",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "description": "Items per page",
-                        "name": "page_size",
+                        "description": "Offset",
+                        "name": "offset",
                         "in": "query"
                     }
                 ],
@@ -12718,14 +12682,14 @@
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Page number",
-                        "name": "page",
+                        "description": "Page size",
+                        "name": "limit",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "description": "Items per page",
-                        "name": "page_size",
+                        "description": "Offset",
+                        "name": "offset",
                         "in": "query"
                     }
                 ],
@@ -13542,18 +13506,6 @@
                         "name": "id",
                         "in": "path",
                         "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Page size",
-                        "name": "limit",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Offset",
-                        "name": "offset",
-                        "in": "query"
                     },
                     {
                         "type": "integer",
@@ -14608,18 +14560,6 @@
                         "description": "Offset",
                         "name": "offset",
                         "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Page size",
-                        "name": "limit",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Offset",
-                        "name": "offset",
-                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -14754,18 +14694,6 @@
                         "name": "id",
                         "in": "path",
                         "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Page size",
-                        "name": "limit",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Offset",
-                        "name": "offset",
-                        "in": "query"
                     },
                     {
                         "type": "integer",

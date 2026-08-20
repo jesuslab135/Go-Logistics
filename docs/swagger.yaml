@@ -7163,13 +7163,13 @@ paths:
         this is not scoped to the caller''s company: it answers "who exists anywhere",
         which is what assigning an employee to a second company needs.'
       parameters:
-      - description: Page number
-        in: query
-        name: page
-        type: integer
       - description: Page size
         in: query
-        name: page_size
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
         type: integer
       produces:
       - application/json
@@ -7286,13 +7286,13 @@ paths:
   /api/v1/asset-statuses:
     get:
       parameters:
-      - description: Page number
+      - description: Page size
         in: query
-        name: page
+        name: limit
         type: integer
-      - description: Items per page
+      - description: Offset
         in: query
-        name: page_size
+        name: offset
         type: integer
       produces:
       - application/json
@@ -7464,13 +7464,13 @@ paths:
   /api/v1/asset-types:
     get:
       parameters:
-      - description: Page number
+      - description: Page size
         in: query
-        name: page
+        name: limit
         type: integer
-      - description: Items per page
+      - description: Offset
         in: query
-        name: page_size
+        name: offset
         type: integer
       produces:
       - application/json
@@ -8983,13 +8983,13 @@ paths:
   /api/v1/companies:
     get:
       parameters:
-      - description: Page number (1-based)
+      - description: Page size
         in: query
-        name: page
+        name: limit
         type: integer
-      - description: Items per page
+      - description: Offset
         in: query
-        name: page_size
+        name: offset
         type: integer
       produces:
       - application/json
@@ -11180,14 +11180,6 @@ paths:
         in: query
         name: offset
         type: integer
-      - description: Page size
-        in: query
-        name: limit
-        type: integer
-      - description: Offset
-        in: query
-        name: offset
-        type: integer
       produces:
       - application/json
       responses:
@@ -11271,14 +11263,6 @@ paths:
         in: path
         name: id
         required: true
-        type: integer
-      - description: Page size
-        in: query
-        name: limit
-        type: integer
-      - description: Offset
-        in: query
-        name: offset
         type: integer
       - description: Page size
         in: query
@@ -13321,14 +13305,6 @@ paths:
         in: query
         name: offset
         type: integer
-      - description: Page size
-        in: query
-        name: limit
-        type: integer
-      - description: Offset
-        in: query
-        name: offset
-        type: integer
       produces:
       - application/json
       responses:
@@ -14847,13 +14823,13 @@ paths:
   /api/v1/vehicle-makes:
     get:
       parameters:
-      - description: Page number
+      - description: Page size
         in: query
-        name: page
+        name: limit
         type: integer
-      - description: Items per page
+      - description: Offset
         in: query
-        name: page_size
+        name: offset
         type: integer
       produces:
       - application/json
@@ -14974,13 +14950,13 @@ paths:
   /api/v1/vehicle-models:
     get:
       parameters:
-      - description: Page number
+      - description: Page size
         in: query
-        name: page
+        name: limit
         type: integer
-      - description: Items per page
+      - description: Offset
         in: query
-        name: page_size
+        name: offset
         type: integer
       produces:
       - application/json
@@ -15486,14 +15462,6 @@ paths:
         in: path
         name: id
         required: true
-        type: integer
-      - description: Page size
-        in: query
-        name: limit
-        type: integer
-      - description: Offset
-        in: query
-        name: offset
         type: integer
       - description: Page size
         in: query
@@ -16157,14 +16125,6 @@ paths:
         in: query
         name: offset
         type: integer
-      - description: Page size
-        in: query
-        name: limit
-        type: integer
-      - description: Offset
-        in: query
-        name: offset
-        type: integer
       produces:
       - application/json
       responses:
@@ -16248,14 +16208,6 @@ paths:
         in: path
         name: id
         required: true
-        type: integer
-      - description: Page size
-        in: query
-        name: limit
-        type: integer
-      - description: Offset
-        in: query
-        name: offset
         type: integer
       - description: Page size
         in: query
