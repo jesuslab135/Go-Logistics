@@ -1421,12 +1421,19 @@ one. Adds a test over the generated spec so neither can regress."
 
 **Problem:** the deployed `CORS_ORIGINS` contains only the backend's own origin, which no browser ever sends, so no `Access-Control-Allow-Origin` header comes back. This is a deployment-value change, not a code change — the middleware already echoes any listed origin.
 
-**What can and cannot be fixed from this repo:** the live value lives in `/opt/fleet/.env` on the VPS, which is gitignored and never written by a deploy. This task delivers the in-repo half — the documented value, the example files, and the first test coverage of the middleware — plus the exact value someone with server access must set.
+**What can and cannot be fixed from this repo:** the *live* value lives in `/opt/fleet/.env` on the VPS, which is gitignored and never written by a deploy — that still needs a human with server access. But the committed template the deployment is provisioned from **carries the defect**: `deploy/.env.production.example:29` reads
+
+```sh
+CORS_ORIGINS=https://go-logistics.jesuslab135.com
+```
+
+— the backend's own origin, which is precisely the value no browser ever sends. That is an in-repo fix, and it is the source the next deployment copies from.
 
 **Files:**
 - Create: `internal/http/middleware/cors_test.go`
-- Modify: `.env.example`
-- Modify: `docs/2026-08-14_golanglogistics-deployment.md`
+- Modify: `deploy/.env.production.example` (line ~28-29 — the real target)
+- Modify: `.env.example` (QA block ~line 54, PROD block ~line 81)
+- Modify: `docs/2026-08-14_golanglogistics-deployment.md` (the doc-embedded copy of the same template, ~line 274)
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1538,7 +1545,22 @@ go test ./internal/http/middleware/ -run TestCORS -v
 ```
 Expected: **PASS immediately.** This is the one place in this plan where the test does not start red — the middleware is already correct and the defect is a deployed value. The test is a characterization guard proving the middleware behaves as the fix assumes, and pinning the exact failure mode (the last case) that is live today. State this explicitly rather than pretending it was red.
 
-- [ ] **Step 3: Make the example config concrete**
+- [ ] **Step 3: Fix the deployment template that carries the defect**
+
+In `deploy/.env.production.example`, replace the comment and value at lines ~28-29:
+
+```sh
+# The frontend's exact origin(s), comma-separated. NOT "*" in production, and
+# NOT this backend's own origin — a browser never sends that, so allowlisting
+# only it means no Access-Control-Allow-Origin header comes back and every
+# browser client is blocked. Add http://localhost:5173 while browser-testing
+# against this deployment.
+CORS_ORIGINS=https://app.example.com,http://localhost:5173
+```
+
+Keep the `example.com` placeholder convention the surrounding file already uses — line 22 of the deployment doc names `example.com` as a value the executor substitutes.
+
+- [ ] **Step 3b: Make the local example config concrete**
 
 In `.env.example`, replace the QA block line 54 and PROD block line 81 comments with a value that names both the app origin and the local dev origin, and explain why:
 
@@ -1566,13 +1588,14 @@ CORS_ORIGINS=https://app.example.com,http://localhost:5173
 ```bash
 go build ./... && go vet ./... && test -z "$(gofmt -l .)" && go test ./...
 git add -A
-git commit -m "docs(cors): document the origins a browser client actually needs
+git commit -m "fix(cors): allowlist the origins a browser client actually sends
 
-The deployed CORS_ORIGINS held only the backend's own origin, which no browser
-sends, so every client got a response with no Access-Control-Allow-Origin. The
-middleware is correct; only the value is wrong, and it lives in a gitignored
-server .env. Makes the example and deployment templates concrete and adds the
-middleware's first test coverage, pinning the live failure mode."
+deploy/.env.production.example set CORS_ORIGINS to the backend's own origin,
+which no browser ever sends, so the middleware echoed no
+Access-Control-Allow-Origin and every browser client was blocked. The
+middleware is correct; the provisioned value was not. Fixes the deployment
+template, makes the .env examples concrete, and adds the middleware's first
+test coverage, pinning the exact failure mode."
 ```
 
 - [ ] **Step 6: Report the manual step**
