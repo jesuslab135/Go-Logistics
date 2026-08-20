@@ -2117,6 +2117,17 @@ definitions:
       upcoming_reminders:
         type: integer
     type: object
+  dto.EmployeeCompaniesResponse:
+    properties:
+      company_ids:
+        items:
+          type: integer
+        type: array
+      default_company_id:
+        type: integer
+      employee_id:
+        type: integer
+    type: object
   dto.EmployeePage:
     properties:
       data:
@@ -3547,6 +3558,17 @@ definitions:
         type: string
     required:
     - refresh_token
+    type: object
+  dto.ReplaceEmployeeCompaniesRequest:
+    properties:
+      company_ids:
+        items:
+          type: integer
+        type: array
+      default_company_id:
+        type: integer
+    required:
+    - company_ids
     type: object
   dto.RolePage:
     properties:
@@ -6916,6 +6938,132 @@ info:
   title: Fleet API
   version: "1.0"
 paths:
+  /api/v1/admin/employees:
+    get:
+      description: 'Cross-company employee register. Unlike GET /api/v1/employees
+        this is not scoped to the caller''s company: it answers "who exists anywhere",
+        which is what assigning an employee to a second company needs.'
+      parameters:
+      - description: Page number
+        in: query
+        name: page
+        type: integer
+      - description: Page size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.EmployeePage'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List employees across every company
+      tags:
+      - admin
+  /api/v1/admin/employees/{id}/companies:
+    get:
+      description: The employee's employee_companies rows, sorted and de-duplicated,
+        plus the default_company_id login resolves against.
+      parameters:
+      - description: Employee id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.EmployeeCompaniesResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List an employee's company memberships
+      tags:
+      - admin
+    put:
+      consumes:
+      - application/json
+      description: Full overwrite of employee_companies. company_ids must be non-empty
+        — an employee with no membership cannot log in, so use is_active to deactivate
+        instead. default_company_id must be null or one of company_ids.
+      parameters:
+      - description: Employee id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Membership set
+        in: body
+        name: companies
+        required: true
+        schema:
+          $ref: '#/definitions/dto.ReplaceEmployeeCompaniesRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.EmployeeCompaniesResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Replace an employee's company memberships
+      tags:
+      - admin
   /api/v1/asset-statuses:
     get:
       parameters:

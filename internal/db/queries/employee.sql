@@ -102,3 +102,26 @@ RETURNING e.*;
 DELETE FROM employee e
 WHERE e.id = sqlc.arg(id)
   AND EXISTS (SELECT 1 FROM employee_companies ec WHERE ec.employee_id = e.id AND ec.company_id = sqlc.arg(company_id));
+
+-- name: ListAllEmployees :many
+-- Cross-company employee list for the admin namespace. Unlike ListEmployees
+-- this is deliberately unscoped: it exists to answer "who exists anywhere",
+-- which the company-scoped route cannot.
+SELECT * FROM employee ORDER BY id LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off);
+
+-- name: CountAllEmployees :one
+SELECT count(*) FROM employee;
+
+-- name: GetEmployeeByID :one
+-- Unscoped single-employee read for the admin namespace.
+SELECT * FROM employee WHERE id = sqlc.arg(id);
+
+-- name: RemoveEmployeeCompaniesNotIn :exec
+-- The delete half of a full-replace over employee_companies.
+DELETE FROM employee_companies
+WHERE employee_id = sqlc.arg(employee_id)
+  AND company_id <> ALL(sqlc.arg(company_ids)::bigint[]);
+
+-- name: SetEmployeeDefaultCompany :exec
+UPDATE employee SET default_company_id = sqlc.narg(default_company_id), updated_at = sqlc.arg(updated_at)
+WHERE id = sqlc.arg(id);

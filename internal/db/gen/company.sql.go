@@ -48,6 +48,20 @@ func (q *Queries) CountCompanies(ctx context.Context, employeeID int64) (int64, 
 	return count, err
 }
 
+const countCompaniesByIDs = `-- name: CountCompaniesByIDs :one
+SELECT count(*) FROM company WHERE id = ANY($1::bigint[])
+`
+
+// Pre-flight for a membership replace: a mismatch against the requested count
+// means at least one id names no company, which is a 422 rather than the 409 a
+// foreign-key violation would surface as.
+func (q *Queries) CountCompaniesByIDs(ctx context.Context, ids []int64) (int64, error) {
+	row := q.db.QueryRow(ctx, countCompaniesByIDs, ids)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createCompany = `-- name: CreateCompany :one
 INSERT INTO company (
     name, tax_id, address, created_at, phone, email, website, logo,
@@ -150,6 +164,35 @@ type GetCompanyParams struct {
 // admin read and DELETE other tenants' companies (cascading to their data).
 func (q *Queries) GetCompany(ctx context.Context, arg GetCompanyParams) (Company, error) {
 	row := q.db.QueryRow(ctx, getCompany, arg.ID, arg.EmployeeID)
+	var i Company
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.TaxID,
+		&i.Address,
+		&i.CreatedAt,
+		&i.Phone,
+		&i.Email,
+		&i.Website,
+		&i.Logo,
+		&i.City,
+		&i.Region,
+		&i.PostalCode,
+		&i.Country,
+		&i.Timezone,
+		&i.Currency,
+		&i.SystemOfMeasurement,
+	)
+	return i, err
+}
+
+const getCompanyByID = `-- name: GetCompanyByID :one
+SELECT id, name, tax_id, address, created_at, phone, email, website, logo, city, region, postal_code, country, timezone, currency, system_of_measurement FROM company WHERE id = $1
+`
+
+// Unscoped single-company read for the admin namespace.
+func (q *Queries) GetCompanyByID(ctx context.Context, id int64) (Company, error) {
+	row := q.db.QueryRow(ctx, getCompanyByID, id)
 	var i Company
 	err := row.Scan(
 		&i.ID,

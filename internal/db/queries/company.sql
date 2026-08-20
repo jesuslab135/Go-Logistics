@@ -69,3 +69,13 @@ UPDATE employee SET
     default_company_id = COALESCE(default_company_id, sqlc.arg(company_id)),
     updated_at         = sqlc.arg(updated_at)
 WHERE id = sqlc.arg(id);
+
+-- name: CountCompaniesByIDs :one
+-- Pre-flight for a membership replace: a mismatch against the requested count
+-- means at least one id names no company, which is a 422 rather than the 409 a
+-- foreign-key violation would surface as.
+SELECT count(*) FROM company WHERE id = ANY(sqlc.arg(ids)::bigint[]);
+
+-- name: GetCompanyByID :one
+-- Unscoped single-company read for the admin namespace.
+SELECT * FROM company WHERE id = sqlc.arg(id);

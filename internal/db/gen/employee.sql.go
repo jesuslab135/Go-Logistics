@@ -28,6 +28,17 @@ func (q *Queries) AddEmployeeCompany(ctx context.Context, arg AddEmployeeCompany
 	return err
 }
 
+const countAllEmployees = `-- name: CountAllEmployees :one
+SELECT count(*) FROM employee
+`
+
+func (q *Queries) CountAllEmployees(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, countAllEmployees)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countEmployees = `-- name: CountEmployees :one
 SELECT count(*) FROM employee e
 WHERE EXISTS (SELECT 1 FROM employee_companies ec WHERE ec.employee_id = e.id AND ec.company_id = $1)
@@ -270,6 +281,53 @@ func (q *Queries) GetEmployeeAuthByEmail(ctx context.Context, email string) (Get
 	return i, err
 }
 
+const getEmployeeByID = `-- name: GetEmployeeByID :one
+SELECT id, user_id, default_company_id, first_name, last_name, employee_id, role_id, is_active, email, mobile_phone, work_phone, job_title, start_date, leave_date, birth_date, hourly_labor_rate, is_technician, is_vehicle_operator, is_account_owner, license_class, license_number, license_state, license_expiry, street_address, city, region, postal_code, country, group_id, custom_fields, table_preferences, dashboard_preferences, updated_at, password_hash FROM employee WHERE id = $1
+`
+
+// Unscoped single-employee read for the admin namespace.
+func (q *Queries) GetEmployeeByID(ctx context.Context, id int64) (Employee, error) {
+	row := q.db.QueryRow(ctx, getEmployeeByID, id)
+	var i Employee
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.DefaultCompanyID,
+		&i.FirstName,
+		&i.LastName,
+		&i.EmployeeID,
+		&i.RoleID,
+		&i.IsActive,
+		&i.Email,
+		&i.MobilePhone,
+		&i.WorkPhone,
+		&i.JobTitle,
+		&i.StartDate,
+		&i.LeaveDate,
+		&i.BirthDate,
+		&i.HourlyLaborRate,
+		&i.IsTechnician,
+		&i.IsVehicleOperator,
+		&i.IsAccountOwner,
+		&i.LicenseClass,
+		&i.LicenseNumber,
+		&i.LicenseState,
+		&i.LicenseExpiry,
+		&i.StreetAddress,
+		&i.City,
+		&i.Region,
+		&i.PostalCode,
+		&i.Country,
+		&i.GroupID,
+		&i.CustomFields,
+		&i.TablePreferences,
+		&i.DashboardPreferences,
+		&i.UpdatedAt,
+		&i.PasswordHash,
+	)
+	return i, err
+}
+
 const getEmployeeIdentity = `-- name: GetEmployeeIdentity :one
 SELECT
     e.id,
@@ -319,6 +377,73 @@ func (q *Queries) GetEmployeeIdentity(ctx context.Context, arg GetEmployeeIdenti
 		&i.IsMember,
 	)
 	return i, err
+}
+
+const listAllEmployees = `-- name: ListAllEmployees :many
+SELECT id, user_id, default_company_id, first_name, last_name, employee_id, role_id, is_active, email, mobile_phone, work_phone, job_title, start_date, leave_date, birth_date, hourly_labor_rate, is_technician, is_vehicle_operator, is_account_owner, license_class, license_number, license_state, license_expiry, street_address, city, region, postal_code, country, group_id, custom_fields, table_preferences, dashboard_preferences, updated_at, password_hash FROM employee ORDER BY id LIMIT $2 OFFSET $1
+`
+
+type ListAllEmployeesParams struct {
+	Off int32
+	Lim int32
+}
+
+// Cross-company employee list for the admin namespace. Unlike ListEmployees
+// this is deliberately unscoped: it exists to answer "who exists anywhere",
+// which the company-scoped route cannot.
+func (q *Queries) ListAllEmployees(ctx context.Context, arg ListAllEmployeesParams) ([]Employee, error) {
+	rows, err := q.db.Query(ctx, listAllEmployees, arg.Off, arg.Lim)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Employee{}
+	for rows.Next() {
+		var i Employee
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.DefaultCompanyID,
+			&i.FirstName,
+			&i.LastName,
+			&i.EmployeeID,
+			&i.RoleID,
+			&i.IsActive,
+			&i.Email,
+			&i.MobilePhone,
+			&i.WorkPhone,
+			&i.JobTitle,
+			&i.StartDate,
+			&i.LeaveDate,
+			&i.BirthDate,
+			&i.HourlyLaborRate,
+			&i.IsTechnician,
+			&i.IsVehicleOperator,
+			&i.IsAccountOwner,
+			&i.LicenseClass,
+			&i.LicenseNumber,
+			&i.LicenseState,
+			&i.LicenseExpiry,
+			&i.StreetAddress,
+			&i.City,
+			&i.Region,
+			&i.PostalCode,
+			&i.Country,
+			&i.GroupID,
+			&i.CustomFields,
+			&i.TablePreferences,
+			&i.DashboardPreferences,
+			&i.UpdatedAt,
+			&i.PasswordHash,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listEmployeeCompanyIDs = `-- name: ListEmployeeCompanyIDs :many
@@ -416,6 +541,39 @@ func (q *Queries) ListEmployees(ctx context.Context, arg ListEmployeesParams) ([
 		return nil, err
 	}
 	return items, nil
+}
+
+const removeEmployeeCompaniesNotIn = `-- name: RemoveEmployeeCompaniesNotIn :exec
+DELETE FROM employee_companies
+WHERE employee_id = $1
+  AND company_id <> ALL($2::bigint[])
+`
+
+type RemoveEmployeeCompaniesNotInParams struct {
+	EmployeeID int64
+	CompanyIds []int64
+}
+
+// The delete half of a full-replace over employee_companies.
+func (q *Queries) RemoveEmployeeCompaniesNotIn(ctx context.Context, arg RemoveEmployeeCompaniesNotInParams) error {
+	_, err := q.db.Exec(ctx, removeEmployeeCompaniesNotIn, arg.EmployeeID, arg.CompanyIds)
+	return err
+}
+
+const setEmployeeDefaultCompany = `-- name: SetEmployeeDefaultCompany :exec
+UPDATE employee SET default_company_id = $1, updated_at = $2
+WHERE id = $3
+`
+
+type SetEmployeeDefaultCompanyParams struct {
+	DefaultCompanyID *int64
+	UpdatedAt        time.Time
+	ID               int64
+}
+
+func (q *Queries) SetEmployeeDefaultCompany(ctx context.Context, arg SetEmployeeDefaultCompanyParams) error {
+	_, err := q.db.Exec(ctx, setEmployeeDefaultCompany, arg.DefaultCompanyID, arg.UpdatedAt, arg.ID)
+	return err
 }
 
 const updateEmployee = `-- name: UpdateEmployee :one

@@ -79,6 +79,7 @@ func NewRouter(d Deps) *gin.Engine {
 	member := api.Group("", middleware.RequireCompanyMember())
 
 	registerCompanyRoutes(api, member, d)
+	registerAdminRoutes(member, d)
 
 	assets := member.Group("", middleware.RequireModule("assets"))
 	tires := member.Group("", middleware.RequireModule("tires"))
@@ -288,4 +289,17 @@ func registerCompanyRoutes(api, member *gin.RouterGroup, d Deps) {
 	admin.GET("/companies/:id", h.Get)
 	admin.PUT("/companies/:id", h.Update)
 	admin.DELETE("/companies/:id", h.Delete)
+}
+
+// registerAdminRoutes wires the cross-company namespace. Every route here reads
+// or writes another tenant's data on purpose — the company-scoped routes cannot
+// answer "who belongs to company X" or "did company X get seeded" — so the whole
+// group sits behind RequireAdminRole rather than a module permission.
+func registerAdminRoutes(member *gin.RouterGroup, d Deps) {
+	admin := member.Group("", middleware.RequireAdminRole())
+
+	employees := NewAdminEmployeeHandler(d.Queries, d.Pool)
+	admin.GET("/admin/employees", employees.List)
+	admin.GET("/admin/employees/:id/companies", employees.ListCompanies)
+	admin.PUT("/admin/employees/:id/companies", employees.ReplaceCompanies)
 }
