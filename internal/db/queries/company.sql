@@ -111,3 +111,22 @@ WHERE employee.id = sqlc.arg(id)
       WHERE ec.employee_id = employee.id AND ec.company_id = sqlc.arg(company_id)
   )
 RETURNING id, first_name, last_name, email, job_title;
+
+-- name: ListOwnersInOtherCompanies :many
+-- Pre-flight for set-owner's clear half. is_account_owner is a single global
+-- boolean, so clearing "this company's owner" also clears it for every other
+-- company that employee belongs to, silently leaving those without an owner and
+-- so without POST /api/v1/companies. The incoming owner is excluded: the same
+-- transaction sets the flag straight back on them, so nothing is lost there.
+SELECT e.id FROM employee e
+WHERE e.is_account_owner = true
+  AND e.id <> sqlc.arg(new_owner_id)
+  AND EXISTS (
+      SELECT 1 FROM employee_companies ec
+      WHERE ec.employee_id = e.id AND ec.company_id = sqlc.arg(company_id)
+  )
+  AND EXISTS (
+      SELECT 1 FROM employee_companies other
+      WHERE other.employee_id = e.id AND other.company_id <> sqlc.arg(company_id)
+  )
+ORDER BY e.id;

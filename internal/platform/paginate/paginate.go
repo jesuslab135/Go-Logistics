@@ -1,6 +1,7 @@
 package paginate
 
 import (
+	"math"
 	"os"
 	"strconv"
 
@@ -19,7 +20,8 @@ type Params struct {
 
 // Parse reads pagination from the query string. It accepts either page-based
 // (?page=2&page_size=50) or explicit (?limit=50&offset=100) params; explicit
-// values win when both are present. Limit is always clamped to [1, PAGE_MAX_SIZE].
+// values win when both are present. Limit is always clamped to [1, PAGE_MAX_SIZE]
+// and offset to [0, math.MaxInt32].
 func Parse(c *gin.Context) Params {
 	limit := clamp(queryInt(c, "page_size", defaultLimit), 1, maxLimit)
 
@@ -37,7 +39,10 @@ func Parse(c *gin.Context) Params {
 		}
 	}
 
-	return Params{Limit: limit, Offset: offset}
+	// Every call site narrows Offset to int32 for Postgres, so an unclamped
+	// value truncates to a negative one and the query fails with
+	// invalid_row_count_in_result_offset_clause — a 500 on any list route.
+	return Params{Limit: limit, Offset: clamp(offset, 0, math.MaxInt32)}
 }
 
 type Page[T any] struct {

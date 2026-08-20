@@ -23,6 +23,7 @@ func docListWarranties() {}
 //	@Param	body	body	dto.CreateWarrantyRequest	true	"body"
 //	@Success	201	{object}	dto.WarrantyResponse
 //	@Failure	400	{object}	dto.ErrorResponse
+//	@Failure	422	{object}	dto.ErrorResponse
 //	@Router	/api/v1/warranties [post]
 func docCreateWarranty() {}
 
@@ -49,6 +50,7 @@ func docGetWarranty() {}
 //	@Param	body	body	dto.UpdateWarrantyRequest	true	"body"
 //	@Success	200	{object}	dto.WarrantyResponse
 //	@Failure	404	{object}	dto.ErrorResponse
+//	@Failure	422	{object}	dto.ErrorResponse
 //	@Router	/api/v1/warranties/{id} [put]
 func docUpdateWarranty() {}
 

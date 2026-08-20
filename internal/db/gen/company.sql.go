@@ -319,6 +319,51 @@ func (q *Queries) ListCompanies(ctx context.Context, arg ListCompaniesParams) ([
 	return items, nil
 }
 
+const listOwnersInOtherCompanies = `-- name: ListOwnersInOtherCompanies :many
+SELECT e.id FROM employee e
+WHERE e.is_account_owner = true
+  AND e.id <> $1
+  AND EXISTS (
+      SELECT 1 FROM employee_companies ec
+      WHERE ec.employee_id = e.id AND ec.company_id = $2
+  )
+  AND EXISTS (
+      SELECT 1 FROM employee_companies other
+      WHERE other.employee_id = e.id AND other.company_id <> $2
+  )
+ORDER BY e.id
+`
+
+type ListOwnersInOtherCompaniesParams struct {
+	NewOwnerID int64
+	CompanyID  int64
+}
+
+// Pre-flight for set-owner's clear half. is_account_owner is a single global
+// boolean, so clearing "this company's owner" also clears it for every other
+// company that employee belongs to, silently leaving those without an owner and
+// so without POST /api/v1/companies. The incoming owner is excluded: the same
+// transaction sets the flag straight back on them, so nothing is lost there.
+func (q *Queries) ListOwnersInOtherCompanies(ctx context.Context, arg ListOwnersInOtherCompaniesParams) ([]int64, error) {
+	rows, err := q.db.Query(ctx, listOwnersInOtherCompanies, arg.NewOwnerID, arg.CompanyID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []int64{}
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const seedAssetStatus = `-- name: SeedAssetStatus :exec
 
 INSERT INTO asset_status (company_id, name, color_code)

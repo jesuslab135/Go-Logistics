@@ -143,7 +143,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Clears the current owner and flags the named employee in one transaction, so a company never carries two. The employee must already be a member of this company — is_account_owner is a single global boolean, so this cannot make an outsider the owner of a tenant.",
+                "description": "Clears the current owner and flags the named employee in one transaction, so a company never carries two. The employee must already be a member of this company. Note that employee.is_account_owner is a single global boolean rather than a per-company column: the clear half therefore also unsets ownership everywhere else the current owner belongs. Where the current owner belongs to another company this is refused with 409 owner_in_multiple_companies rather than silently leaving that company without an owner; move that owner out of this company, or hand the other company a new owner first.",
                 "consumes": [
                     "application/json"
                 ],
@@ -199,6 +199,12 @@
                     },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -402,7 +408,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Full overwrite of employee_companies. company_ids must be non-empty — an employee with no membership cannot log in, so use is_active to deactivate instead. default_company_id must be null or one of company_ids.",
+                "description": "Full overwrite of employee_companies. company_ids must be non-empty — an employee with no membership cannot log in, so use is_active to deactivate instead. default_company_id must be null or one of company_ids; omitting it clears the employee's stored default_company_id, so send it on every call unless you mean to clear it. Every id in company_ids must be a company the caller themselves belongs to: this route cannot hand out membership in a tenant the caller has no access to, which would also confer admin there because employee.role_id is global.",
                 "consumes": [
                     "application/json"
                 ],
@@ -13157,6 +13163,12 @@
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
                     }
                 }
             }
@@ -13242,6 +13254,12 @@
                     },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -15431,6 +15449,12 @@
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }

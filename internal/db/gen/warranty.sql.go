@@ -83,8 +83,8 @@ func (q *Queries) DeleteWarranty(ctx context.Context, arg DeleteWarrantyParams) 
 
 const getWarranty = `-- name: GetWarranty :one
 
-SELECT w.id, w.company_id, w.provider_id, w.asset_id, w.part_id, w.start_date, w.end_date, w.terms, w.is_active, v.name AS provider_name FROM warranty w
-JOIN vendor v ON v.id = w.provider_id
+SELECT w.id, w.company_id, w.provider_id, w.asset_id, w.part_id, w.start_date, w.end_date, w.terms, w.is_active, COALESCE(v.name, '') AS provider_name FROM warranty w
+LEFT JOIN vendor v ON v.id = w.provider_id AND v.company_id = w.company_id
 WHERE w.id = $1 AND w.company_id = $2
 `
 
@@ -107,7 +107,11 @@ type GetWarrantyRow struct {
 }
 
 // The provider's name is joined in so a warranty row renders without a second
-// request per row just to resolve the vendor.
+// request per row just to resolve the vendor. The join is company-scoped and a
+// LEFT JOIN on purpose: warranty.provider_id carries no company predicate of its
+// own, so an INNER JOIN would leak another tenant's vendor name — and, since
+// CountWarranties is unjoined, would also drop rows from the page while the
+// total still counted them, breaking has_next.
 func (q *Queries) GetWarranty(ctx context.Context, arg GetWarrantyParams) (GetWarrantyRow, error) {
 	row := q.db.QueryRow(ctx, getWarranty, arg.ID, arg.CompanyID)
 	var i GetWarrantyRow
@@ -127,8 +131,8 @@ func (q *Queries) GetWarranty(ctx context.Context, arg GetWarrantyParams) (GetWa
 }
 
 const listWarranties = `-- name: ListWarranties :many
-SELECT w.id, w.company_id, w.provider_id, w.asset_id, w.part_id, w.start_date, w.end_date, w.terms, w.is_active, v.name AS provider_name FROM warranty w
-JOIN vendor v ON v.id = w.provider_id
+SELECT w.id, w.company_id, w.provider_id, w.asset_id, w.part_id, w.start_date, w.end_date, w.terms, w.is_active, COALESCE(v.name, '') AS provider_name FROM warranty w
+LEFT JOIN vendor v ON v.id = w.provider_id AND v.company_id = w.company_id
 WHERE w.company_id = $1
 ORDER BY w.end_date DESC, w.id
 LIMIT $3 OFFSET $2

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"slices"
 
 	"github.com/gin-gonic/gin"
 
@@ -100,6 +101,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 //	@Success	200		{object}	auth.TokenPair
 //	@Failure	400		{object}	dto.ErrorResponse
 //	@Failure	401		{object}	dto.ErrorResponse
+//	@Failure	403		{object}	dto.ErrorResponse
 //	@Router		/auth/refresh [post]
 func (h *AuthHandler) Refresh(c *gin.Context) {
 	var req dto.RefreshRequest
@@ -126,6 +128,20 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 	}
 	if revoked {
 		apierr.Abort(c, apierr.Unauthorized("invalid refresh token"))
+		return
+	}
+
+	// Login and switch-company both prove employee_companies membership before
+	// minting a token; refresh re-issues company_id off the old token, so
+	// without this a revoked membership stays live for a whole refresh TTL.
+	companies, err := h.q.ListEmployeeCompanyIDs(c.Request.Context(), claims.EmployeeID())
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	if !slices.Contains(companies, claims.CompanyID) {
+		apierr.Abort(c, apierr.New(http.StatusForbidden, "no_company_membership",
+			"this account is no longer a member of the company this token was issued for"))
 		return
 	}
 

@@ -2,8 +2,10 @@ package handler
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -37,6 +39,16 @@ func adminCompanyParam(c *gin.Context) (int64, error) {
 		return 0, apierr.BadRequest("invalid id")
 	}
 	return id, nil
+}
+
+// joinInt64s renders ids for an error message, so the caller is told which
+// employee blocks the change rather than only that something does.
+func joinInt64s(ids []int64) string {
+	parts := make([]string, len(ids))
+	for i, id := range ids {
+		parts[i] = strconv.FormatInt(id, 10)
+	}
+	return strings.Join(parts, ", ")
 }
 
 func toCompanyOwnerResponse(row gen.GetCompanyOwnerRow) dto.CompanyOwnerResponse {
@@ -95,7 +107,7 @@ func (h *AdminCompanyHandler) Owner(c *gin.Context) {
 // SetOwner godoc
 //
 //	@Summary		Set a company's account owner
-//	@Description	Clears the current owner and flags the named employee in one transaction, so a company never carries two. The employee must already be a member of this company — is_account_owner is a single global boolean, so this cannot make an outsider the owner of a tenant.
+//	@Description	Clears the current owner and flags the named employee in one transaction, so a company never carries two. The employee must already be a member of this company. Note that employee.is_account_owner is a single global boolean rather than a per-company column: the clear half therefore also unsets ownership everywhere else the current owner belongs. Where the current owner belongs to another company this is refused with 409 owner_in_multiple_companies rather than silently leaving that company without an owner; move that owner out of this company, or hand the other company a new owner first.
 //	@Tags			admin
 //	@Accept			json
 //	@Produce		json
@@ -107,6 +119,7 @@ func (h *AdminCompanyHandler) Owner(c *gin.Context) {
 //	@Failure		401		{object}	dto.ErrorResponse
 //	@Failure		403		{object}	dto.ErrorResponse
 //	@Failure		404		{object}	dto.ErrorResponse
+//	@Failure		409		{object}	dto.ErrorResponse
 //	@Failure		422		{object}	dto.ErrorResponse
 //	@Router			/api/v1/admin/companies/{id}/set-owner [post]
 func (h *AdminCompanyHandler) SetOwner(c *gin.Context) {
@@ -125,6 +138,24 @@ func (h *AdminCompanyHandler) SetOwner(c *gin.Context) {
 	ctx := c.Request.Context()
 	if _, err := h.q.GetCompanyByID(ctx, id); err != nil {
 		apierr.Abort(c, err)
+		return
+	}
+
+	// is_account_owner is global, so the clear below would strip it from an
+	// owner who also belongs to another company, leaving that company ownerless
+	// and unable to reach POST /api/v1/companies. Refuse instead of doing it.
+	shared, err := h.q.ListOwnersInOtherCompanies(ctx, gen.ListOwnersInOtherCompaniesParams{
+		CompanyID:  id,
+		NewOwnerID: req.EmployeeID,
+	})
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	if len(shared) > 0 {
+		apierr.Abort(c, apierr.New(http.StatusConflict, "owner_in_multiple_companies",
+			fmt.Sprintf("employee %s carries the global is_account_owner flag and also belongs to another company; "+
+				"replacing this company's owner would leave that company without one", joinInt64s(shared))))
 		return
 	}
 

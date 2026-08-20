@@ -1,14 +1,18 @@
 -- The provider's name is joined in so a warranty row renders without a second
--- request per row just to resolve the vendor.
+-- request per row just to resolve the vendor. The join is company-scoped and a
+-- LEFT JOIN on purpose: warranty.provider_id carries no company predicate of its
+-- own, so an INNER JOIN would leak another tenant's vendor name — and, since
+-- CountWarranties is unjoined, would also drop rows from the page while the
+-- total still counted them, breaking has_next.
 
 -- name: GetWarranty :one
-SELECT w.*, v.name AS provider_name FROM warranty w
-JOIN vendor v ON v.id = w.provider_id
+SELECT w.*, COALESCE(v.name, '') AS provider_name FROM warranty w
+LEFT JOIN vendor v ON v.id = w.provider_id AND v.company_id = w.company_id
 WHERE w.id = sqlc.arg(id) AND w.company_id = sqlc.arg(company_id);
 
 -- name: ListWarranties :many
-SELECT w.*, v.name AS provider_name FROM warranty w
-JOIN vendor v ON v.id = w.provider_id
+SELECT w.*, COALESCE(v.name, '') AS provider_name FROM warranty w
+LEFT JOIN vendor v ON v.id = w.provider_id AND v.company_id = w.company_id
 WHERE w.company_id = sqlc.arg(company_id)
 ORDER BY w.end_date DESC, w.id
 LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off);

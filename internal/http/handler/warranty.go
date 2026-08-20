@@ -2,10 +2,14 @@ package handler
 
 import (
 	"context"
+	"errors"
+
+	"github.com/jackc/pgx/v5"
 
 	"fleet/internal/db/gen"
 	"fleet/internal/http/dto"
 	"fleet/internal/http/middleware"
+	"fleet/internal/platform/apierr"
 	"fleet/internal/platform/paginate"
 )
 
@@ -40,7 +44,22 @@ func (s *WarrantyStore) Get(ctx context.Context, id int64) (dto.WarrantyResponse
 	return toWarrantyResponse(gen.ListWarrantiesRow(r)), nil
 }
 
+// requireOwnProvider rejects a provider_id that does not name a vendor of the
+// caller's company. warranty.provider_id has no company predicate of its own, so
+// without this a warranty can be pointed at another tenant's vendor — and the
+// joined provider_name would then read that tenant's data straight back out.
+func (s *WarrantyStore) requireOwnProvider(ctx context.Context, providerID int64) error {
+	_, err := s.q.GetVendor(ctx, gen.GetVendorParams{ID: providerID, CompanyID: middleware.CompanyFromContext(ctx)})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return apierr.Validation(map[string]string{"provider_id": "must name a vendor of your company"})
+	}
+	return err
+}
+
 func (s *WarrantyStore) Create(ctx context.Context, in dto.CreateWarrantyRequest) (dto.WarrantyResponse, error) {
+	if err := s.requireOwnProvider(ctx, in.ProviderID); err != nil {
+		return dto.WarrantyResponse{}, err
+	}
 	r, err := s.q.CreateWarranty(ctx, gen.CreateWarrantyParams{
 		CompanyID:  middleware.CompanyFromContext(ctx),
 		ProviderID: in.ProviderID,
@@ -60,6 +79,9 @@ func (s *WarrantyStore) Create(ctx context.Context, in dto.CreateWarrantyRequest
 }
 
 func (s *WarrantyStore) Update(ctx context.Context, id int64, in dto.UpdateWarrantyRequest) (dto.WarrantyResponse, error) {
+	if err := s.requireOwnProvider(ctx, in.ProviderID); err != nil {
+		return dto.WarrantyResponse{}, err
+	}
 	_, err := s.q.UpdateWarranty(ctx, gen.UpdateWarrantyParams{
 		ID:         id,
 		CompanyID:  middleware.CompanyFromContext(ctx),

@@ -70,3 +70,41 @@ func TestValidateMembershipReplace(t *testing.T) {
 		})
 	}
 }
+
+// The admin namespace is gated on RequireAdminRole alone, and role_id is a
+// single global FK: granting yourself a company you do not belong to therefore
+// makes you an admin of that company too, with DELETE /companies/:id behind it.
+// A grant is constrained to the caller's own memberships to close that.
+func TestValidateGrantableCompanies(t *testing.T) {
+	tests := []struct {
+		name            string
+		requested       []int64
+		callerCompanies []int64
+		wantErr         bool
+	}{
+		{name: "every requested company is one the caller belongs to", requested: []int64{3, 7}, callerCompanies: []int64{3, 7, 9}, wantErr: false},
+		{name: "the caller's whole set is grantable", requested: []int64{3}, callerCompanies: []int64{3}, wantErr: false},
+		{name: "one company outside the caller's set is refused", requested: []int64{3, 8}, callerCompanies: []int64{3, 7}, wantErr: true},
+		{name: "a caller with no companies can grant nothing", requested: []int64{3}, callerCompanies: nil, wantErr: true},
+		{name: "an empty caller slice can grant nothing", requested: []int64{3}, callerCompanies: []int64{}, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateGrantableCompanies(tt.requested, tt.callerCompanies)
+			if tt.wantErr == (err == nil) {
+				t.Fatalf("err = %v, wantErr = %v", err, tt.wantErr)
+			}
+			if err == nil {
+				return
+			}
+			var ae *apierr.Error
+			if !errors.As(err, &ae) {
+				t.Fatalf("error is %T, want *apierr.Error", err)
+			}
+			if ae.Status != 403 {
+				t.Errorf("status = %d, want 403", ae.Status)
+			}
+		})
+	}
+}

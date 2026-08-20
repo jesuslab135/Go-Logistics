@@ -11,6 +11,7 @@ import (
 
 	"fleet/internal/db/gen"
 	"fleet/internal/http/dto"
+	"fleet/internal/http/middleware"
 	"fleet/internal/platform/apierr"
 	"fleet/internal/platform/paginate"
 )
@@ -56,6 +57,20 @@ func validateMembershipReplace(companyIDs []int64, defaultCompanyID *int64) erro
 		return apierr.Validation(map[string]string{
 			"default_company_id": "must be null or one of company_ids",
 		})
+	}
+	return nil
+}
+
+// validateGrantableCompanies constrains a membership grant to the companies the
+// caller themselves belongs to. Without it the admin namespace escalates: the
+// gate is RequireAdminRole and employee.role_id is a single global FK, so an
+// admin of company A who grants themselves company B is an admin of B as well —
+// which reaches DELETE /companies/{B}, and every foreign key cascades.
+func validateGrantableCompanies(requested, callerCompanies []int64) error {
+	for _, id := range requested {
+		if !slices.Contains(callerCompanies, id) {
+			return apierr.Forbidden("you can only grant membership in a company you belong to")
+		}
 	}
 	return nil
 }
@@ -142,7 +157,7 @@ func (h *AdminEmployeeHandler) ListCompanies(c *gin.Context) {
 // ReplaceCompanies godoc
 //
 //	@Summary		Replace an employee's company memberships
-//	@Description	Full overwrite of employee_companies. company_ids must be non-empty — an employee with no membership cannot log in, so use is_active to deactivate instead. default_company_id must be null or one of company_ids.
+//	@Description	Full overwrite of employee_companies. company_ids must be non-empty — an employee with no membership cannot log in, so use is_active to deactivate instead. default_company_id must be null or one of company_ids; omitting it clears the employee's stored default_company_id, so send it on every call unless you mean to clear it. Every id in company_ids must be a company the caller themselves belongs to: this route cannot hand out membership in a tenant the caller has no access to, which would also confer admin there because employee.role_id is global.
 //	@Tags			admin
 //	@Accept			json
 //	@Produce		json
@@ -190,6 +205,18 @@ func (h *AdminEmployeeHandler) ReplaceCompanies(c *gin.Context) {
 	}
 	if n != int64(len(ids)) {
 		apierr.Abort(c, apierr.Validation(map[string]string{"company_ids": "one or more companies do not exist"}))
+		return
+	}
+
+	// Existing is not the same as grantable: the caller may only extend
+	// membership into companies they are themselves a member of.
+	callerCompanies, err := h.q.ListEmployeeCompanyIDs(ctx, middleware.EmployeeFromContext(ctx))
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	if err := validateGrantableCompanies(ids, callerCompanies); err != nil {
+		apierr.Abort(c, err)
 		return
 	}
 
