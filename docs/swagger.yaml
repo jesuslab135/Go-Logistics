@@ -7004,6 +7004,54 @@ paths:
       summary: Get a company's account owner
       tags:
       - admin
+  /api/v1/admin/companies/{id}/roles:
+    get:
+      description: The plain /roles route reads company_id off the caller's own JWT,
+        which would show the admin's roles mislabeled as company X's. This reads company
+        X's roles directly, so a provisioning check can answer "did company X get
+        seeded".
+      parameters:
+      - description: Company id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Page size
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.RolePage'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List another company's roles
+      tags:
+      - admin
   /api/v1/admin/companies/{id}/set-owner:
     post:
       consumes:
@@ -7054,6 +7102,54 @@ paths:
       security:
       - BearerAuth: []
       summary: Set a company's account owner
+      tags:
+      - admin
+  /api/v1/admin/companies/{id}/work-order-statuses:
+    get:
+      description: The plain /work-order-statuses route reads company_id off the caller's
+        own JWT, which would show the admin's statuses mislabeled as company X's.
+        This reads company X's statuses directly, so a provisioning check can answer
+        "did company X get seeded".
+      parameters:
+      - description: Company id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Page size
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.WorkOrderStatusPage'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List another company's work order statuses
       tags:
       - admin
   /api/v1/admin/employees:

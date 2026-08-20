@@ -13,6 +13,7 @@ import (
 	"fleet/internal/db/gen"
 	"fleet/internal/http/dto"
 	"fleet/internal/platform/apierr"
+	"fleet/internal/platform/paginate"
 )
 
 // AdminCompanyHandler serves the cross-company /admin/companies routes: owner
@@ -164,4 +165,98 @@ func (h *AdminCompanyHandler) SetOwner(c *gin.Context) {
 		JobTitle:   owner.JobTitle,
 	}
 	c.JSON(http.StatusOK, dto.CompanyOwnerEnvelope{Owner: &resp})
+}
+
+// Roles godoc
+//
+//	@Summary		List another company's roles
+//	@Description	The plain /roles route reads company_id off the caller's own JWT, which would show the admin's roles mislabeled as company X's. This reads company X's roles directly, so a provisioning check can answer "did company X get seeded".
+//	@Tags			admin
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			id		path		int	true	"Company id"
+//	@Param			limit	query		int	false	"Page size"
+//	@Param			offset	query		int	false	"Offset"
+//	@Success		200		{object}	dto.RolePage
+//	@Failure		400		{object}	dto.ErrorResponse
+//	@Failure		401		{object}	dto.ErrorResponse
+//	@Failure		403		{object}	dto.ErrorResponse
+//	@Failure		404		{object}	dto.ErrorResponse
+//	@Router			/api/v1/admin/companies/{id}/roles [get]
+func (h *AdminCompanyHandler) Roles(c *gin.Context) {
+	id, err := adminCompanyParam(c)
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	ctx := c.Request.Context()
+	if _, err := h.q.GetCompanyByID(ctx, id); err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+
+	p := paginate.Parse(c)
+	rows, err := h.q.ListRoles(ctx, gen.ListRolesParams{CompanyID: id, Limit: int32(p.Limit), Offset: int32(p.Offset)})
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	total, err := h.q.CountRoles(ctx, id)
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+
+	out := make([]dto.RoleResponse, len(rows))
+	for i, r := range rows {
+		out[i] = toRoleResponse(r)
+	}
+	c.JSON(http.StatusOK, paginate.NewPage(out, total, p))
+}
+
+// WorkOrderStatuses godoc
+//
+//	@Summary		List another company's work order statuses
+//	@Description	The plain /work-order-statuses route reads company_id off the caller's own JWT, which would show the admin's statuses mislabeled as company X's. This reads company X's statuses directly, so a provisioning check can answer "did company X get seeded".
+//	@Tags			admin
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			id		path		int	true	"Company id"
+//	@Param			limit	query		int	false	"Page size"
+//	@Param			offset	query		int	false	"Offset"
+//	@Success		200		{object}	dto.WorkOrderStatusPage
+//	@Failure		400		{object}	dto.ErrorResponse
+//	@Failure		401		{object}	dto.ErrorResponse
+//	@Failure		403		{object}	dto.ErrorResponse
+//	@Failure		404		{object}	dto.ErrorResponse
+//	@Router			/api/v1/admin/companies/{id}/work-order-statuses [get]
+func (h *AdminCompanyHandler) WorkOrderStatuses(c *gin.Context) {
+	id, err := adminCompanyParam(c)
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	ctx := c.Request.Context()
+	if _, err := h.q.GetCompanyByID(ctx, id); err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+
+	p := paginate.Parse(c)
+	rows, err := h.q.ListWorkOrderStatuses(ctx, gen.ListWorkOrderStatusesParams{CompanyID: id, Limit: int32(p.Limit), Offset: int32(p.Offset)})
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	total, err := h.q.CountWorkOrderStatuses(ctx, id)
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+
+	out := make([]dto.WorkOrderStatusResponse, len(rows))
+	for i, r := range rows {
+		out[i] = toWorkOrderStatusResponse(r)
+	}
+	c.JSON(http.StatusOK, paginate.NewPage(out, total, p))
 }
