@@ -15,7 +15,7 @@ func NewWarrantyStore(q *gen.Queries) *WarrantyStore { return &WarrantyStore{q: 
 
 func (s *WarrantyStore) List(ctx context.Context, p paginate.Params) ([]dto.WarrantyResponse, int64, error) {
 	company := middleware.CompanyFromContext(ctx)
-	rows, err := s.q.ListWarranties(ctx, gen.ListWarrantiesParams{CompanyID: company, Limit: int32(p.Limit), Offset: int32(p.Offset)})
+	rows, err := s.q.ListWarranties(ctx, gen.ListWarrantiesParams{CompanyID: company, Lim: int32(p.Limit), Off: int32(p.Offset)})
 	if err != nil {
 		return nil, 0, err
 	}
@@ -35,7 +35,9 @@ func (s *WarrantyStore) Get(ctx context.Context, id int64) (dto.WarrantyResponse
 	if err != nil {
 		return dto.WarrantyResponse{}, err
 	}
-	return toWarrantyResponse(r), nil
+	// GetWarrantyRow and ListWarrantiesRow project the same columns in the same
+	// order, so the conversion is exact and one mapper serves both.
+	return toWarrantyResponse(gen.ListWarrantiesRow(r)), nil
 }
 
 func (s *WarrantyStore) Create(ctx context.Context, in dto.CreateWarrantyRequest) (dto.WarrantyResponse, error) {
@@ -52,11 +54,13 @@ func (s *WarrantyStore) Create(ctx context.Context, in dto.CreateWarrantyRequest
 	if err != nil {
 		return dto.WarrantyResponse{}, err
 	}
-	return toWarrantyResponse(r), nil
+	// Re-read so the response carries the joined provider name, which the
+	// INSERT itself cannot return.
+	return s.Get(ctx, r.ID)
 }
 
 func (s *WarrantyStore) Update(ctx context.Context, id int64, in dto.UpdateWarrantyRequest) (dto.WarrantyResponse, error) {
-	r, err := s.q.UpdateWarranty(ctx, gen.UpdateWarrantyParams{
+	_, err := s.q.UpdateWarranty(ctx, gen.UpdateWarrantyParams{
 		ID:         id,
 		CompanyID:  middleware.CompanyFromContext(ctx),
 		ProviderID: in.ProviderID,
@@ -70,23 +74,26 @@ func (s *WarrantyStore) Update(ctx context.Context, id int64, in dto.UpdateWarra
 	if err != nil {
 		return dto.WarrantyResponse{}, err
 	}
-	return toWarrantyResponse(r), nil
+	// Re-read so the response carries the joined provider name, which the
+	// UPDATE itself cannot return.
+	return s.Get(ctx, id)
 }
 
 func (s *WarrantyStore) Delete(ctx context.Context, id int64) error {
 	return s.q.DeleteWarranty(ctx, gen.DeleteWarrantyParams{ID: id, CompanyID: middleware.CompanyFromContext(ctx)})
 }
 
-func toWarrantyResponse(r gen.Warranty) dto.WarrantyResponse {
+func toWarrantyResponse(r gen.ListWarrantiesRow) dto.WarrantyResponse {
 	return dto.WarrantyResponse{
-		ID:         r.ID,
-		CompanyID:  r.CompanyID,
-		ProviderID: r.ProviderID,
-		AssetID:    r.AssetID,
-		PartID:     r.PartID,
-		StartDate:  r.StartDate,
-		EndDate:    r.EndDate,
-		Terms:      r.Terms,
-		IsActive:   r.IsActive,
+		ID:           r.ID,
+		CompanyID:    r.CompanyID,
+		ProviderID:   r.ProviderID,
+		ProviderName: r.ProviderName,
+		AssetID:      r.AssetID,
+		PartID:       r.PartID,
+		StartDate:    r.StartDate,
+		EndDate:      r.EndDate,
+		Terms:        r.Terms,
+		IsActive:     r.IsActive,
 	}
 }

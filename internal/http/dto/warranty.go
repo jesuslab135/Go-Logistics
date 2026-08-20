@@ -25,15 +25,18 @@ type UpdateWarrantyRequest struct {
 }
 
 type WarrantyResponse struct {
-	ID         int64     `json:"id"`
-	CompanyID  int64     `json:"company_id"`
-	ProviderID int64     `json:"provider_id"`
-	AssetID    *int64    `json:"asset_id"`
-	PartID     *int64    `json:"part_id"`
-	StartDate  time.Time `json:"start_date"`
-	EndDate    time.Time `json:"end_date"`
-	Terms      string    `json:"terms"`
-	IsActive   bool      `json:"is_active"`
+	ID         int64 `json:"id"`
+	CompanyID  int64 `json:"company_id"`
+	ProviderID int64 `json:"provider_id"`
+	// Denormalized from the provider vendor so a row renders without a second
+	// request per warranty.
+	ProviderName string    `json:"provider_name"`
+	AssetID      *int64    `json:"asset_id"`
+	PartID       *int64    `json:"part_id"`
+	StartDate    time.Time `json:"start_date"`
+	EndDate      time.Time `json:"end_date"`
+	Terms        string    `json:"terms"`
+	IsActive     bool      `json:"is_active"`
 }
 
 type WarrantyPage struct {

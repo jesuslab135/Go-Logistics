@@ -82,7 +82,10 @@ func (q *Queries) DeleteWarranty(ctx context.Context, arg DeleteWarrantyParams) 
 }
 
 const getWarranty = `-- name: GetWarranty :one
-SELECT id, company_id, provider_id, asset_id, part_id, start_date, end_date, terms, is_active FROM warranty WHERE id = $1 AND company_id = $2
+
+SELECT w.id, w.company_id, w.provider_id, w.asset_id, w.part_id, w.start_date, w.end_date, w.terms, w.is_active, v.name AS provider_name FROM warranty w
+JOIN vendor v ON v.id = w.provider_id
+WHERE w.id = $1 AND w.company_id = $2
 `
 
 type GetWarrantyParams struct {
@@ -90,9 +93,24 @@ type GetWarrantyParams struct {
 	CompanyID int64
 }
 
-func (q *Queries) GetWarranty(ctx context.Context, arg GetWarrantyParams) (Warranty, error) {
+type GetWarrantyRow struct {
+	ID           int64
+	CompanyID    int64
+	ProviderID   int64
+	AssetID      *int64
+	PartID       *int64
+	StartDate    time.Time
+	EndDate      time.Time
+	Terms        string
+	IsActive     bool
+	ProviderName string
+}
+
+// The provider's name is joined in so a warranty row renders without a second
+// request per row just to resolve the vendor.
+func (q *Queries) GetWarranty(ctx context.Context, arg GetWarrantyParams) (GetWarrantyRow, error) {
 	row := q.db.QueryRow(ctx, getWarranty, arg.ID, arg.CompanyID)
-	var i Warranty
+	var i GetWarrantyRow
 	err := row.Scan(
 		&i.ID,
 		&i.CompanyID,
@@ -103,29 +121,47 @@ func (q *Queries) GetWarranty(ctx context.Context, arg GetWarrantyParams) (Warra
 		&i.EndDate,
 		&i.Terms,
 		&i.IsActive,
+		&i.ProviderName,
 	)
 	return i, err
 }
 
 const listWarranties = `-- name: ListWarranties :many
-SELECT id, company_id, provider_id, asset_id, part_id, start_date, end_date, terms, is_active FROM warranty WHERE company_id = $1 ORDER BY end_date DESC, id LIMIT $2 OFFSET $3
+SELECT w.id, w.company_id, w.provider_id, w.asset_id, w.part_id, w.start_date, w.end_date, w.terms, w.is_active, v.name AS provider_name FROM warranty w
+JOIN vendor v ON v.id = w.provider_id
+WHERE w.company_id = $1
+ORDER BY w.end_date DESC, w.id
+LIMIT $3 OFFSET $2
 `
 
 type ListWarrantiesParams struct {
 	CompanyID int64
-	Limit     int32
-	Offset    int32
+	Off       int32
+	Lim       int32
 }
 
-func (q *Queries) ListWarranties(ctx context.Context, arg ListWarrantiesParams) ([]Warranty, error) {
-	rows, err := q.db.Query(ctx, listWarranties, arg.CompanyID, arg.Limit, arg.Offset)
+type ListWarrantiesRow struct {
+	ID           int64
+	CompanyID    int64
+	ProviderID   int64
+	AssetID      *int64
+	PartID       *int64
+	StartDate    time.Time
+	EndDate      time.Time
+	Terms        string
+	IsActive     bool
+	ProviderName string
+}
+
+func (q *Queries) ListWarranties(ctx context.Context, arg ListWarrantiesParams) ([]ListWarrantiesRow, error) {
+	rows, err := q.db.Query(ctx, listWarranties, arg.CompanyID, arg.Off, arg.Lim)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []Warranty{}
+	items := []ListWarrantiesRow{}
 	for rows.Next() {
-		var i Warranty
+		var i ListWarrantiesRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.CompanyID,
@@ -136,6 +172,7 @@ func (q *Queries) ListWarranties(ctx context.Context, arg ListWarrantiesParams) 
 			&i.EndDate,
 			&i.Terms,
 			&i.IsActive,
+			&i.ProviderName,
 		); err != nil {
 			return nil, err
 		}

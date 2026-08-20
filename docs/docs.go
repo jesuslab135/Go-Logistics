@@ -25251,6 +25251,10 @@ const docTemplate = `{
                 "provider_id": {
                     "type": "integer"
                 },
+                "provider_name": {
+                    "description": "Denormalized from the provider vendor so a row renders without a second\nrequest per warranty.",
+                    "type": "string"
+                },
                 "start_date": {
                     "type": "string"
                 },

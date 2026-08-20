@@ -1,8 +1,17 @@
+-- The provider's name is joined in so a warranty row renders without a second
+-- request per row just to resolve the vendor.
+
 -- name: GetWarranty :one
-SELECT * FROM warranty WHERE id = $1 AND company_id = $2;
+SELECT w.*, v.name AS provider_name FROM warranty w
+JOIN vendor v ON v.id = w.provider_id
+WHERE w.id = sqlc.arg(id) AND w.company_id = sqlc.arg(company_id);
 
 -- name: ListWarranties :many
-SELECT * FROM warranty WHERE company_id = $1 ORDER BY end_date DESC, id LIMIT $2 OFFSET $3;
+SELECT w.*, v.name AS provider_name FROM warranty w
+JOIN vendor v ON v.id = w.provider_id
+WHERE w.company_id = sqlc.arg(company_id)
+ORDER BY w.end_date DESC, w.id
+LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off);
 
 -- name: CountWarranties :one
 SELECT count(*) FROM warranty WHERE company_id = $1;
