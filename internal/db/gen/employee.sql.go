@@ -321,6 +321,35 @@ func (q *Queries) GetEmployeeIdentity(ctx context.Context, arg GetEmployeeIdenti
 	return i, err
 }
 
+const listEmployeeCompanyIDs = `-- name: ListEmployeeCompanyIDs :many
+SELECT company_id FROM employee_companies
+WHERE employee_id = $1
+ORDER BY company_id
+`
+
+// The companies an employee actually belongs to. Login resolves its company_id
+// claim through this rather than trusting employee.default_company_id, which is
+// a plain writable field and can name a company the employee is not a member of.
+func (q *Queries) ListEmployeeCompanyIDs(ctx context.Context, employeeID int64) ([]int64, error) {
+	rows, err := q.db.Query(ctx, listEmployeeCompanyIDs, employeeID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []int64{}
+	for rows.Next() {
+		var company_id int64
+		if err := rows.Scan(&company_id); err != nil {
+			return nil, err
+		}
+		items = append(items, company_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listEmployees = `-- name: ListEmployees :many
 SELECT e.id, e.user_id, e.default_company_id, e.first_name, e.last_name, e.employee_id, e.role_id, e.is_active, e.email, e.mobile_phone, e.work_phone, e.job_title, e.start_date, e.leave_date, e.birth_date, e.hourly_labor_rate, e.is_technician, e.is_vehicle_operator, e.is_account_owner, e.license_class, e.license_number, e.license_state, e.license_expiry, e.street_address, e.city, e.region, e.postal_code, e.country, e.group_id, e.custom_fields, e.table_preferences, e.dashboard_preferences, e.updated_at, e.password_hash FROM employee e
 WHERE EXISTS (SELECT 1 FROM employee_companies ec WHERE ec.employee_id = e.id AND ec.company_id = $1)

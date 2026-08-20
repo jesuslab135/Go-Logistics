@@ -71,6 +71,14 @@ INSERT INTO employee_companies (employee_id, company_id)
 VALUES (sqlc.arg(employee_id), sqlc.arg(company_id))
 ON CONFLICT (employee_id, company_id) DO NOTHING;
 
+-- name: ListEmployeeCompanyIDs :many
+-- The companies an employee actually belongs to. Login resolves its company_id
+-- claim through this rather than trusting employee.default_company_id, which is
+-- a plain writable field and can name a company the employee is not a member of.
+SELECT company_id FROM employee_companies
+WHERE employee_id = sqlc.arg(employee_id)
+ORDER BY company_id;
+
 -- name: UpdateEmployee :one
 UPDATE employee e SET
     user_id = sqlc.arg(user_id), default_company_id = sqlc.arg(default_company_id),

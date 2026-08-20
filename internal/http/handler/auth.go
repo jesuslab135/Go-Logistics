@@ -18,6 +18,11 @@ import (
 // password does not match; it maps to a 401.
 var ErrInvalidCredentials = errors.New("invalid credentials")
 
+// ErrNoCompanyMembership is returned when credentials are valid but the employee
+// belongs to no company. Issuing a token here would scope the session to a
+// company that does not exist, so the login is refused instead.
+var ErrNoCompanyMembership = errors.New("no company membership")
+
 // Identity is the authenticated principal a successful login resolves to.
 type Identity struct {
 	EmployeeID int64
@@ -52,6 +57,7 @@ func NewAuthHandler(tokens *auth.TokenService, verifier CredentialVerifier, q *g
 //	@Success	200			{object}	auth.TokenPair
 //	@Failure	400			{object}	dto.ErrorResponse
 //	@Failure	401			{object}	dto.ErrorResponse
+//	@Failure	403			{object}	dto.ErrorResponse
 //	@Router		/auth/login [post]
 func (h *AuthHandler) Login(c *gin.Context) {
 	if h.verifier == nil {
@@ -67,6 +73,11 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	id, err := h.verifier.Verify(c.Request.Context(), req.Email, req.Password)
 	if err != nil {
+		if errors.Is(err, ErrNoCompanyMembership) {
+			apierr.Abort(c, apierr.New(http.StatusForbidden, "no_company_membership",
+				"this account is not a member of any company"))
+			return
+		}
 		apierr.Abort(c, apierr.Unauthorized("invalid credentials"))
 		return
 	}
