@@ -79,3 +79,35 @@ SELECT count(*) FROM company WHERE id = ANY(sqlc.arg(ids)::bigint[]);
 -- name: GetCompanyByID :one
 -- Unscoped single-company read for the admin namespace.
 SELECT * FROM company WHERE id = sqlc.arg(id);
+
+-- name: GetCompanyOwner :one
+-- employee.is_account_owner is a single global boolean, so a company's owner is
+-- the member of that company carrying the flag. LIMIT 1 keeps the read total
+-- even where historical data has more than one — SetCompanyAccountOwner is what
+-- makes that impossible going forward.
+SELECT e.id, e.first_name, e.last_name, e.email, e.job_title
+FROM employee e
+JOIN employee_companies ec ON ec.employee_id = e.id AND ec.company_id = sqlc.arg(company_id)
+WHERE e.is_account_owner = true
+ORDER BY e.id
+LIMIT 1;
+
+-- name: ClearCompanyAccountOwner :exec
+-- The clear half of set-owner. Runs in the same transaction as the set so a
+-- company never has two owners, which plain CRUD on is_account_owner allows.
+UPDATE employee e SET is_account_owner = false, updated_at = sqlc.arg(updated_at)
+FROM employee_companies ec
+WHERE ec.employee_id = e.id
+  AND ec.company_id = sqlc.arg(company_id)
+  AND e.is_account_owner = true;
+
+-- name: SetCompanyAccountOwner :one
+-- The membership EXISTS guard makes "not a member of this company" return no
+-- row, so the caller cannot make an outsider the owner of a tenant.
+UPDATE employee SET is_account_owner = true, updated_at = sqlc.arg(updated_at)
+WHERE employee.id = sqlc.arg(id)
+  AND EXISTS (
+      SELECT 1 FROM employee_companies ec
+      WHERE ec.employee_id = employee.id AND ec.company_id = sqlc.arg(company_id)
+  )
+RETURNING id, first_name, last_name, email, job_title;

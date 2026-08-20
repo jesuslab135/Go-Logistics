@@ -441,6 +441,24 @@ definitions:
       updated_at:
         type: string
     type: object
+  dto.CompanyOwnerEnvelope:
+    properties:
+      owner:
+        $ref: '#/definitions/dto.CompanyOwnerResponse'
+    type: object
+  dto.CompanyOwnerResponse:
+    properties:
+      email:
+        type: string
+      employee_id:
+        type: integer
+      first_name:
+        type: string
+      job_title:
+        type: string
+      last_name:
+        type: string
+    type: object
   dto.CompanyPage:
     properties:
       data:
@@ -3863,6 +3881,14 @@ definitions:
       updated_at:
         type: string
     type: object
+  dto.SetCompanyOwnerRequest:
+    properties:
+      employee_id:
+        minimum: 1
+        type: integer
+    required:
+    - employee_id
+    type: object
   dto.SetEmployeePasswordRequest:
     properties:
       password:
@@ -6938,6 +6964,98 @@ info:
   title: Fleet API
   version: "1.0"
 paths:
+  /api/v1/admin/companies/{id}/owner:
+    get:
+      description: 'employee.is_account_owner is a single global boolean, not a per-company
+        column: this reads the member of this company who carries it. A company with
+        no owner is 200 with owner:null, not a 404 — that stays reserved for a company
+        that does not exist.'
+      parameters:
+      - description: Company id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.CompanyOwnerEnvelope'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get a company's account owner
+      tags:
+      - admin
+  /api/v1/admin/companies/{id}/set-owner:
+    post:
+      consumes:
+      - application/json
+      description: Clears the current owner and flags the named employee in one transaction,
+        so a company never carries two. The employee must already be a member of this
+        company — is_account_owner is a single global boolean, so this cannot make
+        an outsider the owner of a tenant.
+      parameters:
+      - description: Company id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: New owner
+        in: body
+        name: owner
+        required: true
+        schema:
+          $ref: '#/definitions/dto.SetCompanyOwnerRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.CompanyOwnerEnvelope'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Set a company's account owner
+      tags:
+      - admin
   /api/v1/admin/employees:
     get:
       description: 'Cross-company employee register. Unlike GET /api/v1/employees

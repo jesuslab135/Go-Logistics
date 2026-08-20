@@ -302,4 +302,8 @@ func registerAdminRoutes(member *gin.RouterGroup, d Deps) {
 	admin.GET("/admin/employees", employees.List)
 	admin.GET("/admin/employees/:id/companies", employees.ListCompanies)
 	admin.PUT("/admin/employees/:id/companies", employees.ReplaceCompanies)
+
+	companies := NewAdminCompanyHandler(d.Queries, d.Pool)
+	admin.GET("/admin/companies/:id/owner", companies.Owner)
+	admin.POST("/admin/companies/:id/set-owner", companies.SetOwner)
 }

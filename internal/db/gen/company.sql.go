@@ -36,6 +36,26 @@ func (q *Queries) BootstrapEmployeeCompany(ctx context.Context, arg BootstrapEmp
 	return err
 }
 
+const clearCompanyAccountOwner = `-- name: ClearCompanyAccountOwner :exec
+UPDATE employee e SET is_account_owner = false, updated_at = $1
+FROM employee_companies ec
+WHERE ec.employee_id = e.id
+  AND ec.company_id = $2
+  AND e.is_account_owner = true
+`
+
+type ClearCompanyAccountOwnerParams struct {
+	UpdatedAt time.Time
+	CompanyID int64
+}
+
+// The clear half of set-owner. Runs in the same transaction as the set so a
+// company never has two owners, which plain CRUD on is_account_owner allows.
+func (q *Queries) ClearCompanyAccountOwner(ctx context.Context, arg ClearCompanyAccountOwnerParams) error {
+	_, err := q.db.Exec(ctx, clearCompanyAccountOwner, arg.UpdatedAt, arg.CompanyID)
+	return err
+}
+
 const countCompanies = `-- name: CountCompanies :one
 SELECT count(*) FROM company c
 WHERE EXISTS (SELECT 1 FROM employee_companies ec WHERE ec.company_id = c.id AND ec.employee_id = $1)
@@ -215,6 +235,40 @@ func (q *Queries) GetCompanyByID(ctx context.Context, id int64) (Company, error)
 	return i, err
 }
 
+const getCompanyOwner = `-- name: GetCompanyOwner :one
+SELECT e.id, e.first_name, e.last_name, e.email, e.job_title
+FROM employee e
+JOIN employee_companies ec ON ec.employee_id = e.id AND ec.company_id = $1
+WHERE e.is_account_owner = true
+ORDER BY e.id
+LIMIT 1
+`
+
+type GetCompanyOwnerRow struct {
+	ID        int64
+	FirstName string
+	LastName  string
+	Email     string
+	JobTitle  string
+}
+
+// employee.is_account_owner is a single global boolean, so a company's owner is
+// the member of that company carrying the flag. LIMIT 1 keeps the read total
+// even where historical data has more than one — SetCompanyAccountOwner is what
+// makes that impossible going forward.
+func (q *Queries) GetCompanyOwner(ctx context.Context, companyID int64) (GetCompanyOwnerRow, error) {
+	row := q.db.QueryRow(ctx, getCompanyOwner, companyID)
+	var i GetCompanyOwnerRow
+	err := row.Scan(
+		&i.ID,
+		&i.FirstName,
+		&i.LastName,
+		&i.Email,
+		&i.JobTitle,
+	)
+	return i, err
+}
+
 const listCompanies = `-- name: ListCompanies :many
 SELECT c.id, c.name, c.tax_id, c.address, c.created_at, c.phone, c.email, c.website, c.logo, c.city, c.region, c.postal_code, c.country, c.timezone, c.currency, c.system_of_measurement FROM company c
 WHERE EXISTS (SELECT 1 FROM employee_companies ec WHERE ec.company_id = c.id AND ec.employee_id = $1)
@@ -315,6 +369,45 @@ func (q *Queries) SeedWorkOrderStatus(ctx context.Context, arg SeedWorkOrderStat
 		arg.Position,
 	)
 	return err
+}
+
+const setCompanyAccountOwner = `-- name: SetCompanyAccountOwner :one
+UPDATE employee SET is_account_owner = true, updated_at = $1
+WHERE employee.id = $2
+  AND EXISTS (
+      SELECT 1 FROM employee_companies ec
+      WHERE ec.employee_id = employee.id AND ec.company_id = $3
+  )
+RETURNING id, first_name, last_name, email, job_title
+`
+
+type SetCompanyAccountOwnerParams struct {
+	UpdatedAt time.Time
+	ID        int64
+	CompanyID int64
+}
+
+type SetCompanyAccountOwnerRow struct {
+	ID        int64
+	FirstName string
+	LastName  string
+	Email     string
+	JobTitle  string
+}
+
+// The membership EXISTS guard makes "not a member of this company" return no
+// row, so the caller cannot make an outsider the owner of a tenant.
+func (q *Queries) SetCompanyAccountOwner(ctx context.Context, arg SetCompanyAccountOwnerParams) (SetCompanyAccountOwnerRow, error) {
+	row := q.db.QueryRow(ctx, setCompanyAccountOwner, arg.UpdatedAt, arg.ID, arg.CompanyID)
+	var i SetCompanyAccountOwnerRow
+	err := row.Scan(
+		&i.ID,
+		&i.FirstName,
+		&i.LastName,
+		&i.Email,
+		&i.JobTitle,
+	)
+	return i, err
 }
 
 const updateCompany = `-- name: UpdateCompany :one
