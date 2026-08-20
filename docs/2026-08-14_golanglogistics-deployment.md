@@ -270,8 +270,10 @@ MINIO_ROOT_PASSWORD=<openssl rand -hex 24>
 # ---- application (mirrors .env.example PROD block) -----------------------
 APP_ENV=production
 HTTP_ADDR=:8080
-# The frontend's exact origin(s), comma-separated — NOT "*" in production.
-CORS_ORIGINS=https://app.example.com
+# The frontend's exact origin(s), comma-separated — NOT "*" in production, and
+# NOT the backend's own origin, which no browser sends. Add http://localhost:5173
+# while browser-testing against this deployment.
+CORS_ORIGINS=https://app.example.com,http://localhost:5173
 
 JWT_SECRET=<openssl rand -hex 32>
 JWT_ISSUER=fleet

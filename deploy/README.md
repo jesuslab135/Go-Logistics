@@ -272,9 +272,11 @@ not a sandbox.
 
 ## Known follow-ups
 
-- `CORS_ORIGINS` is `https://go-logistics.jesuslab135.com`, a placeholder.
-  Point it at the frontend's real origin when that ships, then
-  `docker compose up -d api`.
+- `CORS_ORIGINS` is set to the backend's own origin. A browser never sends
+  that as its `Origin`, so the middleware echoes no `Access-Control-Allow-Origin`
+  today and every browser client is blocked — not cosmetic. Set it to the
+  frontend's real origin (plus `http://localhost:5173` if browser-testing
+  against this deployment), then `docker compose up -d api`.
 - Backups are on-box only (see above).
 - The IONOS Cloud Panel has its own firewall policy in front of the OS `ufw`.
   Both currently allow 22/80/443 only; a port opened in `ufw` alone will still
