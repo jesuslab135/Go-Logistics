@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"slices"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -10,6 +11,7 @@ import (
 	"fleet/internal/db/gen"
 	"fleet/internal/http/dto"
 	"fleet/internal/http/middleware"
+	"fleet/internal/platform/apierr"
 	"fleet/internal/platform/paginate"
 )
 
@@ -52,6 +54,13 @@ func (s *EmployeeStore) Get(ctx context.Context, id int64) (dto.EmployeeResponse
 
 func (s *EmployeeStore) Create(ctx context.Context, in dto.CreateEmployeeRequest) (dto.EmployeeResponse, error) {
 	company := middleware.CompanyFromContext(ctx)
+
+	// Create grants exactly one membership — the caller's own company — so that
+	// is the only default_company_id this request can legitimately set.
+	if err := validateDefaultCompany(in.DefaultCompanyID, []int64{company}); err != nil {
+		return dto.EmployeeResponse{}, err
+	}
+
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return dto.EmployeeResponse{}, err
@@ -73,6 +82,14 @@ func (s *EmployeeStore) Create(ctx context.Context, in dto.CreateEmployeeRequest
 }
 
 func (s *EmployeeStore) Update(ctx context.Context, id int64, in dto.UpdateEmployeeRequest) (dto.EmployeeResponse, error) {
+	memberships, err := s.q.ListEmployeeCompanyIDs(ctx, id)
+	if err != nil {
+		return dto.EmployeeResponse{}, err
+	}
+	if err := validateDefaultCompany(in.DefaultCompanyID, memberships); err != nil {
+		return dto.EmployeeResponse{}, err
+	}
+
 	r, err := s.q.UpdateEmployee(ctx, gen.UpdateEmployeeParams{
 		ID:                   id,
 		CompanyID:            middleware.CompanyFromContext(ctx),
@@ -117,6 +134,21 @@ func (s *EmployeeStore) Update(ctx context.Context, id int64, in dto.UpdateEmplo
 
 func (s *EmployeeStore) Delete(ctx context.Context, id int64) error {
 	return s.q.DeleteEmployee(ctx, gen.DeleteEmployeeParams{ID: id, CompanyID: middleware.CompanyFromContext(ctx)})
+}
+
+// validateDefaultCompany rejects a default_company_id the employee has no
+// employee_companies row for. Login scopes a session to this value, so an
+// unvalidated one is a cross-tenant token waiting to be issued.
+func validateDefaultCompany(defaultCompanyID *int64, memberships []int64) error {
+	if defaultCompanyID == nil {
+		return nil
+	}
+	if *defaultCompanyID > 0 && slices.Contains(memberships, *defaultCompanyID) {
+		return nil
+	}
+	return apierr.Validation(map[string]string{
+		"default_company_id": "must be a company this employee belongs to",
+	})
 }
 
 func createEmployeeParams(in dto.CreateEmployeeRequest, now time.Time) gen.CreateEmployeeParams {
