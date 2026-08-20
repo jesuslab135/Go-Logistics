@@ -74,24 +74,31 @@ func TestValidateMembershipReplace(t *testing.T) {
 // The admin namespace is gated on RequireAdminRole alone, and role_id is a
 // single global FK: granting yourself a company you do not belong to therefore
 // makes you an admin of that company too, with DELETE /companies/:id behind it.
-// A grant is constrained to the caller's own memberships to close that.
+// The mirror image is just as bad — a full replace that drops a company evicts
+// the employee from a tenant the caller has no access to. So the constraint is
+// on the delta, not the whole set: an id the request leaves untouched needs no
+// entitlement, an id it adds or removes does.
 func TestValidateGrantableCompanies(t *testing.T) {
 	tests := []struct {
 		name            string
 		requested       []int64
+		current         []int64
 		callerCompanies []int64
 		wantErr         bool
 	}{
-		{name: "every requested company is one the caller belongs to", requested: []int64{3, 7}, callerCompanies: []int64{3, 7, 9}, wantErr: false},
-		{name: "the caller's whole set is grantable", requested: []int64{3}, callerCompanies: []int64{3}, wantErr: false},
-		{name: "one company outside the caller's set is refused", requested: []int64{3, 8}, callerCompanies: []int64{3, 7}, wantErr: true},
-		{name: "a caller with no companies can grant nothing", requested: []int64{3}, callerCompanies: nil, wantErr: true},
-		{name: "an empty caller slice can grant nothing", requested: []int64{3}, callerCompanies: []int64{}, wantErr: true},
+		{name: "an unchanged set is allowed even where the caller belongs to nothing in it", requested: []int64{3, 8}, current: []int64{3, 8}, callerCompanies: []int64{3}, wantErr: false},
+		{name: "adding a company the caller does not belong to is refused", requested: []int64{3, 8}, current: []int64{3}, callerCompanies: []int64{3, 7}, wantErr: true},
+		{name: "removing a company the caller does not belong to is refused", requested: []int64{3}, current: []int64{3, 8}, callerCompanies: []int64{3, 7}, wantErr: true},
+		{name: "adding a company the caller belongs to is allowed", requested: []int64{3, 7}, current: []int64{3}, callerCompanies: []int64{3, 7, 9}, wantErr: false},
+		{name: "removing a company the caller belongs to is allowed", requested: []int64{3}, current: []int64{3, 7}, callerCompanies: []int64{3, 7}, wantErr: false},
+		{name: "a caller with no companies cannot change anything", requested: []int64{3}, current: nil, callerCompanies: nil, wantErr: true},
+		{name: "an empty caller slice cannot change anything", requested: []int64{3, 7}, current: []int64{3}, callerCompanies: []int64{}, wantErr: true},
+		{name: "a first grant into the caller's own company is allowed", requested: []int64{3}, current: nil, callerCompanies: []int64{3}, wantErr: false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateGrantableCompanies(tt.requested, tt.callerCompanies)
+			err := validateGrantableCompanies(tt.requested, tt.current, tt.callerCompanies)
 			if tt.wantErr == (err == nil) {
 				t.Fatalf("err = %v, wantErr = %v", err, tt.wantErr)
 			}

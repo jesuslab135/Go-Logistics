@@ -408,7 +408,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Full overwrite of employee_companies. company_ids must be non-empty — an employee with no membership cannot log in, so use is_active to deactivate instead. default_company_id must be null or one of company_ids; omitting it clears the employee's stored default_company_id, so send it on every call unless you mean to clear it. Every id in company_ids must be a company the caller themselves belongs to: this route cannot hand out membership in a tenant the caller has no access to, which would also confer admin there because employee.role_id is global.",
+                "description": "Full overwrite of employee_companies. company_ids must be non-empty — an employee with no membership cannot log in, so use is_active to deactivate instead. default_company_id must be null or one of company_ids; omitting it clears the employee's stored default_company_id, so send it on every call unless you mean to clear it. Every company this call adds or removes must be one the caller themselves belongs to; memberships the call leaves unchanged are kept regardless. The caller can neither hand out membership in a tenant they have no access to — which would also confer admin there, because employee.role_id is global — nor evict the employee from one.",
                 "consumes": [
                     "application/json"
                 ],

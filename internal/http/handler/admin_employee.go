@@ -61,15 +61,27 @@ func validateMembershipReplace(companyIDs []int64, defaultCompanyID *int64) erro
 	return nil
 }
 
-// validateGrantableCompanies constrains a membership grant to the companies the
-// caller themselves belongs to. Without it the admin namespace escalates: the
-// gate is RequireAdminRole and employee.role_id is a single global FK, so an
-// admin of company A who grants themselves company B is an admin of B as well —
-// which reaches DELETE /companies/{B}, and every foreign key cascades.
-func validateGrantableCompanies(requested, callerCompanies []int64) error {
+// validateGrantableCompanies constrains what a full replace may *change* to the
+// companies the caller themselves belongs to. Both directions of the delta need
+// the check. An addition escalates: the gate is RequireAdminRole and
+// employee.role_id is a single global FK, so an admin of company A who grants
+// themselves company B is an admin of B as well — which reaches
+// DELETE /companies/{B}, and every foreign key cascades. A removal is the mirror
+// image: it evicts the employee from a tenant the caller has no access to.
+//
+// Only the symmetric difference is constrained. An id present in both sets is
+// membership this request is not touching, so it passes whether or not the
+// caller belongs to it — that is what lets an admin of A edit an employee who
+// also belongs to B without silently dropping B.
+func validateGrantableCompanies(requested, current, callerCompanies []int64) error {
 	for _, id := range requested {
-		if !slices.Contains(callerCompanies, id) {
-			return apierr.Forbidden("you can only grant membership in a company you belong to")
+		if !slices.Contains(current, id) && !slices.Contains(callerCompanies, id) {
+			return apierr.Forbidden("you can only add or remove membership in a company you belong to")
+		}
+	}
+	for _, id := range current {
+		if !slices.Contains(requested, id) && !slices.Contains(callerCompanies, id) {
+			return apierr.Forbidden("you can only add or remove membership in a company you belong to")
 		}
 	}
 	return nil
@@ -157,7 +169,7 @@ func (h *AdminEmployeeHandler) ListCompanies(c *gin.Context) {
 // ReplaceCompanies godoc
 //
 //	@Summary		Replace an employee's company memberships
-//	@Description	Full overwrite of employee_companies. company_ids must be non-empty — an employee with no membership cannot log in, so use is_active to deactivate instead. default_company_id must be null or one of company_ids; omitting it clears the employee's stored default_company_id, so send it on every call unless you mean to clear it. Every id in company_ids must be a company the caller themselves belongs to: this route cannot hand out membership in a tenant the caller has no access to, which would also confer admin there because employee.role_id is global.
+//	@Description	Full overwrite of employee_companies. company_ids must be non-empty — an employee with no membership cannot log in, so use is_active to deactivate instead. default_company_id must be null or one of company_ids; omitting it clears the employee's stored default_company_id, so send it on every call unless you mean to clear it. Every company this call adds or removes must be one the caller themselves belongs to; memberships the call leaves unchanged are kept regardless. The caller can neither hand out membership in a tenant they have no access to — which would also confer admin there, because employee.role_id is global — nor evict the employee from one.
 //	@Tags			admin
 //	@Accept			json
 //	@Produce		json
@@ -208,14 +220,20 @@ func (h *AdminEmployeeHandler) ReplaceCompanies(c *gin.Context) {
 		return
 	}
 
-	// Existing is not the same as grantable: the caller may only extend
-	// membership into companies they are themselves a member of.
+	// What the replace changes is what the caller must be entitled to, so the
+	// target's current set is read before the transaction and compared against
+	// the caller's own memberships.
+	current, err := h.q.ListEmployeeCompanyIDs(ctx, id)
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
 	callerCompanies, err := h.q.ListEmployeeCompanyIDs(ctx, middleware.EmployeeFromContext(ctx))
 	if err != nil {
 		apierr.Abort(c, err)
 		return
 	}
-	if err := validateGrantableCompanies(ids, callerCompanies); err != nil {
+	if err := validateGrantableCompanies(ids, normalizeCompanyIDs(current), callerCompanies); err != nil {
 		apierr.Abort(c, err)
 		return
 	}
