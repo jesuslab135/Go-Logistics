@@ -14,6 +14,7 @@ import (
 	"fleet/internal/domain/purchaseorder"
 	"fleet/internal/http/dto"
 	"fleet/internal/http/middleware"
+	"fleet/internal/platform/apierr"
 	"fleet/internal/platform/crud"
 	"fleet/internal/platform/storage"
 )
@@ -248,7 +249,23 @@ func NewRouter(d Deps) *gin.Engine {
 	crud.NewNestedHandler[dto.LaborTimeEntryResponse, dto.CreateLaborTimeEntryRequest, dto.UpdateLaborTimeEntryRequest](NewLaborTimeEntryStore(d.Queries)).Register(workOrders, "/work-order-sub-line-items", "/labor-entries")
 	crud.NewNestedHandler[dto.WheelPositionDefinitionResponse, dto.CreateWheelPositionDefinitionRequest, dto.UpdateWheelPositionDefinitionRequest](NewWheelPositionDefinitionStore(d.Queries)).Register(tires, "/axle-definitions", "/wheel-positions")
 	crud.NewNestedHandler[dto.FuelCommentResponse, dto.CreateFuelCommentRequest, dto.UpdateFuelCommentRequest](NewFuelCommentStore(d.Queries)).Register(fuel, "/fuel-entries", "/comments")
-	crud.NewNestedHandler[dto.FuelPhotoResponse, dto.CreateFuelPhotoRequest, dto.UpdateFuelPhotoRequest](NewFuelPhotoStore(d.Queries, d.Storage, d.Logger)).Register(fuel, "/fuel-entries", "/photos")
+	fuelPhotos := NewFuelPhotoStore(d.Queries, d.Pool, d.Storage, d.Logger)
+	crud.NewNestedHandler[dto.FuelPhotoResponse, dto.CreateFuelPhotoRequest, dto.UpdateFuelPhotoRequest](fuelPhotos).Register(fuel, "/fuel-entries", "/photos")
+	// is_primary is not a field on those writes: at most one photo per entry may
+	// hold it, so promoting one has to demote the others in the same transaction.
+	fuel.POST("/fuel-entries/:id/photos/:child_id/set-primary", func(c *gin.Context) {
+		parentID, id, err := crud.ParentAndIDParams(c)
+		if err != nil {
+			apierr.Abort(c, err)
+			return
+		}
+		out, err := fuelPhotos.SetPrimary(c.Request.Context(), parentID, id)
+		if err != nil {
+			apierr.Abort(c, err)
+			return
+		}
+		c.JSON(http.StatusOK, out)
+	})
 
 	// Phase 8c: shared-PK 1:1 sub-types (singleton under the asset). Django put
 	// vehicle/trailer under 'assets' but the axle config under 'tires'.

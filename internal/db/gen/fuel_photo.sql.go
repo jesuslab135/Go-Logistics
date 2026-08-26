@@ -10,6 +10,25 @@ import (
 	"time"
 )
 
+const clearFuelEntryPrimaryPhoto = `-- name: ClearFuelEntryPrimaryPhoto :exec
+UPDATE fuel_photo c SET is_primary = false
+FROM fuel_entry p0, asset p1
+WHERE c.entry_id = $1 AND c.is_primary
+  AND p0.id = c.entry_id AND p1.id = p0.asset_id AND p1.company_id = $2
+`
+
+type ClearFuelEntryPrimaryPhotoParams struct {
+	ParentID  int64
+	CompanyID int64
+}
+
+// ClearFuelEntryPrimaryPhoto demotes whatever currently holds the flag, so the
+// following promotion cannot collide with the unique index.
+func (q *Queries) ClearFuelEntryPrimaryPhoto(ctx context.Context, arg ClearFuelEntryPrimaryPhotoParams) error {
+	_, err := q.db.Exec(ctx, clearFuelEntryPrimaryPhoto, arg.ParentID, arg.CompanyID)
+	return err
+}
+
 const countFuelPhotos = `-- name: CountFuelPhotos :one
 SELECT count(*) FROM fuel_photo c JOIN fuel_entry p0 ON p0.id = c.entry_id JOIN asset p1 ON p1.id = p0.asset_id WHERE c.entry_id = $1 AND p1.company_id = $2
 `
@@ -28,10 +47,10 @@ func (q *Queries) CountFuelPhotos(ctx context.Context, arg CountFuelPhotosParams
 
 const createFuelPhoto = `-- name: CreateFuelPhoto :one
 INSERT INTO fuel_photo (
-    entry_id, uploaded_by_id, file, file_name, file_size, mime_type, description, uploaded_at, is_primary
+    entry_id, uploaded_by_id, file, file_name, file_size, mime_type, description, uploaded_at
 )
-SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9
-WHERE EXISTS (SELECT 1 FROM fuel_entry p0 JOIN asset p1 ON p1.id = p0.asset_id WHERE p0.id = $1 AND p1.company_id = $10)
+SELECT $1, $2, $3, $4, $5, $6, $7, $8
+WHERE EXISTS (SELECT 1 FROM fuel_entry p0 JOIN asset p1 ON p1.id = p0.asset_id WHERE p0.id = $1 AND p1.company_id = $9)
 RETURNING id, entry_id, uploaded_by_id, file, file_name, file_size, mime_type, description, uploaded_at, is_primary
 `
 
@@ -44,7 +63,6 @@ type CreateFuelPhotoParams struct {
 	MimeType     string
 	Description  *string
 	UploadedAt   time.Time
-	IsPrimary    bool
 	CompanyID    int64
 }
 
@@ -58,7 +76,6 @@ func (q *Queries) CreateFuelPhoto(ctx context.Context, arg CreateFuelPhotoParams
 		arg.MimeType,
 		arg.Description,
 		arg.UploadedAt,
-		arg.IsPrimary,
 		arg.CompanyID,
 	)
 	var i FuelPhoto
@@ -123,6 +140,7 @@ func (q *Queries) GetFuelPhoto(ctx context.Context, arg GetFuelPhotoParams) (Fue
 }
 
 const listFuelPhotos = `-- name: ListFuelPhotos :many
+
 SELECT c.id, c.entry_id, c.uploaded_by_id, c.file, c.file_name, c.file_size, c.mime_type, c.description, c.uploaded_at, c.is_primary FROM fuel_photo c JOIN fuel_entry p0 ON p0.id = c.entry_id JOIN asset p1 ON p1.id = p0.asset_id
 WHERE c.entry_id = $1 AND p1.company_id = $2
 ORDER BY c.uploaded_at DESC, c.id LIMIT $4 OFFSET $3
@@ -135,6 +153,10 @@ type ListFuelPhotosParams struct {
 	Lim       int32
 }
 
+// is_primary is not settable through create or update. At most one photo per
+// entry may carry it (a partial unique index enforces that), so setting it is
+// an action that also clears the others - two writes that have to happen
+// together, which a field on a whole-record update cannot express.
 func (q *Queries) ListFuelPhotos(ctx context.Context, arg ListFuelPhotosParams) ([]FuelPhoto, error) {
 	rows, err := q.db.Query(ctx, listFuelPhotos,
 		arg.ParentID,
@@ -171,10 +193,44 @@ func (q *Queries) ListFuelPhotos(ctx context.Context, arg ListFuelPhotosParams) 
 	return items, nil
 }
 
-const updateFuelPhoto = `-- name: UpdateFuelPhoto :one
-UPDATE fuel_photo AS c SET file = $1, file_name = $2, file_size = $3, mime_type = $4, description = $5, uploaded_at = $6, is_primary = $7
+const setFuelPhotoPrimary = `-- name: SetFuelPhotoPrimary :one
+UPDATE fuel_photo AS c SET is_primary = true
 FROM fuel_entry p0, asset p1
-WHERE c.id = $8 AND c.entry_id = $9 AND p1.company_id = $10 AND p0.id = c.entry_id AND p1.id = p0.asset_id
+WHERE c.id = $1 AND c.entry_id = $2
+  AND p0.id = c.entry_id AND p1.id = p0.asset_id AND p1.company_id = $3
+RETURNING c.id, c.entry_id, c.uploaded_by_id, c.file, c.file_name, c.file_size, c.mime_type, c.description, c.uploaded_at, c.is_primary
+`
+
+type SetFuelPhotoPrimaryParams struct {
+	ID        int64
+	ParentID  int64
+	CompanyID int64
+}
+
+// The tenant scope runs through the entry's asset, as every other fuel_photo
+// query here does: fuel_entry has no company of its own.
+func (q *Queries) SetFuelPhotoPrimary(ctx context.Context, arg SetFuelPhotoPrimaryParams) (FuelPhoto, error) {
+	row := q.db.QueryRow(ctx, setFuelPhotoPrimary, arg.ID, arg.ParentID, arg.CompanyID)
+	var i FuelPhoto
+	err := row.Scan(
+		&i.ID,
+		&i.EntryID,
+		&i.UploadedByID,
+		&i.File,
+		&i.FileName,
+		&i.FileSize,
+		&i.MimeType,
+		&i.Description,
+		&i.UploadedAt,
+		&i.IsPrimary,
+	)
+	return i, err
+}
+
+const updateFuelPhoto = `-- name: UpdateFuelPhoto :one
+UPDATE fuel_photo AS c SET file = $1, file_name = $2, file_size = $3, mime_type = $4, description = $5, uploaded_at = $6
+FROM fuel_entry p0, asset p1
+WHERE c.id = $7 AND c.entry_id = $8 AND p1.company_id = $9 AND p0.id = c.entry_id AND p1.id = p0.asset_id
 RETURNING c.id, c.entry_id, c.uploaded_by_id, c.file, c.file_name, c.file_size, c.mime_type, c.description, c.uploaded_at, c.is_primary
 `
 
@@ -185,7 +241,6 @@ type UpdateFuelPhotoParams struct {
 	MimeType    string
 	Description *string
 	UploadedAt  time.Time
-	IsPrimary   bool
 	ID          int64
 	ParentID    int64
 	CompanyID   int64
@@ -200,7 +255,6 @@ func (q *Queries) UpdateFuelPhoto(ctx context.Context, arg UpdateFuelPhotoParams
 		arg.MimeType,
 		arg.Description,
 		arg.UploadedAt,
-		arg.IsPrimary,
 		arg.ID,
 		arg.ParentID,
 		arg.CompanyID,

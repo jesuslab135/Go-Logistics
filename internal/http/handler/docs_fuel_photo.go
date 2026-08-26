@@ -65,3 +65,18 @@ func docDUpdateFuelPhoto() {}
 //	@Failure	401	{object}	dto.ErrorResponse
 //	@Router	/api/v1/fuel-entries/{id}/photos/{child_id} [delete]
 func docDDeleteFuelPhoto() {}
+
+// docSetFuelPhotoPrimary godoc
+//
+//	@Summary		Make a fuel photo the primary one
+//	@Description	Promotes this photo and demotes the entry's others, in one transaction. At most one photo per entry may be primary, enforced by a partial unique index — which is why is_primary is not a field on create or update. Zero photos, and photos with no primary among them, are both valid: deleting the primary promotes nothing, because auto-promotion would designate a photo nobody chose.
+//	@Tags			fuel-photos
+//	@Security		BearerAuth
+//	@Produce		json
+//	@Param			id			path	int	true	"Fuel entry id"
+//	@Param			child_id	path	int	true	"Photo id"
+//	@Success		200			{object}	dto.FuelPhotoResponse
+//	@Failure		401			{object}	dto.ErrorResponse
+//	@Failure		404			{object}	dto.ErrorResponse
+//	@Router			/api/v1/fuel-entries/{id}/photos/{child_id}/set-primary [post]
+func docSetFuelPhotoPrimary() {}

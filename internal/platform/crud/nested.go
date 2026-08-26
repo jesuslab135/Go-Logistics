@@ -143,3 +143,10 @@ func parentAndIDParams(c *gin.Context) (int64, int64, error) {
 	}
 	return pid, id, nil
 }
+
+// ParentAndIDParams exposes the nested path parsing to handlers wired outside
+// this package — a nested action route needs exactly the same two ids, and
+// re-parsing them by hand is how the two drift.
+func ParentAndIDParams(c *gin.Context) (int64, int64, error) {
+	return parentAndIDParams(c)
+}

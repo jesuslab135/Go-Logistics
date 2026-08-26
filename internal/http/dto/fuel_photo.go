@@ -5,6 +5,9 @@ import (
 )
 
 // Upload attribution is taken from the authenticated context, not the body.
+// is_primary is absent: at most one photo per entry may be primary, so it is
+// set with POST /api/v1/fuel-entries/{id}/photos/{photo_id}/set-primary, which
+// demotes the others in the same transaction.
 type CreateFuelPhotoRequest struct {
 	File        string    `json:"file" binding:"omitempty,max=500"`
 	FileName    string    `json:"file_name" binding:"omitempty,max=255"`
@@ -12,7 +15,6 @@ type CreateFuelPhotoRequest struct {
 	MimeType    string    `json:"mime_type" binding:"omitempty,max=100"`
 	Description *string   `json:"description"`
 	UploadedAt  time.Time `json:"uploaded_at"`
-	IsPrimary   bool      `json:"is_primary"`
 }
 
 type UpdateFuelPhotoRequest struct {
@@ -22,7 +24,6 @@ type UpdateFuelPhotoRequest struct {
 	MimeType    string    `json:"mime_type" binding:"omitempty,max=100"`
 	Description *string   `json:"description"`
 	UploadedAt  time.Time `json:"uploaded_at"`
-	IsPrimary   bool      `json:"is_primary"`
 }
 
 type FuelPhotoResponse struct {

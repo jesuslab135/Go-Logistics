@@ -4484,6 +4484,59 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/fuel-entries/{id}/photos/{child_id}/set-primary": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Promotes this photo and demotes the entry's others, in one transaction. At most one photo per entry may be primary, enforced by a partial unique index — which is why is_primary is not a field on create or update. Zero photos, and photos with no primary among them, are both valid: deleting the primary promotes nothing, because auto-promotion would designate a photo nobody chose.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "fuel-photos"
+                ],
+                "summary": "Make a fuel photo the primary one",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Fuel entry id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Photo id",
+                        "name": "child_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.FuelPhotoResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/fuel-types": {
             "get": {
                 "security": [
@@ -17502,9 +17555,6 @@ const docTemplate = `{
                 "file_size": {
                     "type": "integer"
                 },
-                "is_primary": {
-                    "type": "boolean"
-                },
                 "mime_type": {
                     "type": "string",
                     "maxLength": 100
@@ -23009,9 +23059,6 @@ const docTemplate = `{
                 },
                 "file_size": {
                     "type": "integer"
-                },
-                "is_primary": {
-                    "type": "boolean"
                 },
                 "mime_type": {
                     "type": "string",
