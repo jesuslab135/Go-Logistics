@@ -528,3 +528,48 @@ release; phases 1, 4, 5 and 6 are additive.
   gate nothing.
 - **A1–A4, B1, B5, C8** — frontend.
 - **C7's "drop Protocols and meters"** — no such columns exist here.
+
+---
+
+## Implementation status (updated 2026-08-26)
+
+All twelve backend items are implemented on `feat/product-decisions-backend`,
+one commit each, every commit building and testing green on its own.
+
+| Item | Commit | Notes against the plan |
+|---|---|---|
+| B8 uploads | `e465222` | As planned, plus `STORAGE_MINIO_SIGNING_ENDPOINT`: presigning signs the host, so a URL signed for the address the API dials is unusable from a browser. Found while writing the compose config. |
+| B9 platform admin | `29f022c` | The flag lives on `Identity` (loaded from the database per request) rather than in the JWT, so a revocation applies on the next request instead of at the next token refresh. Everything else as planned. |
+| C1 status audit | `183d362` | As planned. |
+| C3 inventory journal | `7bd5d5d` | As planned, plus: `previous_quantity`/`current_quantity` are no longer accepted from the client at all — only the server can know them — and the stock row is locked `FOR UPDATE`. |
+| A5 follow-up | `3d8f555` | As planned. |
+| B3 PO workflow | `98d21ad` | As planned. The seeded warehouse role gains `purchase_orders` read+update so splitting the module does not silently strip its access. |
+| B2 money | `d8283aa` | As planned. Line-level columns are derived too, which the plan did not say: a line showing a subtotal its sub-lines do not add up to is as wrong as a document showing one its lines do not. |
+| C4 primary photo | `4e2ee88` | As planned. |
+| C9 notifications | `ec4922f` | As planned, including the deliberate omission of the service-reminder producer. |
+| C7 trailer vocabulary | `051320d` | As planned. |
+| C2 archive | `9e23fe6` | As planned. Two judgements worth noting: a service task counts its own children; an inspection form counts submissions but not its own items. |
+| C6 custom fields | `b3759fb` | As planned. |
+
+### Not done, and why
+
+- **The service-reminder-due notification producer.** It needs something to
+  notice a date has passed, which is the scheduler this deployment does not
+  have. A due check that only fires when somebody opens the bell would be worse
+  than none, because it would look like it worked.
+- **Dashboard trends (task-list item 10)** and **Django's `auth.Group`
+  equivalent (item 11)** and the **inventory alerts aggregate (item 12)** — none
+  are in this decision set; they remain wanted-only-if.
+
+### Before deploying
+
+1. Run migrations `000010`–`000017`.
+2. `fleet-cli platform-admin --email <someone>` **before** deploying B9, or
+   `/api/v1/admin/*` is closed to everyone.
+3. Create the private bucket (startup does it) and move existing receipts,
+   signatures, inspection photos and media objects into it — rows written
+   before B8 still hold public URLs and keep resolving to the public bucket.
+4. `fleet-cli inventory-drift` to see where the ledger and stock rows disagree.
+   Nothing is reconciled automatically.
+5. The frontend needs the same release as C1, C2, C3, B3, B2 and C7 — each is
+   marked BREAKING in its commit message, with what changed.
