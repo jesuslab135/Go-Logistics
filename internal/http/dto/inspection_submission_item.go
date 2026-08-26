@@ -2,6 +2,7 @@ package dto
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/shopspring/decimal"
 )
@@ -29,13 +30,17 @@ type UpdateInspectionSubmissionItemRequest struct {
 }
 
 type InspectionSubmissionItemResponse struct {
-	ID               int64            `json:"id"`
-	SubmissionID     int64            `json:"submission_id"`
-	FormItemID       int64            `json:"form_item_id"`
-	ResultStatus     string           `json:"result_status" binding:"omitempty,max=10"`
-	ResultValue      json.RawMessage  `json:"result_value"`
-	Remark           string           `json:"remark"`
-	Photo            *string          `json:"photo" binding:"omitempty,max=500"`
+	ID           int64           `json:"id"`
+	SubmissionID int64           `json:"submission_id"`
+	FormItemID   int64           `json:"form_item_id"`
+	ResultStatus string          `json:"result_status" binding:"omitempty,max=10"`
+	ResultValue  json.RawMessage `json:"result_value"`
+	Remark       string          `json:"remark"`
+	// Photo is a signed, time-limited URL — inspection evidence is a business
+	// record, not branding. Render it, never store it.
+	Photo *string `json:"photo" binding:"omitempty,max=500"`
+	// PhotoExpiresAt is when Photo stops resolving; re-read this record.
+	PhotoExpiresAt   *time.Time       `json:"photo_expires_at"`
 	Latitude         *decimal.Decimal `json:"latitude"`
 	Longitude        *decimal.Decimal `json:"longitude"`
 	GeneratedIssueID *int64           `json:"generated_issue_id"`

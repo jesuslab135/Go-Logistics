@@ -68,7 +68,7 @@ func NewUploadHandler(store storage.Storage, log *slog.Logger) *UploadHandler {
 //	@Accept		multipart/form-data
 //	@Produce	json
 //	@Param		file	formData	file	true	"File to upload"
-//	@Param		purpose	formData	string	false	"photo, document or generic (default). Narrows the accepted media types."
+//	@Param		purpose	formData	string	false	"asset_photo, company_logo, receipt, signature, inspection_photo, media, photo, document or generic (default). Narrows the accepted media types, and decides whether the object is publicly readable — only asset_photo and company_logo are."
 //	@Success	201		{object}	dto.UploadResponse
 //	@Failure	400		{object}	dto.ErrorResponse
 //	@Failure	401		{object}	dto.ErrorResponse
@@ -107,11 +107,12 @@ func (h *UploadHandler) Upload(c *gin.Context) {
 		apierr.Abort(c, apierr.BadRequest("could not read the uploaded file").Wrap(err))
 		return
 	}
-	allowed, err := h.allowedFor(c.PostForm("purpose"))
+	purpose, err := purposeFor(c.PostForm("purpose"))
 	if err != nil {
 		apierr.Abort(c, err)
 		return
 	}
+	allowed := h.allowedFor(purpose)
 	if !allowed[contentType] {
 		apierr.Abort(c, apierr.UnsupportedMediaType(
 			fmt.Sprintf("file type %q is not allowed", contentType)))
@@ -123,22 +124,29 @@ func (h *UploadHandler) Upload(c *gin.Context) {
 		companyID = claims.CompanyID
 	}
 
-	key := objectKey(companyID, header.Filename)
+	key := objectKey(purpose.visibility, companyID, header.Filename)
 	obj, err := h.store.Save(c.Request.Context(), key, f, contentType)
 	if err != nil {
 		apierr.Abort(c, err)
 		return
 	}
 
+	// The key is what the caller stores on the owning record; the URL is a
+	// convenience for rendering the upload immediately, and for a private object
+	// it expires.
+	url, expiresAt := fileReadURL(c.Request.Context(), h.store, obj.Key)
 	out := dto.UploadResponse{
 		Key:         obj.Key,
-		URL:         obj.URL,
+		URL:         url,
+		ExpiresAt:   expiresAt,
+		Visibility:  purpose.visibility.String(),
 		Size:        obj.Size,
 		ContentType: obj.ContentType,
 	}
 	if thumb, ok := h.saveThumbnail(c, key, contentType, f); ok {
+		thumbURL, _ := fileReadURL(c.Request.Context(), h.store, thumb.Key)
 		out.ThumbnailKey = thumb.Key
-		out.ThumbnailURL = thumb.URL
+		out.ThumbnailURL = thumbURL
 	}
 
 	c.JSON(http.StatusCreated, out)
@@ -172,30 +180,86 @@ func (h *UploadHandler) saveThumbnail(c *gin.Context, key, contentType string, f
 	return obj, true
 }
 
-// Upload purposes. One endpoint serves photos and documents alike, so the
-// caller declares what the file is for and the allowlist narrows accordingly:
-// nothing should be able to store a PDF where a gallery expects an image.
+// Upload purposes. One endpoint serves photos and documents alike, so the caller
+// declares what the file is for. The purpose decides two things: which media
+// types are accepted — nothing should store a PDF where a gallery expects an
+// image — and whether the object is world-readable.
+//
+// Visibility is a property of what a file is, not of who uploaded it. A vehicle
+// photo and a company logo are branding: they render in plain img tags across
+// list screens, and signing them would cost a signature per row to protect
+// nothing. Everything else — receipts, signatures, inspection evidence,
+// documents, arbitrary media — is a tenant's business records, and is private.
 const (
-	purposeGeneric  = "generic"
+	purposeGeneric = "generic"
+
+	// purposePhoto and purposeDocument predate the public/private split and are
+	// kept so existing clients keep working. Both are private: a caller that did
+	// not say what the file is for has not established that publishing it is safe.
 	purposePhoto    = "photo"
 	purposeDocument = "document"
+
+	purposeAssetPhoto      = "asset_photo"
+	purposeCompanyLogo     = "company_logo"
+	purposeReceipt         = "receipt"
+	purposeSignature       = "signature"
+	purposeInspectionPhoto = "inspection_photo"
+	purposeMedia           = "media"
 )
 
-// allowedFor narrows the configured allowlist to the declared purpose. An
-// unrecognised purpose is refused rather than silently treated as generic,
-// since that would quietly widen the policy the caller asked for.
-func (h *UploadHandler) allowedFor(purpose string) (map[string]bool, error) {
-	switch strings.ToLower(strings.TrimSpace(purpose)) {
-	case "", purposeGeneric:
-		return h.allowed, nil
-	case purposePhoto:
-		return h.subset(func(mediaType string) bool { return strings.HasPrefix(mediaType, "image/") }), nil
-	case purposeDocument:
-		return h.subset(func(mediaType string) bool { return !strings.HasPrefix(mediaType, "image/") }), nil
-	default:
-		return nil, apierr.New(http.StatusBadRequest, "invalid_upload_purpose",
-			fmt.Sprintf("purpose must be one of %s, %s or %s", purposePhoto, purposeDocument, purposeGeneric))
+// uploadPurpose is one entry of the purpose vocabulary.
+type uploadPurpose struct {
+	name       string
+	visibility storage.Visibility
+	// keep narrows the configured media-type allowlist; nil accepts all of it.
+	keep func(mediaType string) bool
+}
+
+func imagesOnly(mediaType string) bool { return strings.HasPrefix(mediaType, "image/") }
+
+func nonImagesOnly(mediaType string) bool { return !strings.HasPrefix(mediaType, "image/") }
+
+var uploadPurposes = map[string]uploadPurpose{
+	purposeGeneric:         {purposeGeneric, storage.VisibilityPrivate, nil},
+	purposePhoto:           {purposePhoto, storage.VisibilityPrivate, imagesOnly},
+	purposeDocument:        {purposeDocument, storage.VisibilityPrivate, nonImagesOnly},
+	purposeAssetPhoto:      {purposeAssetPhoto, storage.VisibilityPublic, imagesOnly},
+	purposeCompanyLogo:     {purposeCompanyLogo, storage.VisibilityPublic, imagesOnly},
+	purposeReceipt:         {purposeReceipt, storage.VisibilityPrivate, nil},
+	purposeSignature:       {purposeSignature, storage.VisibilityPrivate, imagesOnly},
+	purposeInspectionPhoto: {purposeInspectionPhoto, storage.VisibilityPrivate, imagesOnly},
+	purposeMedia:           {purposeMedia, storage.VisibilityPrivate, nil},
+}
+
+// purposeNames lists the vocabulary for error messages, in a stable order.
+var purposeNames = []string{
+	purposeGeneric, purposePhoto, purposeDocument,
+	purposeAssetPhoto, purposeCompanyLogo, purposeReceipt,
+	purposeSignature, purposeInspectionPhoto, purposeMedia,
+}
+
+// purposeFor resolves the declared purpose. An unrecognised one is refused
+// rather than silently treated as generic, since that would quietly widen both
+// the media-type policy and the visibility the caller asked for.
+func purposeFor(declared string) (uploadPurpose, error) {
+	name := strings.ToLower(strings.TrimSpace(declared))
+	if name == "" {
+		name = purposeGeneric
 	}
+	p, ok := uploadPurposes[name]
+	if !ok {
+		return uploadPurpose{}, apierr.New(http.StatusBadRequest, "invalid_upload_purpose",
+			fmt.Sprintf("purpose must be one of %s", strings.Join(purposeNames, ", ")))
+	}
+	return p, nil
+}
+
+// allowedFor narrows the configured allowlist to the declared purpose.
+func (h *UploadHandler) allowedFor(p uploadPurpose) map[string]bool {
+	if p.keep == nil {
+		return h.allowed
+	}
+	return h.subset(p.keep)
 }
 
 // subset keeps a purpose from widening the configured allowlist: it can only
@@ -263,10 +327,14 @@ func uploadAllowedTypes() map[string]bool {
 	return allowed
 }
 
-func objectKey(companyID int64, filename string) string {
+// objectKey namespaces an upload by visibility and tenant, and prefixes a random
+// token so uploads never collide or overwrite one another. The visibility
+// segment is what lets every later operation route the object to the right
+// bucket from the key alone.
+func objectKey(vis storage.Visibility, companyID int64, filename string) string {
 	token := make([]byte, 8)
 	_, _ = rand.Read(token)
-	return fmt.Sprintf("uploads/%d/%s-%s", companyID, hex.EncodeToString(token), safeName(filename))
+	return fmt.Sprintf("%s%d/%s-%s", vis.KeyPrefix(), companyID, hex.EncodeToString(token), safeName(filename))
 }
 
 func safeName(filename string) string {

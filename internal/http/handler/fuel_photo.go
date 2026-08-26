@@ -32,7 +32,7 @@ func (s *FuelPhotoStore) List(ctx context.Context, parentID int64, p paginate.Pa
 	}
 	out := make([]dto.FuelPhotoResponse, len(rows))
 	for i, r := range rows {
-		out[i] = toFuelPhotoResponse(r)
+		out[i] = s.response(ctx, r)
 	}
 	return out, total, nil
 }
@@ -42,7 +42,7 @@ func (s *FuelPhotoStore) Get(ctx context.Context, parentID, id int64) (dto.FuelP
 	if err != nil {
 		return dto.FuelPhotoResponse{}, err
 	}
-	return toFuelPhotoResponse(r), nil
+	return s.response(ctx, r), nil
 }
 
 func (s *FuelPhotoStore) Create(ctx context.Context, parentID int64, in dto.CreateFuelPhotoRequest) (dto.FuelPhotoResponse, error) {
@@ -61,7 +61,7 @@ func (s *FuelPhotoStore) Create(ctx context.Context, parentID int64, in dto.Crea
 	if err != nil {
 		return dto.FuelPhotoResponse{}, err
 	}
-	return toFuelPhotoResponse(r), nil
+	return s.response(ctx, r), nil
 }
 
 func (s *FuelPhotoStore) Update(ctx context.Context, parentID, id int64, in dto.UpdateFuelPhotoRequest) (dto.FuelPhotoResponse, error) {
@@ -86,7 +86,7 @@ func (s *FuelPhotoStore) Update(ctx context.Context, parentID, id int64, in dto.
 		return dto.FuelPhotoResponse{}, err
 	}
 	s.reclaimReplaced(ctx, &previous.File, &r.File)
-	return toFuelPhotoResponse(r), nil
+	return s.response(ctx, r), nil
 }
 
 func (s *FuelPhotoStore) Delete(ctx context.Context, parentID, id int64) error {
@@ -101,6 +101,15 @@ func (s *FuelPhotoStore) Delete(ctx context.Context, parentID, id int64) error {
 	}
 	s.reclaim(ctx, previous.File)
 	return nil
+}
+
+// response resolves the stored object reference to a URL the caller can read.
+// A fuel receipt is private, so that URL is signed and expires; it is produced
+// here, per response, and never persisted.
+func (s *FuelPhotoStore) response(ctx context.Context, r gen.FuelPhoto) dto.FuelPhotoResponse {
+	out := toFuelPhotoResponse(r)
+	out.File, out.FileExpiresAt = fileReadURL(ctx, s.files, r.File)
+	return out
 }
 
 func toFuelPhotoResponse(r gen.FuelPhoto) dto.FuelPhotoResponse {

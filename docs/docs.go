@@ -12434,7 +12434,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "photo, document or generic (default). Narrows the accepted media types.",
+                        "description": "asset_photo, company_logo, receipt, signature, inspection_photo, media, photo, document or generic (default). Narrows the accepted media types, and decides whether the object is publicly readable — only asset_photo and company_logo are.",
                         "name": "purpose",
                         "in": "formData"
                     }
@@ -19096,8 +19096,13 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "file": {
+                    "description": "File is a signed, time-limited URL: a fuel receipt is a business record,\nnot branding, so it is not anonymously readable. Render it, never store it.",
                     "type": "string",
                     "maxLength": 500
+                },
+                "file_expires_at": {
+                    "description": "FileExpiresAt is when File stops resolving. Re-read this record for a fresh\nURL; null would mean the object is public, which a receipt never is.",
+                    "type": "string"
                 },
                 "file_name": {
                     "type": "string",
@@ -19419,8 +19424,13 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "photo": {
+                    "description": "Photo is a signed, time-limited URL — inspection evidence is a business\nrecord, not branding. Render it, never store it.",
                     "type": "string",
                     "maxLength": 500
+                },
+                "photo_expires_at": {
+                    "description": "PhotoExpiresAt is when Photo stops resolving; re-read this record.",
+                    "type": "string"
                 },
                 "remark": {
                     "type": "string"
@@ -19503,8 +19513,13 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "signature": {
+                    "description": "Signature is a signed, time-limited URL — a technician's signature is\nevidence, not branding. Render it, never store it.",
                     "type": "string",
                     "maxLength": 500
+                },
+                "signature_expires_at": {
+                    "description": "SignatureExpiresAt is when Signature stops resolving; re-read this record.",
+                    "type": "string"
                 },
                 "started_at": {
                     "type": "string"
@@ -20208,8 +20223,13 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "file": {
+                    "description": "File is a signed, time-limited URL: uploaded media belongs to one tenant\nand is not anonymously readable. Render it, never store it.",
                     "type": "string",
                     "maxLength": 500
+                },
+                "file_expires_at": {
+                    "description": "FileExpiresAt is when File and Thumbnail stop resolving; re-read this record.",
+                    "type": "string"
                 },
                 "file_size": {
                     "type": "integer"
@@ -24159,6 +24179,10 @@ const docTemplate = `{
                 "content_type": {
                     "type": "string"
                 },
+                "expires_at": {
+                    "description": "ExpiresAt is null for a public object, whose URL never expires.",
+                    "type": "string"
+                },
                 "key": {
                     "type": "string"
                 },
@@ -24172,6 +24196,11 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "url": {
+                    "description": "URL renders the upload immediately. For a private object it expires at\nExpiresAt and must be re-fetched from the owning record, never cached.",
+                    "type": "string"
+                },
+                "visibility": {
+                    "description": "Visibility is \"public\" or \"private\", determined by the declared purpose.",
                     "type": "string"
                 }
             }

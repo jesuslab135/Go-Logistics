@@ -99,7 +99,7 @@ func NewRouter(d Deps) *gin.Engine {
 
 	// Collections whose filters vary per request take their List verb from
 	// here instead of from the generic CRUD handler.
-	lists := NewFilteredListHandler(d.Pool)
+	lists := NewFilteredListHandler(d.Pool, d.Storage)
 
 	// Phase 2: assets
 	registerCrudWithList(assets, "/assets",

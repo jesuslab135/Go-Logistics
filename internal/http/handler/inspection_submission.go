@@ -33,7 +33,7 @@ func (s *InspectionSubmissionStore) List(ctx context.Context, p paginate.Params)
 	}
 	out := make([]dto.InspectionSubmissionResponse, len(rows))
 	for i, r := range rows {
-		out[i] = toInspectionSubmissionResponse(r)
+		out[i] = s.response(ctx, r)
 	}
 	return out, total, nil
 }
@@ -43,7 +43,7 @@ func (s *InspectionSubmissionStore) Get(ctx context.Context, id int64) (dto.Insp
 	if err != nil {
 		return dto.InspectionSubmissionResponse{}, err
 	}
-	return toInspectionSubmissionResponse(r), nil
+	return s.response(ctx, r), nil
 }
 
 func (s *InspectionSubmissionStore) Create(ctx context.Context, in dto.CreateInspectionSubmissionRequest) (dto.InspectionSubmissionResponse, error) {
@@ -73,7 +73,7 @@ func (s *InspectionSubmissionStore) Create(ctx context.Context, in dto.CreateIns
 	if err != nil {
 		return dto.InspectionSubmissionResponse{}, err
 	}
-	return toInspectionSubmissionResponse(r), nil
+	return s.response(ctx, r), nil
 }
 
 func (s *InspectionSubmissionStore) Update(ctx context.Context, id int64, in dto.UpdateInspectionSubmissionRequest) (dto.InspectionSubmissionResponse, error) {
@@ -108,7 +108,7 @@ func (s *InspectionSubmissionStore) Update(ctx context.Context, id int64, in dto
 		return dto.InspectionSubmissionResponse{}, err
 	}
 	s.reclaimReplaced(ctx, previous.Signature, r.Signature)
-	return toInspectionSubmissionResponse(r), nil
+	return s.response(ctx, r), nil
 }
 
 func (s *InspectionSubmissionStore) Delete(ctx context.Context, id int64) error {
@@ -125,6 +125,15 @@ func (s *InspectionSubmissionStore) Delete(ctx context.Context, id int64) error 
 		s.reclaim(ctx, *previous.Signature)
 	}
 	return nil
+}
+
+// response resolves the stored object reference to a URL the caller can read. A
+// signature is private, so that URL is signed and expires; it is produced here,
+// per response, and never persisted.
+func (s *InspectionSubmissionStore) response(ctx context.Context, r gen.InspectionSubmission) dto.InspectionSubmissionResponse {
+	out := toInspectionSubmissionResponse(r)
+	out.Signature, out.SignatureExpiresAt = fileReadURLPtr(ctx, s.files, r.Signature)
+	return out
 }
 
 func toInspectionSubmissionResponse(r gen.InspectionSubmission) dto.InspectionSubmissionResponse {

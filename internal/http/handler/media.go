@@ -91,7 +91,7 @@ func (s *MediumStore) List(ctx context.Context, p paginate.Params) ([]dto.Medium
 	}
 	out := make([]dto.MediumResponse, len(rows))
 	for i, r := range rows {
-		out[i] = toMediumResponse(r)
+		out[i] = s.response(ctx, r)
 	}
 	return out, total, nil
 }
@@ -101,7 +101,7 @@ func (s *MediumStore) Get(ctx context.Context, id int64) (dto.MediumResponse, er
 	if err != nil {
 		return dto.MediumResponse{}, err
 	}
-	return toMediumResponse(r), nil
+	return s.response(ctx, r), nil
 }
 
 func (s *MediumStore) Create(ctx context.Context, in dto.CreateMediumRequest) (dto.MediumResponse, error) {
@@ -127,7 +127,7 @@ func (s *MediumStore) Create(ctx context.Context, in dto.CreateMediumRequest) (d
 	if err != nil {
 		return dto.MediumResponse{}, err
 	}
-	return toMediumResponse(r), nil
+	return s.response(ctx, r), nil
 }
 
 func (s *MediumStore) Update(ctx context.Context, id int64, in dto.UpdateMediumRequest) (dto.MediumResponse, error) {
@@ -162,7 +162,7 @@ func (s *MediumStore) Update(ctx context.Context, id int64, in dto.UpdateMediumR
 	if previous.File != r.File {
 		s.reclaim(ctx, previous.File, previous.Thumbnail)
 	}
-	return toMediumResponse(r), nil
+	return s.response(ctx, r), nil
 }
 
 func (s *MediumStore) Delete(ctx context.Context, id int64) error {
@@ -177,6 +177,19 @@ func (s *MediumStore) Delete(ctx context.Context, id int64) error {
 	}
 	s.reclaim(ctx, previous.File, previous.Thumbnail)
 	return nil
+}
+
+// response resolves the stored object references to URLs the caller can read.
+// Uploaded media belongs to one tenant, so those URLs are signed and expire;
+// they are produced here, per response, and never persisted. The thumbnail
+// shares the original's expiry because both are signed in the same call.
+func (s *MediumStore) response(ctx context.Context, r gen.Medium) dto.MediumResponse {
+	out := toMediumResponse(r)
+	out.File, out.FileExpiresAt = fileReadURL(ctx, s.files, r.File)
+	if r.Thumbnail != "" {
+		out.Thumbnail, _ = fileReadURL(ctx, s.files, r.Thumbnail)
+	}
+	return out
 }
 
 func toMediumResponse(r gen.Medium) dto.MediumResponse {

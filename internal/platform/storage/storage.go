@@ -9,6 +9,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 var ErrInvalidKey = errors.New("storage: invalid key")
@@ -20,6 +21,49 @@ type Object struct {
 	ContentType string `json:"content_type"`
 }
 
+// Visibility says whether an object may be read by anyone holding its URL, or
+// only through a time-limited signed one.
+//
+// It is derived from the key rather than stored beside it: a key is the only
+// thing that survives into every column, log line and cleanup path, so making
+// it self-describing means nothing can ever hold an object without also knowing
+// how it must be served. Keys written before this distinction existed carry no
+// prefix and are Public, which is what they already were.
+type Visibility int
+
+const (
+	VisibilityPublic Visibility = iota
+	VisibilityPrivate
+)
+
+const (
+	publicKeyPrefix  = "uploads/public/"
+	privateKeyPrefix = "uploads/private/"
+)
+
+// VisibilityOf reports how key must be served.
+func VisibilityOf(key string) Visibility {
+	if strings.HasPrefix(cleanKey(key), privateKeyPrefix) {
+		return VisibilityPrivate
+	}
+	return VisibilityPublic
+}
+
+// KeyPrefix is the prefix uploads of a given visibility are written under.
+func (v Visibility) KeyPrefix() string {
+	if v == VisibilityPrivate {
+		return privateKeyPrefix
+	}
+	return publicKeyPrefix
+}
+
+func (v Visibility) String() string {
+	if v == VisibilityPrivate {
+		return "private"
+	}
+	return "public"
+}
+
 // Storage abstracts blob persistence so handlers depend on the interface, not on
 // local disk vs. object storage. Keys are forward-slash relative paths
 // (e.g. "media/2026/07/photo.jpg").
@@ -28,6 +72,12 @@ type Storage interface {
 	Open(ctx context.Context, key string) (io.ReadCloser, error)
 	Delete(ctx context.Context, key string) error
 	URL(key string) string
+
+	// ReadURL returns the URL a client should use to read key, and the moment
+	// that URL stops working — the zero time for one that never does. A private
+	// object's URL is signed per call, so it must be resolved at response time
+	// and never persisted.
+	ReadURL(ctx context.Context, key string) (string, time.Time, error)
 
 	// Stat reports an existing object's metadata, and KeyFromURL reverses URL.
 	// Together they let handlers verify that a client-supplied file URL really
@@ -55,6 +105,13 @@ func FromEnv() (Storage, error) {
 			PublicURL: os.Getenv("STORAGE_MINIO_PUBLIC_URL"),
 
 			PublicURLIsBucketRoot: env("STORAGE_MINIO_PUBLIC_URL_IS_BUCKET_ROOT", "false") == "true",
+
+			PrivateBucket: env("STORAGE_MINIO_PRIVATE_BUCKET", env("STORAGE_MINIO_BUCKET", "fleet")+"-private"),
+			SignedURLTTL:  signedURLTTL(),
+
+			SigningEndpoint: os.Getenv("STORAGE_MINIO_SIGNING_ENDPOINT"),
+			SigningUseSSL: env("STORAGE_MINIO_SIGNING_USE_SSL",
+				env("STORAGE_MINIO_USE_SSL", "false")) == "true",
 		})
 	default:
 		return NewLocal(env("STORAGE_LOCAL_ROOT", "./uploads"), env("STORAGE_BASE_URL", "/media")), nil
@@ -137,6 +194,14 @@ func (l *Local) Stat(_ context.Context, key string) (Object, error) {
 	}, nil
 }
 
+// ReadURL serves private objects at the same URL as public ones. Local disk has
+// no signing mechanism, and inventing one here would give the development
+// backend a security property production does not get from the same code. The
+// local backend is for development only, which is where this asymmetry belongs.
+func (l *Local) ReadURL(_ context.Context, key string) (string, time.Time, error) {
+	return l.URL(key), time.Time{}, nil
+}
+
 func (l *Local) KeyFromURL(url string) (string, bool) {
 	return keyFromURL(l.baseURL, url)
 }
@@ -180,6 +245,18 @@ func (l *Local) resolve(key string) (string, error) {
 func cleanKey(key string) string {
 	clean := path.Clean("/" + strings.ReplaceAll(key, "\\", "/"))
 	return strings.TrimPrefix(clean, "/")
+}
+
+// defaultSignedURLTTL bounds how long a leaked private URL stays useful. Long
+// enough to outlive a page's render and a slow connection, short enough that a
+// URL copied out of a log or a screenshot is dead before anyone acts on it.
+const defaultSignedURLTTL = 15 * time.Minute
+
+func signedURLTTL() time.Duration {
+	if d, err := time.ParseDuration(os.Getenv("STORAGE_SIGNED_URL_TTL")); err == nil && d > 0 {
+		return d
+	}
+	return defaultSignedURLTTL
 }
 
 func env(key, fallback string) string {

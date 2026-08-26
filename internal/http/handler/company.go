@@ -46,7 +46,7 @@ func (s *CompanyStore) List(ctx context.Context, p paginate.Params) ([]dto.Compa
 
 	out := make([]dto.CompanyResponse, len(rows))
 	for i, r := range rows {
-		out[i] = toCompanyResponse(r)
+		out[i] = s.response(ctx, r)
 	}
 	return out, total, nil
 }
@@ -59,7 +59,7 @@ func (s *CompanyStore) Get(ctx context.Context, id int64) (dto.CompanyResponse, 
 	if err != nil {
 		return dto.CompanyResponse{}, err
 	}
-	return toCompanyResponse(row), nil
+	return s.response(ctx, row), nil
 }
 
 // Create ports Django's CompanyViewSet.perform_create: the company, its default
@@ -101,7 +101,7 @@ func (s *CompanyStore) Create(ctx context.Context, in dto.CreateCompanyRequest) 
 	if err := tx.Commit(ctx); err != nil {
 		return dto.CompanyResponse{}, err
 	}
-	return toCompanyResponse(row), nil
+	return s.response(ctx, row), nil
 }
 
 func (s *CompanyStore) Update(ctx context.Context, id int64, in dto.UpdateCompanyRequest) (dto.CompanyResponse, error) {
@@ -135,7 +135,7 @@ func (s *CompanyStore) Update(ctx context.Context, id int64, in dto.UpdateCompan
 		return dto.CompanyResponse{}, err
 	}
 	s.reclaimReplaced(ctx, previous.Logo, row.Logo)
-	return toCompanyResponse(row), nil
+	return s.response(ctx, row), nil
 }
 
 func (s *CompanyStore) Delete(ctx context.Context, id int64) error {
@@ -152,6 +152,15 @@ func (s *CompanyStore) Delete(ctx context.Context, id int64) error {
 		s.reclaim(ctx, *previous.Logo)
 	}
 	return nil
+}
+
+// response resolves the stored object reference to a URL the caller can read. A
+// company logo is public, so the URL is permanent — but it still has to be
+// derived from the key, because that is what new uploads store.
+func (s *CompanyStore) response(ctx context.Context, r gen.Company) dto.CompanyResponse {
+	out := toCompanyResponse(r)
+	out.Logo, _ = fileReadURLPtr(ctx, s.files, r.Logo)
+	return out
 }
 
 func toCompanyResponse(c gen.Company) dto.CompanyResponse {

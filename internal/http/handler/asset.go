@@ -34,7 +34,7 @@ func (s *AssetStore) List(ctx context.Context, p paginate.Params) ([]dto.AssetRe
 	}
 	out := make([]dto.AssetResponse, len(rows))
 	for i, r := range rows {
-		out[i] = toAssetResponse(r)
+		out[i] = s.response(ctx, r)
 	}
 	return out, total, nil
 }
@@ -44,7 +44,7 @@ func (s *AssetStore) Get(ctx context.Context, id int64) (dto.AssetResponse, erro
 	if err != nil {
 		return dto.AssetResponse{}, err
 	}
-	return s.withSubtypes(ctx, toAssetResponse(r))
+	return s.withSubtypes(ctx, s.response(ctx, r))
 }
 
 // withSubtypes fills the denormalized vehicle/trailer columns so a single asset
@@ -142,7 +142,7 @@ func (s *AssetStore) Create(ctx context.Context, in dto.CreateAssetRequest) (dto
 	if err != nil {
 		return dto.AssetResponse{}, err
 	}
-	return s.withSubtypes(ctx, toAssetResponse(r))
+	return s.withSubtypes(ctx, s.response(ctx, r))
 }
 
 func (s *AssetStore) Update(ctx context.Context, id int64, in dto.UpdateAssetRequest) (dto.AssetResponse, error) {
@@ -230,7 +230,7 @@ func (s *AssetStore) Update(ctx context.Context, id int64, in dto.UpdateAssetReq
 		return dto.AssetResponse{}, err
 	}
 	s.reclaimReplaced(ctx, previous.Photo, r.Photo)
-	return s.withSubtypes(ctx, toAssetResponse(r))
+	return s.withSubtypes(ctx, s.response(ctx, r))
 }
 
 func (s *AssetStore) Delete(ctx context.Context, id int64) error {
@@ -247,6 +247,15 @@ func (s *AssetStore) Delete(ctx context.Context, id int64) error {
 		s.reclaim(ctx, *previous.Photo)
 	}
 	return nil
+}
+
+// response resolves the stored object reference to a URL the caller can read. An
+// asset photo is public, so the URL is permanent — but it still has to be
+// derived from the key, because that is what new uploads store.
+func (s *AssetStore) response(ctx context.Context, r gen.Asset) dto.AssetResponse {
+	out := toAssetResponse(r)
+	out.Photo, _ = fileReadURLPtr(ctx, s.files, r.Photo)
+	return out
 }
 
 func toAssetResponse(r gen.Asset) dto.AssetResponse {
