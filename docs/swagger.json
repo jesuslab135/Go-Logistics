@@ -3414,6 +3414,245 @@
                 }
             }
         },
+        "/api/v1/custom-field-definitions": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Pass ?resource= to get just one resource's fields, which is what a form asks for. Ordered by position.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "custom-field-definitions"
+                ],
+                "summary": "List custom field definitions",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "assets, employees, issues, parts, purchase-orders, service-entries, vendors or work-orders",
+                        "name": "resource",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Offset",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.CustomFieldDefinitionPage"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "field_type is text, number, date, boolean or select; a select needs options and nothing else may have them. The key is immutable once created, because every stored document is keyed by it. A date value is a business date (YYYY-MM-DD), not a timestamp.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "custom-field-definitions"
+                ],
+                "summary": "Declare a custom field",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.CreateCustomFieldDefinitionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/dto.CustomFieldDefinitionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/custom-field-definitions/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "custom-field-definitions"
+                ],
+                "summary": "Get a custom field definition",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.CustomFieldDefinitionResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "The key and resource cannot change: every stored document is keyed by the one and filed under the other, so changing either would orphan the values already written.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "custom-field-definitions"
+                ],
+                "summary": "Update a custom field definition",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.UpdateCustomFieldDefinitionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.CustomFieldDefinitionResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Stops validating that key. Values already stored under it stay in their documents: they are the tenant's data, and nothing else records them.",
+                "tags": [
+                    "custom-field-definitions"
+                ],
+                "summary": "Delete a custom field definition",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/dashboard/stats": {
             "get": {
                 "security": [
@@ -17598,6 +17837,49 @@
                 }
             }
         },
+        "dto.CreateCustomFieldDefinitionRequest": {
+            "type": "object",
+            "required": [
+                "field_type",
+                "key",
+                "label",
+                "resource"
+            ],
+            "properties": {
+                "field_type": {
+                    "description": "FieldType is text, number, date, boolean or select.",
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "key": {
+                    "description": "Key is what the value is stored under. It cannot be changed afterwards:\nevery stored document is keyed by it.",
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "label": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "options": {
+                    "description": "Options are the permitted values for a select, and are ignored otherwise.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "position": {
+                    "type": "integer"
+                },
+                "required": {
+                    "type": "boolean"
+                },
+                "resource": {
+                    "description": "Resource is the API's own plural name: \"assets\", \"parts\", \"work-orders\".",
+                    "type": "string",
+                    "maxLength": 50
+                }
+            }
+        },
         "dto.CreateEmployeeRequest": {
             "type": "object",
             "properties": {
@@ -19397,6 +19679,70 @@
                 },
                 "unit_cost": {
                     "type": "number"
+                }
+            }
+        },
+        "dto.CustomFieldDefinitionPage": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.CustomFieldDefinitionResponse"
+                    }
+                },
+                "has_next": {
+                    "type": "boolean"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.CustomFieldDefinitionResponse": {
+            "type": "object",
+            "properties": {
+                "company_id": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "field_type": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "key": {
+                    "type": "string"
+                },
+                "label": {
+                    "type": "string"
+                },
+                "options": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "position": {
+                    "type": "integer"
+                },
+                "required": {
+                    "type": "boolean"
+                },
+                "resource": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
                 }
             }
         },
@@ -23153,6 +23499,35 @@
                 "website": {
                     "type": "string",
                     "maxLength": 200
+                }
+            }
+        },
+        "dto.UpdateCustomFieldDefinitionRequest": {
+            "type": "object",
+            "required": [
+                "field_type",
+                "label"
+            ],
+            "properties": {
+                "field_type": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "label": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "options": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "position": {
+                    "type": "integer"
+                },
+                "required": {
+                    "type": "boolean"
                 }
             }
         },

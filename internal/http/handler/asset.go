@@ -66,6 +66,12 @@ func (s *AssetStore) withSubtypes(ctx context.Context, resp dto.AssetResponse) (
 }
 
 func (s *AssetStore) Create(ctx context.Context, in dto.CreateAssetRequest) (dto.AssetResponse, error) {
+	// The document has to satisfy whatever this company declared for assets;
+	// a company that declared nothing pays one indexed lookup.
+	if err := validateCustomFields(ctx, s.q, "assets", in.CustomFields); err != nil {
+		return dto.AssetResponse{}, err
+	}
+
 	now := time.Now().UTC()
 	r, err := s.q.CreateAsset(ctx, gen.CreateAssetParams{
 		CompanyID:                   middleware.CompanyFromContext(ctx),
@@ -145,6 +151,12 @@ func (s *AssetStore) Create(ctx context.Context, in dto.CreateAssetRequest) (dto
 }
 
 func (s *AssetStore) Update(ctx context.Context, id int64, in dto.UpdateAssetRequest) (dto.AssetResponse, error) {
+	// The document has to satisfy whatever this company declared for assets;
+	// a company that declared nothing pays one indexed lookup.
+	if err := validateCustomFields(ctx, s.q, "assets", in.CustomFields); err != nil {
+		return dto.AssetResponse{}, err
+	}
+
 	now := time.Now().UTC()
 
 	previous, err := s.q.GetAsset(ctx, gen.GetAssetParams{ID: id, CompanyID: middleware.CompanyFromContext(ctx)})

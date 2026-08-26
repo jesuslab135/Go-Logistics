@@ -50,6 +50,12 @@ func (s *ServiceEntryStore) Get(ctx context.Context, id int64) (dto.ServiceEntry
 }
 
 func (s *ServiceEntryStore) Create(ctx context.Context, in dto.CreateServiceEntryRequest) (dto.ServiceEntryResponse, error) {
+	// The document has to satisfy whatever this company declared for service-entries;
+	// a company that declared nothing pays one indexed lookup.
+	if err := validateCustomFields(ctx, s.q, "service-entries", in.CustomFields); err != nil {
+		return dto.ServiceEntryResponse{}, err
+	}
+
 	var out dto.ServiceEntryResponse
 	err := inTx(ctx, s.pool, s.q, func(qtx *gen.Queries) error {
 		now := time.Now().UTC()
@@ -96,6 +102,12 @@ func (s *ServiceEntryStore) Create(ctx context.Context, in dto.CreateServiceEntr
 }
 
 func (s *ServiceEntryStore) Update(ctx context.Context, id int64, in dto.UpdateServiceEntryRequest) (dto.ServiceEntryResponse, error) {
+	// The document has to satisfy whatever this company declared for service-entries;
+	// a company that declared nothing pays one indexed lookup.
+	if err := validateCustomFields(ctx, s.q, "service-entries", in.CustomFields); err != nil {
+		return dto.ServiceEntryResponse{}, err
+	}
+
 	var out dto.ServiceEntryResponse
 	err := inTx(ctx, s.pool, s.q, func(qtx *gen.Queries) error {
 		now := time.Now().UTC()

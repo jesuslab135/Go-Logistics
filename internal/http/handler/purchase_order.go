@@ -50,6 +50,12 @@ func (s *PurchaseOrderStore) Get(ctx context.Context, id int64) (dto.PurchaseOrd
 }
 
 func (s *PurchaseOrderStore) Create(ctx context.Context, in dto.CreatePurchaseOrderRequest) (dto.PurchaseOrderResponse, error) {
+	// The document has to satisfy whatever this company declared for purchase-orders;
+	// a company that declared nothing pays one indexed lookup.
+	if err := validateCustomFields(ctx, s.q, "purchase-orders", in.CustomFields); err != nil {
+		return dto.PurchaseOrderResponse{}, err
+	}
+
 	var out dto.PurchaseOrderResponse
 	err := inTx(ctx, s.pool, s.q, func(qtx *gen.Queries) error {
 		now := time.Now().UTC()
@@ -92,6 +98,12 @@ func (s *PurchaseOrderStore) Create(ctx context.Context, in dto.CreatePurchaseOr
 }
 
 func (s *PurchaseOrderStore) Update(ctx context.Context, id int64, in dto.UpdatePurchaseOrderRequest) (dto.PurchaseOrderResponse, error) {
+	// The document has to satisfy whatever this company declared for purchase-orders;
+	// a company that declared nothing pays one indexed lookup.
+	if err := validateCustomFields(ctx, s.q, "purchase-orders", in.CustomFields); err != nil {
+		return dto.PurchaseOrderResponse{}, err
+	}
+
 	var out dto.PurchaseOrderResponse
 	err := inTx(ctx, s.pool, s.q, func(qtx *gen.Queries) error {
 		now := time.Now().UTC()

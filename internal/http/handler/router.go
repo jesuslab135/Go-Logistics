@@ -102,6 +102,12 @@ func NewRouter(d Deps) *gin.Engine {
 	// Django gated roles on IsAdminRole rather than on a module entry.
 	roles := member.Group("", middleware.RequireAdminRole())
 
+	// Custom field definitions describe what may go in each resource's
+	// custom_fields document. Admin-gated: they shape everyone's forms.
+	customFields := member.Group("", middleware.RequireAdminRole(), WithResourceFilter())
+	crud.NewHandler[dto.CustomFieldDefinitionResponse, dto.CreateCustomFieldDefinitionRequest, dto.UpdateCustomFieldDefinitionRequest](
+		NewCustomFieldDefinitionStore(d.Queries)).Register(customFields, "/custom-field-definitions")
+
 	// Archive/restore for the five catalogs that carry archived_at. A referenced
 	// record cannot be deleted; archiving is what retires it instead.
 	registerArchiveRoutes(assets, parts, vendors, service, inspections, d.Queries)

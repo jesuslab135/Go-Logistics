@@ -284,3 +284,24 @@ func TestArchiveRoutes(t *testing.T) {
 		}
 	}
 }
+
+// The definitions are what makes custom_fields describable, so the CRUD has to
+// exist for a form to be generated from anything.
+func TestCustomFieldDefinitionRoutes(t *testing.T) {
+	routes := make(map[string]bool)
+	for _, r := range newTestRouter(t).Routes() {
+		routes[r.Method+" "+r.Path] = true
+	}
+
+	for _, want := range []string{
+		"GET /api/v1/custom-field-definitions",
+		"POST /api/v1/custom-field-definitions",
+		"GET /api/v1/custom-field-definitions/:id",
+		"PUT /api/v1/custom-field-definitions/:id",
+		"DELETE /api/v1/custom-field-definitions/:id",
+	} {
+		if !routes[want] {
+			t.Errorf("missing route %q", want)
+		}
+	}
+}

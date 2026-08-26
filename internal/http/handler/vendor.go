@@ -41,6 +41,12 @@ func (s *VendorStore) Get(ctx context.Context, id int64) (dto.VendorResponse, er
 }
 
 func (s *VendorStore) Create(ctx context.Context, in dto.CreateVendorRequest) (dto.VendorResponse, error) {
+	// The document has to satisfy whatever this company declared for vendors;
+	// a company that declared nothing pays one indexed lookup.
+	if err := validateCustomFields(ctx, s.q, "vendors", in.CustomFields); err != nil {
+		return dto.VendorResponse{}, err
+	}
+
 	now := time.Now().UTC()
 	r, err := s.q.CreateVendor(ctx, gen.CreateVendorParams{
 		CompanyID:          middleware.CompanyFromContext(ctx),
@@ -75,6 +81,12 @@ func (s *VendorStore) Create(ctx context.Context, in dto.CreateVendorRequest) (d
 }
 
 func (s *VendorStore) Update(ctx context.Context, id int64, in dto.UpdateVendorRequest) (dto.VendorResponse, error) {
+	// The document has to satisfy whatever this company declared for vendors;
+	// a company that declared nothing pays one indexed lookup.
+	if err := validateCustomFields(ctx, s.q, "vendors", in.CustomFields); err != nil {
+		return dto.VendorResponse{}, err
+	}
+
 	now := time.Now().UTC()
 	r, err := s.q.UpdateVendor(ctx, gen.UpdateVendorParams{
 		ID:                 id,

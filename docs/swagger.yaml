@@ -823,6 +823,41 @@ definitions:
     - name
     - tax_id
     type: object
+  dto.CreateCustomFieldDefinitionRequest:
+    properties:
+      field_type:
+        description: FieldType is text, number, date, boolean or select.
+        maxLength: 20
+        type: string
+      key:
+        description: |-
+          Key is what the value is stored under. It cannot be changed afterwards:
+          every stored document is keyed by it.
+        maxLength: 50
+        type: string
+      label:
+        maxLength: 100
+        type: string
+      options:
+        description: Options are the permitted values for a select, and are ignored
+          otherwise.
+        items:
+          type: string
+        type: array
+      position:
+        type: integer
+      required:
+        type: boolean
+      resource:
+        description: 'Resource is the API''s own plural name: "assets", "parts", "work-orders".'
+        maxLength: 50
+        type: string
+    required:
+    - field_type
+    - key
+    - label
+    - resource
+    type: object
   dto.CreateEmployeeRequest:
     properties:
       birth_date:
@@ -2096,6 +2131,48 @@ definitions:
         type: integer
       unit_cost:
         type: number
+    type: object
+  dto.CustomFieldDefinitionPage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.CustomFieldDefinitionResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.CustomFieldDefinitionResponse:
+    properties:
+      company_id:
+        type: integer
+      created_at:
+        type: string
+      field_type:
+        type: string
+      id:
+        type: integer
+      key:
+        type: string
+      label:
+        type: string
+      options:
+        items:
+          type: string
+        type: array
+      position:
+        type: integer
+      required:
+        type: boolean
+      resource:
+        type: string
+      updated_at:
+        type: string
     type: object
   dto.DashboardStatsResponse:
     properties:
@@ -4666,6 +4743,26 @@ definitions:
     required:
     - name
     - tax_id
+    type: object
+  dto.UpdateCustomFieldDefinitionRequest:
+    properties:
+      field_type:
+        maxLength: 20
+        type: string
+      label:
+        maxLength: 100
+        type: string
+      options:
+        items:
+          type: string
+        type: array
+      position:
+        type: integer
+      required:
+        type: boolean
+    required:
+    - field_type
+    - label
     type: object
   dto.UpdateEmployeeRequest:
     properties:
@@ -9286,6 +9383,166 @@ paths:
       summary: Update a company
       tags:
       - companies
+  /api/v1/custom-field-definitions:
+    get:
+      description: Pass ?resource= to get just one resource's fields, which is what
+        a form asks for. Ordered by position.
+      parameters:
+      - description: assets, employees, issues, parts, purchase-orders, service-entries,
+          vendors or work-orders
+        in: query
+        name: resource
+        type: string
+      - description: Page size
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.CustomFieldDefinitionPage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List custom field definitions
+      tags:
+      - custom-field-definitions
+    post:
+      consumes:
+      - application/json
+      description: field_type is text, number, date, boolean or select; a select needs
+        options and nothing else may have them. The key is immutable once created,
+        because every stored document is keyed by it. A date value is a business date
+        (YYYY-MM-DD), not a timestamp.
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateCustomFieldDefinitionRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.CustomFieldDefinitionResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Declare a custom field
+      tags:
+      - custom-field-definitions
+  /api/v1/custom-field-definitions/{id}:
+    delete:
+      description: 'Stops validating that key. Values already stored under it stay
+        in their documents: they are the tenant''s data, and nothing else records
+        them.'
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete a custom field definition
+      tags:
+      - custom-field-definitions
+    get:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.CustomFieldDefinitionResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get a custom field definition
+      tags:
+      - custom-field-definitions
+    put:
+      consumes:
+      - application/json
+      description: 'The key and resource cannot change: every stored document is keyed
+        by the one and filed under the other, so changing either would orphan the
+        values already written.'
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateCustomFieldDefinitionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.CustomFieldDefinitionResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update a custom field definition
+      tags:
+      - custom-field-definitions
   /api/v1/dashboard/stats:
     get:
       description: Current-state counters for the caller's company. pending_inspections

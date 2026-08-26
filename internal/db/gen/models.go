@@ -165,6 +165,20 @@ type Company struct {
 	SystemOfMeasurement string
 }
 
+type CustomFieldDefinition struct {
+	ID        int64
+	CompanyID int64
+	Resource  string
+	Key       string
+	Label     string
+	FieldType string
+	Required  bool
+	Options   []byte
+	Position  int32
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
 type Employee struct {
 	ID                   int64
 	UserID               *int64

@@ -79,6 +79,10 @@ func (h *FilteredListHandler) WorkOrders(c *gin.Context) {
 	if statusID != nil {
 		where.Add("wo.status_id", filter.Eq, *statusID)
 	}
+	if err := applyCustomFieldFilters(c, where, "wo.custom_fields", "work-orders", gen.New(h.pool)); err != nil {
+		apierr.Abort(c, err)
+		return
+	}
 
 	spec := newListSpec[gen.WorkOrder]("work_order", "wo").
 		filter(where).
@@ -130,6 +134,10 @@ func (h *FilteredListHandler) Issues(c *gin.Context) {
 	}
 	if state != nil {
 		where.Add("i.state", filter.Eq, *state)
+	}
+	if err := applyCustomFieldFilters(c, where, "i.custom_fields", "issues", gen.New(h.pool)); err != nil {
+		apierr.Abort(c, err)
+		return
 	}
 
 	spec := newListSpec[gen.Issue]("issue", "i").
@@ -252,6 +260,10 @@ func (h *FilteredListHandler) Assets(c *gin.Context) {
 	if q := queryStr(c, "q"); q != nil {
 		pattern := "%" + *q + "%"
 		where.Raw("(a.name ILIKE ? OR a.vin_sn ILIKE ? OR a.license_plate ILIKE ?)", pattern, pattern, pattern)
+	}
+	if err := applyCustomFieldFilters(c, where, "a.custom_fields", "assets", gen.New(h.pool)); err != nil {
+		apierr.Abort(c, err)
+		return
 	}
 
 	spec := newListSpec[assetListRow]("asset", "a").

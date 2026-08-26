@@ -74,6 +74,12 @@ func (s *WorkOrderStore) Get(ctx context.Context, id int64) (dto.WorkOrderRespon
 }
 
 func (s *WorkOrderStore) Create(ctx context.Context, in dto.CreateWorkOrderRequest) (dto.WorkOrderResponse, error) {
+	// The document has to satisfy whatever this company declared for work-orders;
+	// a company that declared nothing pays one indexed lookup.
+	if err := validateCustomFields(ctx, s.q, "work-orders", in.CustomFields); err != nil {
+		return dto.WorkOrderResponse{}, err
+	}
+
 	now := time.Now().UTC()
 	company := middleware.CompanyFromContext(ctx)
 
@@ -153,6 +159,12 @@ func (s *WorkOrderStore) Create(ctx context.Context, in dto.CreateWorkOrderReque
 }
 
 func (s *WorkOrderStore) Update(ctx context.Context, id int64, in dto.UpdateWorkOrderRequest) (dto.WorkOrderResponse, error) {
+	// The document has to satisfy whatever this company declared for work-orders;
+	// a company that declared nothing pays one indexed lookup.
+	if err := validateCustomFields(ctx, s.q, "work-orders", in.CustomFields); err != nil {
+		return dto.WorkOrderResponse{}, err
+	}
+
 	now := time.Now().UTC()
 	company := middleware.CompanyFromContext(ctx)
 

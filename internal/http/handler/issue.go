@@ -41,6 +41,12 @@ func (s *IssueStore) Get(ctx context.Context, id int64) (dto.IssueResponse, erro
 }
 
 func (s *IssueStore) Create(ctx context.Context, in dto.CreateIssueRequest) (dto.IssueResponse, error) {
+	// The document has to satisfy whatever this company declared for issues;
+	// a company that declared nothing pays one indexed lookup.
+	if err := validateCustomFields(ctx, s.q, "issues", in.CustomFields); err != nil {
+		return dto.IssueResponse{}, err
+	}
+
 	now := time.Now().UTC()
 	r, err := s.q.CreateIssue(ctx, gen.CreateIssueParams{
 		CompanyID:              middleware.CompanyFromContext(ctx),
@@ -88,6 +94,12 @@ func (s *IssueStore) Create(ctx context.Context, in dto.CreateIssueRequest) (dto
 }
 
 func (s *IssueStore) Update(ctx context.Context, id int64, in dto.UpdateIssueRequest) (dto.IssueResponse, error) {
+	// The document has to satisfy whatever this company declared for issues;
+	// a company that declared nothing pays one indexed lookup.
+	if err := validateCustomFields(ctx, s.q, "issues", in.CustomFields); err != nil {
+		return dto.IssueResponse{}, err
+	}
+
 	now := time.Now().UTC()
 	r, err := s.q.UpdateIssue(ctx, gen.UpdateIssueParams{
 		ID:                     id,

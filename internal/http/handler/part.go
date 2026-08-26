@@ -41,6 +41,12 @@ func (s *PartStore) Get(ctx context.Context, id int64) (dto.PartResponse, error)
 }
 
 func (s *PartStore) Create(ctx context.Context, in dto.CreatePartRequest) (dto.PartResponse, error) {
+	// The document has to satisfy whatever this company declared for parts;
+	// a company that declared nothing pays one indexed lookup.
+	if err := validateCustomFields(ctx, s.q, "parts", in.CustomFields); err != nil {
+		return dto.PartResponse{}, err
+	}
+
 	now := time.Now().UTC()
 	r, err := s.q.CreatePart(ctx, gen.CreatePartParams{
 		CompanyID:              middleware.CompanyFromContext(ctx),
@@ -67,6 +73,12 @@ func (s *PartStore) Create(ctx context.Context, in dto.CreatePartRequest) (dto.P
 }
 
 func (s *PartStore) Update(ctx context.Context, id int64, in dto.UpdatePartRequest) (dto.PartResponse, error) {
+	// The document has to satisfy whatever this company declared for parts;
+	// a company that declared nothing pays one indexed lookup.
+	if err := validateCustomFields(ctx, s.q, "parts", in.CustomFields); err != nil {
+		return dto.PartResponse{}, err
+	}
+
 	now := time.Now().UTC()
 	r, err := s.q.UpdatePart(ctx, gen.UpdatePartParams{
 		ID:                     id,
