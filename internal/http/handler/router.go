@@ -293,10 +293,16 @@ func registerCompanyRoutes(api, member *gin.RouterGroup, d Deps) {
 
 // registerAdminRoutes wires the cross-company namespace. Every route here reads
 // or writes another tenant's data on purpose — the company-scoped routes cannot
-// answer "who belongs to company X" or "did company X get seeded" — so the whole
-// group sits behind RequireAdminRole rather than a module permission.
+// answer "who belongs to company X" or "did company X get seeded".
+//
+// It is gated on RequirePlatformAdmin, not RequireAdminRole. A tenant's own
+// administrator is not a platform operator, and because employee.role_id is a
+// single global FK, an admin of one company is an admin of every company they
+// belong to — so the previous gate let any company admin read and rewrite
+// another tenant's employees. Granting the flag is a CLI act (cmd/cli
+// platform-admin); nothing in the API hands it out.
 func registerAdminRoutes(member *gin.RouterGroup, d Deps) {
-	admin := member.Group("", middleware.RequireAdminRole())
+	admin := member.Group("", middleware.RequirePlatformAdmin())
 
 	employees := NewAdminEmployeeHandler(d.Queries, d.Pool)
 	admin.GET("/admin/employees", employees.List)

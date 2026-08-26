@@ -18,6 +18,7 @@ SELECT
     e.is_active,
     e.is_account_owner,
     e.role_id,
+    e.is_platform_admin,
     COALESCE(r.is_admin, false)         AS is_admin,
     COALESCE(r.permissions, '{}'::jsonb) AS permissions,
     EXISTS (

@@ -171,6 +171,35 @@ Seeding is idempotent by role name, so re-running it never disturbs a role an
 operator has since edited — that is also how companies created before `Almacén`
 existed pick it up.
 
+### Platform administrators
+
+`/api/v1/admin/*` reads and writes other tenants' data — the cross-company
+employee register, membership replacement, company owners, provisioning
+verification. It requires a *platform* administrator, which is not the same
+thing as a tenant's own `is_admin`: `employee.role_id` is a single global FK, so
+an administrator of one company is an administrator of every company they belong
+to, and gating a cross-tenant namespace on that let any company admin rewrite
+another tenant's employees.
+
+Nobody holds the flag after migration `000010`, so grant the first one here —
+there is deliberately no API route that hands it out:
+
+```sh
+go run ./cmd/cli platform-admin --email ops@example.com
+go run ./cmd/cli platform-admin --email ops@example.com --revoke
+go run ./cmd/cli platform-admin --list
+```
+
+The flag is read from the database on every request, like every other
+authorization fact, so revoking it takes effect on the caller's next request
+rather than at their next token refresh.
+
+Every membership addition and removal made through
+`PUT /api/v1/admin/employees/{id}/companies` is recorded in `membership_audit`,
+in the same transaction as the change. Granting a company confers administrator
+access there when the employee's role carries `is_admin`, which makes it the
+highest-privilege write in the system; it previously left no trace.
+
 Set the password with the CLI, then log in:
 
 ```sh

@@ -18,7 +18,7 @@ import (
 
 // AdminEmployeeHandler serves the cross-company employee routes. Everything
 // here is deliberately unscoped by the caller's own company_id — that is the
-// gap it exists to close — so every route is gated on RequireAdminRole.
+// gap it exists to close — so every route is gated on RequirePlatformAdmin.
 type AdminEmployeeHandler struct {
 	q    *gen.Queries
 	pool *pgxpool.Pool
@@ -61,30 +61,35 @@ func validateMembershipReplace(companyIDs []int64, defaultCompanyID *int64) erro
 	return nil
 }
 
-// validateGrantableCompanies constrains what a full replace may *change* to the
-// companies the caller themselves belongs to. Both directions of the delta need
-// the check. An addition escalates: the gate is RequireAdminRole and
-// employee.role_id is a single global FK, so an admin of company A who grants
-// themselves company B is an admin of B as well — which reaches
-// DELETE /companies/{B}, and every foreign key cascades. A removal is the mirror
-// image: it evicts the employee from a tenant the caller has no access to.
-//
-// Only the symmetric difference is constrained. An id present in both sets is
-// membership this request is not touching, so it passes whether or not the
-// caller belongs to it — that is what lets an admin of A edit an employee who
-// also belongs to B without silently dropping B.
-func validateGrantableCompanies(requested, current, callerCompanies []int64) error {
-	for _, id := range requested {
-		if !slices.Contains(current, id) && !slices.Contains(callerCompanies, id) {
-			return apierr.Forbidden("you can only add or remove membership in a company you belong to")
+// membershipChange is one audited addition or removal.
+type membershipChange struct {
+	company int64
+	action  string
+}
+
+const (
+	membershipGranted = "granted"
+	membershipRevoked = "revoked"
+)
+
+// membershipDelta is the symmetric difference between what an employee had and
+// what a full replace leaves them with — the additions and removals, and only
+// those. An id in both sets is membership the request did not touch, and
+// recording it would turn the audit into a log of requests rather than of
+// changes.
+func membershipDelta(before, after []int64) []membershipChange {
+	var out []membershipChange
+	for _, id := range after {
+		if !slices.Contains(before, id) {
+			out = append(out, membershipChange{company: id, action: membershipGranted})
 		}
 	}
-	for _, id := range current {
-		if !slices.Contains(requested, id) && !slices.Contains(callerCompanies, id) {
-			return apierr.Forbidden("you can only add or remove membership in a company you belong to")
+	for _, id := range before {
+		if !slices.Contains(after, id) {
+			out = append(out, membershipChange{company: id, action: membershipRevoked})
 		}
 	}
-	return nil
+	return out
 }
 
 // List godoc
@@ -169,7 +174,7 @@ func (h *AdminEmployeeHandler) ListCompanies(c *gin.Context) {
 // ReplaceCompanies godoc
 //
 //	@Summary		Replace an employee's company memberships
-//	@Description	Full overwrite of employee_companies. company_ids must be non-empty — an employee with no membership cannot log in, so use is_active to deactivate instead. default_company_id must be null or one of company_ids; omitting it clears the employee's stored default_company_id, so send it on every call unless you mean to clear it. Every company this call adds or removes must be one the caller themselves belongs to; memberships the call leaves unchanged are kept regardless. The caller can neither hand out membership in a tenant they have no access to — which would also confer admin there, because employee.role_id is global — nor evict the employee from one.
+//	@Description	Full overwrite of employee_companies. Requires a platform administrator. company_ids must be non-empty — an employee with no membership cannot log in, so use is_active to deactivate instead. default_company_id must be null or one of company_ids; omitting it clears the employee's stored default_company_id, so send it on every call unless you mean to clear it. Every addition and removal is recorded in membership_audit in the same transaction as the change.
 //	@Tags			admin
 //	@Accept			json
 //	@Produce		json
@@ -220,23 +225,19 @@ func (h *AdminEmployeeHandler) ReplaceCompanies(c *gin.Context) {
 		return
 	}
 
-	// What the replace changes is what the caller must be entitled to, so the
-	// target's current set is read before the transaction and compared against
-	// the caller's own memberships.
+	// The delta is what gets audited, so the target's current set is read before
+	// the transaction. It used to also be what constrained the caller: a company
+	// admin could only add or remove a company they themselves belonged to.
+	// That check is gone because the gate replaced it — this namespace now
+	// requires a platform administrator, who is entitled to the whole delta by
+	// definition, and the old constraint would have blocked exactly the
+	// cross-tenant provisioning they exist to do.
 	current, err := h.q.ListEmployeeCompanyIDs(ctx, id)
 	if err != nil {
 		apierr.Abort(c, err)
 		return
 	}
-	callerCompanies, err := h.q.ListEmployeeCompanyIDs(ctx, middleware.EmployeeFromContext(ctx))
-	if err != nil {
-		apierr.Abort(c, err)
-		return
-	}
-	if err := validateGrantableCompanies(ids, normalizeCompanyIDs(current), callerCompanies); err != nil {
-		apierr.Abort(c, err)
-		return
-	}
+	before := normalizeCompanyIDs(current)
 
 	tx, err := h.pool.Begin(ctx)
 	if err != nil {
@@ -262,10 +263,30 @@ func (h *AdminEmployeeHandler) ReplaceCompanies(c *gin.Context) {
 			return
 		}
 	}
+	// Granting a company confers administrator access there when the employee's
+	// role carries is_admin, because role_id is a single global FK. That makes
+	// this the highest-privilege write in the system, and it used to leave no
+	// trace at all. The audit rows go in the same transaction as the change, so
+	// a recorded grant is one that actually happened.
+	now := time.Now().UTC()
+	actor := middleware.EmployeeFromContext(ctx)
+	for _, cid := range membershipDelta(before, ids) {
+		if err := qtx.RecordMembershipChange(ctx, gen.RecordMembershipChangeParams{
+			ActorEmployeeID:   &actor,
+			SubjectEmployeeID: id,
+			CompanyID:         cid.company,
+			Action:            cid.action,
+			OccurredAt:        now,
+		}); err != nil {
+			apierr.Abort(c, err)
+			return
+		}
+	}
+
 	if err := qtx.SetEmployeeDefaultCompany(ctx, gen.SetEmployeeDefaultCompanyParams{
 		ID:               id,
 		DefaultCompanyID: req.DefaultCompanyID,
-		UpdatedAt:        time.Now().UTC(),
+		UpdatedAt:        now,
 	}); err != nil {
 		apierr.Abort(c, err)
 		return

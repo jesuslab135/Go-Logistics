@@ -200,6 +200,7 @@ type Employee struct {
 	DashboardPreferences []byte
 	UpdatedAt            time.Time
 	PasswordHash         string
+	IsPlatformAdmin      bool
 }
 
 type EmployeeCompany struct {
@@ -490,6 +491,15 @@ type Medium struct {
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 	Thumbnail    string
+}
+
+type MembershipAudit struct {
+	ID                int64
+	ActorEmployeeID   *int64
+	SubjectEmployeeID int64
+	CompanyID         int64
+	Action            string
+	OccurredAt        time.Time
 }
 
 type Notification struct {
