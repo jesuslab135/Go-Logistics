@@ -8,6 +8,9 @@ import (
 )
 
 type CreateVendorRequest struct {
+	// archived_at is not writable: archiving is an action
+	// (POST .../archive and .../restore), because a referenced record must be
+	// archived rather than deleted and that is a decision, not a field.
 	Name               string           `json:"name" binding:"omitempty,max=200"`
 	IsMobileService    bool             `json:"is_mobile_service"`
 	StreetAddress      string           `json:"street_address" binding:"omitempty,max=200"`
@@ -28,11 +31,13 @@ type CreateVendorRequest struct {
 	IsServiceVendor    bool             `json:"is_service_vendor"`
 	IsPartsVendor      bool             `json:"is_parts_vendor"`
 	Labels             json.RawMessage  `json:"labels"`
-	ArchivedAt         *time.Time       `json:"archived_at"`
 	CustomFields       json.RawMessage  `json:"custom_fields"`
 }
 
 type UpdateVendorRequest struct {
+	// archived_at is not writable: archiving is an action
+	// (POST .../archive and .../restore), because a referenced record must be
+	// archived rather than deleted and that is a decision, not a field.
 	Name               string           `json:"name" binding:"omitempty,max=200"`
 	IsMobileService    bool             `json:"is_mobile_service"`
 	StreetAddress      string           `json:"street_address" binding:"omitempty,max=200"`
@@ -53,7 +58,6 @@ type UpdateVendorRequest struct {
 	IsServiceVendor    bool             `json:"is_service_vendor"`
 	IsPartsVendor      bool             `json:"is_parts_vendor"`
 	Labels             json.RawMessage  `json:"labels"`
-	ArchivedAt         *time.Time       `json:"archived_at"`
 	CustomFields       json.RawMessage  `json:"custom_fields"`
 }
 

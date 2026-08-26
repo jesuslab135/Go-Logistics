@@ -272,11 +272,24 @@ not a sandbox.
 
 ## Known follow-ups
 
-- `CORS_ORIGINS` is set to the backend's own origin. A browser never sends
-  that as its `Origin`, so the middleware echoes no `Access-Control-Allow-Origin`
-  today and every browser client is blocked — not cosmetic. Set it to the
-  frontend's real origin (plus `http://localhost:5173` if browser-testing
-  against this deployment), then `docker compose up -d api`.
+- ~~`CORS_ORIGINS` is set to the backend's own origin~~ — **resolved 2026-08-26.**
+  It is now `https://go-logistics.netlify.app,http://localhost:5173,https://go-logistics.jesuslab135.com`.
+  The Netlify origin is the production frontend; the backend's own origin is
+  kept only because a browser never sends it and dropping it changes nothing.
+  Verify with the preflight, not by reading the file — a wrong value looks
+  identical to a right one until a browser tries:
+
+  ```sh
+  curl -s -i -X OPTIONS https://go-logistics.jesuslab135.com/api/v1/auth/login \
+      -H 'Origin: https://go-logistics.netlify.app' \
+      -H 'Access-Control-Request-Method: POST' | grep -i access-control-allow-origin
+  ```
+
+  **Netlify deploy previews are still blocked.** They are served from
+  `deploy-preview-<n>--go-logistics.netlify.app`, a different origin per PR, and
+  `middleware.CORS` matches the `Origin` header exactly. Listing them is not
+  possible; making them work needs suffix matching in the middleware, which is a
+  code change, not a config one.
 - Backups are on-box only (see above).
 - The IONOS Cloud Panel has its own firewall policy in front of the OS `ufw`.
   Both currently allow 22/80/443 only; a port opened in `ufw` alone will still

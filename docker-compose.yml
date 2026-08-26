@@ -69,6 +69,15 @@ services:
       # Must end with the bucket name: objects live at <endpoint>/<bucket>/<key>
       # and the public-read policy only covers arn:aws:s3:::fleet/*.
       STORAGE_MINIO_PUBLIC_URL: http://localhost:9010/fleet
+      # Private uploads (receipts, signatures, inspection photos, documents,
+      # media) live in their own bucket with no anonymous-read policy, and are
+      # served through signed URLs. Both buckets are created at startup.
+      STORAGE_MINIO_PRIVATE_BUCKET: fleet-private
+      # Signed URLs must address the host the browser can reach. The API dials
+      # minio:9000 on the compose network; the browser reaches the same MinIO at
+      # localhost:9010. Presigning is offline, so signing against the browser
+      # address is correct and never connects there.
+      STORAGE_MINIO_SIGNING_ENDPOINT: localhost:9010
     ports:
       - "8080:8080"
     depends_on:

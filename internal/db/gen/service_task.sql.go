@@ -11,11 +11,18 @@ import (
 )
 
 const countServiceTasks = `-- name: CountServiceTasks :one
-SELECT count(*) FROM service_task WHERE company_id = $1
+SELECT count(*) FROM service_task
+WHERE company_id = $1
+  AND ($2::boolean OR archived_at IS NULL)
 `
 
-func (q *Queries) CountServiceTasks(ctx context.Context, companyID int64) (int64, error) {
-	row := q.db.QueryRow(ctx, countServiceTasks, companyID)
+type CountServiceTasksParams struct {
+	CompanyID       int64
+	IncludeArchived bool
+}
+
+func (q *Queries) CountServiceTasks(ctx context.Context, arg CountServiceTasksParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countServiceTasks, arg.CompanyID, arg.IncludeArchived)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -23,9 +30,9 @@ func (q *Queries) CountServiceTasks(ctx context.Context, companyID int64) (int64
 
 const createServiceTask = `-- name: CreateServiceTask :one
 INSERT INTO service_task (
-    company_id, name, description, expected_duration_seconds, parent_task_id, archived_at, created_at, updated_at
+    company_id, name, description, expected_duration_seconds, parent_task_id, created_at, updated_at
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8
+    $1, $2, $3, $4, $5, $6, $7
 )
 RETURNING id, company_id, name, description, expected_duration_seconds, parent_task_id, archived_at, created_at, updated_at
 `
@@ -36,7 +43,6 @@ type CreateServiceTaskParams struct {
 	Description             string
 	ExpectedDurationSeconds *int32
 	ParentTaskID            *int64
-	ArchivedAt              *time.Time
 	CreatedAt               time.Time
 	UpdatedAt               time.Time
 }
@@ -48,7 +54,6 @@ func (q *Queries) CreateServiceTask(ctx context.Context, arg CreateServiceTaskPa
 		arg.Description,
 		arg.ExpectedDurationSeconds,
 		arg.ParentTaskID,
-		arg.ArchivedAt,
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)
@@ -108,17 +113,29 @@ func (q *Queries) GetServiceTask(ctx context.Context, arg GetServiceTaskParams) 
 }
 
 const listServiceTasks = `-- name: ListServiceTasks :many
-SELECT id, company_id, name, description, expected_duration_seconds, parent_task_id, archived_at, created_at, updated_at FROM service_task WHERE company_id = $1 ORDER BY name, id LIMIT $2 OFFSET $3
+SELECT id, company_id, name, description, expected_duration_seconds, parent_task_id, archived_at, created_at, updated_at FROM service_task
+WHERE company_id = $1
+  AND ($2::boolean OR archived_at IS NULL)
+ORDER BY name, id LIMIT $4 OFFSET $3
 `
 
 type ListServiceTasksParams struct {
-	CompanyID int64
-	Limit     int32
-	Offset    int32
+	CompanyID       int64
+	IncludeArchived bool
+	Off             int32
+	Lim             int32
 }
 
+// Archived rows are excluded unless include_archived is true. An archived
+// record is one somebody retired; showing it in the default list, and in the
+// pickers built from that list, is how it gets referenced again.
 func (q *Queries) ListServiceTasks(ctx context.Context, arg ListServiceTasksParams) ([]ServiceTask, error) {
-	rows, err := q.db.Query(ctx, listServiceTasks, arg.CompanyID, arg.Limit, arg.Offset)
+	rows, err := q.db.Query(ctx, listServiceTasks,
+		arg.CompanyID,
+		arg.IncludeArchived,
+		arg.Off,
+		arg.Lim,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +165,7 @@ func (q *Queries) ListServiceTasks(ctx context.Context, arg ListServiceTasksPara
 }
 
 const updateServiceTask = `-- name: UpdateServiceTask :one
-UPDATE service_task SET name = $3, description = $4, expected_duration_seconds = $5, parent_task_id = $6, archived_at = $7, updated_at = $8
+UPDATE service_task SET name = $3, description = $4, expected_duration_seconds = $5, parent_task_id = $6, updated_at = $7
 WHERE id = $1 AND company_id = $2
 RETURNING id, company_id, name, description, expected_duration_seconds, parent_task_id, archived_at, created_at, updated_at
 `
@@ -160,7 +177,6 @@ type UpdateServiceTaskParams struct {
 	Description             string
 	ExpectedDurationSeconds *int32
 	ParentTaskID            *int64
-	ArchivedAt              *time.Time
 	UpdatedAt               time.Time
 }
 
@@ -172,7 +188,6 @@ func (q *Queries) UpdateServiceTask(ctx context.Context, arg UpdateServiceTaskPa
 		arg.Description,
 		arg.ExpectedDurationSeconds,
 		arg.ParentTaskID,
-		arg.ArchivedAt,
 		arg.UpdatedAt,
 	)
 	var i ServiceTask

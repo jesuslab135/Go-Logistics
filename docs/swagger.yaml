@@ -518,8 +518,6 @@ definitions:
         type: string
       annual_percentage_rate:
         type: number
-      archived_at:
-        type: string
       asset_type_id:
         type: integer
       body_subtype:
@@ -626,6 +624,10 @@ definitions:
       msrp:
         type: number
       name:
+        description: |-
+          archived_at is not writable: archiving is an action
+          (POST .../archive and .../restore), because a referenced record must be
+          archived rather than deleted and that is a decision, not a field.
         maxLength: 100
         type: string
       notes:
@@ -821,6 +823,41 @@ definitions:
     - name
     - tax_id
     type: object
+  dto.CreateCustomFieldDefinitionRequest:
+    properties:
+      field_type:
+        description: FieldType is text, number, date, boolean or select.
+        maxLength: 20
+        type: string
+      key:
+        description: |-
+          Key is what the value is stored under. It cannot be changed afterwards:
+          every stored document is keyed by it.
+        maxLength: 50
+        type: string
+      label:
+        maxLength: 100
+        type: string
+      options:
+        description: Options are the permitted values for a select, and are ignored
+          otherwise.
+        items:
+          type: string
+        type: array
+      position:
+        type: integer
+      required:
+        type: boolean
+      resource:
+        description: 'Resource is the API''s own plural name: "assets", "parts", "work-orders".'
+        maxLength: 50
+        type: string
+    required:
+    - field_type
+    - key
+    - label
+    - resource
+    type: object
   dto.CreateEmployeeRequest:
     properties:
       birth_date:
@@ -996,8 +1033,6 @@ definitions:
         type: string
       file_size:
         type: integer
-      is_primary:
-        type: boolean
       mime_type:
         maxLength: 100
         type: string
@@ -1070,8 +1105,6 @@ definitions:
     type: object
   dto.CreateInspectionFormRequest:
     properties:
-      archived_at:
-        type: string
       auto_create_issues:
         type: boolean
       color:
@@ -1082,6 +1115,10 @@ definitions:
       require_live_photo:
         type: boolean
       title:
+        description: |-
+          archived_at is not writable: archiving is an action
+          (POST .../archive and .../restore), because a referenced record must be
+          archived rather than deleted and that is a decision, not a field.
         maxLength: 255
         type: string
       version:
@@ -1159,20 +1196,18 @@ definitions:
   dto.CreateInventoryJournalEntryRequest:
     properties:
       adjustment_quantity:
+        description: 'AdjustmentQuantity is signed: negative consumes stock, positive
+          receives it.'
         type: number
       adjustment_type:
         maxLength: 20
         type: string
-      current_quantity:
-        type: number
       notes:
         type: string
       part_id:
         type: integer
       part_location_detail_id:
         type: integer
-      previous_quantity:
-        type: number
       purchase_order_line_id:
         type: integer
       reason_id:
@@ -1181,8 +1216,6 @@ definitions:
         type: integer
       unit_cost:
         type: number
-      user_id:
-        type: integer
       vendor_id:
         type: integer
       work_order_id:
@@ -1405,8 +1438,6 @@ definitions:
     type: object
   dto.CreatePartRequest:
     properties:
-      archived_at:
-        type: string
       custom_fields:
         items:
           type: integer
@@ -1425,6 +1456,10 @@ definitions:
       part_manufacturer_id:
         type: integer
       part_number:
+        description: |-
+          archived_at is not writable: archiving is an action
+          (POST .../archive and .../restore), because a referenced record must be
+          archived rather than deleted and that is a decision, not a field.
         maxLength: 100
         type: string
       supplier_part_number:
@@ -1443,12 +1478,14 @@ definitions:
   dto.CreatePurchaseOrderLineItemRequest:
     properties:
       part_id:
+        description: |-
+          The money columns this record derives are response-only: the server
+          computes them from the line items and the rate terms above, in the same
+          transaction as the write. See internal/domain/money.
         type: integer
       position:
         type: integer
       quantity:
-        type: number
-      subtotal:
         type: number
       total_received:
         type: number
@@ -1457,14 +1494,6 @@ definitions:
     type: object
   dto.CreatePurchaseOrderRequest:
     properties:
-      approved_at:
-        type: string
-      approved_by_id:
-        type: integer
-      closed_at:
-        type: string
-      created_by_id:
-        type: integer
       custom_fields:
         items:
           type: integer
@@ -1481,32 +1510,22 @@ definitions:
         maxLength: 10
         type: string
       labels:
+        description: |-
+          state, the workflow timestamps, the actor ids and rejection_reason are
+          response-only. They are moved by POST /purchase-orders/{id}/{action},
+          which is the only thing that can check a transition is legal and record
+          who made it; created_by_id is stamped from the caller.
         items:
           type: integer
         type: array
       number:
+        description: |-
+          The money columns this record derives are response-only: the server
+          computes them from the line items and the rate terms above, in the same
+          transaction as the write. See internal/domain/money.
         maxLength: 50
         type: string
-      purchased_at:
-        type: string
-      received_full_at:
-        type: string
-      received_partial_at:
-        type: string
-      rejected_at:
-        type: string
-      rejected_by_id:
-        type: integer
       shipping:
-        type: number
-      state:
-        maxLength: 20
-        type: string
-      submitted_at:
-        type: string
-      submitted_by_id:
-        type: integer
-      subtotal:
         type: number
       tax_1:
         type: number
@@ -1522,8 +1541,6 @@ definitions:
       tax_2_type:
         maxLength: 10
         type: string
-      total_amount:
-        type: number
       vendor_id:
         type: integer
     type: object
@@ -1547,6 +1564,10 @@ definitions:
       labor_cost:
         type: number
       line_item_type:
+        description: |-
+          The money columns this record derives are response-only: the server
+          computes them from the line items and the rate terms above, in the same
+          transaction as the write. See internal/domain/money.
         maxLength: 20
         type: string
       part_id:
@@ -1561,8 +1582,6 @@ definitions:
         type: integer
       service_task_id:
         type: integer
-      subtotal:
-        type: number
       technician_id:
         type: integer
       tire_id:
@@ -1593,15 +1612,15 @@ definitions:
         items:
           type: integer
         type: array
-      labor_subtotal:
-        type: number
       labor_time_seconds:
         type: integer
       meter_value:
         type: number
-      parts_subtotal:
-        type: number
       reference:
+        description: |-
+          The money columns this record derives are response-only: the server
+          computes them from the line items and the rate terms above, in the same
+          transaction as the write. See internal/domain/money.
         maxLength: 100
         type: string
       started_at:
@@ -1609,8 +1628,6 @@ definitions:
       status:
         maxLength: 20
         type: string
-      subtotal:
-        type: number
       tax_1:
         type: number
       tax_1_percentage:
@@ -1625,8 +1642,6 @@ definitions:
       tax_2_type:
         maxLength: 10
         type: string
-      total_amount:
-        type: number
       vendor_id:
         type: integer
       work_order_id:
@@ -1678,13 +1693,15 @@ definitions:
     type: object
   dto.CreateServiceTaskRequest:
     properties:
-      archived_at:
-        type: string
       description:
         type: string
       expected_duration_seconds:
         type: integer
       name:
+        description: |-
+          archived_at is not writable: archiving is an action
+          (POST .../archive and .../restore), because a referenced record must be
+          archived rather than deleted and that is a decision, not a field.
         maxLength: 255
         type: string
       parent_task_id:
@@ -1815,6 +1832,17 @@ definitions:
       vendor_id:
         type: integer
     type: object
+  dto.CreateTrailerClassificationRequest:
+    properties:
+      name:
+        maxLength: 100
+        type: string
+      position:
+        description: Position orders the picker. Ties fall back to name.
+        type: integer
+    required:
+    - name
+    type: object
   dto.CreateVehicleMakeRequest:
     properties:
       name:
@@ -1835,8 +1863,6 @@ definitions:
     type: object
   dto.CreateVendorRequest:
     properties:
-      archived_at:
-        type: string
       city:
         maxLength: 100
         type: string
@@ -1876,6 +1902,10 @@ definitions:
       longitude:
         type: number
       name:
+        description: |-
+          archived_at is not writable: archiving is an action
+          (POST .../archive and .../restore), because a referenced record must be
+          archived rather than deleted and that is a decision, not a field.
         maxLength: 200
         type: string
       phone:
@@ -1951,20 +1981,18 @@ definitions:
     properties:
       description:
         type: string
-      labor_cost:
-        type: number
       line_item_type:
+        description: |-
+          The money columns this record derives are response-only: the server
+          computes them from the line items and the rate terms above, in the same
+          transaction as the write. See internal/domain/money.
         maxLength: 20
         type: string
-      parts_cost:
-        type: number
       position:
         type: integer
       service_task:
         maxLength: 255
         type: string
-      subtotal:
-        type: number
       title:
         maxLength: 255
         type: string
@@ -2020,11 +2048,13 @@ definitions:
       labor_markup_type:
         maxLength: 10
         type: string
-      labor_subtotal:
-        type: number
       labor_time_seconds:
         type: integer
       location_id:
+        description: |-
+          The money columns this record derives are response-only: the server
+          computes them from the line items and the rate terms above, in the same
+          transaction as the write. See internal/domain/money.
         type: integer
       number:
         maxLength: 50
@@ -2036,8 +2066,6 @@ definitions:
       parts_markup_type:
         maxLength: 10
         type: string
-      parts_subtotal:
-        type: number
       purchase_order_number:
         maxLength: 100
         type: string
@@ -2049,8 +2077,6 @@ definitions:
         type: number
       status_id:
         type: integer
-      subtotal:
-        type: number
       tax_1:
         type: number
       tax_1_percentage:
@@ -2065,16 +2091,7 @@ definitions:
       tax_2_type:
         maxLength: 10
         type: string
-      total_amount:
-        type: number
       vendor_id:
-        type: integer
-    type: object
-  dto.CreateWorkOrderStatusLogRequest:
-    properties:
-      changed_at:
-        type: string
-      status_id:
         type: integer
     type: object
   dto.CreateWorkOrderStatusRequest:
@@ -2114,6 +2131,48 @@ definitions:
         type: integer
       unit_cost:
         type: number
+    type: object
+  dto.CustomFieldDefinitionPage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.CustomFieldDefinitionResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.CustomFieldDefinitionResponse:
+    properties:
+      company_id:
+        type: integer
+      created_at:
+        type: string
+      field_type:
+        type: string
+      id:
+        type: integer
+      key:
+        type: string
+      label:
+        type: string
+      options:
+        items:
+          type: string
+        type: array
+      position:
+        type: integer
+      required:
+        type: boolean
+      resource:
+        type: string
+      updated_at:
+        type: string
     type: object
   dto.DashboardStatsResponse:
     properties:
@@ -2427,7 +2486,15 @@ definitions:
       entry_id:
         type: integer
       file:
+        description: |-
+          File is a signed, time-limited URL: a fuel receipt is a business record,
+          not branding, so it is not anonymously readable. Render it, never store it.
         maxLength: 500
+        type: string
+      file_expires_at:
+        description: |-
+          FileExpiresAt is when File stops resolving. Re-read this record for a fresh
+          URL; null would mean the object is public, which a receipt never is.
         type: string
       file_name:
         maxLength: 255
@@ -2643,7 +2710,13 @@ definitions:
       longitude:
         type: number
       photo:
+        description: |-
+          Photo is a signed, time-limited URL — inspection evidence is a business
+          record, not branding. Render it, never store it.
         maxLength: 500
+        type: string
+      photo_expires_at:
+        description: PhotoExpiresAt is when Photo stops resolving; re-read this record.
         type: string
       remark:
         type: string
@@ -2699,7 +2772,14 @@ definitions:
       passed_items_count:
         type: integer
       signature:
+        description: |-
+          Signature is a signed, time-limited URL — a technician's signature is
+          evidence, not branding. Render it, never store it.
         maxLength: 500
+        type: string
+      signature_expires_at:
+        description: SignatureExpiresAt is when Signature stops resolving; re-read
+          this record.
         type: string
       started_at:
         type: string
@@ -2786,6 +2866,12 @@ definitions:
       purchase_order_line_id:
         type: integer
       reason_id:
+        type: integer
+      reversal_of_id:
+        description: |-
+          ReversalOfID names the entry this one offsets, and is null for an ordinary
+          movement. An entry that has been reversed keeps its own values: the
+          correction is a second movement, not an edit of the first.
         type: integer
       transfer_part_location_id:
         type: integer
@@ -3173,7 +3259,14 @@ definitions:
       description:
         type: string
       file:
+        description: |-
+          File is a signed, time-limited URL: uploaded media belongs to one tenant
+          and is not anonymously readable. Render it, never store it.
         maxLength: 500
+        type: string
+      file_expires_at:
+        description: FileExpiresAt is when File and Thumbnail stop resolving; re-read
+          this record.
         type: string
       file_size:
         type: integer
@@ -3569,6 +3662,49 @@ definitions:
         type: string
       vendor_id:
         type: integer
+    type: object
+  dto.PurchaseOrderStatusLogPage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.PurchaseOrderStatusLogResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.PurchaseOrderStatusLogResponse:
+    properties:
+      actor_employee_id:
+        type: integer
+      actor_type:
+        type: string
+      changed_at:
+        type: string
+      from_state:
+        type: string
+      id:
+        type: integer
+      purchase_order_id:
+        type: integer
+      reason:
+        type: string
+      to_state:
+        type: string
+    type: object
+  dto.PurchaseOrderTransitionRequest:
+    properties:
+      reason:
+        description: |-
+          Reason is required when rejecting and ignored otherwise. It is recorded on
+          the order and in its status log.
+        maxLength: 2000
+        type: string
     type: object
   dto.RefreshRequest:
     properties:
@@ -4154,6 +4290,46 @@ definitions:
       vendor_id:
         type: integer
     type: object
+  dto.TotalOverrideRequest:
+    properties:
+      amount:
+        description: |-
+          Amount is the figure to charge. Null clears the override and returns the
+          document to its computed total.
+        type: number
+      reason:
+        description: |-
+          Reason is required whenever Amount is given: an unexplained override is a
+          number nobody can defend later.
+        maxLength: 2000
+        type: string
+    type: object
+  dto.TrailerClassificationPage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.TrailerClassificationResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.TrailerClassificationResponse:
+    properties:
+      company_id:
+        type: integer
+      id:
+        type: integer
+      name:
+        type: string
+      position:
+        type: integer
+    type: object
   dto.TrailerResponse:
     properties:
       aero_kit_type:
@@ -4161,11 +4337,18 @@ definitions:
         type: string
       asset_id:
         type: integer
-      classification:
-        maxLength: 100
+      classification_2_id:
+        type: integer
+      classification_2_name:
         type: string
-      classification_2:
-        maxLength: 100
+      classification_id:
+        description: |-
+          Classification names a row in the company's trailer_classification
+          catalog. It used to be free text, which meant "Dry Van", "DRY VAN" and
+          "dry van" were three different classifications to every filter and report.
+        type: integer
+      classification_name:
+        description: The resolved catalog names, empty when no classification is set.
         type: string
       contract_end:
         type: string
@@ -4268,8 +4451,6 @@ definitions:
         type: string
       annual_percentage_rate:
         type: number
-      archived_at:
-        type: string
       asset_type_id:
         type: integer
       body_subtype:
@@ -4376,6 +4557,10 @@ definitions:
       msrp:
         type: number
       name:
+        description: |-
+          archived_at is not writable: archiving is an action
+          (POST .../archive and .../restore), because a referenced record must be
+          archived rather than deleted and that is a decision, not a field.
         maxLength: 100
         type: string
       notes:
@@ -4559,6 +4744,26 @@ definitions:
     - name
     - tax_id
     type: object
+  dto.UpdateCustomFieldDefinitionRequest:
+    properties:
+      field_type:
+        maxLength: 20
+        type: string
+      label:
+        maxLength: 100
+        type: string
+      options:
+        items:
+          type: string
+        type: array
+      position:
+        type: integer
+      required:
+        type: boolean
+    required:
+    - field_type
+    - label
+    type: object
   dto.UpdateEmployeeRequest:
     properties:
       birth_date:
@@ -4731,8 +4936,6 @@ definitions:
         type: string
       file_size:
         type: integer
-      is_primary:
-        type: boolean
       mime_type:
         maxLength: 100
         type: string
@@ -4805,8 +5008,6 @@ definitions:
     type: object
   dto.UpdateInspectionFormRequest:
     properties:
-      archived_at:
-        type: string
       auto_create_issues:
         type: boolean
       color:
@@ -4817,6 +5018,10 @@ definitions:
       require_live_photo:
         type: boolean
       title:
+        description: |-
+          archived_at is not writable: archiving is an action
+          (POST .../archive and .../restore), because a referenced record must be
+          archived rather than deleted and that is a decision, not a field.
         maxLength: 255
         type: string
       version:
@@ -4890,38 +5095,6 @@ definitions:
       name:
         maxLength: 100
         type: string
-    type: object
-  dto.UpdateInventoryJournalEntryRequest:
-    properties:
-      adjustment_quantity:
-        type: number
-      adjustment_type:
-        maxLength: 20
-        type: string
-      current_quantity:
-        type: number
-      notes:
-        type: string
-      part_id:
-        type: integer
-      part_location_detail_id:
-        type: integer
-      previous_quantity:
-        type: number
-      purchase_order_line_id:
-        type: integer
-      reason_id:
-        type: integer
-      transfer_part_location_id:
-        type: integer
-      unit_cost:
-        type: number
-      user_id:
-        type: integer
-      vendor_id:
-        type: integer
-      work_order_id:
-        type: integer
     type: object
   dto.UpdateIssuePriorityRequest:
     properties:
@@ -5140,8 +5313,6 @@ definitions:
     type: object
   dto.UpdatePartRequest:
     properties:
-      archived_at:
-        type: string
       custom_fields:
         items:
           type: integer
@@ -5160,6 +5331,10 @@ definitions:
       part_manufacturer_id:
         type: integer
       part_number:
+        description: |-
+          archived_at is not writable: archiving is an action
+          (POST .../archive and .../restore), because a referenced record must be
+          archived rather than deleted and that is a decision, not a field.
         maxLength: 100
         type: string
       supplier_part_number:
@@ -5178,12 +5353,14 @@ definitions:
   dto.UpdatePurchaseOrderLineItemRequest:
     properties:
       part_id:
+        description: |-
+          The money columns this record derives are response-only: the server
+          computes them from the line items and the rate terms above, in the same
+          transaction as the write. See internal/domain/money.
         type: integer
       position:
         type: integer
       quantity:
-        type: number
-      subtotal:
         type: number
       total_received:
         type: number
@@ -5192,14 +5369,6 @@ definitions:
     type: object
   dto.UpdatePurchaseOrderRequest:
     properties:
-      approved_at:
-        type: string
-      approved_by_id:
-        type: integer
-      closed_at:
-        type: string
-      created_by_id:
-        type: integer
       custom_fields:
         items:
           type: integer
@@ -5216,32 +5385,22 @@ definitions:
         maxLength: 10
         type: string
       labels:
+        description: |-
+          state, the workflow timestamps, the actor ids and rejection_reason are
+          response-only. They are moved by POST /purchase-orders/{id}/{action},
+          which is the only thing that can check a transition is legal and record
+          who made it; created_by_id is stamped from the caller.
         items:
           type: integer
         type: array
       number:
+        description: |-
+          The money columns this record derives are response-only: the server
+          computes them from the line items and the rate terms above, in the same
+          transaction as the write. See internal/domain/money.
         maxLength: 50
         type: string
-      purchased_at:
-        type: string
-      received_full_at:
-        type: string
-      received_partial_at:
-        type: string
-      rejected_at:
-        type: string
-      rejected_by_id:
-        type: integer
       shipping:
-        type: number
-      state:
-        maxLength: 20
-        type: string
-      submitted_at:
-        type: string
-      submitted_by_id:
-        type: integer
-      subtotal:
         type: number
       tax_1:
         type: number
@@ -5257,8 +5416,6 @@ definitions:
       tax_2_type:
         maxLength: 10
         type: string
-      total_amount:
-        type: number
       vendor_id:
         type: integer
     type: object
@@ -5282,6 +5439,10 @@ definitions:
       labor_cost:
         type: number
       line_item_type:
+        description: |-
+          The money columns this record derives are response-only: the server
+          computes them from the line items and the rate terms above, in the same
+          transaction as the write. See internal/domain/money.
         maxLength: 20
         type: string
       part_id:
@@ -5296,8 +5457,6 @@ definitions:
         type: integer
       service_task_id:
         type: integer
-      subtotal:
-        type: number
       technician_id:
         type: integer
       tire_id:
@@ -5328,15 +5487,15 @@ definitions:
         items:
           type: integer
         type: array
-      labor_subtotal:
-        type: number
       labor_time_seconds:
         type: integer
       meter_value:
         type: number
-      parts_subtotal:
-        type: number
       reference:
+        description: |-
+          The money columns this record derives are response-only: the server
+          computes them from the line items and the rate terms above, in the same
+          transaction as the write. See internal/domain/money.
         maxLength: 100
         type: string
       started_at:
@@ -5344,8 +5503,6 @@ definitions:
       status:
         maxLength: 20
         type: string
-      subtotal:
-        type: number
       tax_1:
         type: number
       tax_1_percentage:
@@ -5360,8 +5517,6 @@ definitions:
       tax_2_type:
         maxLength: 10
         type: string
-      total_amount:
-        type: number
       vendor_id:
         type: integer
       work_order_id:
@@ -5413,13 +5568,15 @@ definitions:
     type: object
   dto.UpdateServiceTaskRequest:
     properties:
-      archived_at:
-        type: string
       description:
         type: string
       expected_duration_seconds:
         type: integer
       name:
+        description: |-
+          archived_at is not writable: archiving is an action
+          (POST .../archive and .../restore), because a referenced record must be
+          archived rather than deleted and that is a decision, not a field.
         maxLength: 255
         type: string
       parent_task_id:
@@ -5557,6 +5714,16 @@ definitions:
       vendor_id:
         type: integer
     type: object
+  dto.UpdateTrailerClassificationRequest:
+    properties:
+      name:
+        maxLength: 100
+        type: string
+      position:
+        type: integer
+    required:
+    - name
+    type: object
   dto.UpdateVehicleMakeRequest:
     properties:
       name:
@@ -5577,8 +5744,6 @@ definitions:
     type: object
   dto.UpdateVendorRequest:
     properties:
-      archived_at:
-        type: string
       city:
         maxLength: 100
         type: string
@@ -5618,6 +5783,10 @@ definitions:
       longitude:
         type: number
       name:
+        description: |-
+          archived_at is not writable: archiving is an action
+          (POST .../archive and .../restore), because a referenced record must be
+          archived rather than deleted and that is a decision, not a field.
         maxLength: 200
         type: string
       phone:
@@ -5693,20 +5862,18 @@ definitions:
     properties:
       description:
         type: string
-      labor_cost:
-        type: number
       line_item_type:
+        description: |-
+          The money columns this record derives are response-only: the server
+          computes them from the line items and the rate terms above, in the same
+          transaction as the write. See internal/domain/money.
         maxLength: 20
         type: string
-      parts_cost:
-        type: number
       position:
         type: integer
       service_task:
         maxLength: 255
         type: string
-      subtotal:
-        type: number
       title:
         maxLength: 255
         type: string
@@ -5762,11 +5929,13 @@ definitions:
       labor_markup_type:
         maxLength: 10
         type: string
-      labor_subtotal:
-        type: number
       labor_time_seconds:
         type: integer
       location_id:
+        description: |-
+          The money columns this record derives are response-only: the server
+          computes them from the line items and the rate terms above, in the same
+          transaction as the write. See internal/domain/money.
         type: integer
       number:
         maxLength: 50
@@ -5778,8 +5947,6 @@ definitions:
       parts_markup_type:
         maxLength: 10
         type: string
-      parts_subtotal:
-        type: number
       purchase_order_number:
         maxLength: 100
         type: string
@@ -5791,8 +5958,6 @@ definitions:
         type: number
       status_id:
         type: integer
-      subtotal:
-        type: number
       tax_1:
         type: number
       tax_1_percentage:
@@ -5807,16 +5972,7 @@ definitions:
       tax_2_type:
         maxLength: 10
         type: string
-      total_amount:
-        type: number
       vendor_id:
-        type: integer
-    type: object
-  dto.UpdateWorkOrderStatusLogRequest:
-    properties:
-      changed_at:
-        type: string
-      status_id:
         type: integer
     type: object
   dto.UpdateWorkOrderStatusRequest:
@@ -5861,6 +6017,9 @@ definitions:
     properties:
       content_type:
         type: string
+      expires_at:
+        description: ExpiresAt is null for a public object, whose URL never expires.
+        type: string
       key:
         type: string
       size:
@@ -5870,6 +6029,13 @@ definitions:
       thumbnail_url:
         type: string
       url:
+        description: |-
+          URL renders the upload immediately. For a private object it expires at
+          ExpiresAt and must be re-fetched from the owning record, never cached.
+        type: string
+      visibility:
+        description: Visibility is "public" or "private", determined by the declared
+          purpose.
         type: string
     type: object
   dto.UpsertTrailerRequest:
@@ -5877,12 +6043,14 @@ definitions:
       aero_kit_type:
         maxLength: 50
         type: string
-      classification:
-        maxLength: 100
-        type: string
-      classification_2:
-        maxLength: 100
-        type: string
+      classification_2_id:
+        type: integer
+      classification_id:
+        description: |-
+          Classification names a row in the company's trailer_classification
+          catalog. It used to be free text, which meant "Dry Van", "DRY VAN" and
+          "dry van" were three different classifications to every filter and report.
+        type: integer
       contract_end:
         type: string
       contract_period:
@@ -6874,6 +7042,17 @@ definitions:
     type: object
   dto.WorkOrderStatusLogResponse:
     properties:
+      actor_employee_id:
+        description: |-
+          ActorEmployeeID is null for a system transition, and for rows written
+          before actors were recorded. Read ActorType to tell those apart.
+        type: integer
+      actor_type:
+        description: |-
+          ActorType is "employee" or "system". Rows that predate this field are
+          "system": they were written through the old CRUD route with no actor
+          captured, so naming a person would be a fabrication.
+        type: string
       changed_at:
         type: string
       id:
@@ -6969,6 +7148,65 @@ info:
   title: Fleet API
   version: "1.0"
 paths:
+  /api/v1/{resource}/{id}/archive:
+    post:
+      description: 'Retires the record. Use this instead of DELETE for anything other
+        records reference — DELETE answers 409 resource_referenced in that case. Archived
+        records disappear from lists and pickers unless ?include_archived=true. Archiving
+        needs the same permission as editing: deciding a vendor is no longer used
+        is the same kind of decision as correcting its address.'
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: The archived record, in its own resource's shape
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Archive a record
+      tags:
+      - archive
+  /api/v1/{resource}/{id}/restore:
+    post:
+      description: Clears archived_at, returning the record to the lists and pickers
+        it was hidden from.
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: The restored record, in its own resource's shape
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Restore an archived record
+      tags:
+      - archive
   /api/v1/admin/companies/{id}/owner:
     get:
       description: 'employee.is_account_owner is a single global boolean, not a per-company
@@ -7169,8 +7407,15 @@ paths:
     get:
       description: 'Cross-company employee register. Unlike GET /api/v1/employees
         this is not scoped to the caller''s company: it answers "who exists anywhere",
-        which is what assigning an employee to a second company needs.'
+        which is what assigning an employee to a second company needs. Pass company_id
+        to narrow it to one tenant''s staff — that is membership (employee_companies),
+        not default_company_id, so an employee who belongs to a company that is not
+        their default is still listed.'
       parameters:
+      - description: Only employees who belong to this company
+        in: query
+        name: company_id
+        type: integer
       - description: Page size
         in: query
         name: limit
@@ -7244,15 +7489,12 @@ paths:
     put:
       consumes:
       - application/json
-      description: Full overwrite of employee_companies. company_ids must be non-empty
-        — an employee with no membership cannot log in, so use is_active to deactivate
-        instead. default_company_id must be null or one of company_ids; omitting it
-        clears the employee's stored default_company_id, so send it on every call
-        unless you mean to clear it. Every company this call adds or removes must
-        be one the caller themselves belongs to; memberships the call leaves unchanged
-        are kept regardless. The caller can neither hand out membership in a tenant
-        they have no access to — which would also confer admin there, because employee.role_id
-        is global — nor evict the employee from one.
+      description: Full overwrite of employee_companies. Requires a platform administrator.
+        company_ids must be non-empty — an employee with no membership cannot log
+        in, so use is_active to deactivate instead. default_company_id must be null
+        or one of company_ids; omitting it clears the employee's stored default_company_id,
+        so send it on every call unless you mean to clear it. Every addition and removal
+        is recorded in membership_audit in the same transaction as the change.
       parameters:
       - description: Employee id
         in: path
@@ -9141,6 +9383,166 @@ paths:
       summary: Update a company
       tags:
       - companies
+  /api/v1/custom-field-definitions:
+    get:
+      description: Pass ?resource= to get just one resource's fields, which is what
+        a form asks for. Ordered by position.
+      parameters:
+      - description: assets, employees, issues, parts, purchase-orders, service-entries,
+          vendors or work-orders
+        in: query
+        name: resource
+        type: string
+      - description: Page size
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.CustomFieldDefinitionPage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List custom field definitions
+      tags:
+      - custom-field-definitions
+    post:
+      consumes:
+      - application/json
+      description: field_type is text, number, date, boolean or select; a select needs
+        options and nothing else may have them. The key is immutable once created,
+        because every stored document is keyed by it. A date value is a business date
+        (YYYY-MM-DD), not a timestamp.
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateCustomFieldDefinitionRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.CustomFieldDefinitionResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Declare a custom field
+      tags:
+      - custom-field-definitions
+  /api/v1/custom-field-definitions/{id}:
+    delete:
+      description: 'Stops validating that key. Values already stored under it stay
+        in their documents: they are the tenant''s data, and nothing else records
+        them.'
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete a custom field definition
+      tags:
+      - custom-field-definitions
+    get:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.CustomFieldDefinitionResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get a custom field definition
+      tags:
+      - custom-field-definitions
+    put:
+      consumes:
+      - application/json
+      description: 'The key and resource cannot change: every stored document is keyed
+        by the one and filed under the other, so changing either would orphan the
+        values already written.'
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateCustomFieldDefinitionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.CustomFieldDefinitionResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update a custom field definition
+      tags:
+      - custom-field-definitions
   /api/v1/dashboard/stats:
     get:
       description: Current-state counters for the caller's company. pending_inspections
@@ -9814,6 +10216,44 @@ paths:
       security:
       - BearerAuth: []
       summary: Update fuel-photos
+      tags:
+      - fuel-photos
+  /api/v1/fuel-entries/{id}/photos/{child_id}/set-primary:
+    post:
+      description: 'Promotes this photo and demotes the entry''s others, in one transaction.
+        At most one photo per entry may be primary, enforced by a partial unique index
+        — which is why is_primary is not a field on create or update. Zero photos,
+        and photos with no primary among them, are both valid: deleting the primary
+        promotes nothing, because auto-promotion would designate a photo nobody chose.'
+      parameters:
+      - description: Fuel entry id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Photo id
+        in: path
+        name: child_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.FuelPhotoResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Make a fuel photo the primary one
       tags:
       - fuel-photos
   /api/v1/fuel-types:
@@ -10807,6 +11247,10 @@ paths:
     post:
       consumes:
       - application/json
+      description: 'Files a stock movement and applies it: part_inventory.available_quantity
+        moves by adjustment_quantity in the same transaction. adjustment_quantity
+        is signed — negative consumes, positive receives. previous_quantity and current_quantity
+        are server-derived and returned, not sent; user_id is stamped from the caller.'
       parameters:
       - description: body
         in: body
@@ -10825,31 +11269,16 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Create inventory-journal-entries
       tags:
       - inventory-journal-entries
   /api/v1/inventory-journal-entries/{id}:
-    delete:
-      parameters:
-      - description: id
-        in: path
-        name: id
-        required: true
-        type: integer
-      responses:
-        "204":
-          description: No Content
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/dto.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Delete inventory-journal-entries
-      tags:
-      - inventory-journal-entries
     get:
       parameters:
       - description: id
@@ -10873,35 +11302,50 @@ paths:
       summary: Get inventory-journal-entries
       tags:
       - inventory-journal-entries
-    put:
-      consumes:
-      - application/json
+  /api/v1/inventory-journal-entries/{id}/reverse:
+    post:
+      description: 'Files an offsetting entry and moves the stock back, in one transaction.
+        The original is left untouched — the correction is itself a movement, and
+        both rows stay visible. An entry can be reversed once: a second attempt is
+        409, because repeated reversals would drive the stock arbitrarily far from
+        what the ledger sums to. A reversal cannot itself be reversed; reverse the
+        original instead.'
       parameters:
-      - description: id
+      - description: Entry id
         in: path
         name: id
         required: true
         type: integer
-      - description: body
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/dto.UpdateInventoryJournalEntryRequest'
       produces:
       - application/json
       responses:
-        "200":
-          description: OK
+        "201":
+          description: Created
           schema:
             $ref: '#/definitions/dto.InventoryJournalEntryResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
         "404":
           description: Not Found
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Update inventory-journal-entries
+      summary: Reverse an inventory journal entry
       tags:
       - inventory-journal-entries
   /api/v1/issue-priorities:
@@ -11781,7 +12225,9 @@ paths:
     get:
       description: Scoped to the authenticated employee within the active company,
         newest first. The unread count describes the whole inbox, not just the returned
-        page.
+        page. Notifications older than 180 days are deleted; the sweep runs opportunistically
+        here rather than on a schedule, because this deployment has nothing to run
+        a cron in.
       parameters:
       - description: Page size
         in: query
@@ -12745,6 +13191,61 @@ paths:
       summary: Update purchase-orders
       tags:
       - purchase-orders
+  /api/v1/purchase-orders/{id}/approve:
+    post:
+      description: PENDING_APPROVAL to APPROVED. Requires the purchase_orders.approve
+        permission. Stamps approved_at and approved_by_id from the caller.
+      parameters:
+      - description: Purchase order id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PurchaseOrderResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Approve a purchase order
+      tags:
+      - purchase-orders
+  /api/v1/purchase-orders/{id}/close:
+    post:
+      description: RECEIVED_FULL to CLOSED, which is terminal. Stamps closed_at.
+      parameters:
+      - description: Purchase order id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PurchaseOrderResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Close a purchase order
+      tags:
+      - purchase-orders
   /api/v1/purchase-orders/{id}/line-items:
     get:
       parameters:
@@ -12897,6 +13398,292 @@ paths:
       summary: Update purchase-order-line-items
       tags:
       - purchase-order-line-items
+  /api/v1/purchase-orders/{id}/override-total:
+    post:
+      consumes:
+      - application/json
+      description: 'As for work orders: replaces the computed total with an audited
+        figure, null clears it, and a line-item edit clears it automatically.'
+      parameters:
+      - description: Purchase order id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Override
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.TotalOverrideRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PurchaseOrderResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Override a purchase order's total
+      tags:
+      - purchase-orders
+  /api/v1/purchase-orders/{id}/purchase:
+    post:
+      description: APPROVED to PURCHASED. Stamps purchased_at.
+      parameters:
+      - description: Purchase order id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PurchaseOrderResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Mark a purchase order as purchased
+      tags:
+      - purchase-orders
+  /api/v1/purchase-orders/{id}/receive-full:
+    post:
+      description: PURCHASED or RECEIVED_PARTIAL to RECEIVED_FULL. Stamps received_full_at.
+      parameters:
+      - description: Purchase order id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PurchaseOrderResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Record full receipt
+      tags:
+      - purchase-orders
+  /api/v1/purchase-orders/{id}/receive-partial:
+    post:
+      description: PURCHASED to RECEIVED_PARTIAL. Stamps received_partial_at.
+      parameters:
+      - description: Purchase order id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PurchaseOrderResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Record a partial receipt
+      tags:
+      - purchase-orders
+  /api/v1/purchase-orders/{id}/reject:
+    post:
+      consumes:
+      - application/json
+      description: PENDING_APPROVAL to REJECTED. Requires the purchase_orders.approve
+        permission and a reason, which is stored on the order and in its history.
+        Rejection is not terminal — the order is revised back to DRAFT and resubmitted.
+      parameters:
+      - description: Purchase order id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Rejection reason
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.PurchaseOrderTransitionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PurchaseOrderResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Reject a purchase order
+      tags:
+      - purchase-orders
+  /api/v1/purchase-orders/{id}/revise:
+    post:
+      description: 'REJECTED back to DRAFT so it can be edited and resubmitted. Stamps
+        nothing: it undoes a decision rather than making one, and the rejection stays
+        in the history.'
+      parameters:
+      - description: Purchase order id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PurchaseOrderResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Revise a rejected purchase order
+      tags:
+      - purchase-orders
+  /api/v1/purchase-orders/{id}/status-logs:
+    get:
+      description: Append-only transition history, newest first. Each row records
+        the state moved from and to, who moved it, and the reason where one was required.
+        Written inside the transaction that moved the order, so it cannot disagree
+        with the order.
+      parameters:
+      - description: Purchase order id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Page size
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PurchaseOrderStatusLogPage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List purchase-order transitions
+      tags:
+      - purchase-orders
+  /api/v1/purchase-orders/{id}/status-logs/{child_id}:
+    get:
+      parameters:
+      - description: Purchase order id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Transition id
+        in: path
+        name: child_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PurchaseOrderStatusLogResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get one purchase-order transition
+      tags:
+      - purchase-orders
+  /api/v1/purchase-orders/{id}/submit:
+    post:
+      description: DRAFT or REJECTED to PENDING_APPROVAL. Stamps submitted_at and
+        submitted_by_id.
+      parameters:
+      - description: Purchase order id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PurchaseOrderResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Submit a purchase order for approval
+      tags:
+      - purchase-orders
   /api/v1/roles:
     get:
       parameters:
@@ -13303,6 +14090,48 @@ paths:
       summary: Update service-entry-line-items
       tags:
       - service-entry-line-items
+  /api/v1/service-entries/{id}/override-total:
+    post:
+      consumes:
+      - application/json
+      description: 'As for work orders: replaces the computed total with an audited
+        figure, null clears it, and a line-item edit clears it automatically.'
+      parameters:
+      - description: Service entry id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Override
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.TotalOverrideRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.ServiceEntryResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Override a service entry's total
+      tags:
+      - service-entries
   /api/v1/service-entry-line-items/{id}/issues:
     get:
       parameters:
@@ -14791,6 +15620,145 @@ paths:
       summary: Update tire-mount-logs
       tags:
       - tire-mount-logs
+  /api/v1/trailer-classifications:
+    get:
+      description: The company's own vocabulary for classifying trailers. It replaced
+        two free-text columns, where "Dry Van", "DRY VAN" and "dry van" counted as
+        three classifications to every filter and report. Each company's catalog was
+        seeded from the values that company was already using; no list is seeded on
+        top of that.
+      parameters:
+      - description: Page size
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.TrailerClassificationPage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List trailer classifications
+      tags:
+      - trailer-classifications
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateTrailerClassificationRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.TrailerClassificationResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a trailer classification
+      tags:
+      - trailer-classifications
+  /api/v1/trailer-classifications/{id}:
+    delete:
+      description: 'Trailers referencing it become unclassified rather than blocking
+        the delete: retiring a term nobody uses should not require re-classifying
+        every trailer that ever carried it.'
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete a trailer classification
+      tags:
+      - trailer-classifications
+    get:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.TrailerClassificationResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get a trailer classification
+      tags:
+      - trailer-classifications
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateTrailerClassificationRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.TrailerClassificationResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update a trailer classification
+      tags:
+      - trailer-classifications
   /api/v1/uploads:
     post:
       consumes:
@@ -14801,8 +15769,10 @@ paths:
         name: file
         required: true
         type: file
-      - description: photo, document or generic (default). Narrows the accepted media
-          types.
+      - description: asset_photo, company_logo, receipt, signature, inspection_photo,
+          media, photo, document or generic (default). Narrows the accepted media
+          types, and decides whether the object is publicly readable — only asset_photo
+          and company_logo are.
         in: formData
         name: purpose
         type: string
@@ -16467,8 +17437,59 @@ paths:
       summary: Update work-order-line-items
       tags:
       - work-order-line-items
+  /api/v1/work-orders/{id}/override-total:
+    post:
+      consumes:
+      - application/json
+      description: Replaces the computed total with an explicit figure, recording
+        who set it and why. The component columns (parts_subtotal, labor_subtotal,
+        subtotal) stay computed, so the difference between what the document adds
+        up to and what it is being charged at stays visible — which is the reason
+        an override is audited. Send a null amount to drop the override and return
+        to the computed total. Any later edit to the line items clears it automatically.
+      parameters:
+      - description: Work order id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Override
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.TotalOverrideRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.WorkOrderResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Override a work order's total
+      tags:
+      - work-orders
   /api/v1/work-orders/{id}/status-logs:
     get:
+      description: Append-only status history, newest first. Rows are written by the
+        operation that changes the work order's status, inside the same transaction,
+        so this history cannot disagree with the work order. actor_type is "employee"
+        or "system"; actor_employee_id is null for a system transition and for rows
+        written before actors were recorded.
       parameters:
       - description: parent id
         in: path
@@ -16499,62 +17520,7 @@ paths:
       summary: List work-order-status-logs
       tags:
       - work-order-status-logs
-    post:
-      consumes:
-      - application/json
-      parameters:
-      - description: parent id
-        in: path
-        name: id
-        required: true
-        type: integer
-      - description: body
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/dto.CreateWorkOrderStatusLogRequest'
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/dto.WorkOrderStatusLogResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/dto.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Create work-order-status-logs
-      tags:
-      - work-order-status-logs
   /api/v1/work-orders/{id}/status-logs/{child_id}:
-    delete:
-      parameters:
-      - description: parent id
-        in: path
-        name: id
-        required: true
-        type: integer
-      - description: id
-        in: path
-        name: child_id
-        required: true
-        type: integer
-      responses:
-        "204":
-          description: No Content
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/dto.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Delete work-order-status-logs
-      tags:
-      - work-order-status-logs
     get:
       parameters:
       - description: parent id
@@ -16581,42 +17547,6 @@ paths:
       security:
       - BearerAuth: []
       summary: Get work-order-status-logs
-      tags:
-      - work-order-status-logs
-    put:
-      consumes:
-      - application/json
-      parameters:
-      - description: parent id
-        in: path
-        name: id
-        required: true
-        type: integer
-      - description: id
-        in: path
-        name: child_id
-        required: true
-        type: integer
-      - description: body
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/dto.UpdateWorkOrderStatusLogRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/dto.WorkOrderStatusLogResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/dto.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Update work-order-status-logs
       tags:
       - work-order-status-logs
   /auth/login:

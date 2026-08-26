@@ -13,11 +13,18 @@ import (
 )
 
 const countVendors = `-- name: CountVendors :one
-SELECT count(*) FROM vendor WHERE company_id = $1
+SELECT count(*) FROM vendor
+WHERE company_id = $1
+  AND ($2::boolean OR archived_at IS NULL)
 `
 
-func (q *Queries) CountVendors(ctx context.Context, companyID int64) (int64, error) {
-	row := q.db.QueryRow(ctx, countVendors, companyID)
+type CountVendorsParams struct {
+	CompanyID       int64
+	IncludeArchived bool
+}
+
+func (q *Queries) CountVendors(ctx context.Context, arg CountVendorsParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countVendors, arg.CompanyID, arg.IncludeArchived)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -25,9 +32,9 @@ func (q *Queries) CountVendors(ctx context.Context, companyID int64) (int64, err
 
 const createVendor = `-- name: CreateVendor :one
 INSERT INTO vendor (
-    company_id, name, is_mobile_service, street_address, street_address_line_2, city, region, postal_code, country, phone, website, contact_name, contact_phone, contact_email, external_id, latitude, longitude, is_fuel_vendor, is_service_vendor, is_parts_vendor, labels, archived_at, custom_fields, created_at, updated_at
+    company_id, name, is_mobile_service, street_address, street_address_line_2, city, region, postal_code, country, phone, website, contact_name, contact_phone, contact_email, external_id, latitude, longitude, is_fuel_vendor, is_service_vendor, is_parts_vendor, labels, custom_fields, created_at, updated_at
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24
 )
 RETURNING id, company_id, name, is_mobile_service, street_address, street_address_line_2, city, region, postal_code, country, phone, website, contact_name, contact_phone, contact_email, external_id, latitude, longitude, is_fuel_vendor, is_service_vendor, is_parts_vendor, labels, archived_at, custom_fields, created_at, updated_at
 `
@@ -54,7 +61,6 @@ type CreateVendorParams struct {
 	IsServiceVendor    bool
 	IsPartsVendor      bool
 	Labels             []byte
-	ArchivedAt         *time.Time
 	CustomFields       []byte
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
@@ -83,7 +89,6 @@ func (q *Queries) CreateVendor(ctx context.Context, arg CreateVendorParams) (Ven
 		arg.IsServiceVendor,
 		arg.IsPartsVendor,
 		arg.Labels,
-		arg.ArchivedAt,
 		arg.CustomFields,
 		arg.CreatedAt,
 		arg.UpdatedAt,
@@ -178,17 +183,29 @@ func (q *Queries) GetVendor(ctx context.Context, arg GetVendorParams) (Vendor, e
 }
 
 const listVendors = `-- name: ListVendors :many
-SELECT id, company_id, name, is_mobile_service, street_address, street_address_line_2, city, region, postal_code, country, phone, website, contact_name, contact_phone, contact_email, external_id, latitude, longitude, is_fuel_vendor, is_service_vendor, is_parts_vendor, labels, archived_at, custom_fields, created_at, updated_at FROM vendor WHERE company_id = $1 ORDER BY name, id LIMIT $2 OFFSET $3
+SELECT id, company_id, name, is_mobile_service, street_address, street_address_line_2, city, region, postal_code, country, phone, website, contact_name, contact_phone, contact_email, external_id, latitude, longitude, is_fuel_vendor, is_service_vendor, is_parts_vendor, labels, archived_at, custom_fields, created_at, updated_at FROM vendor
+WHERE company_id = $1
+  AND ($2::boolean OR archived_at IS NULL)
+ORDER BY name, id LIMIT $4 OFFSET $3
 `
 
 type ListVendorsParams struct {
-	CompanyID int64
-	Limit     int32
-	Offset    int32
+	CompanyID       int64
+	IncludeArchived bool
+	Off             int32
+	Lim             int32
 }
 
+// Archived rows are excluded unless include_archived is true. An archived
+// record is one somebody retired; showing it in the default list, and in the
+// pickers built from that list, is how it gets referenced again.
 func (q *Queries) ListVendors(ctx context.Context, arg ListVendorsParams) ([]Vendor, error) {
-	rows, err := q.db.Query(ctx, listVendors, arg.CompanyID, arg.Limit, arg.Offset)
+	rows, err := q.db.Query(ctx, listVendors,
+		arg.CompanyID,
+		arg.IncludeArchived,
+		arg.Off,
+		arg.Lim,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -235,7 +252,7 @@ func (q *Queries) ListVendors(ctx context.Context, arg ListVendorsParams) ([]Ven
 }
 
 const updateVendor = `-- name: UpdateVendor :one
-UPDATE vendor SET name = $3, is_mobile_service = $4, street_address = $5, street_address_line_2 = $6, city = $7, region = $8, postal_code = $9, country = $10, phone = $11, website = $12, contact_name = $13, contact_phone = $14, contact_email = $15, external_id = $16, latitude = $17, longitude = $18, is_fuel_vendor = $19, is_service_vendor = $20, is_parts_vendor = $21, labels = $22, archived_at = $23, custom_fields = $24, updated_at = $25
+UPDATE vendor SET name = $3, is_mobile_service = $4, street_address = $5, street_address_line_2 = $6, city = $7, region = $8, postal_code = $9, country = $10, phone = $11, website = $12, contact_name = $13, contact_phone = $14, contact_email = $15, external_id = $16, latitude = $17, longitude = $18, is_fuel_vendor = $19, is_service_vendor = $20, is_parts_vendor = $21, labels = $22, custom_fields = $23, updated_at = $24
 WHERE id = $1 AND company_id = $2
 RETURNING id, company_id, name, is_mobile_service, street_address, street_address_line_2, city, region, postal_code, country, phone, website, contact_name, contact_phone, contact_email, external_id, latitude, longitude, is_fuel_vendor, is_service_vendor, is_parts_vendor, labels, archived_at, custom_fields, created_at, updated_at
 `
@@ -263,7 +280,6 @@ type UpdateVendorParams struct {
 	IsServiceVendor    bool
 	IsPartsVendor      bool
 	Labels             []byte
-	ArchivedAt         *time.Time
 	CustomFields       []byte
 	UpdatedAt          time.Time
 }
@@ -292,7 +308,6 @@ func (q *Queries) UpdateVendor(ctx context.Context, arg UpdateVendorParams) (Ven
 		arg.IsServiceVendor,
 		arg.IsPartsVendor,
 		arg.Labels,
-		arg.ArchivedAt,
 		arg.CustomFields,
 		arg.UpdatedAt,
 	)

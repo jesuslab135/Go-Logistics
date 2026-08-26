@@ -7,6 +7,9 @@ import (
 )
 
 type CreateServiceEntryLineItemRequest struct {
+	// The money columns this record derives are response-only: the server
+	// computes them from the line items and the rate terms above, in the same
+	// transaction as the write. See internal/domain/money.
 	LineItemType      string          `json:"line_item_type" binding:"omitempty,max=20"`
 	Description       string          `json:"description" binding:"omitempty,max=255"`
 	ServiceTaskID     *int64          `json:"service_task_id"`
@@ -18,11 +21,13 @@ type CreateServiceEntryLineItemRequest struct {
 	Quantity          decimal.Decimal `json:"quantity"`
 	PartsCost         decimal.Decimal `json:"parts_cost"`
 	LaborCost         decimal.Decimal `json:"labor_cost"`
-	Subtotal          decimal.Decimal `json:"subtotal"`
 	Position          int32           `json:"position"`
 }
 
 type UpdateServiceEntryLineItemRequest struct {
+	// The money columns this record derives are response-only: the server
+	// computes them from the line items and the rate terms above, in the same
+	// transaction as the write. See internal/domain/money.
 	LineItemType      string          `json:"line_item_type" binding:"omitempty,max=20"`
 	Description       string          `json:"description" binding:"omitempty,max=255"`
 	ServiceTaskID     *int64          `json:"service_task_id"`
@@ -34,7 +39,6 @@ type UpdateServiceEntryLineItemRequest struct {
 	Quantity          decimal.Decimal `json:"quantity"`
 	PartsCost         decimal.Decimal `json:"parts_cost"`
 	LaborCost         decimal.Decimal `json:"labor_cost"`
-	Subtotal          decimal.Decimal `json:"subtotal"`
 	Position          int32           `json:"position"`
 }
 

@@ -11,6 +11,7 @@ import (
 
 	"fleet/internal/auth"
 	"fleet/internal/db/gen"
+	"fleet/internal/domain/purchaseorder"
 	"fleet/internal/platform/storage"
 )
 
@@ -144,4 +145,163 @@ func splitPath(path string) []string {
 		}
 	}
 	return out
+}
+
+// A retired write verb must stay routed. Leaving it unrouted returns 404, which
+// a client cannot tell from a typo'd path; 405 with a stable code and the
+// replacement in the message turns a bug report into a one-line fix.
+func TestRetiredStatusLogWritesAnswer405(t *testing.T) {
+	r := newTestRouter(t)
+
+	writes := []struct{ method, path string }{
+		{http.MethodPost, "/api/v1/work-orders/1/status-logs"},
+		{http.MethodPut, "/api/v1/work-orders/1/status-logs/1"},
+		{http.MethodDelete, "/api/v1/work-orders/1/status-logs/1"},
+	}
+
+	routes := make(map[string]bool)
+	for _, route := range r.Routes() {
+		routes[route.Method+" "+route.Path] = true
+	}
+
+	for _, w := range writes {
+		path := strings.Replace(w.path, "/1/status-logs", "/:id/status-logs", 1)
+		path = strings.Replace(path, "/status-logs/1", "/status-logs/:child_id", 1)
+		if !routes[w.method+" "+path] {
+			t.Errorf("%s %s is not routed; it must answer 405, not 404", w.method, path)
+		}
+	}
+}
+
+// The append-only history has no write routes of its own, so its request DTOs
+// are gone. This pins that the read routes survive, since the whole point of
+// retiring the writes was to keep the history readable and truthful.
+func TestStatusLogReadsSurvive(t *testing.T) {
+	routes := make(map[string]bool)
+	for _, r := range newTestRouter(t).Routes() {
+		routes[r.Method+" "+r.Path] = true
+	}
+
+	for _, want := range []string{
+		"GET /api/v1/work-orders/:id/status-logs",
+		"GET /api/v1/work-orders/:id/status-logs/:child_id",
+	} {
+		if !routes[want] {
+			t.Errorf("missing route %q", want)
+		}
+	}
+}
+
+// The ledger's retired verbs must stay routed for the same reason the status
+// log's do: a 404 reads as a wrong path, a 405 tells the client to reverse.
+func TestInventoryJournalRoutes(t *testing.T) {
+	routes := make(map[string]bool)
+	for _, r := range newTestRouter(t).Routes() {
+		routes[r.Method+" "+r.Path] = true
+	}
+
+	for _, want := range []string{
+		"GET /api/v1/inventory-journal-entries",
+		"POST /api/v1/inventory-journal-entries",
+		"GET /api/v1/inventory-journal-entries/:id",
+		"POST /api/v1/inventory-journal-entries/:id/reverse",
+		// Retired, but routed: they answer 405 route_retired.
+		"PUT /api/v1/inventory-journal-entries/:id",
+		"DELETE /api/v1/inventory-journal-entries/:id",
+	} {
+		if !routes[want] {
+			t.Errorf("missing route %q", want)
+		}
+	}
+}
+
+// Every transition the state machine defines must be routed, or an order can
+// reach a state nothing moves it out of. Driven off the machine itself, so
+// adding a transition without a route fails here.
+func TestPurchaseOrderTransitionRoutes(t *testing.T) {
+	routes := make(map[string]bool)
+	for _, r := range newTestRouter(t).Routes() {
+		routes[r.Method+" "+r.Path] = true
+	}
+
+	for _, action := range purchaseorder.Actions() {
+		want := "POST /api/v1/purchase-orders/:id/" + action
+		if !routes[want] {
+			t.Errorf("missing route %q", want)
+		}
+	}
+
+	for _, want := range []string{
+		"GET /api/v1/purchase-orders/:id/status-logs",
+		"GET /api/v1/purchase-orders/:id/status-logs/:child_id",
+	} {
+		if !routes[want] {
+			t.Errorf("missing route %q", want)
+		}
+	}
+}
+
+// Totals are computed, so departing from the formula must go through the
+// audited action rather than a writable field.
+func TestTotalOverrideRoutes(t *testing.T) {
+	routes := make(map[string]bool)
+	for _, r := range newTestRouter(t).Routes() {
+		routes[r.Method+" "+r.Path] = true
+	}
+
+	for _, want := range []string{
+		"POST /api/v1/work-orders/:id/override-total",
+		"POST /api/v1/purchase-orders/:id/override-total",
+		"POST /api/v1/service-entries/:id/override-total",
+	} {
+		if !routes[want] {
+			t.Errorf("missing route %q", want)
+		}
+	}
+}
+
+// A referenced record cannot be deleted, so every archivable resource needs the
+// pair of routes that retire it instead. A missing one leaves that catalog with
+// no way to retire anything.
+func TestArchiveRoutes(t *testing.T) {
+	routes := make(map[string]bool)
+	for _, r := range newTestRouter(t).Routes() {
+		routes[r.Method+" "+r.Path] = true
+	}
+
+	for _, resource := range []string{
+		"/api/v1/assets",
+		"/api/v1/parts",
+		"/api/v1/vendors",
+		"/api/v1/service-tasks",
+		"/api/v1/inspection-forms",
+	} {
+		for _, action := range []string{"/archive", "/restore"} {
+			want := "POST " + resource + "/:id" + action
+			if !routes[want] {
+				t.Errorf("missing route %q", want)
+			}
+		}
+	}
+}
+
+// The definitions are what makes custom_fields describable, so the CRUD has to
+// exist for a form to be generated from anything.
+func TestCustomFieldDefinitionRoutes(t *testing.T) {
+	routes := make(map[string]bool)
+	for _, r := range newTestRouter(t).Routes() {
+		routes[r.Method+" "+r.Path] = true
+	}
+
+	for _, want := range []string{
+		"GET /api/v1/custom-field-definitions",
+		"POST /api/v1/custom-field-definitions",
+		"GET /api/v1/custom-field-definitions/:id",
+		"PUT /api/v1/custom-field-definitions/:id",
+		"DELETE /api/v1/custom-field-definitions/:id",
+	} {
+		if !routes[want] {
+			t.Errorf("missing route %q", want)
+		}
+	}
 }

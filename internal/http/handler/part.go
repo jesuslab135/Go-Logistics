@@ -17,11 +17,11 @@ func NewPartStore(q *gen.Queries) *PartStore { return &PartStore{q: q} }
 
 func (s *PartStore) List(ctx context.Context, p paginate.Params) ([]dto.PartResponse, int64, error) {
 	company := middleware.CompanyFromContext(ctx)
-	rows, err := s.q.ListParts(ctx, gen.ListPartsParams{CompanyID: company, Limit: int32(p.Limit), Offset: int32(p.Offset)})
+	rows, err := s.q.ListParts(ctx, gen.ListPartsParams{CompanyID: company, IncludeArchived: includeArchived(ctx), Lim: int32(p.Limit), Off: int32(p.Offset)})
 	if err != nil {
 		return nil, 0, err
 	}
-	total, err := s.q.CountParts(ctx, company)
+	total, err := s.q.CountParts(ctx, gen.CountPartsParams{CompanyID: company, IncludeArchived: includeArchived(ctx)})
 	if err != nil {
 		return nil, 0, err
 	}
@@ -41,6 +41,12 @@ func (s *PartStore) Get(ctx context.Context, id int64) (dto.PartResponse, error)
 }
 
 func (s *PartStore) Create(ctx context.Context, in dto.CreatePartRequest) (dto.PartResponse, error) {
+	// The document has to satisfy whatever this company declared for parts;
+	// a company that declared nothing pays one indexed lookup.
+	if err := validateCustomFields(ctx, s.q, "parts", in.CustomFields); err != nil {
+		return dto.PartResponse{}, err
+	}
+
 	now := time.Now().UTC()
 	r, err := s.q.CreatePart(ctx, gen.CreatePartParams{
 		CompanyID:              middleware.CompanyFromContext(ctx),
@@ -56,7 +62,6 @@ func (s *PartStore) Create(ctx context.Context, in dto.CreatePartRequest) (dto.P
 		Upc:                    in.Upc,
 		UnitCost:               in.UnitCost,
 		InventoryItem:          boolOrDefault(in.InventoryItem, true),
-		ArchivedAt:             in.ArchivedAt,
 		CustomFields:           jsonbOrDefault(in.CustomFields, "{}"),
 		CreatedAt:              now,
 		UpdatedAt:              now,
@@ -68,6 +73,12 @@ func (s *PartStore) Create(ctx context.Context, in dto.CreatePartRequest) (dto.P
 }
 
 func (s *PartStore) Update(ctx context.Context, id int64, in dto.UpdatePartRequest) (dto.PartResponse, error) {
+	// The document has to satisfy whatever this company declared for parts;
+	// a company that declared nothing pays one indexed lookup.
+	if err := validateCustomFields(ctx, s.q, "parts", in.CustomFields); err != nil {
+		return dto.PartResponse{}, err
+	}
+
 	now := time.Now().UTC()
 	r, err := s.q.UpdatePart(ctx, gen.UpdatePartParams{
 		ID:                     id,
@@ -84,7 +95,6 @@ func (s *PartStore) Update(ctx context.Context, id int64, in dto.UpdatePartReque
 		Upc:                    in.Upc,
 		UnitCost:               in.UnitCost,
 		InventoryItem:          in.InventoryItem,
-		ArchivedAt:             in.ArchivedAt,
 		CustomFields:           jsonbOrDefault(in.CustomFields, "{}"),
 		UpdatedAt:              now,
 	})
@@ -95,6 +105,9 @@ func (s *PartStore) Update(ctx context.Context, id int64, in dto.UpdatePartReque
 }
 
 func (s *PartStore) Delete(ctx context.Context, id int64) error {
+	if err := guardDelete(ctx, "part", id, s.q.PartReferences); err != nil {
+		return err
+	}
 	return s.q.DeletePart(ctx, gen.DeletePartParams{ID: id, CompanyID: middleware.CompanyFromContext(ctx)})
 }
 

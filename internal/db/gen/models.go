@@ -165,6 +165,20 @@ type Company struct {
 	SystemOfMeasurement string
 }
 
+type CustomFieldDefinition struct {
+	ID        int64
+	CompanyID int64
+	Resource  string
+	Key       string
+	Label     string
+	FieldType string
+	Required  bool
+	Options   []byte
+	Position  int32
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
 type Employee struct {
 	ID                   int64
 	UserID               *int64
@@ -200,6 +214,7 @@ type Employee struct {
 	DashboardPreferences []byte
 	UpdatedAt            time.Time
 	PasswordHash         string
+	IsPlatformAdmin      bool
 }
 
 type EmployeeCompany struct {
@@ -384,6 +399,7 @@ type InventoryJournalEntry struct {
 	TransferPartLocationID *int64
 	Notes                  string
 	CreatedAt              time.Time
+	ReversalOfID           *int64
 }
 
 type Issue struct {
@@ -492,6 +508,15 @@ type Medium struct {
 	Thumbnail    string
 }
 
+type MembershipAudit struct {
+	ID                int64
+	ActorEmployeeID   *int64
+	SubjectEmployeeID int64
+	CompanyID         int64
+	Action            string
+	OccurredAt        time.Time
+}
+
 type Notification struct {
 	ID         int64
 	CompanyID  int64
@@ -575,40 +600,45 @@ type PartManufacturer struct {
 }
 
 type PurchaseOrder struct {
-	ID                 int64
-	CompanyID          int64
-	Number             string
-	Description        string
-	State              string
-	VendorID           int64
-	DestinationID      int64
-	DiscountType       string
-	Discount           decimal.Decimal
-	DiscountPercentage decimal.Decimal
-	Tax1Type           string
-	Tax1               decimal.Decimal
-	Tax1Percentage     decimal.Decimal
-	Tax2Type           string
-	Tax2               decimal.Decimal
-	Tax2Percentage     decimal.Decimal
-	Shipping           decimal.Decimal
-	Subtotal           decimal.Decimal
-	TotalAmount        decimal.Decimal
-	CreatedByID        *int64
-	SubmittedAt        *time.Time
-	SubmittedByID      *int64
-	RejectedAt         *time.Time
-	RejectedByID       *int64
-	ApprovedAt         *time.Time
-	ApprovedByID       *int64
-	PurchasedAt        *time.Time
-	ReceivedPartialAt  *time.Time
-	ReceivedFullAt     *time.Time
-	ClosedAt           *time.Time
-	Labels             []byte
-	CustomFields       []byte
-	CreatedAt          time.Time
-	UpdatedAt          time.Time
+	ID                  int64
+	CompanyID           int64
+	Number              string
+	Description         string
+	State               string
+	VendorID            int64
+	DestinationID       int64
+	DiscountType        string
+	Discount            decimal.Decimal
+	DiscountPercentage  decimal.Decimal
+	Tax1Type            string
+	Tax1                decimal.Decimal
+	Tax1Percentage      decimal.Decimal
+	Tax2Type            string
+	Tax2                decimal.Decimal
+	Tax2Percentage      decimal.Decimal
+	Shipping            decimal.Decimal
+	Subtotal            decimal.Decimal
+	TotalAmount         decimal.Decimal
+	CreatedByID         *int64
+	SubmittedAt         *time.Time
+	SubmittedByID       *int64
+	RejectedAt          *time.Time
+	RejectedByID        *int64
+	ApprovedAt          *time.Time
+	ApprovedByID        *int64
+	PurchasedAt         *time.Time
+	ReceivedPartialAt   *time.Time
+	ReceivedFullAt      *time.Time
+	ClosedAt            *time.Time
+	Labels              []byte
+	CustomFields        []byte
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
+	RejectionReason     string
+	TotalOverride       *decimal.Decimal
+	TotalOverrideReason *string
+	TotalOverrideByID   *int64
+	TotalOverrideAt     *time.Time
 }
 
 type PurchaseOrderLineItem struct {
@@ -622,6 +652,17 @@ type PurchaseOrderLineItem struct {
 	Position        int32
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
+}
+
+type PurchaseOrderStatusLog struct {
+	ID              int64
+	PurchaseOrderID int64
+	FromState       string
+	ToState         string
+	ActorEmployeeID *int64
+	ActorType       string
+	Reason          string
+	ChangedAt       time.Time
 }
 
 type RevokedToken struct {
@@ -668,6 +709,11 @@ type ServiceEntry struct {
 	CustomFields         []byte
 	CreatedAt            time.Time
 	UpdatedAt            time.Time
+	DiscountPercentage   decimal.Decimal
+	TotalOverride        *decimal.Decimal
+	TotalOverrideReason  *string
+	TotalOverrideByID    *int64
+	TotalOverrideAt      *time.Time
 }
 
 type ServiceEntryLineItem struct {
@@ -821,9 +867,11 @@ type TireMountLog struct {
 }
 
 type Trailer struct {
-	AssetID              int64
-	TrailerType          string
-	Classification       string
+	AssetID     int64
+	TrailerType string
+	// Deprecated: superseded by classification_id. Retained for one release; no longer written.
+	Classification string
+	// Deprecated: superseded by classification_2_id. Retained for one release; no longer written.
 	Classification2      string
 	Size                 string
 	Suspension           string
@@ -859,6 +907,15 @@ type Trailer struct {
 	DecommissionDate     *time.Time
 	OperationalUse       string
 	OperationZone        string
+	ClassificationID     *int64
+	Classification2ID    *int64
+}
+
+type TrailerClassification struct {
+	ID        int64
+	CompanyID int64
+	Name      string
+	Position  int32
 }
 
 type Vehicle struct {
@@ -1080,6 +1137,11 @@ type WorkOrder struct {
 	CustomFields          []byte
 	CreatedAt             time.Time
 	UpdatedAt             time.Time
+	DiscountPercentage    decimal.Decimal
+	TotalOverride         *decimal.Decimal
+	TotalOverrideReason   *string
+	TotalOverrideByID     *int64
+	TotalOverrideAt       *time.Time
 }
 
 type WorkOrderFault struct {
@@ -1127,10 +1189,12 @@ type WorkOrderStatus struct {
 }
 
 type WorkOrderStatusLog struct {
-	ID          int64
-	WorkOrderID int64
-	StatusID    int64
-	ChangedAt   time.Time
+	ID              int64
+	WorkOrderID     int64
+	StatusID        int64
+	ChangedAt       time.Time
+	ActorEmployeeID *int64
+	ActorType       string
 }
 
 type WorkOrderSubLineItem struct {

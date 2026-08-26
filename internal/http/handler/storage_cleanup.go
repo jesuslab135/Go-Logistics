@@ -19,10 +19,11 @@ import (
 // Failures are logged and swallowed for the same reason: the user's write
 // succeeded, and reporting an error for unreclaimed bytes would be misleading.
 
-// reclaimObjects deletes objects that are no longer referenced. Values that are
-// empty, or URLs this storage does not own (an externally hosted image, say),
-// are skipped rather than treated as errors.
-func reclaimObjects(ctx context.Context, files storage.Storage, log *slog.Logger, urls ...string) {
+// reclaimObjects deletes objects that are no longer referenced. Values may be
+// storage keys or the absolute URLs older rows still hold; either resolves to a
+// key. Values that are empty, or URLs this storage does not own (an externally
+// hosted image, say), are skipped rather than treated as errors.
+func reclaimObjects(ctx context.Context, files storage.Storage, log *slog.Logger, refs ...string) {
 	if files == nil {
 		return
 	}
@@ -30,11 +31,8 @@ func reclaimObjects(ctx context.Context, files storage.Storage, log *slog.Logger
 		log = slog.Default()
 	}
 
-	for _, url := range urls {
-		if url == "" {
-			continue
-		}
-		key, ok := files.KeyFromURL(url)
+	for _, ref := range refs {
+		key, ok := fileKey(files, ref)
 		if !ok {
 			continue
 		}
@@ -57,20 +55,20 @@ func newFileOwner(files storage.Storage, log *slog.Logger) fileOwner {
 	return fileOwner{files: files, log: log}
 }
 
-func (o fileOwner) reclaim(ctx context.Context, urls ...string) {
-	reclaimObjects(ctx, o.files, o.log, urls...)
+func (o fileOwner) reclaim(ctx context.Context, refs ...string) {
+	reclaimObjects(ctx, o.files, o.log, refs...)
 }
 
 // reclaimReplaced deletes the previous object when a write replaced or cleared
-// the URL, and does nothing when it was left alone.
+// the reference, and does nothing when it was left alone.
 func (o fileOwner) reclaimReplaced(ctx context.Context, before, after *string) {
 	if previous, ok := changedURL(before, after); ok {
 		o.reclaim(ctx, previous)
 	}
 }
 
-// changedURL reports the previous URL when a write replaced or cleared it, and
-// therefore when that object is no longer referenced.
+// changedURL reports the previous reference when a write replaced or cleared it,
+// and therefore when that object is no longer referenced.
 func changedURL(before, after *string) (string, bool) {
 	previous := ""
 	if before != nil {

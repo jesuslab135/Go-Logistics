@@ -23,14 +23,18 @@ type UpdateMediumRequest struct {
 }
 
 type MediumResponse struct {
-	ID          int64  `json:"id"`
-	CompanyID   int64  `json:"company_id"`
-	AssetID     int64  `json:"asset_id"`
-	File        string `json:"file" binding:"omitempty,max=500"`
-	Title       string `json:"title" binding:"omitempty,max=255"`
-	Description string `json:"description"`
-	FileType    string `json:"file_type" binding:"omitempty,max=20"`
-	FileSize    int32  `json:"file_size"`
+	ID        int64 `json:"id"`
+	CompanyID int64 `json:"company_id"`
+	AssetID   int64 `json:"asset_id"`
+	// File is a signed, time-limited URL: uploaded media belongs to one tenant
+	// and is not anonymously readable. Render it, never store it.
+	File string `json:"file" binding:"omitempty,max=500"`
+	// FileExpiresAt is when File and Thumbnail stop resolving; re-read this record.
+	FileExpiresAt *time.Time `json:"file_expires_at"`
+	Title         string     `json:"title" binding:"omitempty,max=255"`
+	Description   string     `json:"description"`
+	FileType      string     `json:"file_type" binding:"omitempty,max=20"`
+	FileSize      int32      `json:"file_size"`
 	// Thumbnail is empty when none exists: media predating thumbnailing, or a
 	// format the server cannot decode.
 	Thumbnail    string    `json:"thumbnail"`

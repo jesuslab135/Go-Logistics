@@ -3,6 +3,7 @@ package handler
 import (
 	"errors"
 	"reflect"
+	"slices"
 	"testing"
 
 	"fleet/internal/platform/apierr"
@@ -71,46 +72,57 @@ func TestValidateMembershipReplace(t *testing.T) {
 	}
 }
 
-// The admin namespace is gated on RequireAdminRole alone, and role_id is a
-// single global FK: granting yourself a company you do not belong to therefore
-// makes you an admin of that company too, with DELETE /companies/:id behind it.
-// The mirror image is just as bad — a full replace that drops a company evicts
-// the employee from a tenant the caller has no access to. So the constraint is
-// on the delta, not the whole set: an id the request leaves untouched needs no
-// entitlement, an id it adds or removes does.
-func TestValidateGrantableCompanies(t *testing.T) {
+// The audit records what changed, not what was requested. A full replace sends
+// the employee's whole membership set every time, so recording the request
+// verbatim would file a "granted" row on every save for companies the employee
+// already had — and bury the one grant that actually mattered.
+func TestMembershipDelta(t *testing.T) {
 	tests := []struct {
-		name            string
-		requested       []int64
-		current         []int64
-		callerCompanies []int64
-		wantErr         bool
+		name   string
+		before []int64
+		after  []int64
+		want   []membershipChange
 	}{
-		{name: "an unchanged set is allowed even where the caller belongs to nothing in it", requested: []int64{3, 8}, current: []int64{3, 8}, callerCompanies: []int64{3}, wantErr: false},
-		{name: "adding a company the caller does not belong to is refused", requested: []int64{3, 8}, current: []int64{3}, callerCompanies: []int64{3, 7}, wantErr: true},
-		{name: "removing a company the caller does not belong to is refused", requested: []int64{3}, current: []int64{3, 8}, callerCompanies: []int64{3, 7}, wantErr: true},
-		{name: "adding a company the caller belongs to is allowed", requested: []int64{3, 7}, current: []int64{3}, callerCompanies: []int64{3, 7, 9}, wantErr: false},
-		{name: "removing a company the caller belongs to is allowed", requested: []int64{3}, current: []int64{3, 7}, callerCompanies: []int64{3, 7}, wantErr: false},
-		{name: "a caller with no companies cannot change anything", requested: []int64{3}, current: nil, callerCompanies: nil, wantErr: true},
-		{name: "an empty caller slice cannot change anything", requested: []int64{3, 7}, current: []int64{3}, callerCompanies: []int64{}, wantErr: true},
-		{name: "a first grant into the caller's own company is allowed", requested: []int64{3}, current: nil, callerCompanies: []int64{3}, wantErr: false},
+		{
+			name:   "an unchanged set records nothing",
+			before: []int64{3, 8},
+			after:  []int64{3, 8},
+			want:   nil,
+		},
+		{
+			name:   "an addition is recorded once",
+			before: []int64{3},
+			after:  []int64{3, 8},
+			want:   []membershipChange{{company: 8, action: membershipGranted}},
+		},
+		{
+			name:   "a removal is recorded once",
+			before: []int64{3, 8},
+			after:  []int64{3},
+			want:   []membershipChange{{company: 8, action: membershipRevoked}},
+		},
+		{
+			name:   "a swap records both halves",
+			before: []int64{3},
+			after:  []int64{8},
+			want: []membershipChange{
+				{company: 8, action: membershipGranted},
+				{company: 3, action: membershipRevoked},
+			},
+		},
+		{
+			name:   "a first grant to an employee with nothing",
+			before: nil,
+			after:  []int64{3},
+			want:   []membershipChange{{company: 3, action: membershipGranted}},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateGrantableCompanies(tt.requested, tt.current, tt.callerCompanies)
-			if tt.wantErr == (err == nil) {
-				t.Fatalf("err = %v, wantErr = %v", err, tt.wantErr)
-			}
-			if err == nil {
-				return
-			}
-			var ae *apierr.Error
-			if !errors.As(err, &ae) {
-				t.Fatalf("error is %T, want *apierr.Error", err)
-			}
-			if ae.Status != 403 {
-				t.Errorf("status = %d, want 403", ae.Status)
+			got := membershipDelta(tt.before, tt.after)
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("membershipDelta(%v, %v) = %v, want %v", tt.before, tt.after, got, tt.want)
 			}
 		})
 	}

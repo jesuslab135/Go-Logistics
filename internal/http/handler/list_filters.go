@@ -13,6 +13,7 @@ import (
 	"fleet/internal/platform/apierr"
 	"fleet/internal/platform/filter"
 	"fleet/internal/platform/paginate"
+	"fleet/internal/platform/storage"
 )
 
 // FilteredListHandler serves the collections whose filters vary per request.
@@ -22,10 +23,14 @@ import (
 // verb is taken over, via registerCrudWithList.
 type FilteredListHandler struct {
 	pool *pgxpool.Pool
+	// files resolves stored object references to readable URLs. The filtered
+	// lists bypass the stores that would otherwise do it, so a list that returns
+	// a file column has to resolve it here or hand the client a raw storage key.
+	files storage.Storage
 }
 
-func NewFilteredListHandler(pool *pgxpool.Pool) *FilteredListHandler {
-	return &FilteredListHandler{pool: pool}
+func NewFilteredListHandler(pool *pgxpool.Pool, files storage.Storage) *FilteredListHandler {
+	return &FilteredListHandler{pool: pool, files: files}
 }
 
 // renderPage maps rows through their DTO conversion and writes the page.
@@ -73,6 +78,10 @@ func (h *FilteredListHandler) WorkOrders(c *gin.Context) {
 	}
 	if statusID != nil {
 		where.Add("wo.status_id", filter.Eq, *statusID)
+	}
+	if err := applyCustomFieldFilters(c, where, "wo.custom_fields", "work-orders", gen.New(h.pool)); err != nil {
+		apierr.Abort(c, err)
+		return
 	}
 
 	spec := newListSpec[gen.WorkOrder]("work_order", "wo").
@@ -125,6 +134,10 @@ func (h *FilteredListHandler) Issues(c *gin.Context) {
 	}
 	if state != nil {
 		where.Add("i.state", filter.Eq, *state)
+	}
+	if err := applyCustomFieldFilters(c, where, "i.custom_fields", "issues", gen.New(h.pool)); err != nil {
+		apierr.Abort(c, err)
+		return
 	}
 
 	spec := newListSpec[gen.Issue]("issue", "i").
@@ -248,10 +261,15 @@ func (h *FilteredListHandler) Assets(c *gin.Context) {
 		pattern := "%" + *q + "%"
 		where.Raw("(a.name ILIKE ? OR a.vin_sn ILIKE ? OR a.license_plate ILIKE ?)", pattern, pattern, pattern)
 	}
+	if err := applyCustomFieldFilters(c, where, "a.custom_fields", "assets", gen.New(h.pool)); err != nil {
+		apierr.Abort(c, err)
+		return
+	}
 
 	spec := newListSpec[assetListRow]("asset", "a").
-		join("LEFT JOIN vehicle v ON v.asset_id = a.id", "LEFT JOIN trailer t ON t.asset_id = a.id").
-		selecting("v.operator", "t.trailer_type", "t.classification", "t.size").
+		join("LEFT JOIN vehicle v ON v.asset_id = a.id", "LEFT JOIN trailer t ON t.asset_id = a.id",
+			"LEFT JOIN trailer_classification tc ON tc.id = t.classification_id").
+		selecting("v.operator", "t.trailer_type", "tc.name", "t.size").
 		filter(where).
 		orderBy(orderClause(c, map[string]string{
 			"name":         "a.name",
@@ -268,6 +286,7 @@ func (h *FilteredListHandler) Assets(c *gin.Context) {
 	}
 	renderPage(c, rows, total, p, func(r assetListRow) dto.AssetResponse {
 		out := toAssetResponse(r.Asset)
+		out.Photo, _ = fileReadURLPtr(ctx, h.files, r.Asset.Photo)
 		out.Operator = r.Operator
 		out.TrailerType = r.TrailerType
 		out.TrailerClassification = r.TrailerClassification

@@ -24,17 +24,17 @@ func NewAssetStore(q *gen.Queries, files storage.Storage, log *slog.Logger) *Ass
 
 func (s *AssetStore) List(ctx context.Context, p paginate.Params) ([]dto.AssetResponse, int64, error) {
 	company := middleware.CompanyFromContext(ctx)
-	rows, err := s.q.ListAssets(ctx, gen.ListAssetsParams{CompanyID: company, Limit: int32(p.Limit), Offset: int32(p.Offset)})
+	rows, err := s.q.ListAssets(ctx, gen.ListAssetsParams{CompanyID: company, IncludeArchived: includeArchived(ctx), Lim: int32(p.Limit), Off: int32(p.Offset)})
 	if err != nil {
 		return nil, 0, err
 	}
-	total, err := s.q.CountAssets(ctx, company)
+	total, err := s.q.CountAssets(ctx, gen.CountAssetsParams{CompanyID: company, IncludeArchived: includeArchived(ctx)})
 	if err != nil {
 		return nil, 0, err
 	}
 	out := make([]dto.AssetResponse, len(rows))
 	for i, r := range rows {
-		out[i] = toAssetResponse(r)
+		out[i] = s.response(ctx, r)
 	}
 	return out, total, nil
 }
@@ -44,7 +44,7 @@ func (s *AssetStore) Get(ctx context.Context, id int64) (dto.AssetResponse, erro
 	if err != nil {
 		return dto.AssetResponse{}, err
 	}
-	return s.withSubtypes(ctx, toAssetResponse(r))
+	return s.withSubtypes(ctx, s.response(ctx, r))
 }
 
 // withSubtypes fills the denormalized vehicle/trailer columns so a single asset
@@ -66,6 +66,12 @@ func (s *AssetStore) withSubtypes(ctx context.Context, resp dto.AssetResponse) (
 }
 
 func (s *AssetStore) Create(ctx context.Context, in dto.CreateAssetRequest) (dto.AssetResponse, error) {
+	// The document has to satisfy whatever this company declared for assets;
+	// a company that declared nothing pays one indexed lookup.
+	if err := validateCustomFields(ctx, s.q, "assets", in.CustomFields); err != nil {
+		return dto.AssetResponse{}, err
+	}
+
 	now := time.Now().UTC()
 	r, err := s.q.CreateAsset(ctx, gen.CreateAssetParams{
 		CompanyID:                   middleware.CompanyFromContext(ctx),
@@ -127,7 +133,6 @@ func (s *AssetStore) Create(ctx context.Context, in dto.CreateAssetRequest) (dto
 		ResidualValue:               in.ResidualValue,
 		MileageCap:                  in.MileageCap,
 		Notes:                       in.Notes,
-		ArchivedAt:                  in.ArchivedAt,
 		ExternalID:                  in.ExternalID,
 		CustomFields:                jsonbOrDefault(in.CustomFields, "{}"),
 		FuelVolumeUnits:             orDefault(in.FuelVolumeUnits, "liters"),
@@ -142,10 +147,16 @@ func (s *AssetStore) Create(ctx context.Context, in dto.CreateAssetRequest) (dto
 	if err != nil {
 		return dto.AssetResponse{}, err
 	}
-	return s.withSubtypes(ctx, toAssetResponse(r))
+	return s.withSubtypes(ctx, s.response(ctx, r))
 }
 
 func (s *AssetStore) Update(ctx context.Context, id int64, in dto.UpdateAssetRequest) (dto.AssetResponse, error) {
+	// The document has to satisfy whatever this company declared for assets;
+	// a company that declared nothing pays one indexed lookup.
+	if err := validateCustomFields(ctx, s.q, "assets", in.CustomFields); err != nil {
+		return dto.AssetResponse{}, err
+	}
+
 	now := time.Now().UTC()
 
 	previous, err := s.q.GetAsset(ctx, gen.GetAssetParams{ID: id, CompanyID: middleware.CompanyFromContext(ctx)})
@@ -214,7 +225,6 @@ func (s *AssetStore) Update(ctx context.Context, id int64, in dto.UpdateAssetReq
 		ResidualValue:               in.ResidualValue,
 		MileageCap:                  in.MileageCap,
 		Notes:                       in.Notes,
-		ArchivedAt:                  in.ArchivedAt,
 		ExternalID:                  in.ExternalID,
 		CustomFields:                jsonbOrDefault(in.CustomFields, "{}"),
 		FuelVolumeUnits:             in.FuelVolumeUnits,
@@ -230,10 +240,13 @@ func (s *AssetStore) Update(ctx context.Context, id int64, in dto.UpdateAssetReq
 		return dto.AssetResponse{}, err
 	}
 	s.reclaimReplaced(ctx, previous.Photo, r.Photo)
-	return s.withSubtypes(ctx, toAssetResponse(r))
+	return s.withSubtypes(ctx, s.response(ctx, r))
 }
 
 func (s *AssetStore) Delete(ctx context.Context, id int64) error {
+	if err := guardDelete(ctx, "asset", id, s.q.AssetReferences); err != nil {
+		return err
+	}
 	company := middleware.CompanyFromContext(ctx)
 
 	previous, err := s.q.GetAsset(ctx, gen.GetAssetParams{ID: id, CompanyID: company})
@@ -247,6 +260,15 @@ func (s *AssetStore) Delete(ctx context.Context, id int64) error {
 		s.reclaim(ctx, *previous.Photo)
 	}
 	return nil
+}
+
+// response resolves the stored object reference to a URL the caller can read. An
+// asset photo is public, so the URL is permanent — but it still has to be
+// derived from the key, because that is what new uploads store.
+func (s *AssetStore) response(ctx context.Context, r gen.Asset) dto.AssetResponse {
+	out := toAssetResponse(r)
+	out.Photo, _ = fileReadURLPtr(ctx, s.files, r.Photo)
+	return out
 }
 
 func toAssetResponse(r gen.Asset) dto.AssetResponse {

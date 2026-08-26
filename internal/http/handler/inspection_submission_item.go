@@ -33,7 +33,7 @@ func (s *InspectionSubmissionItemStore) List(ctx context.Context, parentID int64
 	}
 	out := make([]dto.InspectionSubmissionItemResponse, len(rows))
 	for i, r := range rows {
-		out[i] = toInspectionSubmissionItemResponse(r)
+		out[i] = s.response(ctx, r)
 	}
 	return out, total, nil
 }
@@ -43,7 +43,7 @@ func (s *InspectionSubmissionItemStore) Get(ctx context.Context, parentID, id in
 	if err != nil {
 		return dto.InspectionSubmissionItemResponse{}, err
 	}
-	return toInspectionSubmissionItemResponse(r), nil
+	return s.response(ctx, r), nil
 }
 
 func (s *InspectionSubmissionItemStore) Create(ctx context.Context, parentID int64, in dto.CreateInspectionSubmissionItemRequest) (dto.InspectionSubmissionItemResponse, error) {
@@ -62,7 +62,7 @@ func (s *InspectionSubmissionItemStore) Create(ctx context.Context, parentID int
 	if err != nil {
 		return dto.InspectionSubmissionItemResponse{}, err
 	}
-	return toInspectionSubmissionItemResponse(r), nil
+	return s.response(ctx, r), nil
 }
 
 func (s *InspectionSubmissionItemStore) Update(ctx context.Context, parentID, id int64, in dto.UpdateInspectionSubmissionItemRequest) (dto.InspectionSubmissionItemResponse, error) {
@@ -88,7 +88,7 @@ func (s *InspectionSubmissionItemStore) Update(ctx context.Context, parentID, id
 		return dto.InspectionSubmissionItemResponse{}, err
 	}
 	s.reclaimReplaced(ctx, previous.Photo, r.Photo)
-	return toInspectionSubmissionItemResponse(r), nil
+	return s.response(ctx, r), nil
 }
 
 func (s *InspectionSubmissionItemStore) Delete(ctx context.Context, parentID, id int64) error {
@@ -105,6 +105,15 @@ func (s *InspectionSubmissionItemStore) Delete(ctx context.Context, parentID, id
 		s.reclaim(ctx, *previous.Photo)
 	}
 	return nil
+}
+
+// response resolves the stored object reference to a URL the caller can read.
+// Inspection evidence is private, so that URL is signed and expires; it is
+// produced here, per response, and never persisted.
+func (s *InspectionSubmissionItemStore) response(ctx context.Context, r gen.InspectionSubmissionItem) dto.InspectionSubmissionItemResponse {
+	out := toInspectionSubmissionItemResponse(r)
+	out.Photo, out.PhotoExpiresAt = fileReadURLPtr(ctx, s.files, r.Photo)
+	return out
 }
 
 func toInspectionSubmissionItemResponse(r gen.InspectionSubmissionItem) dto.InspectionSubmissionItemResponse {

@@ -61,7 +61,11 @@ type InspectionSubmissionResponse struct {
 	StartingLongitude  *decimal.Decimal `json:"starting_longitude"`
 	SubmittedLatitude  *decimal.Decimal `json:"submitted_latitude"`
 	SubmittedLongitude *decimal.Decimal `json:"submitted_longitude"`
-	Signature          *string          `json:"signature" binding:"omitempty,max=500"`
+	// Signature is a signed, time-limited URL — a technician's signature is
+	// evidence, not branding. Render it, never store it.
+	Signature *string `json:"signature" binding:"omitempty,max=500"`
+	// SignatureExpiresAt is when Signature stops resolving; re-read this record.
+	SignatureExpiresAt *time.Time       `json:"signature_expires_at"`
 	Odometer           *decimal.Decimal `json:"odometer"`
 	TotalItems         int32            `json:"total_items"`
 	FailedItemsCount   int32            `json:"failed_items_count"`

@@ -8,6 +8,9 @@ import (
 )
 
 type CreateAssetRequest struct {
+	// archived_at is not writable: archiving is an action
+	// (POST .../archive and .../restore), because a referenced record must be
+	// archived rather than deleted and that is a decision, not a field.
 	Name                        string           `json:"name" binding:"omitempty,max=100"`
 	VinSn                       string           `json:"vin_sn" binding:"omitempty,max=100"`
 	Msrp                        *decimal.Decimal `json:"msrp"`
@@ -66,7 +69,6 @@ type CreateAssetRequest struct {
 	ResidualValue               *decimal.Decimal `json:"residual_value"`
 	MileageCap                  *int32           `json:"mileage_cap"`
 	Notes                       string           `json:"notes"`
-	ArchivedAt                  *time.Time       `json:"archived_at"`
 	ExternalID                  string           `json:"external_id" binding:"omitempty,max=100"`
 	CustomFields                json.RawMessage  `json:"custom_fields"`
 	FuelVolumeUnits             string           `json:"fuel_volume_units" binding:"omitempty,max=20"`
@@ -79,6 +81,9 @@ type CreateAssetRequest struct {
 }
 
 type UpdateAssetRequest struct {
+	// archived_at is not writable: archiving is an action
+	// (POST .../archive and .../restore), because a referenced record must be
+	// archived rather than deleted and that is a decision, not a field.
 	Name                        string           `json:"name" binding:"omitempty,max=100"`
 	VinSn                       string           `json:"vin_sn" binding:"omitempty,max=100"`
 	Msrp                        *decimal.Decimal `json:"msrp"`
@@ -137,7 +142,6 @@ type UpdateAssetRequest struct {
 	ResidualValue               *decimal.Decimal `json:"residual_value"`
 	MileageCap                  *int32           `json:"mileage_cap"`
 	Notes                       string           `json:"notes"`
-	ArchivedAt                  *time.Time       `json:"archived_at"`
 	ExternalID                  string           `json:"external_id" binding:"omitempty,max=100"`
 	CustomFields                json.RawMessage  `json:"custom_fields"`
 	FuelVolumeUnits             string           `json:"fuel_volume_units" binding:"omitempty,max=20"`

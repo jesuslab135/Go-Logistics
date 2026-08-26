@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"regexp"
 	"strconv"
 	"time"
 
@@ -19,7 +20,30 @@ import (
 const (
 	NotificationTireAssignmentPending  = "tire_assignment_pending"
 	NotificationTireAssignmentApproved = "tire_assignment_approved"
+	NotificationWorkOrderAssigned      = "work_order_assigned"
 )
+
+// Notifications are kept for a bounded time and then deleted. Six months covers
+// a quarter-end look-back, which is the longest anyone has needed to say "when
+// was I told about this"; nothing else reads the table.
+const notificationRetention = 180 * 24 * time.Hour
+
+// prunePerRequest bounds the work one list request does. A long-neglected inbox
+// is trimmed over several visits rather than stalling a single one.
+const prunePerRequest = 500
+
+// notificationURLPattern constrains url to an internal path.
+//
+// The column is unconstrained text, so without this a producer could store an
+// absolute URL and the bell would render an off-site link that looks like part
+// of the application - which is a phishing vector inside a trusted surface.
+var notificationURLPattern = regexp.MustCompile(`^/[a-zA-Z0-9/_-]*$`)
+
+// ValidNotificationURL reports whether a producer's url may be stored. An empty
+// url is allowed: not every notification points anywhere.
+func ValidNotificationURL(url string) bool {
+	return url == "" || notificationURLPattern.MatchString(url)
+}
 
 type NotificationHandler struct{ q *gen.Queries }
 
@@ -30,7 +54,7 @@ func NewNotificationHandler(q *gen.Queries) *NotificationHandler {
 // List godoc
 //
 //	@Summary		List the caller's notifications
-//	@Description	Scoped to the authenticated employee within the active company, newest first. The unread count describes the whole inbox, not just the returned page.
+//	@Description	Scoped to the authenticated employee within the active company, newest first. The unread count describes the whole inbox, not just the returned page. Notifications older than 180 days are deleted; the sweep runs opportunistically here rather than on a schedule, because this deployment has nothing to run a cron in.
 //	@Tags			notifications
 //	@Produce		json
 //	@Security		BearerAuth
@@ -45,6 +69,13 @@ func (h *NotificationHandler) List(c *gin.Context) {
 	p := paginate.Parse(c)
 	employee := middleware.EmployeeFromContext(ctx)
 	company := middleware.CompanyFromContext(ctx)
+
+	// Opportunistic retention sweep. Failures are ignored on purpose: the caller
+	// asked for their inbox, and unreclaimed rows are not worth failing that.
+	_ = h.q.PruneNotifications(ctx, gen.PruneNotificationsParams{
+		Before: time.Now().UTC().Add(-notificationRetention),
+		Lim:    prunePerRequest,
+	})
 
 	rows, err := h.q.ListNotifications(ctx, gen.ListNotificationsParams{
 		EmployeeID: employee,

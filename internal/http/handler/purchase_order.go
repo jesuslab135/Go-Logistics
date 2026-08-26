@@ -5,15 +5,24 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"fleet/internal/db/gen"
 	"fleet/internal/http/dto"
 	"fleet/internal/http/middleware"
 	"fleet/internal/platform/paginate"
 )
 
-type PurchaseOrderStore struct{ q *gen.Queries }
+// Totals are derived from the line items and this record's own rate terms,
+// so a write that can change either recomputes them in the same transaction.
+type PurchaseOrderStore struct {
+	q    *gen.Queries
+	pool *pgxpool.Pool
+}
 
-func NewPurchaseOrderStore(q *gen.Queries) *PurchaseOrderStore { return &PurchaseOrderStore{q: q} }
+func NewPurchaseOrderStore(q *gen.Queries, pool *pgxpool.Pool) *PurchaseOrderStore {
+	return &PurchaseOrderStore{q: q, pool: pool}
+}
 
 func (s *PurchaseOrderStore) List(ctx context.Context, p paginate.Params) ([]dto.PurchaseOrderResponse, int64, error) {
 	company := middleware.CompanyFromContext(ctx)
@@ -41,89 +50,98 @@ func (s *PurchaseOrderStore) Get(ctx context.Context, id int64) (dto.PurchaseOrd
 }
 
 func (s *PurchaseOrderStore) Create(ctx context.Context, in dto.CreatePurchaseOrderRequest) (dto.PurchaseOrderResponse, error) {
-	now := time.Now().UTC()
-	r, err := s.q.CreatePurchaseOrder(ctx, gen.CreatePurchaseOrderParams{
-		CompanyID:          middleware.CompanyFromContext(ctx),
-		Number:             in.Number,
-		Description:        in.Description,
-		State:              orDefault(in.State, "DRAFT"),
-		VendorID:           in.VendorID,
-		DestinationID:      in.DestinationID,
-		DiscountType:       orDefault(in.DiscountType, "FIXED"),
-		Discount:           in.Discount,
-		DiscountPercentage: in.DiscountPercentage,
-		Tax1Type:           orDefault(in.Tax1Type, "PERCENTAGE"),
-		Tax1:               in.Tax1,
-		Tax1Percentage:     in.Tax1Percentage,
-		Tax2Type:           orDefault(in.Tax2Type, "PERCENTAGE"),
-		Tax2:               in.Tax2,
-		Tax2Percentage:     in.Tax2Percentage,
-		Shipping:           in.Shipping,
-		Subtotal:           in.Subtotal,
-		TotalAmount:        in.TotalAmount,
-		CreatedByID:        in.CreatedByID,
-		SubmittedAt:        in.SubmittedAt,
-		SubmittedByID:      in.SubmittedByID,
-		RejectedAt:         in.RejectedAt,
-		RejectedByID:       in.RejectedByID,
-		ApprovedAt:         in.ApprovedAt,
-		ApprovedByID:       in.ApprovedByID,
-		PurchasedAt:        in.PurchasedAt,
-		ReceivedPartialAt:  in.ReceivedPartialAt,
-		ReceivedFullAt:     in.ReceivedFullAt,
-		ClosedAt:           in.ClosedAt,
-		Labels:             jsonbOrDefault(in.Labels, "[]"),
-		CustomFields:       jsonbOrDefault(in.CustomFields, "{}"),
-		CreatedAt:          now,
-		UpdatedAt:          now,
-	})
-	if err != nil {
+	// The document has to satisfy whatever this company declared for purchase-orders;
+	// a company that declared nothing pays one indexed lookup.
+	if err := validateCustomFields(ctx, s.q, "purchase-orders", in.CustomFields); err != nil {
 		return dto.PurchaseOrderResponse{}, err
 	}
-	return toPurchaseOrderResponse(r), nil
+
+	var out dto.PurchaseOrderResponse
+	err := inTx(ctx, s.pool, s.q, func(qtx *gen.Queries) error {
+		now := time.Now().UTC()
+		r, err := qtx.CreatePurchaseOrder(ctx, gen.CreatePurchaseOrderParams{
+			CompanyID:          middleware.CompanyFromContext(ctx),
+			CreatedByID:        authorFromContext(ctx),
+			Number:             in.Number,
+			Description:        in.Description,
+			VendorID:           in.VendorID,
+			DestinationID:      in.DestinationID,
+			DiscountType:       orDefault(in.DiscountType, "FIXED"),
+			Discount:           in.Discount,
+			DiscountPercentage: in.DiscountPercentage,
+			Tax1Type:           orDefault(in.Tax1Type, "PERCENTAGE"),
+			Tax1:               in.Tax1,
+			Tax1Percentage:     in.Tax1Percentage,
+			Tax2Type:           orDefault(in.Tax2Type, "PERCENTAGE"),
+			Tax2:               in.Tax2,
+			Tax2Percentage:     in.Tax2Percentage,
+			Shipping:           in.Shipping,
+			Labels:             jsonbOrDefault(in.Labels, "[]"),
+			CustomFields:       jsonbOrDefault(in.CustomFields, "{}"),
+			CreatedAt:          now,
+			UpdatedAt:          now,
+		})
+		if err != nil {
+			return err
+		}
+		if err := recalcPurchaseOrder(ctx, qtx, r.ID, now); err != nil {
+			return err
+		}
+		fresh, err := qtx.GetPurchaseOrder(ctx, gen.GetPurchaseOrderParams{ID: r.ID, CompanyID: middleware.CompanyFromContext(ctx)})
+		if err != nil {
+			return err
+		}
+		out = toPurchaseOrderResponse(fresh)
+		return nil
+	})
+	return out, err
 }
 
 func (s *PurchaseOrderStore) Update(ctx context.Context, id int64, in dto.UpdatePurchaseOrderRequest) (dto.PurchaseOrderResponse, error) {
-	now := time.Now().UTC()
-	r, err := s.q.UpdatePurchaseOrder(ctx, gen.UpdatePurchaseOrderParams{
-		ID:                 id,
-		CompanyID:          middleware.CompanyFromContext(ctx),
-		Number:             in.Number,
-		Description:        in.Description,
-		State:              in.State,
-		VendorID:           in.VendorID,
-		DestinationID:      in.DestinationID,
-		DiscountType:       in.DiscountType,
-		Discount:           in.Discount,
-		DiscountPercentage: in.DiscountPercentage,
-		Tax1Type:           in.Tax1Type,
-		Tax1:               in.Tax1,
-		Tax1Percentage:     in.Tax1Percentage,
-		Tax2Type:           in.Tax2Type,
-		Tax2:               in.Tax2,
-		Tax2Percentage:     in.Tax2Percentage,
-		Shipping:           in.Shipping,
-		Subtotal:           in.Subtotal,
-		TotalAmount:        in.TotalAmount,
-		CreatedByID:        in.CreatedByID,
-		SubmittedAt:        in.SubmittedAt,
-		SubmittedByID:      in.SubmittedByID,
-		RejectedAt:         in.RejectedAt,
-		RejectedByID:       in.RejectedByID,
-		ApprovedAt:         in.ApprovedAt,
-		ApprovedByID:       in.ApprovedByID,
-		PurchasedAt:        in.PurchasedAt,
-		ReceivedPartialAt:  in.ReceivedPartialAt,
-		ReceivedFullAt:     in.ReceivedFullAt,
-		ClosedAt:           in.ClosedAt,
-		Labels:             jsonbOrDefault(in.Labels, "[]"),
-		CustomFields:       jsonbOrDefault(in.CustomFields, "{}"),
-		UpdatedAt:          now,
-	})
-	if err != nil {
+	// The document has to satisfy whatever this company declared for purchase-orders;
+	// a company that declared nothing pays one indexed lookup.
+	if err := validateCustomFields(ctx, s.q, "purchase-orders", in.CustomFields); err != nil {
 		return dto.PurchaseOrderResponse{}, err
 	}
-	return toPurchaseOrderResponse(r), nil
+
+	var out dto.PurchaseOrderResponse
+	err := inTx(ctx, s.pool, s.q, func(qtx *gen.Queries) error {
+		now := time.Now().UTC()
+		_, err := qtx.UpdatePurchaseOrder(ctx, gen.UpdatePurchaseOrderParams{
+			ID:                 id,
+			CompanyID:          middleware.CompanyFromContext(ctx),
+			Number:             in.Number,
+			Description:        in.Description,
+			VendorID:           in.VendorID,
+			DestinationID:      in.DestinationID,
+			DiscountType:       in.DiscountType,
+			Discount:           in.Discount,
+			DiscountPercentage: in.DiscountPercentage,
+			Tax1Type:           in.Tax1Type,
+			Tax1:               in.Tax1,
+			Tax1Percentage:     in.Tax1Percentage,
+			Tax2Type:           in.Tax2Type,
+			Tax2:               in.Tax2,
+			Tax2Percentage:     in.Tax2Percentage,
+			Shipping:           in.Shipping,
+			Labels:             jsonbOrDefault(in.Labels, "[]"),
+			CustomFields:       jsonbOrDefault(in.CustomFields, "{}"),
+			UpdatedAt:          now,
+		})
+		if err != nil {
+			return err
+		}
+		if err := recalcPurchaseOrder(ctx, qtx, id, now); err != nil {
+			return err
+		}
+		fresh, err := qtx.GetPurchaseOrder(ctx, gen.GetPurchaseOrderParams{ID: id, CompanyID: middleware.CompanyFromContext(ctx)})
+		if err != nil {
+			return err
+		}
+		out = toPurchaseOrderResponse(fresh)
+		return nil
+	})
+	return out, err
 }
 
 func (s *PurchaseOrderStore) Delete(ctx context.Context, id int64) error {

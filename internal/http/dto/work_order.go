@@ -8,6 +8,9 @@ import (
 )
 
 type CreateWorkOrderRequest struct {
+	// The money columns this record derives are response-only: the server
+	// computes them from the line items and the rate terms above, in the same
+	// transaction as the write. See internal/domain/money.
 	LocationID            *int64           `json:"location_id"`
 	Number                string           `json:"number" binding:"omitempty,max=50"`
 	Description           string           `json:"description"`
@@ -32,9 +35,6 @@ type CreateWorkOrderRequest struct {
 	LaborMarkupType       string           `json:"labor_markup_type" binding:"omitempty,max=10"`
 	LaborMarkup           decimal.Decimal  `json:"labor_markup"`
 	LaborMarkupPercentage decimal.Decimal  `json:"labor_markup_percentage"`
-	PartsSubtotal         decimal.Decimal  `json:"parts_subtotal"`
-	LaborSubtotal         decimal.Decimal  `json:"labor_subtotal"`
-	Subtotal              decimal.Decimal  `json:"subtotal"`
 	Discount              decimal.Decimal  `json:"discount"`
 	DiscountType          string           `json:"discount_type" binding:"omitempty,max=10"`
 	Tax1                  decimal.Decimal  `json:"tax_1"`
@@ -43,7 +43,6 @@ type CreateWorkOrderRequest struct {
 	Tax2                  decimal.Decimal  `json:"tax_2"`
 	Tax2Type              string           `json:"tax_2_type" binding:"omitempty,max=10"`
 	Tax2Percentage        decimal.Decimal  `json:"tax_2_percentage"`
-	TotalAmount           decimal.Decimal  `json:"total_amount"`
 	InvoiceNumber         string           `json:"invoice_number" binding:"omitempty,max=100"`
 	PurchaseOrderNumber   string           `json:"purchase_order_number" binding:"omitempty,max=100"`
 	CommentsCount         int32            `json:"comments_count"`
@@ -54,6 +53,9 @@ type CreateWorkOrderRequest struct {
 }
 
 type UpdateWorkOrderRequest struct {
+	// The money columns this record derives are response-only: the server
+	// computes them from the line items and the rate terms above, in the same
+	// transaction as the write. See internal/domain/money.
 	LocationID            *int64           `json:"location_id"`
 	Number                string           `json:"number" binding:"omitempty,max=50"`
 	Description           string           `json:"description"`
@@ -78,9 +80,6 @@ type UpdateWorkOrderRequest struct {
 	LaborMarkupType       string           `json:"labor_markup_type" binding:"omitempty,max=10"`
 	LaborMarkup           decimal.Decimal  `json:"labor_markup"`
 	LaborMarkupPercentage decimal.Decimal  `json:"labor_markup_percentage"`
-	PartsSubtotal         decimal.Decimal  `json:"parts_subtotal"`
-	LaborSubtotal         decimal.Decimal  `json:"labor_subtotal"`
-	Subtotal              decimal.Decimal  `json:"subtotal"`
 	Discount              decimal.Decimal  `json:"discount"`
 	DiscountType          string           `json:"discount_type" binding:"omitempty,max=10"`
 	Tax1                  decimal.Decimal  `json:"tax_1"`
@@ -89,7 +88,6 @@ type UpdateWorkOrderRequest struct {
 	Tax2                  decimal.Decimal  `json:"tax_2"`
 	Tax2Type              string           `json:"tax_2_type" binding:"omitempty,max=10"`
 	Tax2Percentage        decimal.Decimal  `json:"tax_2_percentage"`
-	TotalAmount           decimal.Decimal  `json:"total_amount"`
 	InvoiceNumber         string           `json:"invoice_number" binding:"omitempty,max=100"`
 	PurchaseOrderNumber   string           `json:"purchase_order_number" binding:"omitempty,max=100"`
 	CommentsCount         int32            `json:"comments_count"`

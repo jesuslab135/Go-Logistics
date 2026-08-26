@@ -27,13 +27,14 @@ func (l *IdentityLoader) LoadIdentity(ctx context.Context, employeeID, companyID
 	}
 
 	return middleware.Identity{
-		EmployeeID:     row.ID,
-		CompanyID:      companyID,
-		IsActive:       row.IsActive,
-		IsAccountOwner: row.IsAccountOwner,
-		IsMember:       row.IsMember,
-		HasRole:        row.RoleID != nil,
-		IsAdmin:        row.IsAdmin,
-		Permissions:    middleware.DecodePermissions(row.Permissions),
+		EmployeeID:      row.ID,
+		CompanyID:       companyID,
+		IsActive:        row.IsActive,
+		IsAccountOwner:  row.IsAccountOwner,
+		IsMember:        row.IsMember,
+		HasRole:         row.RoleID != nil,
+		IsAdmin:         row.IsAdmin,
+		IsPlatformAdmin: row.IsPlatformAdmin,
+		Permissions:     middleware.DecodePermissions(row.Permissions),
 	}, nil
 }

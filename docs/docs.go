@@ -302,7 +302,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Cross-company employee register. Unlike GET /api/v1/employees this is not scoped to the caller's company: it answers \"who exists anywhere\", which is what assigning an employee to a second company needs.",
+                "description": "Cross-company employee register. Unlike GET /api/v1/employees this is not scoped to the caller's company: it answers \"who exists anywhere\", which is what assigning an employee to a second company needs. Pass company_id to narrow it to one tenant's staff — that is membership (employee_companies), not default_company_id, so an employee who belongs to a company that is not their default is still listed.",
                 "produces": [
                     "application/json"
                 ],
@@ -311,6 +311,12 @@ const docTemplate = `{
                 ],
                 "summary": "List employees across every company",
                 "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Only employees who belong to this company",
+                        "name": "company_id",
+                        "in": "query"
+                    },
                     {
                         "type": "integer",
                         "description": "Page size",
@@ -415,7 +421,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Full overwrite of employee_companies. company_ids must be non-empty — an employee with no membership cannot log in, so use is_active to deactivate instead. default_company_id must be null or one of company_ids; omitting it clears the employee's stored default_company_id, so send it on every call unless you mean to clear it. Every company this call adds or removes must be one the caller themselves belongs to; memberships the call leaves unchanged are kept regardless. The caller can neither hand out membership in a tenant they have no access to — which would also confer admin there, because employee.role_id is global — nor evict the employee from one.",
+                "description": "Full overwrite of employee_companies. Requires a platform administrator. company_ids must be non-empty — an employee with no membership cannot log in, so use is_active to deactivate instead. default_company_id must be null or one of company_ids; omitting it clears the employee's stored default_company_id, so send it on every call unless you mean to clear it. Every addition and removal is recorded in membership_audit in the same transaction as the change.",
                 "consumes": [
                     "application/json"
                 ],
@@ -3415,6 +3421,245 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/custom-field-definitions": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Pass ?resource= to get just one resource's fields, which is what a form asks for. Ordered by position.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "custom-field-definitions"
+                ],
+                "summary": "List custom field definitions",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "assets, employees, issues, parts, purchase-orders, service-entries, vendors or work-orders",
+                        "name": "resource",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Offset",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.CustomFieldDefinitionPage"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "field_type is text, number, date, boolean or select; a select needs options and nothing else may have them. The key is immutable once created, because every stored document is keyed by it. A date value is a business date (YYYY-MM-DD), not a timestamp.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "custom-field-definitions"
+                ],
+                "summary": "Declare a custom field",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.CreateCustomFieldDefinitionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/dto.CustomFieldDefinitionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/custom-field-definitions/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "custom-field-definitions"
+                ],
+                "summary": "Get a custom field definition",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.CustomFieldDefinitionResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "The key and resource cannot change: every stored document is keyed by the one and filed under the other, so changing either would orphan the values already written.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "custom-field-definitions"
+                ],
+                "summary": "Update a custom field definition",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.UpdateCustomFieldDefinitionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.CustomFieldDefinitionResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Stops validating that key. Values already stored under it stay in their documents: they are the tenant's data, and nothing else records them.",
+                "tags": [
+                    "custom-field-definitions"
+                ],
+                "summary": "Delete a custom field definition",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/dashboard/stats": {
             "get": {
                 "security": [
@@ -4471,6 +4716,59 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/fuel-entries/{id}/photos/{child_id}/set-primary": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Promotes this photo and demotes the entry's others, in one transaction. At most one photo per entry may be primary, enforced by a partial unique index — which is why is_primary is not a field on create or update. Zero photos, and photos with no primary among them, are both valid: deleting the primary promotes nothing, because auto-promotion would designate a photo nobody chose.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "fuel-photos"
+                ],
+                "summary": "Make a fuel photo the primary one",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Fuel entry id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Photo id",
+                        "name": "child_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.FuelPhotoResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -6063,6 +6361,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Files a stock movement and applies it: part_inventory.available_quantity moves by adjustment_quantity in the same transaction. adjustment_quantity is signed — negative consumes, positive receives. previous_quantity and current_quantity are server-derived and returned, not sent; user_id is stamped from the caller.",
                 "consumes": [
                     "application/json"
                 ],
@@ -6093,6 +6392,12 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -6137,46 +6442,55 @@ const docTemplate = `{
                         }
                     }
                 }
-            },
-            "put": {
+            }
+        },
+        "/api/v1/inventory-journal-entries/{id}/reverse": {
+            "post": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "consumes": [
-                    "application/json"
-                ],
+                "description": "Files an offsetting entry and moves the stock back, in one transaction. The original is left untouched — the correction is itself a movement, and both rows stay visible. An entry can be reversed once: a second attempt is 409, because repeated reversals would drive the stock arbitrarily far from what the ledger sums to. A reversal cannot itself be reversed; reverse the original instead.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "inventory-journal-entries"
                 ],
-                "summary": "Update inventory-journal-entries",
+                "summary": "Reverse an inventory journal entry",
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "id",
+                        "description": "Entry id",
                         "name": "id",
                         "in": "path",
                         "required": true
-                    },
-                    {
-                        "description": "body",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dto.UpdateInventoryJournalEntryRequest"
-                        }
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "OK",
+                    "201": {
+                        "description": "Created",
                         "schema": {
                             "$ref": "#/definitions/dto.InventoryJournalEntryResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "404": {
@@ -6184,34 +6498,9 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "tags": [
-                    "inventory-journal-entries"
-                ],
-                "summary": "Delete inventory-journal-entries",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "id",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
                     },
-                    "401": {
-                        "description": "Unauthorized",
+                    "409": {
+                        "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -7627,7 +7916,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Scoped to the authenticated employee within the active company, newest first. The unread count describes the whole inbox, not just the returned page.",
+                "description": "Scoped to the authenticated employee within the active company, newest first. The unread count describes the whole inbox, not just the returned page. Notifications older than 180 days are deleted; the sweep runs opportunistically here rather than on a schedule, because this deployment has nothing to run a cron in.",
                 "produces": [
                     "application/json"
                 ],
@@ -9156,6 +9445,92 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/purchase-orders/{id}/approve": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "PENDING_APPROVAL to APPROVED. Requires the purchase_orders.approve permission. Stamps approved_at and approved_by_id from the caller.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "purchase-orders"
+                ],
+                "summary": "Approve a purchase order",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Purchase order id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PurchaseOrderResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/purchase-orders/{id}/close": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "RECEIVED_FULL to CLOSED, which is terminal. Stamps closed_at.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "purchase-orders"
+                ],
+                "summary": "Close a purchase order",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Purchase order id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PurchaseOrderResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/purchase-orders/{id}/line-items": {
             "get": {
                 "security": [
@@ -9389,6 +9764,444 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/purchase-orders/{id}/override-total": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "As for work orders: replaces the computed total with an audited figure, null clears it, and a line-item edit clears it automatically.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "purchase-orders"
+                ],
+                "summary": "Override a purchase order's total",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Purchase order id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Override",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.TotalOverrideRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PurchaseOrderResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/purchase-orders/{id}/purchase": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "APPROVED to PURCHASED. Stamps purchased_at.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "purchase-orders"
+                ],
+                "summary": "Mark a purchase order as purchased",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Purchase order id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PurchaseOrderResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/purchase-orders/{id}/receive-full": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "PURCHASED or RECEIVED_PARTIAL to RECEIVED_FULL. Stamps received_full_at.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "purchase-orders"
+                ],
+                "summary": "Record full receipt",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Purchase order id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PurchaseOrderResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/purchase-orders/{id}/receive-partial": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "PURCHASED to RECEIVED_PARTIAL. Stamps received_partial_at.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "purchase-orders"
+                ],
+                "summary": "Record a partial receipt",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Purchase order id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PurchaseOrderResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/purchase-orders/{id}/reject": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "PENDING_APPROVAL to REJECTED. Requires the purchase_orders.approve permission and a reason, which is stored on the order and in its history. Rejection is not terminal — the order is revised back to DRAFT and resubmitted.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "purchase-orders"
+                ],
+                "summary": "Reject a purchase order",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Purchase order id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Rejection reason",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.PurchaseOrderTransitionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PurchaseOrderResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/purchase-orders/{id}/revise": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "REJECTED back to DRAFT so it can be edited and resubmitted. Stamps nothing: it undoes a decision rather than making one, and the rejection stays in the history.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "purchase-orders"
+                ],
+                "summary": "Revise a rejected purchase order",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Purchase order id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PurchaseOrderResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/purchase-orders/{id}/status-logs": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Append-only transition history, newest first. Each row records the state moved from and to, who moved it, and the reason where one was required. Written inside the transaction that moved the order, so it cannot disagree with the order.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "purchase-orders"
+                ],
+                "summary": "List purchase-order transitions",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Purchase order id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Offset",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PurchaseOrderStatusLogPage"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/purchase-orders/{id}/status-logs/{child_id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "purchase-orders"
+                ],
+                "summary": "Get one purchase-order transition",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Purchase order id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Transition id",
+                        "name": "child_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PurchaseOrderStatusLogResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/purchase-orders/{id}/submit": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "DRAFT or REJECTED to PENDING_APPROVAL. Stamps submitted_at and submitted_by_id.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "purchase-orders"
+                ],
+                "summary": "Submit a purchase order for approval",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Purchase order id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PurchaseOrderResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -10039,6 +10852,70 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/service-entries/{id}/override-total": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "As for work orders: replaces the computed total with an audited figure, null clears it, and a line-item edit clears it automatically.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "service-entries"
+                ],
+                "summary": "Override a service entry's total",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Service entry id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Override",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.TotalOverrideRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ServiceEntryResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -12407,6 +13284,219 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/trailer-classifications": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "The company's own vocabulary for classifying trailers. It replaced two free-text columns, where \"Dry Van\", \"DRY VAN\" and \"dry van\" counted as three classifications to every filter and report. Each company's catalog was seeded from the values that company was already using; no list is seeded on top of that.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "trailer-classifications"
+                ],
+                "summary": "List trailer classifications",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page size",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Offset",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.TrailerClassificationPage"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "trailer-classifications"
+                ],
+                "summary": "Create a trailer classification",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.CreateTrailerClassificationRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/dto.TrailerClassificationResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/trailer-classifications/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "trailer-classifications"
+                ],
+                "summary": "Get a trailer classification",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.TrailerClassificationResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "trailer-classifications"
+                ],
+                "summary": "Update a trailer classification",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.UpdateTrailerClassificationRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.TrailerClassificationResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Trailers referencing it become unclassified rather than blocking the delete: retiring a term nobody uses should not require re-classifying every trailer that ever carried it.",
+                "tags": [
+                    "trailer-classifications"
+                ],
+                "summary": "Delete a trailer classification",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/uploads": {
             "post": {
                 "security": [
@@ -12434,7 +13524,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "photo, document or generic (default). Narrows the accepted media types.",
+                        "description": "asset_photo, company_logo, receipt, signature, inspection_photo, media, photo, document or generic (default). Narrows the accepted media types, and decides whether the object is publicly readable — only asset_photo and company_logo are.",
                         "name": "purpose",
                         "in": "formData"
                     }
@@ -15084,6 +16174,70 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/work-orders/{id}/override-total": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Replaces the computed total with an explicit figure, recording who set it and why. The component columns (parts_subtotal, labor_subtotal, subtotal) stay computed, so the difference between what the document adds up to and what it is being charged at stays visible — which is the reason an override is audited. Send a null amount to drop the override and return to the computed total. Any later edit to the line items clears it automatically.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "work-orders"
+                ],
+                "summary": "Override a work order's total",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Work order id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Override",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.TotalOverrideRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.WorkOrderResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/work-orders/{id}/status-logs": {
             "get": {
                 "security": [
@@ -15091,6 +16245,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Append-only status history, newest first. Rows are written by the operation that changes the work order's status, inside the same transaction, so this history cannot disagree with the work order. actor_type is \"employee\" or \"system\"; actor_employee_id is null for a system transition and for rows written before actors were recorded.",
                 "produces": [
                     "application/json"
                 ],
@@ -15128,55 +16283,6 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "work-order-status-logs"
-                ],
-                "summary": "Create work-order-status-logs",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "parent id",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "body",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dto.CreateWorkOrderStatusLogRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "$ref": "#/definitions/dto.WorkOrderStatusLogResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -15228,53 +16334,40 @@ const docTemplate = `{
                         }
                     }
                 }
-            },
-            "put": {
+            }
+        },
+        "/api/v1/{resource}/{id}/archive": {
+            "post": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "consumes": [
-                    "application/json"
-                ],
+                "description": "Retires the record. Use this instead of DELETE for anything other records reference — DELETE answers 409 resource_referenced in that case. Archived records disappear from lists and pickers unless ?include_archived=true. Archiving needs the same permission as editing: deciding a vendor is no longer used is the same kind of decision as correcting its address.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "work-order-status-logs"
+                    "archive"
                 ],
-                "summary": "Update work-order-status-logs",
+                "summary": "Archive a record",
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "parent id",
+                        "description": "id",
                         "name": "id",
                         "in": "path",
                         "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "id",
-                        "name": "child_id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "body",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dto.UpdateWorkOrderStatusLogRequest"
-                        }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "The archived record, in its own resource's shape"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/dto.WorkOrderStatusLogResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "404": {
@@ -15284,39 +16377,44 @@ const docTemplate = `{
                         }
                     }
                 }
-            },
-            "delete": {
+            }
+        },
+        "/api/v1/{resource}/{id}/restore": {
+            "post": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "tags": [
-                    "work-order-status-logs"
+                "description": "Clears archived_at, returning the record to the lists and pickers it was hidden from.",
+                "produces": [
+                    "application/json"
                 ],
-                "summary": "Delete work-order-status-logs",
+                "tags": [
+                    "archive"
+                ],
+                "summary": "Restore an archived record",
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "parent id",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
                         "description": "id",
-                        "name": "child_id",
+                        "name": "id",
                         "in": "path",
                         "required": true
                     }
                 ],
                 "responses": {
-                    "204": {
-                        "description": "No Content"
+                    "200": {
+                        "description": "The restored record, in its own resource's shape"
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -16315,9 +17413,6 @@ const docTemplate = `{
                 "annual_percentage_rate": {
                     "type": "number"
                 },
-                "archived_at": {
-                    "type": "string"
-                },
                 "asset_type_id": {
                     "type": "integer"
                 },
@@ -16470,6 +17565,7 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "name": {
+                    "description": "archived_at is not writable: archiving is an action\n(POST .../archive and .../restore), because a referenced record must be\narchived rather than deleted and that is a decision, not a field.",
                     "type": "string",
                     "maxLength": 100
                 },
@@ -16748,6 +17844,49 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.CreateCustomFieldDefinitionRequest": {
+            "type": "object",
+            "required": [
+                "field_type",
+                "key",
+                "label",
+                "resource"
+            ],
+            "properties": {
+                "field_type": {
+                    "description": "FieldType is text, number, date, boolean or select.",
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "key": {
+                    "description": "Key is what the value is stored under. It cannot be changed afterwards:\nevery stored document is keyed by it.",
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "label": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "options": {
+                    "description": "Options are the permitted values for a select, and are ignored otherwise.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "position": {
+                    "type": "integer"
+                },
+                "required": {
+                    "type": "boolean"
+                },
+                "resource": {
+                    "description": "Resource is the API's own plural name: \"assets\", \"parts\", \"work-orders\".",
+                    "type": "string",
+                    "maxLength": 50
+                }
+            }
+        },
         "dto.CreateEmployeeRequest": {
             "type": "object",
             "properties": {
@@ -16995,9 +18134,6 @@ const docTemplate = `{
                 "file_size": {
                     "type": "integer"
                 },
-                "is_primary": {
-                    "type": "boolean"
-                },
                 "mime_type": {
                     "type": "string",
                     "maxLength": 100
@@ -17101,9 +18237,6 @@ const docTemplate = `{
         "dto.CreateInspectionFormRequest": {
             "type": "object",
             "properties": {
-                "archived_at": {
-                    "type": "string"
-                },
                 "auto_create_issues": {
                     "type": "boolean"
                 },
@@ -17118,6 +18251,7 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "title": {
+                    "description": "archived_at is not writable: archiving is an action\n(POST .../archive and .../restore), because a referenced record must be\narchived rather than deleted and that is a decision, not a field.",
                     "type": "string",
                     "maxLength": 255
                 },
@@ -17233,14 +18367,12 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "adjustment_quantity": {
+                    "description": "AdjustmentQuantity is signed: negative consumes stock, positive receives it.",
                     "type": "number"
                 },
                 "adjustment_type": {
                     "type": "string",
                     "maxLength": 20
-                },
-                "current_quantity": {
-                    "type": "number"
                 },
                 "notes": {
                     "type": "string"
@@ -17250,9 +18382,6 @@ const docTemplate = `{
                 },
                 "part_location_detail_id": {
                     "type": "integer"
-                },
-                "previous_quantity": {
-                    "type": "number"
                 },
                 "purchase_order_line_id": {
                     "type": "integer"
@@ -17265,9 +18394,6 @@ const docTemplate = `{
                 },
                 "unit_cost": {
                     "type": "number"
-                },
-                "user_id": {
-                    "type": "integer"
                 },
                 "vendor_id": {
                     "type": "integer"
@@ -17595,9 +18721,6 @@ const docTemplate = `{
         "dto.CreatePartRequest": {
             "type": "object",
             "properties": {
-                "archived_at": {
-                    "type": "string"
-                },
                 "custom_fields": {
                     "type": "array",
                     "items": {
@@ -17624,6 +18747,7 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "part_number": {
+                    "description": "archived_at is not writable: archiving is an action\n(POST .../archive and .../restore), because a referenced record must be\narchived rather than deleted and that is a decision, not a field.",
                     "type": "string",
                     "maxLength": 100
                 },
@@ -17650,15 +18774,13 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "part_id": {
+                    "description": "The money columns this record derives are response-only: the server\ncomputes them from the line items and the rate terms above, in the same\ntransaction as the write. See internal/domain/money.",
                     "type": "integer"
                 },
                 "position": {
                     "type": "integer"
                 },
                 "quantity": {
-                    "type": "number"
-                },
-                "subtotal": {
                     "type": "number"
                 },
                 "total_received": {
@@ -17672,18 +18794,6 @@ const docTemplate = `{
         "dto.CreatePurchaseOrderRequest": {
             "type": "object",
             "properties": {
-                "approved_at": {
-                    "type": "string"
-                },
-                "approved_by_id": {
-                    "type": "integer"
-                },
-                "closed_at": {
-                    "type": "string"
-                },
-                "created_by_id": {
-                    "type": "integer"
-                },
                 "custom_fields": {
                     "type": "array",
                     "items": {
@@ -17707,44 +18817,18 @@ const docTemplate = `{
                     "maxLength": 10
                 },
                 "labels": {
+                    "description": "state, the workflow timestamps, the actor ids and rejection_reason are\nresponse-only. They are moved by POST /purchase-orders/{id}/{action},\nwhich is the only thing that can check a transition is legal and record\nwho made it; created_by_id is stamped from the caller.",
                     "type": "array",
                     "items": {
                         "type": "integer"
                     }
                 },
                 "number": {
+                    "description": "The money columns this record derives are response-only: the server\ncomputes them from the line items and the rate terms above, in the same\ntransaction as the write. See internal/domain/money.",
                     "type": "string",
                     "maxLength": 50
                 },
-                "purchased_at": {
-                    "type": "string"
-                },
-                "received_full_at": {
-                    "type": "string"
-                },
-                "received_partial_at": {
-                    "type": "string"
-                },
-                "rejected_at": {
-                    "type": "string"
-                },
-                "rejected_by_id": {
-                    "type": "integer"
-                },
                 "shipping": {
-                    "type": "number"
-                },
-                "state": {
-                    "type": "string",
-                    "maxLength": 20
-                },
-                "submitted_at": {
-                    "type": "string"
-                },
-                "submitted_by_id": {
-                    "type": "integer"
-                },
-                "subtotal": {
                     "type": "number"
                 },
                 "tax_1": {
@@ -17766,9 +18850,6 @@ const docTemplate = `{
                 "tax_2_type": {
                     "type": "string",
                     "maxLength": 10
-                },
-                "total_amount": {
-                    "type": "number"
                 },
                 "vendor_id": {
                     "type": "integer"
@@ -17804,6 +18885,7 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "line_item_type": {
+                    "description": "The money columns this record derives are response-only: the server\ncomputes them from the line items and the rate terms above, in the same\ntransaction as the write. See internal/domain/money.",
                     "type": "string",
                     "maxLength": 20
                 },
@@ -17824,9 +18906,6 @@ const docTemplate = `{
                 },
                 "service_task_id": {
                     "type": "integer"
-                },
-                "subtotal": {
-                    "type": "number"
                 },
                 "technician_id": {
                     "type": "integer"
@@ -17873,19 +18952,14 @@ const docTemplate = `{
                         "type": "integer"
                     }
                 },
-                "labor_subtotal": {
-                    "type": "number"
-                },
                 "labor_time_seconds": {
                     "type": "integer"
                 },
                 "meter_value": {
                     "type": "number"
                 },
-                "parts_subtotal": {
-                    "type": "number"
-                },
                 "reference": {
+                    "description": "The money columns this record derives are response-only: the server\ncomputes them from the line items and the rate terms above, in the same\ntransaction as the write. See internal/domain/money.",
                     "type": "string",
                     "maxLength": 100
                 },
@@ -17895,9 +18969,6 @@ const docTemplate = `{
                 "status": {
                     "type": "string",
                     "maxLength": 20
-                },
-                "subtotal": {
-                    "type": "number"
                 },
                 "tax_1": {
                     "type": "number"
@@ -17918,9 +18989,6 @@ const docTemplate = `{
                 "tax_2_type": {
                     "type": "string",
                     "maxLength": 10
-                },
-                "total_amount": {
-                    "type": "number"
                 },
                 "vendor_id": {
                     "type": "integer"
@@ -17999,9 +19067,6 @@ const docTemplate = `{
         "dto.CreateServiceTaskRequest": {
             "type": "object",
             "properties": {
-                "archived_at": {
-                    "type": "string"
-                },
                 "description": {
                     "type": "string"
                 },
@@ -18009,6 +19074,7 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "name": {
+                    "description": "archived_at is not writable: archiving is an action\n(POST .../archive and .../restore), because a referenced record must be\narchived rather than deleted and that is a decision, not a field.",
                     "type": "string",
                     "maxLength": 255
                 },
@@ -18200,6 +19266,22 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.CreateTrailerClassificationRequest": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "position": {
+                    "description": "Position orders the picker. Ties fall back to name.",
+                    "type": "integer"
+                }
+            }
+        },
         "dto.CreateVehicleMakeRequest": {
             "type": "object",
             "required": [
@@ -18230,9 +19312,6 @@ const docTemplate = `{
         "dto.CreateVendorRequest": {
             "type": "object",
             "properties": {
-                "archived_at": {
-                    "type": "string"
-                },
                 "city": {
                     "type": "string",
                     "maxLength": 100
@@ -18288,6 +19367,7 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "name": {
+                    "description": "archived_at is not writable: archiving is an action\n(POST .../archive and .../restore), because a referenced record must be\narchived rather than deleted and that is a decision, not a field.",
                     "type": "string",
                     "maxLength": 200
                 },
@@ -18398,15 +19478,10 @@ const docTemplate = `{
                 "description": {
                     "type": "string"
                 },
-                "labor_cost": {
-                    "type": "number"
-                },
                 "line_item_type": {
+                    "description": "The money columns this record derives are response-only: the server\ncomputes them from the line items and the rate terms above, in the same\ntransaction as the write. See internal/domain/money.",
                     "type": "string",
                     "maxLength": 20
-                },
-                "parts_cost": {
-                    "type": "number"
                 },
                 "position": {
                     "type": "integer"
@@ -18414,9 +19489,6 @@ const docTemplate = `{
                 "service_task": {
                     "type": "string",
                     "maxLength": 255
-                },
-                "subtotal": {
-                    "type": "number"
                 },
                 "title": {
                     "type": "string",
@@ -18499,13 +19571,11 @@ const docTemplate = `{
                     "type": "string",
                     "maxLength": 10
                 },
-                "labor_subtotal": {
-                    "type": "number"
-                },
                 "labor_time_seconds": {
                     "type": "integer"
                 },
                 "location_id": {
+                    "description": "The money columns this record derives are response-only: the server\ncomputes them from the line items and the rate terms above, in the same\ntransaction as the write. See internal/domain/money.",
                     "type": "integer"
                 },
                 "number": {
@@ -18522,9 +19592,6 @@ const docTemplate = `{
                     "type": "string",
                     "maxLength": 10
                 },
-                "parts_subtotal": {
-                    "type": "number"
-                },
                 "purchase_order_number": {
                     "type": "string",
                     "maxLength": 100
@@ -18540,9 +19607,6 @@ const docTemplate = `{
                 },
                 "status_id": {
                     "type": "integer"
-                },
-                "subtotal": {
-                    "type": "number"
                 },
                 "tax_1": {
                     "type": "number"
@@ -18564,21 +19628,7 @@ const docTemplate = `{
                     "type": "string",
                     "maxLength": 10
                 },
-                "total_amount": {
-                    "type": "number"
-                },
                 "vendor_id": {
-                    "type": "integer"
-                }
-            }
-        },
-        "dto.CreateWorkOrderStatusLogRequest": {
-            "type": "object",
-            "properties": {
-                "changed_at": {
-                    "type": "string"
-                },
-                "status_id": {
                     "type": "integer"
                 }
             }
@@ -18636,6 +19686,70 @@ const docTemplate = `{
                 },
                 "unit_cost": {
                     "type": "number"
+                }
+            }
+        },
+        "dto.CustomFieldDefinitionPage": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.CustomFieldDefinitionResponse"
+                    }
+                },
+                "has_next": {
+                    "type": "boolean"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.CustomFieldDefinitionResponse": {
+            "type": "object",
+            "properties": {
+                "company_id": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "field_type": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "key": {
+                    "type": "string"
+                },
+                "label": {
+                    "type": "string"
+                },
+                "options": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "position": {
+                    "type": "integer"
+                },
+                "required": {
+                    "type": "boolean"
+                },
+                "resource": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
                 }
             }
         },
@@ -19096,8 +20210,13 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "file": {
+                    "description": "File is a signed, time-limited URL: a fuel receipt is a business record,\nnot branding, so it is not anonymously readable. Render it, never store it.",
                     "type": "string",
                     "maxLength": 500
+                },
+                "file_expires_at": {
+                    "description": "FileExpiresAt is when File stops resolving. Re-read this record for a fresh\nURL; null would mean the object is public, which a receipt never is.",
+                    "type": "string"
                 },
                 "file_name": {
                     "type": "string",
@@ -19419,8 +20538,13 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "photo": {
+                    "description": "Photo is a signed, time-limited URL — inspection evidence is a business\nrecord, not branding. Render it, never store it.",
                     "type": "string",
                     "maxLength": 500
+                },
+                "photo_expires_at": {
+                    "description": "PhotoExpiresAt is when Photo stops resolving; re-read this record.",
+                    "type": "string"
                 },
                 "remark": {
                     "type": "string"
@@ -19503,8 +20627,13 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "signature": {
+                    "description": "Signature is a signed, time-limited URL — a technician's signature is\nevidence, not branding. Render it, never store it.",
                     "type": "string",
                     "maxLength": 500
+                },
+                "signature_expires_at": {
+                    "description": "SignatureExpiresAt is when Signature stops resolving; re-read this record.",
+                    "type": "string"
                 },
                 "started_at": {
                     "type": "string"
@@ -19634,6 +20763,10 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "reason_id": {
+                    "type": "integer"
+                },
+                "reversal_of_id": {
+                    "description": "ReversalOfID names the entry this one offsets, and is null for an ordinary\nmovement. An entry that has been reversed keeps its own values: the\ncorrection is a second movement, not an edit of the first.",
                     "type": "integer"
                 },
                 "transfer_part_location_id": {
@@ -20208,8 +21341,13 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "file": {
+                    "description": "File is a signed, time-limited URL: uploaded media belongs to one tenant\nand is not anonymously readable. Render it, never store it.",
                     "type": "string",
                     "maxLength": 500
+                },
+                "file_expires_at": {
+                    "description": "FileExpiresAt is when File and Thumbnail stop resolving; re-read this record.",
+                    "type": "string"
                 },
                 "file_size": {
                     "type": "integer"
@@ -20795,6 +21933,68 @@ const docTemplate = `{
                 },
                 "vendor_id": {
                     "type": "integer"
+                }
+            }
+        },
+        "dto.PurchaseOrderStatusLogPage": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.PurchaseOrderStatusLogResponse"
+                    }
+                },
+                "has_next": {
+                    "type": "boolean"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.PurchaseOrderStatusLogResponse": {
+            "type": "object",
+            "properties": {
+                "actor_employee_id": {
+                    "type": "integer"
+                },
+                "actor_type": {
+                    "type": "string"
+                },
+                "changed_at": {
+                    "type": "string"
+                },
+                "from_state": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "purchase_order_id": {
+                    "type": "integer"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "to_state": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.PurchaseOrderTransitionRequest": {
+            "type": "object",
+            "properties": {
+                "reason": {
+                    "description": "Reason is required when rejecting and ignored otherwise. It is recorded on\nthe order and in its status log.",
+                    "type": "string",
+                    "maxLength": 2000
                 }
             }
         },
@@ -21675,6 +22875,60 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.TotalOverrideRequest": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "description": "Amount is the figure to charge. Null clears the override and returns the\ndocument to its computed total.",
+                    "type": "number"
+                },
+                "reason": {
+                    "description": "Reason is required whenever Amount is given: an unexplained override is a\nnumber nobody can defend later.",
+                    "type": "string",
+                    "maxLength": 2000
+                }
+            }
+        },
+        "dto.TrailerClassificationPage": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.TrailerClassificationResponse"
+                    }
+                },
+                "has_next": {
+                    "type": "boolean"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.TrailerClassificationResponse": {
+            "type": "object",
+            "properties": {
+                "company_id": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "position": {
+                    "type": "integer"
+                }
+            }
+        },
         "dto.TrailerResponse": {
             "type": "object",
             "properties": {
@@ -21685,13 +22939,19 @@ const docTemplate = `{
                 "asset_id": {
                     "type": "integer"
                 },
-                "classification": {
-                    "type": "string",
-                    "maxLength": 100
+                "classification_2_id": {
+                    "type": "integer"
                 },
-                "classification_2": {
-                    "type": "string",
-                    "maxLength": 100
+                "classification_2_name": {
+                    "type": "string"
+                },
+                "classification_id": {
+                    "description": "Classification names a row in the company's trailer_classification\ncatalog. It used to be free text, which meant \"Dry Van\", \"DRY VAN\" and\n\"dry van\" were three different classifications to every filter and report.",
+                    "type": "integer"
+                },
+                "classification_name": {
+                    "description": "The resolved catalog names, empty when no classification is set.",
+                    "type": "string"
                 },
                 "contract_end": {
                     "type": "string"
@@ -21832,9 +23092,6 @@ const docTemplate = `{
                 },
                 "annual_percentage_rate": {
                     "type": "number"
-                },
-                "archived_at": {
-                    "type": "string"
                 },
                 "asset_type_id": {
                     "type": "integer"
@@ -21988,6 +23245,7 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "name": {
+                    "description": "archived_at is not writable: archiving is an action\n(POST .../archive and .../restore), because a referenced record must be\narchived rather than deleted and that is a decision, not a field.",
                     "type": "string",
                     "maxLength": 100
                 },
@@ -22251,6 +23509,35 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.UpdateCustomFieldDefinitionRequest": {
+            "type": "object",
+            "required": [
+                "field_type",
+                "label"
+            ],
+            "properties": {
+                "field_type": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "label": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "options": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "position": {
+                    "type": "integer"
+                },
+                "required": {
+                    "type": "boolean"
+                }
+            }
+        },
         "dto.UpdateEmployeeRequest": {
             "type": "object",
             "properties": {
@@ -22497,9 +23784,6 @@ const docTemplate = `{
                 "file_size": {
                     "type": "integer"
                 },
-                "is_primary": {
-                    "type": "boolean"
-                },
                 "mime_type": {
                     "type": "string",
                     "maxLength": 100
@@ -22603,9 +23887,6 @@ const docTemplate = `{
         "dto.UpdateInspectionFormRequest": {
             "type": "object",
             "properties": {
-                "archived_at": {
-                    "type": "string"
-                },
                 "auto_create_issues": {
                     "type": "boolean"
                 },
@@ -22620,6 +23901,7 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "title": {
+                    "description": "archived_at is not writable: archiving is an action\n(POST .../archive and .../restore), because a referenced record must be\narchived rather than deleted and that is a decision, not a field.",
                     "type": "string",
                     "maxLength": 255
                 },
@@ -22728,54 +24010,6 @@ const docTemplate = `{
                 "name": {
                     "type": "string",
                     "maxLength": 100
-                }
-            }
-        },
-        "dto.UpdateInventoryJournalEntryRequest": {
-            "type": "object",
-            "properties": {
-                "adjustment_quantity": {
-                    "type": "number"
-                },
-                "adjustment_type": {
-                    "type": "string",
-                    "maxLength": 20
-                },
-                "current_quantity": {
-                    "type": "number"
-                },
-                "notes": {
-                    "type": "string"
-                },
-                "part_id": {
-                    "type": "integer"
-                },
-                "part_location_detail_id": {
-                    "type": "integer"
-                },
-                "previous_quantity": {
-                    "type": "number"
-                },
-                "purchase_order_line_id": {
-                    "type": "integer"
-                },
-                "reason_id": {
-                    "type": "integer"
-                },
-                "transfer_part_location_id": {
-                    "type": "integer"
-                },
-                "unit_cost": {
-                    "type": "number"
-                },
-                "user_id": {
-                    "type": "integer"
-                },
-                "vendor_id": {
-                    "type": "integer"
-                },
-                "work_order_id": {
-                    "type": "integer"
                 }
             }
         },
@@ -23097,9 +24331,6 @@ const docTemplate = `{
         "dto.UpdatePartRequest": {
             "type": "object",
             "properties": {
-                "archived_at": {
-                    "type": "string"
-                },
                 "custom_fields": {
                     "type": "array",
                     "items": {
@@ -23126,6 +24357,7 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "part_number": {
+                    "description": "archived_at is not writable: archiving is an action\n(POST .../archive and .../restore), because a referenced record must be\narchived rather than deleted and that is a decision, not a field.",
                     "type": "string",
                     "maxLength": 100
                 },
@@ -23152,15 +24384,13 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "part_id": {
+                    "description": "The money columns this record derives are response-only: the server\ncomputes them from the line items and the rate terms above, in the same\ntransaction as the write. See internal/domain/money.",
                     "type": "integer"
                 },
                 "position": {
                     "type": "integer"
                 },
                 "quantity": {
-                    "type": "number"
-                },
-                "subtotal": {
                     "type": "number"
                 },
                 "total_received": {
@@ -23174,18 +24404,6 @@ const docTemplate = `{
         "dto.UpdatePurchaseOrderRequest": {
             "type": "object",
             "properties": {
-                "approved_at": {
-                    "type": "string"
-                },
-                "approved_by_id": {
-                    "type": "integer"
-                },
-                "closed_at": {
-                    "type": "string"
-                },
-                "created_by_id": {
-                    "type": "integer"
-                },
                 "custom_fields": {
                     "type": "array",
                     "items": {
@@ -23209,44 +24427,18 @@ const docTemplate = `{
                     "maxLength": 10
                 },
                 "labels": {
+                    "description": "state, the workflow timestamps, the actor ids and rejection_reason are\nresponse-only. They are moved by POST /purchase-orders/{id}/{action},\nwhich is the only thing that can check a transition is legal and record\nwho made it; created_by_id is stamped from the caller.",
                     "type": "array",
                     "items": {
                         "type": "integer"
                     }
                 },
                 "number": {
+                    "description": "The money columns this record derives are response-only: the server\ncomputes them from the line items and the rate terms above, in the same\ntransaction as the write. See internal/domain/money.",
                     "type": "string",
                     "maxLength": 50
                 },
-                "purchased_at": {
-                    "type": "string"
-                },
-                "received_full_at": {
-                    "type": "string"
-                },
-                "received_partial_at": {
-                    "type": "string"
-                },
-                "rejected_at": {
-                    "type": "string"
-                },
-                "rejected_by_id": {
-                    "type": "integer"
-                },
                 "shipping": {
-                    "type": "number"
-                },
-                "state": {
-                    "type": "string",
-                    "maxLength": 20
-                },
-                "submitted_at": {
-                    "type": "string"
-                },
-                "submitted_by_id": {
-                    "type": "integer"
-                },
-                "subtotal": {
                     "type": "number"
                 },
                 "tax_1": {
@@ -23268,9 +24460,6 @@ const docTemplate = `{
                 "tax_2_type": {
                     "type": "string",
                     "maxLength": 10
-                },
-                "total_amount": {
-                    "type": "number"
                 },
                 "vendor_id": {
                     "type": "integer"
@@ -23306,6 +24495,7 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "line_item_type": {
+                    "description": "The money columns this record derives are response-only: the server\ncomputes them from the line items and the rate terms above, in the same\ntransaction as the write. See internal/domain/money.",
                     "type": "string",
                     "maxLength": 20
                 },
@@ -23326,9 +24516,6 @@ const docTemplate = `{
                 },
                 "service_task_id": {
                     "type": "integer"
-                },
-                "subtotal": {
-                    "type": "number"
                 },
                 "technician_id": {
                     "type": "integer"
@@ -23375,19 +24562,14 @@ const docTemplate = `{
                         "type": "integer"
                     }
                 },
-                "labor_subtotal": {
-                    "type": "number"
-                },
                 "labor_time_seconds": {
                     "type": "integer"
                 },
                 "meter_value": {
                     "type": "number"
                 },
-                "parts_subtotal": {
-                    "type": "number"
-                },
                 "reference": {
+                    "description": "The money columns this record derives are response-only: the server\ncomputes them from the line items and the rate terms above, in the same\ntransaction as the write. See internal/domain/money.",
                     "type": "string",
                     "maxLength": 100
                 },
@@ -23397,9 +24579,6 @@ const docTemplate = `{
                 "status": {
                     "type": "string",
                     "maxLength": 20
-                },
-                "subtotal": {
-                    "type": "number"
                 },
                 "tax_1": {
                     "type": "number"
@@ -23420,9 +24599,6 @@ const docTemplate = `{
                 "tax_2_type": {
                     "type": "string",
                     "maxLength": 10
-                },
-                "total_amount": {
-                    "type": "number"
                 },
                 "vendor_id": {
                     "type": "integer"
@@ -23501,9 +24677,6 @@ const docTemplate = `{
         "dto.UpdateServiceTaskRequest": {
             "type": "object",
             "properties": {
-                "archived_at": {
-                    "type": "string"
-                },
                 "description": {
                     "type": "string"
                 },
@@ -23511,6 +24684,7 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "name": {
+                    "description": "archived_at is not writable: archiving is an action\n(POST .../archive and .../restore), because a referenced record must be\narchived rather than deleted and that is a decision, not a field.",
                     "type": "string",
                     "maxLength": 255
                 },
@@ -23714,6 +24888,21 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.UpdateTrailerClassificationRequest": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "position": {
+                    "type": "integer"
+                }
+            }
+        },
         "dto.UpdateVehicleMakeRequest": {
             "type": "object",
             "required": [
@@ -23744,9 +24933,6 @@ const docTemplate = `{
         "dto.UpdateVendorRequest": {
             "type": "object",
             "properties": {
-                "archived_at": {
-                    "type": "string"
-                },
                 "city": {
                     "type": "string",
                     "maxLength": 100
@@ -23802,6 +24988,7 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "name": {
+                    "description": "archived_at is not writable: archiving is an action\n(POST .../archive and .../restore), because a referenced record must be\narchived rather than deleted and that is a decision, not a field.",
                     "type": "string",
                     "maxLength": 200
                 },
@@ -23912,15 +25099,10 @@ const docTemplate = `{
                 "description": {
                     "type": "string"
                 },
-                "labor_cost": {
-                    "type": "number"
-                },
                 "line_item_type": {
+                    "description": "The money columns this record derives are response-only: the server\ncomputes them from the line items and the rate terms above, in the same\ntransaction as the write. See internal/domain/money.",
                     "type": "string",
                     "maxLength": 20
-                },
-                "parts_cost": {
-                    "type": "number"
                 },
                 "position": {
                     "type": "integer"
@@ -23928,9 +25110,6 @@ const docTemplate = `{
                 "service_task": {
                     "type": "string",
                     "maxLength": 255
-                },
-                "subtotal": {
-                    "type": "number"
                 },
                 "title": {
                     "type": "string",
@@ -24013,13 +25192,11 @@ const docTemplate = `{
                     "type": "string",
                     "maxLength": 10
                 },
-                "labor_subtotal": {
-                    "type": "number"
-                },
                 "labor_time_seconds": {
                     "type": "integer"
                 },
                 "location_id": {
+                    "description": "The money columns this record derives are response-only: the server\ncomputes them from the line items and the rate terms above, in the same\ntransaction as the write. See internal/domain/money.",
                     "type": "integer"
                 },
                 "number": {
@@ -24036,9 +25213,6 @@ const docTemplate = `{
                     "type": "string",
                     "maxLength": 10
                 },
-                "parts_subtotal": {
-                    "type": "number"
-                },
                 "purchase_order_number": {
                     "type": "string",
                     "maxLength": 100
@@ -24054,9 +25228,6 @@ const docTemplate = `{
                 },
                 "status_id": {
                     "type": "integer"
-                },
-                "subtotal": {
-                    "type": "number"
                 },
                 "tax_1": {
                     "type": "number"
@@ -24078,21 +25249,7 @@ const docTemplate = `{
                     "type": "string",
                     "maxLength": 10
                 },
-                "total_amount": {
-                    "type": "number"
-                },
                 "vendor_id": {
-                    "type": "integer"
-                }
-            }
-        },
-        "dto.UpdateWorkOrderStatusLogRequest": {
-            "type": "object",
-            "properties": {
-                "changed_at": {
-                    "type": "string"
-                },
-                "status_id": {
                     "type": "integer"
                 }
             }
@@ -24159,6 +25316,10 @@ const docTemplate = `{
                 "content_type": {
                     "type": "string"
                 },
+                "expires_at": {
+                    "description": "ExpiresAt is null for a public object, whose URL never expires.",
+                    "type": "string"
+                },
                 "key": {
                     "type": "string"
                 },
@@ -24172,6 +25333,11 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "url": {
+                    "description": "URL renders the upload immediately. For a private object it expires at\nExpiresAt and must be re-fetched from the owning record, never cached.",
+                    "type": "string"
+                },
+                "visibility": {
+                    "description": "Visibility is \"public\" or \"private\", determined by the declared purpose.",
                     "type": "string"
                 }
             }
@@ -24183,13 +25349,12 @@ const docTemplate = `{
                     "type": "string",
                     "maxLength": 50
                 },
-                "classification": {
-                    "type": "string",
-                    "maxLength": 100
+                "classification_2_id": {
+                    "type": "integer"
                 },
-                "classification_2": {
-                    "type": "string",
-                    "maxLength": 100
+                "classification_id": {
+                    "description": "Classification names a row in the company's trailer_classification\ncatalog. It used to be free text, which meant \"Dry Van\", \"DRY VAN\" and\n\"dry van\" were three different classifications to every filter and report.",
+                    "type": "integer"
                 },
                 "contract_end": {
                     "type": "string"
@@ -25604,6 +26769,14 @@ const docTemplate = `{
         "dto.WorkOrderStatusLogResponse": {
             "type": "object",
             "properties": {
+                "actor_employee_id": {
+                    "description": "ActorEmployeeID is null for a system transition, and for rows written\nbefore actors were recorded. Read ActorType to tell those apart.",
+                    "type": "integer"
+                },
+                "actor_type": {
+                    "description": "ActorType is \"employee\" or \"system\". Rows that predate this field are\n\"system\": they were written through the old CRUD route with no actor\ncaptured, so naming a person would be a fabrication.",
+                    "type": "string"
+                },
                 "changed_at": {
                     "type": "string"
                 },

@@ -18,6 +18,7 @@ SELECT
     e.is_active,
     e.is_account_owner,
     e.role_id,
+    e.is_platform_admin,
     COALESCE(r.is_admin, false)         AS is_admin,
     COALESCE(r.permissions, '{}'::jsonb) AS permissions,
     EXISTS (
@@ -107,10 +108,31 @@ WHERE e.id = sqlc.arg(id)
 -- Cross-company employee list for the admin namespace. Unlike ListEmployees
 -- this is deliberately unscoped: it exists to answer "who exists anywhere",
 -- which the company-scoped route cannot.
-SELECT * FROM employee ORDER BY id LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off);
+--
+-- company_id narrows it to one tenant's staff, through employee_companies -
+-- membership, not default_company_id. "Belongs to company X" is what a
+-- membership row says; default_company_id only says where a session lands, and
+-- an employee can belong to a company that is not their default. A null
+-- argument means no filter, so one query serves both questions.
+SELECT e.* FROM employee e
+WHERE (
+    sqlc.narg(company_id)::bigint IS NULL
+    OR EXISTS (
+        SELECT 1 FROM employee_companies ec
+        WHERE ec.employee_id = e.id AND ec.company_id = sqlc.narg(company_id)
+    )
+)
+ORDER BY e.id LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off);
 
 -- name: CountAllEmployees :one
-SELECT count(*) FROM employee;
+SELECT count(*) FROM employee e
+WHERE (
+    sqlc.narg(company_id)::bigint IS NULL
+    OR EXISTS (
+        SELECT 1 FROM employee_companies ec
+        WHERE ec.employee_id = e.id AND ec.company_id = sqlc.narg(company_id)
+    )
+);
 
 -- name: GetEmployeeByID :one
 -- Unscoped single-employee read for the admin namespace.

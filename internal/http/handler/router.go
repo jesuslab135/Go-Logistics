@@ -11,8 +11,10 @@ import (
 
 	"fleet/internal/auth"
 	"fleet/internal/db/gen"
+	"fleet/internal/domain/purchaseorder"
 	"fleet/internal/http/dto"
 	"fleet/internal/http/middleware"
+	"fleet/internal/platform/apierr"
 	"fleet/internal/platform/crud"
 	"fleet/internal/platform/storage"
 )
@@ -77,6 +79,8 @@ func NewRouter(d Deps) *gin.Engine {
 	// module the resource belonged to in Django (its viewset's module_name).
 	// Groups below are named for that module.
 	member := api.Group("", middleware.RequireCompanyMember())
+	// Archived rows are hidden from every list unless the caller opts in.
+	member.Use(WithIncludeArchived())
 
 	registerCompanyRoutes(api, member, d)
 	registerAdminRoutes(member, d)
@@ -94,12 +98,23 @@ func NewRouter(d Deps) *gin.Engine {
 	warranties := member.Group("", middleware.RequireModule("warranties"))
 	mileageGoals := member.Group("", middleware.RequireModule("mileage_goals"))
 	employees := member.Group("", middleware.RequireModule("employees"))
+	purchaseOrders := member.Group("", middleware.RequireModule("purchase_orders"))
 	// Django gated roles on IsAdminRole rather than on a module entry.
 	roles := member.Group("", middleware.RequireAdminRole())
 
+	// Custom field definitions describe what may go in each resource's
+	// custom_fields document. Admin-gated: they shape everyone's forms.
+	customFields := member.Group("", middleware.RequireAdminRole(), WithResourceFilter())
+	crud.NewHandler[dto.CustomFieldDefinitionResponse, dto.CreateCustomFieldDefinitionRequest, dto.UpdateCustomFieldDefinitionRequest](
+		NewCustomFieldDefinitionStore(d.Queries)).Register(customFields, "/custom-field-definitions")
+
+	// Archive/restore for the five catalogs that carry archived_at. A referenced
+	// record cannot be deleted; archiving is what retires it instead.
+	registerArchiveRoutes(assets, parts, vendors, service, inspections, d.Queries)
+
 	// Collections whose filters vary per request take their List verb from
 	// here instead of from the generic CRUD handler.
-	lists := NewFilteredListHandler(d.Pool)
+	lists := NewFilteredListHandler(d.Pool, d.Storage)
 
 	// Phase 2: assets
 	registerCrudWithList(assets, "/assets",
@@ -126,9 +141,7 @@ func NewRouter(d Deps) *gin.Engine {
 	// parent. Forms need them as foreign-key sources; mutations stay nested.
 	inventory.GET("/part-inventory", lists.PartInventory)
 	inventory.GET("/purchase-order-line-items", lists.PurchaseOrderLineItems)
-	registerCrudWithList(inventory, "/inventory-journal-entries",
-		crud.NewHandler[dto.InventoryJournalEntryResponse, dto.CreateInventoryJournalEntryRequest, dto.UpdateInventoryJournalEntryRequest](
-			NewInventoryJournalEntryStore(d.Queries)), lists.InventoryJournalEntries)
+	registerInventoryJournalRoutes(inventory, d, lists.InventoryJournalEntries)
 
 	// Phase 4: vendors, work orders & issues
 	crud.NewHandler[dto.VendorResponse, dto.CreateVendorRequest, dto.UpdateVendorRequest](NewVendorStore(d.Queries)).Register(vendors, "/vendors")
@@ -136,18 +149,21 @@ func NewRouter(d Deps) *gin.Engine {
 	// Django's LocationViewSet required membership only, no module entry.
 	crud.NewHandler[dto.LocationResponse, dto.CreateLocationRequest, dto.UpdateLocationRequest](NewLocationStore(d.Queries)).Register(member, "/locations")
 	registerCrudWithList(workOrders, "/work-orders",
-		crud.NewHandler[dto.WorkOrderResponse, dto.CreateWorkOrderRequest, dto.UpdateWorkOrderRequest](NewWorkOrderStore(d.Queries)), lists.WorkOrders)
+		crud.NewHandler[dto.WorkOrderResponse, dto.CreateWorkOrderRequest, dto.UpdateWorkOrderRequest](NewWorkOrderStore(d.Queries, d.Pool)), lists.WorkOrders)
+	// Totals are computed; this is the audited way to depart from the formula.
+	overrides := NewTotalOverrideHandler(d.Queries, d.Pool)
+	workOrders.POST("/work-orders/:id/override-total", overrides.WorkOrder)
+	service.POST("/service-entries/:id/override-total", overrides.ServiceEntry)
 	registerCrudWithList(issues, "/issues",
 		crud.NewHandler[dto.IssueResponse, dto.CreateIssueRequest, dto.UpdateIssueRequest](NewIssueStore(d.Queries)), lists.Issues)
 	crud.NewHandler[dto.IssuePriorityResponse, dto.CreateIssuePriorityRequest, dto.UpdateIssuePriorityRequest](NewIssuePriorityStore(d.Queries)).Register(issues, "/issue-priorities")
 	crud.NewHandler[dto.FaultResponse, dto.CreateFaultRequest, dto.UpdateFaultRequest](NewFaultStore(d.Queries)).Register(issues, "/faults")
 
 	// Phase 5: purchase orders & service
-	registerCrudWithList(inventory, "/purchase-orders",
-		crud.NewHandler[dto.PurchaseOrderResponse, dto.CreatePurchaseOrderRequest, dto.UpdatePurchaseOrderRequest](NewPurchaseOrderStore(d.Queries)), lists.PurchaseOrders)
+	registerPurchaseOrderRoutes(purchaseOrders, d, lists.PurchaseOrders)
 	crud.NewHandler[dto.ServiceTaskResponse, dto.CreateServiceTaskRequest, dto.UpdateServiceTaskRequest](NewServiceTaskStore(d.Queries)).Register(service, "/service-tasks")
 	crud.NewHandler[dto.ServiceReminderResponse, dto.CreateServiceReminderRequest, dto.UpdateServiceReminderRequest](NewServiceReminderStore(d.Queries)).Register(service, "/service-reminders")
-	crud.NewHandler[dto.ServiceEntryResponse, dto.CreateServiceEntryRequest, dto.UpdateServiceEntryRequest](NewServiceEntryStore(d.Queries)).Register(service, "/service-entries")
+	crud.NewHandler[dto.ServiceEntryResponse, dto.CreateServiceEntryRequest, dto.UpdateServiceEntryRequest](NewServiceEntryStore(d.Queries, d.Pool)).Register(service, "/service-entries")
 
 	// Phase 6: tires
 	crud.NewHandler[dto.TireResponse, dto.CreateTireRequest, dto.UpdateTireRequest](NewTireStore(d.Queries)).Register(tires, "/tires")
@@ -165,6 +181,9 @@ func NewRouter(d Deps) *gin.Engine {
 
 	// Phase 7: fuel, inspections, org & misc
 	crud.NewHandler[dto.FuelTypeResponse, dto.CreateFuelTypeRequest, dto.UpdateFuelTypeRequest](NewFuelTypeStore(d.Queries)).Register(fuel, "/fuel-types")
+	// The trailer classification vocabulary, a Settings catalog like the others.
+	crud.NewHandler[dto.TrailerClassificationResponse, dto.CreateTrailerClassificationRequest, dto.UpdateTrailerClassificationRequest](
+		NewTrailerClassificationStore(d.Queries)).Register(assets, "/trailer-classifications")
 	crud.NewHandler[dto.InspectionFormResponse, dto.CreateInspectionFormRequest, dto.UpdateInspectionFormRequest](NewInspectionFormStore(d.Queries)).Register(inspections, "/inspection-forms")
 	crud.NewHandler[dto.InspectionSubmissionResponse, dto.CreateInspectionSubmissionRequest, dto.UpdateInspectionSubmissionRequest](NewInspectionSubmissionStore(d.Queries, d.Storage, d.Logger)).Register(inspections, "/inspection-submissions")
 	registerCrudWithList(assets, "/media",
@@ -217,11 +236,14 @@ func NewRouter(d Deps) *gin.Engine {
 		NewGroupStore(d.Queries)).Register(employees, "/groups")
 
 	// Phase 8: nested, parent-scoped child resources
-	crud.NewNestedHandler[dto.WorkOrderLineItemResponse, dto.CreateWorkOrderLineItemRequest, dto.UpdateWorkOrderLineItemRequest](NewWorkOrderLineItemStore(d.Queries)).Register(workOrders, "/work-orders", "/line-items")
-	crud.NewNestedHandler[dto.WorkOrderStatusLogResponse, dto.CreateWorkOrderStatusLogRequest, dto.UpdateWorkOrderStatusLogRequest](NewWorkOrderStatusLogStore(d.Queries)).Register(workOrders, "/work-orders", "/status-logs")
-	crud.NewNestedHandler[dto.PurchaseOrderLineItemResponse, dto.CreatePurchaseOrderLineItemRequest, dto.UpdatePurchaseOrderLineItemRequest](NewPurchaseOrderLineItemStore(d.Queries)).Register(inventory, "/purchase-orders", "/line-items")
+	crud.NewNestedHandler[dto.WorkOrderLineItemResponse, dto.CreateWorkOrderLineItemRequest, dto.UpdateWorkOrderLineItemRequest](NewWorkOrderLineItemStore(d.Queries, d.Pool)).Register(workOrders, "/work-orders", "/line-items")
+	crud.NewReadOnlyNestedHandler[dto.WorkOrderStatusLogResponse](
+		NewWorkOrderStatusLogStore(d.Queries),
+		"the status history is append-only: change the work order's status_id with PUT /api/v1/work-orders/{id} and the transition is recorded automatically",
+	).Register(workOrders, "/work-orders", "/status-logs")
+	crud.NewNestedHandler[dto.PurchaseOrderLineItemResponse, dto.CreatePurchaseOrderLineItemRequest, dto.UpdatePurchaseOrderLineItemRequest](NewPurchaseOrderLineItemStore(d.Queries, d.Pool)).Register(purchaseOrders, "/purchase-orders", "/line-items")
 	crud.NewNestedHandler[dto.ServiceTaskPartResponse, dto.CreateServiceTaskPartRequest, dto.UpdateServiceTaskPartRequest](NewServiceTaskPartStore(d.Queries)).Register(service, "/service-tasks", "/parts")
-	crud.NewNestedHandler[dto.ServiceEntryLineItemResponse, dto.CreateServiceEntryLineItemRequest, dto.UpdateServiceEntryLineItemRequest](NewServiceEntryLineItemStore(d.Queries)).Register(service, "/service-entries", "/line-items")
+	crud.NewNestedHandler[dto.ServiceEntryLineItemResponse, dto.CreateServiceEntryLineItemRequest, dto.UpdateServiceEntryLineItemRequest](NewServiceEntryLineItemStore(d.Queries, d.Pool)).Register(service, "/service-entries", "/line-items")
 	crud.NewNestedHandler[dto.InspectionFormItemResponse, dto.CreateInspectionFormItemRequest, dto.UpdateInspectionFormItemRequest](NewInspectionFormItemStore(d.Queries)).Register(inspections, "/inspection-forms", "/items")
 	crud.NewNestedHandler[dto.InspectionSubmissionItemResponse, dto.CreateInspectionSubmissionItemRequest, dto.UpdateInspectionSubmissionItemRequest](NewInspectionSubmissionItemStore(d.Queries, d.Storage, d.Logger)).Register(inspections, "/inspection-submissions", "/items")
 	crud.NewNestedHandler[dto.AxleDefinitionResponse, dto.CreateAxleDefinitionRequest, dto.UpdateAxleDefinitionRequest](NewAxleDefinitionStore(d.Queries)).Register(tires, "/axle-templates", "/definitions")
@@ -238,11 +260,27 @@ func NewRouter(d Deps) *gin.Engine {
 	tires.GET("/tire-mount-logs", lists.TireMountLogs)
 
 	// Phase 8b: deeper (grandchild) nested resources, scoped up the chain to company
-	crud.NewNestedHandler[dto.WorkOrderSubLineItemResponse, dto.CreateWorkOrderSubLineItemRequest, dto.UpdateWorkOrderSubLineItemRequest](NewWorkOrderSubLineItemStore(d.Queries)).Register(workOrders, "/work-order-line-items", "/sub-line-items")
+	crud.NewNestedHandler[dto.WorkOrderSubLineItemResponse, dto.CreateWorkOrderSubLineItemRequest, dto.UpdateWorkOrderSubLineItemRequest](NewWorkOrderSubLineItemStore(d.Queries, d.Pool)).Register(workOrders, "/work-order-line-items", "/sub-line-items")
 	crud.NewNestedHandler[dto.LaborTimeEntryResponse, dto.CreateLaborTimeEntryRequest, dto.UpdateLaborTimeEntryRequest](NewLaborTimeEntryStore(d.Queries)).Register(workOrders, "/work-order-sub-line-items", "/labor-entries")
 	crud.NewNestedHandler[dto.WheelPositionDefinitionResponse, dto.CreateWheelPositionDefinitionRequest, dto.UpdateWheelPositionDefinitionRequest](NewWheelPositionDefinitionStore(d.Queries)).Register(tires, "/axle-definitions", "/wheel-positions")
 	crud.NewNestedHandler[dto.FuelCommentResponse, dto.CreateFuelCommentRequest, dto.UpdateFuelCommentRequest](NewFuelCommentStore(d.Queries)).Register(fuel, "/fuel-entries", "/comments")
-	crud.NewNestedHandler[dto.FuelPhotoResponse, dto.CreateFuelPhotoRequest, dto.UpdateFuelPhotoRequest](NewFuelPhotoStore(d.Queries, d.Storage, d.Logger)).Register(fuel, "/fuel-entries", "/photos")
+	fuelPhotos := NewFuelPhotoStore(d.Queries, d.Pool, d.Storage, d.Logger)
+	crud.NewNestedHandler[dto.FuelPhotoResponse, dto.CreateFuelPhotoRequest, dto.UpdateFuelPhotoRequest](fuelPhotos).Register(fuel, "/fuel-entries", "/photos")
+	// is_primary is not a field on those writes: at most one photo per entry may
+	// hold it, so promoting one has to demote the others in the same transaction.
+	fuel.POST("/fuel-entries/:id/photos/:child_id/set-primary", func(c *gin.Context) {
+		parentID, id, err := crud.ParentAndIDParams(c)
+		if err != nil {
+			apierr.Abort(c, err)
+			return
+		}
+		out, err := fuelPhotos.SetPrimary(c.Request.Context(), parentID, id)
+		if err != nil {
+			apierr.Abort(c, err)
+			return
+		}
+		c.JSON(http.StatusOK, out)
+	})
 
 	// Phase 8c: shared-PK 1:1 sub-types (singleton under the asset). Django put
 	// vehicle/trailer under 'assets' but the axle config under 'tires'.
@@ -275,6 +313,67 @@ func registerCrudWithList[T, C, U any](r gin.IRouter, path string, h *crud.Handl
 	r.DELETE(path+"/:id", h.Delete)
 }
 
+// registerPurchaseOrderRoutes wires the order plus its workflow.
+//
+// The transitions are separate routes rather than fields on the PUT because
+// each one has to decide whether it is legal from the current state, stamp its
+// own timestamp, and record who did it. A whole-record replace can do none of
+// that: it takes whatever the client sends.
+//
+// Approve and reject additionally require the purchase_orders.approve action.
+// Deciding to commit money is the privileged act; submitting an order for that
+// decision, and receiving the goods afterwards, are ordinary work and need only
+// update. The pattern is the one tire_approvals already uses.
+func registerPurchaseOrderRoutes(r *gin.RouterGroup, d Deps, list gin.HandlerFunc) {
+	const path = "/purchase-orders"
+
+	// registerCrudWithList, not Register: the list comes from the filtered
+	// handler, which is the one that understands vendor and state.
+	registerCrudWithList(r, path,
+		crud.NewHandler[dto.PurchaseOrderResponse, dto.CreatePurchaseOrderRequest, dto.UpdatePurchaseOrderRequest](
+			NewPurchaseOrderStore(d.Queries, d.Pool)), list)
+
+	r.POST(path+"/:id/override-total", NewTotalOverrideHandler(d.Queries, d.Pool).PurchaseOrder)
+
+	actions := NewPurchaseOrderActionHandler(d.Queries, d.Pool)
+	approve := r.Group("", middleware.RequireAction("purchase_orders", "approve"))
+
+	for _, action := range purchaseorder.Actions() {
+		t, _ := purchaseorder.Lookup(action)
+		group := r
+		if t.RequiresApproval {
+			group = approve
+		}
+		group.POST(path+"/:id/"+action, actions.Handle(action))
+	}
+
+	crud.NewReadOnlyNestedHandler[dto.PurchaseOrderStatusLogResponse](
+		NewPurchaseOrderStatusLogStore(d.Queries),
+		"the transition history is append-only: move the order with POST /api/v1/purchase-orders/{id}/{action} and the transition is recorded automatically",
+	).Register(r, path, "/status-logs")
+}
+
+// registerInventoryJournalRoutes wires the ledger. It is not registerCrudWithList
+// because the ledger is append-only: PUT and DELETE are retired, answering 405
+// with the replacement rather than 404, and a reversal route takes their place.
+func registerInventoryJournalRoutes(r gin.IRouter, d Deps, list gin.HandlerFunc) {
+	const path = "/inventory-journal-entries"
+
+	store := NewInventoryJournalEntryStore(d.Queries, d.Pool)
+	entries := crud.NewAppendOnlyHandler[dto.InventoryJournalEntryResponse, dto.CreateInventoryJournalEntryRequest](
+		store, journalRetiredMessage)
+
+	// The verbs are wired individually rather than through Register because the
+	// list comes from the filtered handler: the generic one has no part_id or
+	// date filter, and this is the one collection that never plateaus.
+	r.GET(path, list)
+	r.POST(path, entries.Create)
+	r.GET(path+"/:id", entries.Get)
+	r.PUT(path+"/:id", entries.Retired)
+	r.DELETE(path+"/:id", entries.Retired)
+	r.POST(path+"/:id/reverse", NewInventoryJournalEntryHandler(store).Reverse)
+}
+
 // registerCompanyRoutes wires /companies with Django's split gating: creating a
 // company requires account ownership (and no membership, since the first company
 // is what creates it), while reading and mutating one requires company admin.
@@ -293,10 +392,16 @@ func registerCompanyRoutes(api, member *gin.RouterGroup, d Deps) {
 
 // registerAdminRoutes wires the cross-company namespace. Every route here reads
 // or writes another tenant's data on purpose — the company-scoped routes cannot
-// answer "who belongs to company X" or "did company X get seeded" — so the whole
-// group sits behind RequireAdminRole rather than a module permission.
+// answer "who belongs to company X" or "did company X get seeded".
+//
+// It is gated on RequirePlatformAdmin, not RequireAdminRole. A tenant's own
+// administrator is not a platform operator, and because employee.role_id is a
+// single global FK, an admin of one company is an admin of every company they
+// belong to — so the previous gate let any company admin read and rewrite
+// another tenant's employees. Granting the flag is a CLI act (cmd/cli
+// platform-admin); nothing in the API hands it out.
 func registerAdminRoutes(member *gin.RouterGroup, d Deps) {
-	admin := member.Group("", middleware.RequireAdminRole())
+	admin := member.Group("", middleware.RequirePlatformAdmin())
 
 	employees := NewAdminEmployeeHandler(d.Queries, d.Pool)
 	admin.GET("/admin/employees", employees.List)

@@ -21,7 +21,10 @@ type Identity struct {
 	IsMember       bool
 	HasRole        bool
 	IsAdmin        bool
-	Permissions    map[string]ModulePermissions
+	// IsPlatformAdmin is internal staff acting across tenants, which IsAdmin is
+	// not: that one is a tenant's own administrator.
+	IsPlatformAdmin bool
+	Permissions     map[string]ModulePermissions
 }
 
 // ModulePermissions is one entry of role.permissions. An empty object grants the
@@ -67,6 +70,11 @@ var Modules = []string{
 	"issues",
 	"mileage_goals",
 	"parts",
+	// purchase_orders is not a Django module: there, purchase orders sat under
+	// inventory. They are separated here because approving one commits money,
+	// which is a different privilege from adjusting stock, and a permission
+	// cannot be granted separately from a module it shares.
+	"purchase_orders",
 	"roles",
 	"service",
 	"tire_approvals",
@@ -197,6 +205,16 @@ func RequireCompanyMember() gin.HandlerFunc {
 func RequireAdminRole() gin.HandlerFunc {
 	return gate(func(i Identity, _ *gin.Context) bool { return i.IsAdmin },
 		"an administrator role is required for this action")
+}
+
+// RequirePlatformAdmin gates the cross-tenant /admin namespace. It is
+// deliberately not RequireAdminRole: employee.role_id is a single global FK, so
+// a tenant administrator is an administrator in every company they belong to,
+// and gating cross-tenant routes on that let any company admin read and rewrite
+// another tenant's employees.
+func RequirePlatformAdmin() gin.HandlerFunc {
+	return gate(func(i Identity, _ *gin.Context) bool { return i.IsPlatformAdmin },
+		"platform administrator privileges are required for this action")
 }
 
 // RequireAccountOwner ports IsAccountOwner.

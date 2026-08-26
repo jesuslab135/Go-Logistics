@@ -9,6 +9,15 @@ import (
 	"fleet/internal/platform/paginate"
 )
 
+// WorkOrderStatusLogStore reads a work order's status history. It has no write
+// methods by design: rows are appended by whatever changes the status, inside
+// that operation's transaction (see logStatusChange in work_order.go).
+//
+// This restores what the Django model documented — "Historial inmutable de
+// transiciones... Se alimenta automáticamente mediante signals" — which the port
+// lost by registering the table as a writable nested resource. While it was
+// writable, a status could change with no row recorded, and a recorded row could
+// be edited to say something that never happened.
 type WorkOrderStatusLogStore struct{ q *gen.Queries }
 
 func NewWorkOrderStatusLogStore(q *gen.Queries) *WorkOrderStatusLogStore {
@@ -40,42 +49,13 @@ func (s *WorkOrderStatusLogStore) Get(ctx context.Context, parentID, id int64) (
 	return toWorkOrderStatusLogResponse(r), nil
 }
 
-func (s *WorkOrderStatusLogStore) Create(ctx context.Context, parentID int64, in dto.CreateWorkOrderStatusLogRequest) (dto.WorkOrderStatusLogResponse, error) {
-	r, err := s.q.CreateWorkOrderStatusLog(ctx, gen.CreateWorkOrderStatusLogParams{
-		ParentID:  parentID,
-		CompanyID: middleware.CompanyFromContext(ctx),
-		StatusID:  in.StatusID,
-		ChangedAt: in.ChangedAt,
-	})
-	if err != nil {
-		return dto.WorkOrderStatusLogResponse{}, err
-	}
-	return toWorkOrderStatusLogResponse(r), nil
-}
-
-func (s *WorkOrderStatusLogStore) Update(ctx context.Context, parentID, id int64, in dto.UpdateWorkOrderStatusLogRequest) (dto.WorkOrderStatusLogResponse, error) {
-	r, err := s.q.UpdateWorkOrderStatusLog(ctx, gen.UpdateWorkOrderStatusLogParams{
-		ID:        id,
-		ParentID:  parentID,
-		CompanyID: middleware.CompanyFromContext(ctx),
-		StatusID:  in.StatusID,
-		ChangedAt: in.ChangedAt,
-	})
-	if err != nil {
-		return dto.WorkOrderStatusLogResponse{}, err
-	}
-	return toWorkOrderStatusLogResponse(r), nil
-}
-
-func (s *WorkOrderStatusLogStore) Delete(ctx context.Context, parentID, id int64) error {
-	return s.q.DeleteWorkOrderStatusLog(ctx, gen.DeleteWorkOrderStatusLogParams{ID: id, ParentID: parentID, CompanyID: middleware.CompanyFromContext(ctx)})
-}
-
 func toWorkOrderStatusLogResponse(r gen.WorkOrderStatusLog) dto.WorkOrderStatusLogResponse {
 	return dto.WorkOrderStatusLogResponse{
-		ID:          r.ID,
-		WorkOrderID: r.WorkOrderID,
-		StatusID:    r.StatusID,
-		ChangedAt:   r.ChangedAt,
+		ID:              r.ID,
+		WorkOrderID:     r.WorkOrderID,
+		StatusID:        r.StatusID,
+		ChangedAt:       r.ChangedAt,
+		ActorEmployeeID: r.ActorEmployeeID,
+		ActorType:       r.ActorType,
 	}
 }

@@ -8,6 +8,9 @@ import (
 )
 
 type CreatePartRequest struct {
+	// archived_at is not writable: archiving is an action
+	// (POST .../archive and .../restore), because a referenced record must be
+	// archived rather than deleted and that is a decision, not a field.
 	PartNumber             string           `json:"part_number" binding:"omitempty,max=100"`
 	Description            string           `json:"description"`
 	UsefulLifeMonths       *int32           `json:"useful_life_months"`
@@ -20,11 +23,13 @@ type CreatePartRequest struct {
 	Upc                    string           `json:"upc" binding:"omitempty,max=50"`
 	UnitCost               *decimal.Decimal `json:"unit_cost"`
 	InventoryItem          *bool            `json:"inventory_item"`
-	ArchivedAt             *time.Time       `json:"archived_at"`
 	CustomFields           json.RawMessage  `json:"custom_fields"`
 }
 
 type UpdatePartRequest struct {
+	// archived_at is not writable: archiving is an action
+	// (POST .../archive and .../restore), because a referenced record must be
+	// archived rather than deleted and that is a decision, not a field.
 	PartNumber             string           `json:"part_number" binding:"omitempty,max=100"`
 	Description            string           `json:"description"`
 	UsefulLifeMonths       *int32           `json:"useful_life_months"`
@@ -37,7 +42,6 @@ type UpdatePartRequest struct {
 	Upc                    string           `json:"upc" binding:"omitempty,max=50"`
 	UnitCost               *decimal.Decimal `json:"unit_cost"`
 	InventoryItem          bool             `json:"inventory_item"`
-	ArchivedAt             *time.Time       `json:"archived_at"`
 	CustomFields           json.RawMessage  `json:"custom_fields"`
 }
 

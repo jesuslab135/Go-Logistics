@@ -4,16 +4,25 @@ import (
 	"context"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"fleet/internal/db/gen"
 	"fleet/internal/http/dto"
 	"fleet/internal/http/middleware"
 	"fleet/internal/platform/paginate"
 )
 
-type WorkOrderSubLineItemStore struct{ q *gen.Queries }
+// A sub-line item is where a work order's money originates: quantity ×
+// unit_cost, split into parts and labour by item_type. Every write here
+// recomputes the line it belongs to and the document above it, in the same
+// transaction, so no reader ever sees a total that does not describe its lines.
+type WorkOrderSubLineItemStore struct {
+	q    *gen.Queries
+	pool *pgxpool.Pool
+}
 
-func NewWorkOrderSubLineItemStore(q *gen.Queries) *WorkOrderSubLineItemStore {
-	return &WorkOrderSubLineItemStore{q: q}
+func NewWorkOrderSubLineItemStore(q *gen.Queries, pool *pgxpool.Pool) *WorkOrderSubLineItemStore {
+	return &WorkOrderSubLineItemStore{q: q, pool: pool}
 }
 
 func (s *WorkOrderSubLineItemStore) List(ctx context.Context, parentID int64, p paginate.Params) ([]dto.WorkOrderSubLineItemResponse, int64, error) {
@@ -43,50 +52,70 @@ func (s *WorkOrderSubLineItemStore) Get(ctx context.Context, parentID, id int64)
 
 func (s *WorkOrderSubLineItemStore) Create(ctx context.Context, parentID int64, in dto.CreateWorkOrderSubLineItemRequest) (dto.WorkOrderSubLineItemResponse, error) {
 	now := time.Now().UTC()
-	r, err := s.q.CreateWorkOrderSubLineItem(ctx, gen.CreateWorkOrderSubLineItemParams{
-		ParentID:             parentID,
-		CompanyID:            middleware.CompanyFromContext(ctx),
-		ItemType:             in.ItemType,
-		Description:          in.Description,
-		Position:             in.Position,
-		PartID:               in.PartID,
-		PartLocationDetailID: in.PartLocationDetailID,
-		TechnicianID:         in.TechnicianID,
-		UnitCost:             in.UnitCost,
-		Quantity:             decimalOrDefault(in.Quantity, 1),
-		CreatedAt:            now,
-		UpdatedAt:            now,
+
+	var out dto.WorkOrderSubLineItemResponse
+	err := inTx(ctx, s.pool, s.q, func(qtx *gen.Queries) error {
+		r, err := qtx.CreateWorkOrderSubLineItem(ctx, gen.CreateWorkOrderSubLineItemParams{
+			ParentID:             parentID,
+			CompanyID:            middleware.CompanyFromContext(ctx),
+			ItemType:             in.ItemType,
+			Description:          in.Description,
+			Position:             in.Position,
+			PartID:               in.PartID,
+			PartLocationDetailID: in.PartLocationDetailID,
+			TechnicianID:         in.TechnicianID,
+			UnitCost:             in.UnitCost,
+			Quantity:             decimalOrDefault(in.Quantity, 1),
+			CreatedAt:            now,
+			UpdatedAt:            now,
+		})
+		if err != nil {
+			return err
+		}
+		out = toWorkOrderSubLineItemResponse(r)
+		return recalcWorkOrderLineItem(ctx, qtx, parentID, now)
 	})
-	if err != nil {
-		return dto.WorkOrderSubLineItemResponse{}, err
-	}
-	return toWorkOrderSubLineItemResponse(r), nil
+	return out, err
 }
 
 func (s *WorkOrderSubLineItemStore) Update(ctx context.Context, parentID, id int64, in dto.UpdateWorkOrderSubLineItemRequest) (dto.WorkOrderSubLineItemResponse, error) {
 	now := time.Now().UTC()
-	r, err := s.q.UpdateWorkOrderSubLineItem(ctx, gen.UpdateWorkOrderSubLineItemParams{
-		ID:                   id,
-		ParentID:             parentID,
-		CompanyID:            middleware.CompanyFromContext(ctx),
-		ItemType:             in.ItemType,
-		Description:          in.Description,
-		Position:             in.Position,
-		PartID:               in.PartID,
-		PartLocationDetailID: in.PartLocationDetailID,
-		TechnicianID:         in.TechnicianID,
-		UnitCost:             in.UnitCost,
-		Quantity:             in.Quantity,
-		UpdatedAt:            now,
+
+	var out dto.WorkOrderSubLineItemResponse
+	err := inTx(ctx, s.pool, s.q, func(qtx *gen.Queries) error {
+		r, err := qtx.UpdateWorkOrderSubLineItem(ctx, gen.UpdateWorkOrderSubLineItemParams{
+			ID:                   id,
+			ParentID:             parentID,
+			CompanyID:            middleware.CompanyFromContext(ctx),
+			ItemType:             in.ItemType,
+			Description:          in.Description,
+			Position:             in.Position,
+			PartID:               in.PartID,
+			PartLocationDetailID: in.PartLocationDetailID,
+			TechnicianID:         in.TechnicianID,
+			UnitCost:             in.UnitCost,
+			Quantity:             in.Quantity,
+			UpdatedAt:            now,
+		})
+		if err != nil {
+			return err
+		}
+		out = toWorkOrderSubLineItemResponse(r)
+		return recalcWorkOrderLineItem(ctx, qtx, parentID, now)
 	})
-	if err != nil {
-		return dto.WorkOrderSubLineItemResponse{}, err
-	}
-	return toWorkOrderSubLineItemResponse(r), nil
+	return out, err
 }
 
 func (s *WorkOrderSubLineItemStore) Delete(ctx context.Context, parentID, id int64) error {
-	return s.q.DeleteWorkOrderSubLineItem(ctx, gen.DeleteWorkOrderSubLineItemParams{ID: id, ParentID: parentID, CompanyID: middleware.CompanyFromContext(ctx)})
+	now := time.Now().UTC()
+	return inTx(ctx, s.pool, s.q, func(qtx *gen.Queries) error {
+		if err := qtx.DeleteWorkOrderSubLineItem(ctx, gen.DeleteWorkOrderSubLineItemParams{
+			ID: id, ParentID: parentID, CompanyID: middleware.CompanyFromContext(ctx),
+		}); err != nil {
+			return err
+		}
+		return recalcWorkOrderLineItem(ctx, qtx, parentID, now)
+	})
 }
 
 func toWorkOrderSubLineItemResponse(r gen.WorkOrderSubLineItem) dto.WorkOrderSubLineItemResponse {

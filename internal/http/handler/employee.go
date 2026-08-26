@@ -53,6 +53,12 @@ func (s *EmployeeStore) Get(ctx context.Context, id int64) (dto.EmployeeResponse
 }
 
 func (s *EmployeeStore) Create(ctx context.Context, in dto.CreateEmployeeRequest) (dto.EmployeeResponse, error) {
+	// The document has to satisfy whatever this company declared for employees;
+	// a company that declared nothing pays one indexed lookup.
+	if err := validateCustomFields(ctx, s.q, "employees", in.CustomFields); err != nil {
+		return dto.EmployeeResponse{}, err
+	}
+
 	company := middleware.CompanyFromContext(ctx)
 
 	// Create grants exactly one membership — the caller's own company — so that
@@ -82,6 +88,12 @@ func (s *EmployeeStore) Create(ctx context.Context, in dto.CreateEmployeeRequest
 }
 
 func (s *EmployeeStore) Update(ctx context.Context, id int64, in dto.UpdateEmployeeRequest) (dto.EmployeeResponse, error) {
+	// The document has to satisfy whatever this company declared for employees;
+	// a company that declared nothing pays one indexed lookup.
+	if err := validateCustomFields(ctx, s.q, "employees", in.CustomFields); err != nil {
+		return dto.EmployeeResponse{}, err
+	}
+
 	memberships, err := s.q.ListEmployeeCompanyIDs(ctx, id)
 	if err != nil {
 		return dto.EmployeeResponse{}, err
