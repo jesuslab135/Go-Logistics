@@ -28,18 +28,20 @@ func (q *Queries) CountWorkOrderStatusLogs(ctx context.Context, arg CountWorkOrd
 
 const createWorkOrderStatusLog = `-- name: CreateWorkOrderStatusLog :one
 INSERT INTO work_order_status_log (
-    work_order_id, status_id, changed_at
+    work_order_id, status_id, changed_at, actor_employee_id, actor_type
 )
-SELECT $1, $2, $3
-WHERE EXISTS (SELECT 1 FROM work_order WHERE id = $1 AND company_id = $4)
-RETURNING id, work_order_id, status_id, changed_at
+SELECT $1, $2, $3, $4, $5
+WHERE EXISTS (SELECT 1 FROM work_order WHERE id = $1 AND company_id = $6)
+RETURNING id, work_order_id, status_id, changed_at, actor_employee_id, actor_type
 `
 
 type CreateWorkOrderStatusLogParams struct {
-	ParentID  int64
-	StatusID  int64
-	ChangedAt time.Time
-	CompanyID int64
+	ParentID        int64
+	StatusID        int64
+	ChangedAt       time.Time
+	ActorEmployeeID *int64
+	ActorType       string
+	CompanyID       int64
 }
 
 func (q *Queries) CreateWorkOrderStatusLog(ctx context.Context, arg CreateWorkOrderStatusLogParams) (WorkOrderStatusLog, error) {
@@ -47,6 +49,8 @@ func (q *Queries) CreateWorkOrderStatusLog(ctx context.Context, arg CreateWorkOr
 		arg.ParentID,
 		arg.StatusID,
 		arg.ChangedAt,
+		arg.ActorEmployeeID,
+		arg.ActorType,
 		arg.CompanyID,
 	)
 	var i WorkOrderStatusLog
@@ -55,28 +59,14 @@ func (q *Queries) CreateWorkOrderStatusLog(ctx context.Context, arg CreateWorkOr
 		&i.WorkOrderID,
 		&i.StatusID,
 		&i.ChangedAt,
+		&i.ActorEmployeeID,
+		&i.ActorType,
 	)
 	return i, err
 }
 
-const deleteWorkOrderStatusLog = `-- name: DeleteWorkOrderStatusLog :exec
-DELETE FROM work_order_status_log AS c USING work_order p
-WHERE c.id = $1 AND c.work_order_id = $2 AND p.company_id = $3 AND p.id = c.work_order_id
-`
-
-type DeleteWorkOrderStatusLogParams struct {
-	ID        int64
-	ParentID  int64
-	CompanyID int64
-}
-
-func (q *Queries) DeleteWorkOrderStatusLog(ctx context.Context, arg DeleteWorkOrderStatusLogParams) error {
-	_, err := q.db.Exec(ctx, deleteWorkOrderStatusLog, arg.ID, arg.ParentID, arg.CompanyID)
-	return err
-}
-
 const getWorkOrderStatusLog = `-- name: GetWorkOrderStatusLog :one
-SELECT c.id, c.work_order_id, c.status_id, c.changed_at FROM work_order_status_log c JOIN work_order p ON p.id = c.work_order_id
+SELECT c.id, c.work_order_id, c.status_id, c.changed_at, c.actor_employee_id, c.actor_type FROM work_order_status_log c JOIN work_order p ON p.id = c.work_order_id
 WHERE c.id = $1 AND c.work_order_id = $2 AND p.company_id = $3
 `
 
@@ -94,12 +84,15 @@ func (q *Queries) GetWorkOrderStatusLog(ctx context.Context, arg GetWorkOrderSta
 		&i.WorkOrderID,
 		&i.StatusID,
 		&i.ChangedAt,
+		&i.ActorEmployeeID,
+		&i.ActorType,
 	)
 	return i, err
 }
 
 const listWorkOrderStatusLogs = `-- name: ListWorkOrderStatusLogs :many
-SELECT c.id, c.work_order_id, c.status_id, c.changed_at FROM work_order_status_log c JOIN work_order p ON p.id = c.work_order_id
+
+SELECT c.id, c.work_order_id, c.status_id, c.changed_at, c.actor_employee_id, c.actor_type FROM work_order_status_log c JOIN work_order p ON p.id = c.work_order_id
 WHERE c.work_order_id = $1 AND p.company_id = $2
 ORDER BY c.changed_at DESC, c.id LIMIT $4 OFFSET $3
 `
@@ -111,6 +104,10 @@ type ListWorkOrderStatusLogsParams struct {
 	Lim       int32
 }
 
+// The status log is append-only and is written by the operation that changes the
+// status, inside that transaction — never through a route of its own. There is
+// deliberately no update or delete here: a history a client can rewrite records
+// nothing. See internal/http/handler/work_order.go.
 func (q *Queries) ListWorkOrderStatusLogs(ctx context.Context, arg ListWorkOrderStatusLogsParams) ([]WorkOrderStatusLog, error) {
 	rows, err := q.db.Query(ctx, listWorkOrderStatusLogs,
 		arg.ParentID,
@@ -130,6 +127,8 @@ func (q *Queries) ListWorkOrderStatusLogs(ctx context.Context, arg ListWorkOrder
 			&i.WorkOrderID,
 			&i.StatusID,
 			&i.ChangedAt,
+			&i.ActorEmployeeID,
+			&i.ActorType,
 		); err != nil {
 			return nil, err
 		}
@@ -139,37 +138,4 @@ func (q *Queries) ListWorkOrderStatusLogs(ctx context.Context, arg ListWorkOrder
 		return nil, err
 	}
 	return items, nil
-}
-
-const updateWorkOrderStatusLog = `-- name: UpdateWorkOrderStatusLog :one
-UPDATE work_order_status_log AS c SET status_id = $1, changed_at = $2
-FROM work_order p
-WHERE c.id = $3 AND c.work_order_id = $4 AND p.company_id = $5 AND p.id = c.work_order_id
-RETURNING c.id, c.work_order_id, c.status_id, c.changed_at
-`
-
-type UpdateWorkOrderStatusLogParams struct {
-	StatusID  int64
-	ChangedAt time.Time
-	ID        int64
-	ParentID  int64
-	CompanyID int64
-}
-
-func (q *Queries) UpdateWorkOrderStatusLog(ctx context.Context, arg UpdateWorkOrderStatusLogParams) (WorkOrderStatusLog, error) {
-	row := q.db.QueryRow(ctx, updateWorkOrderStatusLog,
-		arg.StatusID,
-		arg.ChangedAt,
-		arg.ID,
-		arg.ParentID,
-		arg.CompanyID,
-	)
-	var i WorkOrderStatusLog
-	err := row.Scan(
-		&i.ID,
-		&i.WorkOrderID,
-		&i.StatusID,
-		&i.ChangedAt,
-	)
-	return i, err
 }

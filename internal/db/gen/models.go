@@ -1137,10 +1137,12 @@ type WorkOrderStatus struct {
 }
 
 type WorkOrderStatusLog struct {
-	ID          int64
-	WorkOrderID int64
-	StatusID    int64
-	ChangedAt   time.Time
+	ID              int64
+	WorkOrderID     int64
+	StatusID        int64
+	ChangedAt       time.Time
+	ActorEmployeeID *int64
+	ActorType       string
 }
 
 type WorkOrderSubLineItem struct {

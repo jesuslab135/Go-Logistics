@@ -15091,6 +15091,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Append-only status history, newest first. Rows are written by the operation that changes the work order's status, inside the same transaction, so this history cannot disagree with the work order. actor_type is \"employee\" or \"system\"; actor_employee_id is null for a system transition and for rows written before actors were recorded.",
                 "produces": [
                     "application/json"
                 ],
@@ -15128,55 +15129,6 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "work-order-status-logs"
-                ],
-                "summary": "Create work-order-status-logs",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "parent id",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "body",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dto.CreateWorkOrderStatusLogRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "$ref": "#/definitions/dto.WorkOrderStatusLogResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -15223,100 +15175,6 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "put": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "work-order-status-logs"
-                ],
-                "summary": "Update work-order-status-logs",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "parent id",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "id",
-                        "name": "child_id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "body",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dto.UpdateWorkOrderStatusLogRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/dto.WorkOrderStatusLogResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "tags": [
-                    "work-order-status-logs"
-                ],
-                "summary": "Delete work-order-status-logs",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "parent id",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "id",
-                        "name": "child_id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "401": {
-                        "description": "Unauthorized",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -18568,17 +18426,6 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "vendor_id": {
-                    "type": "integer"
-                }
-            }
-        },
-        "dto.CreateWorkOrderStatusLogRequest": {
-            "type": "object",
-            "properties": {
-                "changed_at": {
-                    "type": "string"
-                },
-                "status_id": {
                     "type": "integer"
                 }
             }
@@ -24106,17 +23953,6 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.UpdateWorkOrderStatusLogRequest": {
-            "type": "object",
-            "properties": {
-                "changed_at": {
-                    "type": "string"
-                },
-                "status_id": {
-                    "type": "integer"
-                }
-            }
-        },
         "dto.UpdateWorkOrderStatusRequest": {
             "type": "object",
             "properties": {
@@ -25633,6 +25469,14 @@ const docTemplate = `{
         "dto.WorkOrderStatusLogResponse": {
             "type": "object",
             "properties": {
+                "actor_employee_id": {
+                    "description": "ActorEmployeeID is null for a system transition, and for rows written\nbefore actors were recorded. Read ActorType to tell those apart.",
+                    "type": "integer"
+                },
+                "actor_type": {
+                    "description": "ActorType is \"employee\" or \"system\". Rows that predate this field are\n\"system\": they were written through the old CRUD route with no actor\ncaptured, so naming a person would be a fabrication.",
+                    "type": "string"
+                },
                 "changed_at": {
                     "type": "string"
                 },

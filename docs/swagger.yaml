@@ -2070,13 +2070,6 @@ definitions:
       vendor_id:
         type: integer
     type: object
-  dto.CreateWorkOrderStatusLogRequest:
-    properties:
-      changed_at:
-        type: string
-      status_id:
-        type: integer
-    type: object
   dto.CreateWorkOrderStatusRequest:
     properties:
       color:
@@ -5840,13 +5833,6 @@ definitions:
       vendor_id:
         type: integer
     type: object
-  dto.UpdateWorkOrderStatusLogRequest:
-    properties:
-      changed_at:
-        type: string
-      status_id:
-        type: integer
-    type: object
   dto.UpdateWorkOrderStatusRequest:
     properties:
       color:
@@ -6912,6 +6898,17 @@ definitions:
     type: object
   dto.WorkOrderStatusLogResponse:
     properties:
+      actor_employee_id:
+        description: |-
+          ActorEmployeeID is null for a system transition, and for rows written
+          before actors were recorded. Read ActorType to tell those apart.
+        type: integer
+      actor_type:
+        description: |-
+          ActorType is "employee" or "system". Rows that predate this field are
+          "system": they were written through the old CRUD route with no actor
+          captured, so naming a person would be a fabrication.
+        type: string
       changed_at:
         type: string
       id:
@@ -16506,6 +16503,11 @@ paths:
       - work-order-line-items
   /api/v1/work-orders/{id}/status-logs:
     get:
+      description: Append-only status history, newest first. Rows are written by the
+        operation that changes the work order's status, inside the same transaction,
+        so this history cannot disagree with the work order. actor_type is "employee"
+        or "system"; actor_employee_id is null for a system transition and for rows
+        written before actors were recorded.
       parameters:
       - description: parent id
         in: path
@@ -16536,62 +16538,7 @@ paths:
       summary: List work-order-status-logs
       tags:
       - work-order-status-logs
-    post:
-      consumes:
-      - application/json
-      parameters:
-      - description: parent id
-        in: path
-        name: id
-        required: true
-        type: integer
-      - description: body
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/dto.CreateWorkOrderStatusLogRequest'
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/dto.WorkOrderStatusLogResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/dto.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Create work-order-status-logs
-      tags:
-      - work-order-status-logs
   /api/v1/work-orders/{id}/status-logs/{child_id}:
-    delete:
-      parameters:
-      - description: parent id
-        in: path
-        name: id
-        required: true
-        type: integer
-      - description: id
-        in: path
-        name: child_id
-        required: true
-        type: integer
-      responses:
-        "204":
-          description: No Content
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/dto.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Delete work-order-status-logs
-      tags:
-      - work-order-status-logs
     get:
       parameters:
       - description: parent id
@@ -16618,42 +16565,6 @@ paths:
       security:
       - BearerAuth: []
       summary: Get work-order-status-logs
-      tags:
-      - work-order-status-logs
-    put:
-      consumes:
-      - application/json
-      parameters:
-      - description: parent id
-        in: path
-        name: id
-        required: true
-        type: integer
-      - description: id
-        in: path
-        name: child_id
-        required: true
-        type: integer
-      - description: body
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/dto.UpdateWorkOrderStatusLogRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/dto.WorkOrderStatusLogResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/dto.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Update work-order-status-logs
       tags:
       - work-order-status-logs
   /auth/login:

@@ -145,3 +145,48 @@ func splitPath(path string) []string {
 	}
 	return out
 }
+
+// A retired write verb must stay routed. Leaving it unrouted returns 404, which
+// a client cannot tell from a typo'd path; 405 with a stable code and the
+// replacement in the message turns a bug report into a one-line fix.
+func TestRetiredStatusLogWritesAnswer405(t *testing.T) {
+	r := newTestRouter(t)
+
+	writes := []struct{ method, path string }{
+		{http.MethodPost, "/api/v1/work-orders/1/status-logs"},
+		{http.MethodPut, "/api/v1/work-orders/1/status-logs/1"},
+		{http.MethodDelete, "/api/v1/work-orders/1/status-logs/1"},
+	}
+
+	routes := make(map[string]bool)
+	for _, route := range r.Routes() {
+		routes[route.Method+" "+route.Path] = true
+	}
+
+	for _, w := range writes {
+		path := strings.Replace(w.path, "/1/status-logs", "/:id/status-logs", 1)
+		path = strings.Replace(path, "/status-logs/1", "/status-logs/:child_id", 1)
+		if !routes[w.method+" "+path] {
+			t.Errorf("%s %s is not routed; it must answer 405, not 404", w.method, path)
+		}
+	}
+}
+
+// The append-only history has no write routes of its own, so its request DTOs
+// are gone. This pins that the read routes survive, since the whole point of
+// retiring the writes was to keep the history readable and truthful.
+func TestStatusLogReadsSurvive(t *testing.T) {
+	routes := make(map[string]bool)
+	for _, r := range newTestRouter(t).Routes() {
+		routes[r.Method+" "+r.Path] = true
+	}
+
+	for _, want := range []string{
+		"GET /api/v1/work-orders/:id/status-logs",
+		"GET /api/v1/work-orders/:id/status-logs/:child_id",
+	} {
+		if !routes[want] {
+			t.Errorf("missing route %q", want)
+		}
+	}
+}

@@ -5,15 +5,60 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"fleet/internal/db/gen"
 	"fleet/internal/http/dto"
 	"fleet/internal/http/middleware"
 	"fleet/internal/platform/paginate"
 )
 
-type WorkOrderStore struct{ q *gen.Queries }
+type WorkOrderStore struct {
+	q *gen.Queries
+	// pool is needed because a status change and the row recording it must land
+	// together. Django did this with a post_save signal; the transaction is the
+	// same guarantee without the indirection.
+	pool *pgxpool.Pool
+}
 
-func NewWorkOrderStore(q *gen.Queries) *WorkOrderStore { return &WorkOrderStore{q: q} }
+func NewWorkOrderStore(q *gen.Queries, pool *pgxpool.Pool) *WorkOrderStore {
+	return &WorkOrderStore{q: q, pool: pool}
+}
+
+// logStatusChange appends to the work order's history. It is unexported and
+// takes a transaction on purpose: the log is written by whatever changed the
+// status, never by a route, so the record can never disagree with the record it
+// describes.
+//
+// The actor is the authenticated caller when there is one. A transition with no
+// caller is a system transition, which is why actor_employee_id is nullable and
+// actor_type carries the distinction rather than leaving a null to interpret.
+func logStatusChange(ctx context.Context, qtx *gen.Queries, workOrderID, statusID, companyID int64, at time.Time) error {
+	actor := middleware.EmployeeFromContext(ctx)
+
+	actorID := &actor
+	actorType := workOrderActorEmployee
+	if actor == 0 {
+		actorID, actorType = nil, workOrderActorSystem
+	}
+
+	_, err := qtx.CreateWorkOrderStatusLog(ctx, gen.CreateWorkOrderStatusLogParams{
+		ParentID:        workOrderID,
+		CompanyID:       companyID,
+		StatusID:        statusID,
+		ChangedAt:       at,
+		ActorEmployeeID: actorID,
+		ActorType:       actorType,
+	})
+	return err
+}
+
+// Actor kinds recorded on a status transition. Two values cover both producers;
+// a third can be added without a migration.
+const (
+	workOrderActorEmployee = "employee"
+	workOrderActorSystem   = "system"
+)
 
 func (s *WorkOrderStore) List(ctx context.Context, p paginate.Params) ([]dto.WorkOrderResponse, int64, error) {
 	company := middleware.CompanyFromContext(ctx)
@@ -42,7 +87,16 @@ func (s *WorkOrderStore) Get(ctx context.Context, id int64) (dto.WorkOrderRespon
 
 func (s *WorkOrderStore) Create(ctx context.Context, in dto.CreateWorkOrderRequest) (dto.WorkOrderResponse, error) {
 	now := time.Now().UTC()
-	r, err := s.q.CreateWorkOrder(ctx, gen.CreateWorkOrderParams{
+	company := middleware.CompanyFromContext(ctx)
+
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return dto.WorkOrderResponse{}, err
+	}
+	defer tx.Rollback(ctx)
+	qtx := s.q.WithTx(tx)
+
+	r, err := qtx.CreateWorkOrder(ctx, gen.CreateWorkOrderParams{
 		LocationID:            in.LocationID,
 		CompanyID:             middleware.CompanyFromContext(ctx),
 		Number:                in.Number,
@@ -93,14 +147,40 @@ func (s *WorkOrderStore) Create(ctx context.Context, in dto.CreateWorkOrderReque
 	if err != nil {
 		return dto.WorkOrderResponse{}, err
 	}
+
+	// A work order opens in a status, and that is the first thing its history has
+	// to show — Django logged on create for the same reason.
+	if err := logStatusChange(ctx, qtx, r.ID, r.StatusID, company, now); err != nil {
+		return dto.WorkOrderResponse{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return dto.WorkOrderResponse{}, err
+	}
 	return toWorkOrderResponse(r), nil
 }
 
 func (s *WorkOrderStore) Update(ctx context.Context, id int64, in dto.UpdateWorkOrderRequest) (dto.WorkOrderResponse, error) {
 	now := time.Now().UTC()
-	r, err := s.q.UpdateWorkOrder(ctx, gen.UpdateWorkOrderParams{
+	company := middleware.CompanyFromContext(ctx)
+
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return dto.WorkOrderResponse{}, err
+	}
+	defer tx.Rollback(ctx)
+	qtx := s.q.WithTx(tx)
+
+	// Read the stored status inside the transaction: whether this write is a
+	// transition is decided against the row being replaced, not against whatever
+	// a concurrent request left behind.
+	previous, err := qtx.GetWorkOrder(ctx, gen.GetWorkOrderParams{ID: id, CompanyID: company})
+	if err != nil {
+		return dto.WorkOrderResponse{}, err
+	}
+
+	r, err := qtx.UpdateWorkOrder(ctx, gen.UpdateWorkOrderParams{
 		ID:                    id,
-		CompanyID:             middleware.CompanyFromContext(ctx),
+		CompanyID:             company,
 		LocationID:            in.LocationID,
 		Number:                in.Number,
 		Description:           in.Description,
@@ -147,6 +227,17 @@ func (s *WorkOrderStore) Update(ctx context.Context, id int64, in dto.UpdateWork
 		UpdatedAt:             now,
 	})
 	if err != nil {
+		return dto.WorkOrderResponse{}, err
+	}
+
+	// Only a transition is history. A save that leaves the status alone would
+	// otherwise file a row saying nothing happened.
+	if r.StatusID != previous.StatusID {
+		if err := logStatusChange(ctx, qtx, r.ID, r.StatusID, company, now); err != nil {
+			return dto.WorkOrderResponse{}, err
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
 		return dto.WorkOrderResponse{}, err
 	}
 	return toWorkOrderResponse(r), nil

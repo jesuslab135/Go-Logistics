@@ -136,7 +136,7 @@ func NewRouter(d Deps) *gin.Engine {
 	// Django's LocationViewSet required membership only, no module entry.
 	crud.NewHandler[dto.LocationResponse, dto.CreateLocationRequest, dto.UpdateLocationRequest](NewLocationStore(d.Queries)).Register(member, "/locations")
 	registerCrudWithList(workOrders, "/work-orders",
-		crud.NewHandler[dto.WorkOrderResponse, dto.CreateWorkOrderRequest, dto.UpdateWorkOrderRequest](NewWorkOrderStore(d.Queries)), lists.WorkOrders)
+		crud.NewHandler[dto.WorkOrderResponse, dto.CreateWorkOrderRequest, dto.UpdateWorkOrderRequest](NewWorkOrderStore(d.Queries, d.Pool)), lists.WorkOrders)
 	registerCrudWithList(issues, "/issues",
 		crud.NewHandler[dto.IssueResponse, dto.CreateIssueRequest, dto.UpdateIssueRequest](NewIssueStore(d.Queries)), lists.Issues)
 	crud.NewHandler[dto.IssuePriorityResponse, dto.CreateIssuePriorityRequest, dto.UpdateIssuePriorityRequest](NewIssuePriorityStore(d.Queries)).Register(issues, "/issue-priorities")
@@ -218,7 +218,10 @@ func NewRouter(d Deps) *gin.Engine {
 
 	// Phase 8: nested, parent-scoped child resources
 	crud.NewNestedHandler[dto.WorkOrderLineItemResponse, dto.CreateWorkOrderLineItemRequest, dto.UpdateWorkOrderLineItemRequest](NewWorkOrderLineItemStore(d.Queries)).Register(workOrders, "/work-orders", "/line-items")
-	crud.NewNestedHandler[dto.WorkOrderStatusLogResponse, dto.CreateWorkOrderStatusLogRequest, dto.UpdateWorkOrderStatusLogRequest](NewWorkOrderStatusLogStore(d.Queries)).Register(workOrders, "/work-orders", "/status-logs")
+	crud.NewReadOnlyNestedHandler[dto.WorkOrderStatusLogResponse](
+		NewWorkOrderStatusLogStore(d.Queries),
+		"the status history is append-only: change the work order's status_id with PUT /api/v1/work-orders/{id} and the transition is recorded automatically",
+	).Register(workOrders, "/work-orders", "/status-logs")
 	crud.NewNestedHandler[dto.PurchaseOrderLineItemResponse, dto.CreatePurchaseOrderLineItemRequest, dto.UpdatePurchaseOrderLineItemRequest](NewPurchaseOrderLineItemStore(d.Queries)).Register(inventory, "/purchase-orders", "/line-items")
 	crud.NewNestedHandler[dto.ServiceTaskPartResponse, dto.CreateServiceTaskPartRequest, dto.UpdateServiceTaskPartRequest](NewServiceTaskPartStore(d.Queries)).Register(service, "/service-tasks", "/parts")
 	crud.NewNestedHandler[dto.ServiceEntryLineItemResponse, dto.CreateServiceEntryLineItemRequest, dto.UpdateServiceEntryLineItemRequest](NewServiceEntryLineItemStore(d.Queries)).Register(service, "/service-entries", "/line-items")
