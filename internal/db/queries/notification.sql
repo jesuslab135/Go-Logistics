@@ -34,3 +34,32 @@ WHERE e.is_active
     OR COALESCE(r.permissions -> 'tire_approvals' ->> 'approve', 'false') = 'true'
     OR (r.permissions ? 'tire_approvals' AND r.permissions -> 'tire_approvals' = '{}'::jsonb)
   );
+
+-- PruneNotifications drops what nobody will read again.
+--
+-- It is called opportunistically from the list endpoint rather than by a
+-- scheduler: this deployment is a single API container with nothing to run a
+-- cron in, and adding one to delete rows would be disproportionate. The bound
+-- caps the work any single request does, so a long-neglected inbox is trimmed
+-- over several visits instead of stalling one.
+-- name: PruneNotifications :exec
+DELETE FROM notification
+WHERE id IN (
+    SELECT n.id FROM notification n
+    WHERE n.created_at < sqlc.arg(before)
+    LIMIT sqlc.arg(lim)
+);
+
+-- NotifyWorkOrderAssignee tells one person that work is now theirs.
+--
+-- Only the assignee, not the watchers: on a busy asset, watcher fan-out turns
+-- the bell into noise, and the assignment is news to exactly one person.
+-- Nothing is sent when a work order is assigned to nobody, or to the person who
+-- assigned it - being told about your own action is not a notification.
+-- name: NotifyWorkOrderAssignee :exec
+INSERT INTO notification (company_id, employee_id, kind, title, body, url, created_at)
+SELECT sqlc.arg(company_id), sqlc.arg(employee_id), sqlc.arg(kind), sqlc.arg(title), sqlc.arg(body), sqlc.arg(url), sqlc.arg(created_at)
+WHERE EXISTS (
+    SELECT 1 FROM employee_companies ec
+    WHERE ec.employee_id = sqlc.arg(employee_id) AND ec.company_id = sqlc.arg(company_id)
+);

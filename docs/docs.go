@@ -7677,7 +7677,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Scoped to the authenticated employee within the active company, newest first. The unread count describes the whole inbox, not just the returned page.",
+                "description": "Scoped to the authenticated employee within the active company, newest first. The unread count describes the whole inbox, not just the returned page. Notifications older than 180 days are deleted; the sweep runs opportunistically here rather than on a schedule, because this deployment has nothing to run a cron in.",
                 "produces": [
                     "application/json"
                 ],

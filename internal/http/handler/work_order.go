@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"strconv"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -225,6 +226,11 @@ func (s *WorkOrderStore) Update(ctx context.Context, id int64, in dto.UpdateWork
 			return dto.WorkOrderResponse{}, err
 		}
 	}
+	// Being handed work is news to exactly one person, and only when the
+	// assignee actually changed — re-saving a form does not re-announce it.
+	if err := notifyWorkOrderAssignee(ctx, qtx, r, previous.AssignedToID, company, now); err != nil {
+		return dto.WorkOrderResponse{}, err
+	}
 	// This write can change the markup, discount and tax terms, so the totals
 	// are recomputed from them and re-read.
 	if err := recalcWorkOrder(ctx, qtx, id, now); err != nil {
@@ -294,4 +300,42 @@ func toWorkOrderResponse(r gen.WorkOrder) dto.WorkOrderResponse {
 		CreatedAt:             r.CreatedAt,
 		UpdatedAt:             r.UpdatedAt,
 	}
+}
+
+// notifyWorkOrderAssignee tells the new assignee that work is theirs.
+//
+// Nothing is sent when the assignee did not change, when the order is assigned
+// to nobody, or when the caller assigned it to themselves — being told about
+// your own action is not a notification, it is an echo.
+//
+// It runs in the transaction that made the assignment, so a notification that
+// exists always describes an assignment that happened.
+func notifyWorkOrderAssignee(ctx context.Context, qtx *gen.Queries, order gen.WorkOrder, previous *int64, companyID int64, at time.Time) error {
+	assignee := order.AssignedToID
+	if assignee == nil {
+		return nil
+	}
+	if previous != nil && *previous == *assignee {
+		return nil
+	}
+	if actor := middleware.EmployeeFromContext(ctx); actor == *assignee {
+		return nil
+	}
+
+	url := "/app/maintenance/work-orders/" + strconv.FormatInt(order.ID, 10)
+	if !ValidNotificationURL(url) {
+		// Unreachable with a numeric id, but the check is where the rule lives:
+		// a producer must not be the one place that can store an off-site link.
+		return nil
+	}
+
+	return qtx.NotifyWorkOrderAssignee(ctx, gen.NotifyWorkOrderAssigneeParams{
+		CompanyID:  companyID,
+		EmployeeID: *assignee,
+		Kind:       NotificationWorkOrderAssigned,
+		Title:      "Work order " + order.Number + " assigned to you",
+		Body:       order.Description,
+		Url:        url,
+		CreatedAt:  at,
+	})
 }

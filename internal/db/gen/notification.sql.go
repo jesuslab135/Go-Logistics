@@ -178,3 +178,67 @@ func (q *Queries) NotifyTireApprovers(ctx context.Context, arg NotifyTireApprove
 	)
 	return err
 }
+
+const notifyWorkOrderAssignee = `-- name: NotifyWorkOrderAssignee :exec
+INSERT INTO notification (company_id, employee_id, kind, title, body, url, created_at)
+SELECT $1, $2, $3, $4, $5, $6, $7
+WHERE EXISTS (
+    SELECT 1 FROM employee_companies ec
+    WHERE ec.employee_id = $2 AND ec.company_id = $1
+)
+`
+
+type NotifyWorkOrderAssigneeParams struct {
+	CompanyID  int64
+	EmployeeID int64
+	Kind       string
+	Title      string
+	Body       string
+	Url        string
+	CreatedAt  time.Time
+}
+
+// NotifyWorkOrderAssignee tells one person that work is now theirs.
+//
+// Only the assignee, not the watchers: on a busy asset, watcher fan-out turns
+// the bell into noise, and the assignment is news to exactly one person.
+// Nothing is sent when a work order is assigned to nobody, or to the person who
+// assigned it - being told about your own action is not a notification.
+func (q *Queries) NotifyWorkOrderAssignee(ctx context.Context, arg NotifyWorkOrderAssigneeParams) error {
+	_, err := q.db.Exec(ctx, notifyWorkOrderAssignee,
+		arg.CompanyID,
+		arg.EmployeeID,
+		arg.Kind,
+		arg.Title,
+		arg.Body,
+		arg.Url,
+		arg.CreatedAt,
+	)
+	return err
+}
+
+const pruneNotifications = `-- name: PruneNotifications :exec
+DELETE FROM notification
+WHERE id IN (
+    SELECT n.id FROM notification n
+    WHERE n.created_at < $1
+    LIMIT $2
+)
+`
+
+type PruneNotificationsParams struct {
+	Before time.Time
+	Lim    int32
+}
+
+// PruneNotifications drops what nobody will read again.
+//
+// It is called opportunistically from the list endpoint rather than by a
+// scheduler: this deployment is a single API container with nothing to run a
+// cron in, and adding one to delete rows would be disproportionate. The bound
+// caps the work any single request does, so a long-neglected inbox is trimmed
+// over several visits instead of stalling one.
+func (q *Queries) PruneNotifications(ctx context.Context, arg PruneNotificationsParams) error {
+	_, err := q.db.Exec(ctx, pruneNotifications, arg.Before, arg.Lim)
+	return err
+}
