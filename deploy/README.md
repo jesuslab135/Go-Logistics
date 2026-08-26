@@ -290,6 +290,22 @@ not a sandbox.
   `middleware.CORS` matches the `Origin` header exactly. Listing them is not
   possible; making them work needs suffix matching in the middleware, which is a
   code change, not a config one.
+- **The edge vhost has no `/fleet-private/` location yet — private uploads
+  cannot render until it does.** Deploying the private-bucket work added a
+  second bucket, `fleet-private`, whose objects are served by presigned URL.
+  `STORAGE_MINIO_SIGNING_ENDPOINT` is set on the server so those URLs are
+  addressed to `go-logistics.jesuslab135.com`, but nginx only routes `/fleet/`,
+  so `/fleet-private/…` falls through to the API and answers 404. Nothing is
+  exposed by this — the bucket carries no anonymous read policy, and uploads
+  still succeed; only rendering breaks.
+
+  The block is written and versioned in `deploy/nginx/go-logistics.conf`; it
+  still has to be spliced into `/opt/sga/nginx/app.conf` **as root**, in place,
+  preserving the inode (see "Editing the edge vhost" above), then
+  `docker exec sga_nginx nginx -t && docker exec sga_nginx nginx -s reload`.
+  Verify with `curl -i https://go-logistics.jesuslab135.com/fleet-private/probe`:
+  MinIO XML saying `AccessDenied` is correct, nginx's plain-text `404 page not
+  found` means the block is not live.
 - Backups are on-box only (see above).
 - The IONOS Cloud Panel has its own firewall policy in front of the OS `ufw`.
   Both currently allow 22/80/443 only; a port opened in `ufw` alone will still
