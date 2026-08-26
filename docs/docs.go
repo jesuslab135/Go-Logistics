@@ -9479,6 +9479,70 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/purchase-orders/{id}/override-total": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "As for work orders: replaces the computed total with an audited figure, null clears it, and a line-item edit clears it automatically.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "purchase-orders"
+                ],
+                "summary": "Override a purchase order's total",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Purchase order id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Override",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.TotalOverrideRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PurchaseOrderResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/purchase-orders/{id}/purchase": {
             "post": {
                 "security": [
@@ -10496,6 +10560,70 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/service-entries/{id}/override-total": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "As for work orders: replaces the computed total with an audited figure, null clears it, and a line-item edit clears it automatically.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "service-entries"
+                ],
+                "summary": "Override a service entry's total",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Service entry id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Override",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.TotalOverrideRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ServiceEntryResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -15541,6 +15669,70 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/work-orders/{id}/override-total": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Replaces the computed total with an explicit figure, recording who set it and why. The component columns (parts_subtotal, labor_subtotal, subtotal) stay computed, so the difference between what the document adds up to and what it is being charged at stays visible — which is the reason an override is audited. Send a null amount to drop the override and return to the computed total. Any later edit to the line items clears it automatically.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "work-orders"
+                ],
+                "summary": "Override a work order's total",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Work order id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Override",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.TotalOverrideRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.WorkOrderResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/work-orders/{id}/status-logs": {
             "get": {
                 "security": [
@@ -17957,15 +18149,13 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "part_id": {
+                    "description": "The money columns this record derives are response-only: the server\ncomputes them from the line items and the rate terms above, in the same\ntransaction as the write. See internal/domain/money.",
                     "type": "integer"
                 },
                 "position": {
                     "type": "integer"
                 },
                 "quantity": {
-                    "type": "number"
-                },
-                "subtotal": {
                     "type": "number"
                 },
                 "total_received": {
@@ -18009,13 +18199,11 @@ const docTemplate = `{
                     }
                 },
                 "number": {
+                    "description": "The money columns this record derives are response-only: the server\ncomputes them from the line items and the rate terms above, in the same\ntransaction as the write. See internal/domain/money.",
                     "type": "string",
                     "maxLength": 50
                 },
                 "shipping": {
-                    "type": "number"
-                },
-                "subtotal": {
                     "type": "number"
                 },
                 "tax_1": {
@@ -18037,9 +18225,6 @@ const docTemplate = `{
                 "tax_2_type": {
                     "type": "string",
                     "maxLength": 10
-                },
-                "total_amount": {
-                    "type": "number"
                 },
                 "vendor_id": {
                     "type": "integer"
@@ -18075,6 +18260,7 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "line_item_type": {
+                    "description": "The money columns this record derives are response-only: the server\ncomputes them from the line items and the rate terms above, in the same\ntransaction as the write. See internal/domain/money.",
                     "type": "string",
                     "maxLength": 20
                 },
@@ -18095,9 +18281,6 @@ const docTemplate = `{
                 },
                 "service_task_id": {
                     "type": "integer"
-                },
-                "subtotal": {
-                    "type": "number"
                 },
                 "technician_id": {
                     "type": "integer"
@@ -18144,19 +18327,14 @@ const docTemplate = `{
                         "type": "integer"
                     }
                 },
-                "labor_subtotal": {
-                    "type": "number"
-                },
                 "labor_time_seconds": {
                     "type": "integer"
                 },
                 "meter_value": {
                     "type": "number"
                 },
-                "parts_subtotal": {
-                    "type": "number"
-                },
                 "reference": {
+                    "description": "The money columns this record derives are response-only: the server\ncomputes them from the line items and the rate terms above, in the same\ntransaction as the write. See internal/domain/money.",
                     "type": "string",
                     "maxLength": 100
                 },
@@ -18166,9 +18344,6 @@ const docTemplate = `{
                 "status": {
                     "type": "string",
                     "maxLength": 20
-                },
-                "subtotal": {
-                    "type": "number"
                 },
                 "tax_1": {
                     "type": "number"
@@ -18189,9 +18364,6 @@ const docTemplate = `{
                 "tax_2_type": {
                     "type": "string",
                     "maxLength": 10
-                },
-                "total_amount": {
-                    "type": "number"
                 },
                 "vendor_id": {
                     "type": "integer"
@@ -18669,15 +18841,10 @@ const docTemplate = `{
                 "description": {
                     "type": "string"
                 },
-                "labor_cost": {
-                    "type": "number"
-                },
                 "line_item_type": {
+                    "description": "The money columns this record derives are response-only: the server\ncomputes them from the line items and the rate terms above, in the same\ntransaction as the write. See internal/domain/money.",
                     "type": "string",
                     "maxLength": 20
-                },
-                "parts_cost": {
-                    "type": "number"
                 },
                 "position": {
                     "type": "integer"
@@ -18685,9 +18852,6 @@ const docTemplate = `{
                 "service_task": {
                     "type": "string",
                     "maxLength": 255
-                },
-                "subtotal": {
-                    "type": "number"
                 },
                 "title": {
                     "type": "string",
@@ -18770,13 +18934,11 @@ const docTemplate = `{
                     "type": "string",
                     "maxLength": 10
                 },
-                "labor_subtotal": {
-                    "type": "number"
-                },
                 "labor_time_seconds": {
                     "type": "integer"
                 },
                 "location_id": {
+                    "description": "The money columns this record derives are response-only: the server\ncomputes them from the line items and the rate terms above, in the same\ntransaction as the write. See internal/domain/money.",
                     "type": "integer"
                 },
                 "number": {
@@ -18793,9 +18955,6 @@ const docTemplate = `{
                     "type": "string",
                     "maxLength": 10
                 },
-                "parts_subtotal": {
-                    "type": "number"
-                },
                 "purchase_order_number": {
                     "type": "string",
                     "maxLength": 100
@@ -18811,9 +18970,6 @@ const docTemplate = `{
                 },
                 "status_id": {
                     "type": "integer"
-                },
-                "subtotal": {
-                    "type": "number"
                 },
                 "tax_1": {
                     "type": "number"
@@ -18834,9 +18990,6 @@ const docTemplate = `{
                 "tax_2_type": {
                     "type": "string",
                     "maxLength": 10
-                },
-                "total_amount": {
-                    "type": "number"
                 },
                 "vendor_id": {
                     "type": "integer"
@@ -22021,6 +22174,20 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.TotalOverrideRequest": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "description": "Amount is the figure to charge. Null clears the override and returns the\ndocument to its computed total.",
+                    "type": "number"
+                },
+                "reason": {
+                    "description": "Reason is required whenever Amount is given: an unexplained override is a\nnumber nobody can defend later.",
+                    "type": "string",
+                    "maxLength": 2000
+                }
+            }
+        },
         "dto.TrailerResponse": {
             "type": "object",
             "properties": {
@@ -23450,15 +23617,13 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "part_id": {
+                    "description": "The money columns this record derives are response-only: the server\ncomputes them from the line items and the rate terms above, in the same\ntransaction as the write. See internal/domain/money.",
                     "type": "integer"
                 },
                 "position": {
                     "type": "integer"
                 },
                 "quantity": {
-                    "type": "number"
-                },
-                "subtotal": {
                     "type": "number"
                 },
                 "total_received": {
@@ -23502,13 +23667,11 @@ const docTemplate = `{
                     }
                 },
                 "number": {
+                    "description": "The money columns this record derives are response-only: the server\ncomputes them from the line items and the rate terms above, in the same\ntransaction as the write. See internal/domain/money.",
                     "type": "string",
                     "maxLength": 50
                 },
                 "shipping": {
-                    "type": "number"
-                },
-                "subtotal": {
                     "type": "number"
                 },
                 "tax_1": {
@@ -23530,9 +23693,6 @@ const docTemplate = `{
                 "tax_2_type": {
                     "type": "string",
                     "maxLength": 10
-                },
-                "total_amount": {
-                    "type": "number"
                 },
                 "vendor_id": {
                     "type": "integer"
@@ -23568,6 +23728,7 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "line_item_type": {
+                    "description": "The money columns this record derives are response-only: the server\ncomputes them from the line items and the rate terms above, in the same\ntransaction as the write. See internal/domain/money.",
                     "type": "string",
                     "maxLength": 20
                 },
@@ -23588,9 +23749,6 @@ const docTemplate = `{
                 },
                 "service_task_id": {
                     "type": "integer"
-                },
-                "subtotal": {
-                    "type": "number"
                 },
                 "technician_id": {
                     "type": "integer"
@@ -23637,19 +23795,14 @@ const docTemplate = `{
                         "type": "integer"
                     }
                 },
-                "labor_subtotal": {
-                    "type": "number"
-                },
                 "labor_time_seconds": {
                     "type": "integer"
                 },
                 "meter_value": {
                     "type": "number"
                 },
-                "parts_subtotal": {
-                    "type": "number"
-                },
                 "reference": {
+                    "description": "The money columns this record derives are response-only: the server\ncomputes them from the line items and the rate terms above, in the same\ntransaction as the write. See internal/domain/money.",
                     "type": "string",
                     "maxLength": 100
                 },
@@ -23659,9 +23812,6 @@ const docTemplate = `{
                 "status": {
                     "type": "string",
                     "maxLength": 20
-                },
-                "subtotal": {
-                    "type": "number"
                 },
                 "tax_1": {
                     "type": "number"
@@ -23682,9 +23832,6 @@ const docTemplate = `{
                 "tax_2_type": {
                     "type": "string",
                     "maxLength": 10
-                },
-                "total_amount": {
-                    "type": "number"
                 },
                 "vendor_id": {
                     "type": "integer"
@@ -24174,15 +24321,10 @@ const docTemplate = `{
                 "description": {
                     "type": "string"
                 },
-                "labor_cost": {
-                    "type": "number"
-                },
                 "line_item_type": {
+                    "description": "The money columns this record derives are response-only: the server\ncomputes them from the line items and the rate terms above, in the same\ntransaction as the write. See internal/domain/money.",
                     "type": "string",
                     "maxLength": 20
-                },
-                "parts_cost": {
-                    "type": "number"
                 },
                 "position": {
                     "type": "integer"
@@ -24190,9 +24332,6 @@ const docTemplate = `{
                 "service_task": {
                     "type": "string",
                     "maxLength": 255
-                },
-                "subtotal": {
-                    "type": "number"
                 },
                 "title": {
                     "type": "string",
@@ -24275,13 +24414,11 @@ const docTemplate = `{
                     "type": "string",
                     "maxLength": 10
                 },
-                "labor_subtotal": {
-                    "type": "number"
-                },
                 "labor_time_seconds": {
                     "type": "integer"
                 },
                 "location_id": {
+                    "description": "The money columns this record derives are response-only: the server\ncomputes them from the line items and the rate terms above, in the same\ntransaction as the write. See internal/domain/money.",
                     "type": "integer"
                 },
                 "number": {
@@ -24298,9 +24435,6 @@ const docTemplate = `{
                     "type": "string",
                     "maxLength": 10
                 },
-                "parts_subtotal": {
-                    "type": "number"
-                },
                 "purchase_order_number": {
                     "type": "string",
                     "maxLength": 100
@@ -24316,9 +24450,6 @@ const docTemplate = `{
                 },
                 "status_id": {
                     "type": "integer"
-                },
-                "subtotal": {
-                    "type": "number"
                 },
                 "tax_1": {
                     "type": "number"
@@ -24339,9 +24470,6 @@ const docTemplate = `{
                 "tax_2_type": {
                     "type": "string",
                     "maxLength": 10
-                },
-                "total_amount": {
-                    "type": "number"
                 },
                 "vendor_id": {
                     "type": "integer"

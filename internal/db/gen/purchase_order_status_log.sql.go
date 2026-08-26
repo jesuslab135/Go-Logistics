@@ -26,7 +26,7 @@ UPDATE purchase_order SET
     closed_at           = COALESCE($12, closed_at),
     updated_at          = $13
 WHERE id = $14 AND company_id = $15
-RETURNING id, company_id, number, description, state, vendor_id, destination_id, discount_type, discount, discount_percentage, tax_1_type, tax_1, tax_1_percentage, tax_2_type, tax_2, tax_2_percentage, shipping, subtotal, total_amount, created_by_id, submitted_at, submitted_by_id, rejected_at, rejected_by_id, approved_at, approved_by_id, purchased_at, received_partial_at, received_full_at, closed_at, labels, custom_fields, created_at, updated_at, rejection_reason
+RETURNING id, company_id, number, description, state, vendor_id, destination_id, discount_type, discount, discount_percentage, tax_1_type, tax_1, tax_1_percentage, tax_2_type, tax_2, tax_2_percentage, shipping, subtotal, total_amount, created_by_id, submitted_at, submitted_by_id, rejected_at, rejected_by_id, approved_at, approved_by_id, purchased_at, received_partial_at, received_full_at, closed_at, labels, custom_fields, created_at, updated_at, rejection_reason, total_override, total_override_reason, total_override_by_id, total_override_at
 `
 
 type ApplyPurchaseOrderTransitionParams struct {
@@ -106,6 +106,10 @@ func (q *Queries) ApplyPurchaseOrderTransition(ctx context.Context, arg ApplyPur
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.RejectionReason,
+		&i.TotalOverride,
+		&i.TotalOverrideReason,
+		&i.TotalOverrideByID,
+		&i.TotalOverrideAt,
 	)
 	return i, err
 }
@@ -250,7 +254,7 @@ func (q *Queries) ListPurchaseOrderStatusLogs(ctx context.Context, arg ListPurch
 }
 
 const lockPurchaseOrder = `-- name: LockPurchaseOrder :one
-SELECT id, company_id, number, description, state, vendor_id, destination_id, discount_type, discount, discount_percentage, tax_1_type, tax_1, tax_1_percentage, tax_2_type, tax_2, tax_2_percentage, shipping, subtotal, total_amount, created_by_id, submitted_at, submitted_by_id, rejected_at, rejected_by_id, approved_at, approved_by_id, purchased_at, received_partial_at, received_full_at, closed_at, labels, custom_fields, created_at, updated_at, rejection_reason FROM purchase_order WHERE id = $1 AND company_id = $2 FOR UPDATE
+SELECT id, company_id, number, description, state, vendor_id, destination_id, discount_type, discount, discount_percentage, tax_1_type, tax_1, tax_1_percentage, tax_2_type, tax_2, tax_2_percentage, shipping, subtotal, total_amount, created_by_id, submitted_at, submitted_by_id, rejected_at, rejected_by_id, approved_at, approved_by_id, purchased_at, received_partial_at, received_full_at, closed_at, labels, custom_fields, created_at, updated_at, rejection_reason, total_override, total_override_reason, total_override_by_id, total_override_at FROM purchase_order WHERE id = $1 AND company_id = $2 FOR UPDATE
 `
 
 type LockPurchaseOrderParams struct {
@@ -301,6 +305,10 @@ func (q *Queries) LockPurchaseOrder(ctx context.Context, arg LockPurchaseOrderPa
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.RejectionReason,
+		&i.TotalOverride,
+		&i.TotalOverrideReason,
+		&i.TotalOverrideByID,
+		&i.TotalOverrideAt,
 	)
 	return i, err
 }

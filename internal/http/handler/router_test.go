@@ -240,3 +240,22 @@ func TestPurchaseOrderTransitionRoutes(t *testing.T) {
 		}
 	}
 }
+
+// Totals are computed, so departing from the formula must go through the
+// audited action rather than a writable field.
+func TestTotalOverrideRoutes(t *testing.T) {
+	routes := make(map[string]bool)
+	for _, r := range newTestRouter(t).Routes() {
+		routes[r.Method+" "+r.Path] = true
+	}
+
+	for _, want := range []string{
+		"POST /api/v1/work-orders/:id/override-total",
+		"POST /api/v1/purchase-orders/:id/override-total",
+		"POST /api/v1/service-entries/:id/override-total",
+	} {
+		if !routes[want] {
+			t.Errorf("missing route %q", want)
+		}
+	}
+}

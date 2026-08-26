@@ -8,6 +8,9 @@ import (
 )
 
 type CreatePurchaseOrderRequest struct {
+	// The money columns this record derives are response-only: the server
+	// computes them from the line items and the rate terms above, in the same
+	// transaction as the write. See internal/domain/money.
 	Number             string          `json:"number" binding:"omitempty,max=50"`
 	Description        string          `json:"description"`
 	VendorID           int64           `json:"vendor_id"`
@@ -22,8 +25,6 @@ type CreatePurchaseOrderRequest struct {
 	Tax2               decimal.Decimal `json:"tax_2"`
 	Tax2Percentage     decimal.Decimal `json:"tax_2_percentage"`
 	Shipping           decimal.Decimal `json:"shipping"`
-	Subtotal           decimal.Decimal `json:"subtotal"`
-	TotalAmount        decimal.Decimal `json:"total_amount"`
 	// state, the workflow timestamps, the actor ids and rejection_reason are
 	// response-only. They are moved by POST /purchase-orders/{id}/{action},
 	// which is the only thing that can check a transition is legal and record
@@ -33,6 +34,9 @@ type CreatePurchaseOrderRequest struct {
 }
 
 type UpdatePurchaseOrderRequest struct {
+	// The money columns this record derives are response-only: the server
+	// computes them from the line items and the rate terms above, in the same
+	// transaction as the write. See internal/domain/money.
 	Number             string          `json:"number" binding:"omitempty,max=50"`
 	Description        string          `json:"description"`
 	VendorID           int64           `json:"vendor_id"`
@@ -47,8 +51,6 @@ type UpdatePurchaseOrderRequest struct {
 	Tax2               decimal.Decimal `json:"tax_2"`
 	Tax2Percentage     decimal.Decimal `json:"tax_2_percentage"`
 	Shipping           decimal.Decimal `json:"shipping"`
-	Subtotal           decimal.Decimal `json:"subtotal"`
-	TotalAmount        decimal.Decimal `json:"total_amount"`
 	// state, the workflow timestamps, the actor ids and rejection_reason are
 	// response-only. They are moved by POST /purchase-orders/{id}/{action},
 	// which is the only thing that can check a transition is legal and record

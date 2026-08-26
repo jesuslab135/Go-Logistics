@@ -8,6 +8,9 @@ import (
 )
 
 type CreateServiceEntryRequest struct {
+	// The money columns this record derives are response-only: the server
+	// computes them from the line items and the rate terms above, in the same
+	// transaction as the write. See internal/domain/money.
 	Reference            string           `json:"reference" binding:"omitempty,max=100"`
 	Status               string           `json:"status" binding:"omitempty,max=20"`
 	AssetID              int64            `json:"asset_id"`
@@ -16,9 +19,6 @@ type CreateServiceEntryRequest struct {
 	StartedAt            *time.Time       `json:"started_at"`
 	CompletedAt          *time.Time       `json:"completed_at"`
 	MeterValue           *decimal.Decimal `json:"meter_value"`
-	PartsSubtotal        decimal.Decimal  `json:"parts_subtotal"`
-	LaborSubtotal        decimal.Decimal  `json:"labor_subtotal"`
-	Subtotal             decimal.Decimal  `json:"subtotal"`
 	Discount             decimal.Decimal  `json:"discount"`
 	DiscountType         string           `json:"discount_type" binding:"omitempty,max=10"`
 	Tax1                 decimal.Decimal  `json:"tax_1"`
@@ -27,7 +27,6 @@ type CreateServiceEntryRequest struct {
 	Tax2                 decimal.Decimal  `json:"tax_2"`
 	Tax2Type             string           `json:"tax_2_type" binding:"omitempty,max=10"`
 	Tax2Percentage       decimal.Decimal  `json:"tax_2_percentage"`
-	TotalAmount          decimal.Decimal  `json:"total_amount"`
 	GeneralNotes         string           `json:"general_notes"`
 	IsRoadsideAssistance bool             `json:"is_roadside_assistance"`
 	LaborTimeSeconds     *int32           `json:"labor_time_seconds"`
@@ -36,6 +35,9 @@ type CreateServiceEntryRequest struct {
 }
 
 type UpdateServiceEntryRequest struct {
+	// The money columns this record derives are response-only: the server
+	// computes them from the line items and the rate terms above, in the same
+	// transaction as the write. See internal/domain/money.
 	Reference            string           `json:"reference" binding:"omitempty,max=100"`
 	Status               string           `json:"status" binding:"omitempty,max=20"`
 	AssetID              int64            `json:"asset_id"`
@@ -44,9 +46,6 @@ type UpdateServiceEntryRequest struct {
 	StartedAt            *time.Time       `json:"started_at"`
 	CompletedAt          *time.Time       `json:"completed_at"`
 	MeterValue           *decimal.Decimal `json:"meter_value"`
-	PartsSubtotal        decimal.Decimal  `json:"parts_subtotal"`
-	LaborSubtotal        decimal.Decimal  `json:"labor_subtotal"`
-	Subtotal             decimal.Decimal  `json:"subtotal"`
 	Discount             decimal.Decimal  `json:"discount"`
 	DiscountType         string           `json:"discount_type" binding:"omitempty,max=10"`
 	Tax1                 decimal.Decimal  `json:"tax_1"`
@@ -55,7 +54,6 @@ type UpdateServiceEntryRequest struct {
 	Tax2                 decimal.Decimal  `json:"tax_2"`
 	Tax2Type             string           `json:"tax_2_type" binding:"omitempty,max=10"`
 	Tax2Percentage       decimal.Decimal  `json:"tax_2_percentage"`
-	TotalAmount          decimal.Decimal  `json:"total_amount"`
 	GeneralNotes         string           `json:"general_notes"`
 	IsRoadsideAssistance bool             `json:"is_roadside_assistance"`
 	LaborTimeSeconds     *int32           `json:"labor_time_seconds"`

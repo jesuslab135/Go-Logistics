@@ -109,9 +109,6 @@ func (s *WorkOrderStore) Create(ctx context.Context, in dto.CreateWorkOrderReque
 		LaborMarkupType:       orDefault(in.LaborMarkupType, "PERCENTAGE"),
 		LaborMarkup:           in.LaborMarkup,
 		LaborMarkupPercentage: in.LaborMarkupPercentage,
-		PartsSubtotal:         in.PartsSubtotal,
-		LaborSubtotal:         in.LaborSubtotal,
-		Subtotal:              in.Subtotal,
 		Discount:              in.Discount,
 		DiscountType:          orDefault(in.DiscountType, "FIXED"),
 		Tax1:                  in.Tax1,
@@ -120,7 +117,6 @@ func (s *WorkOrderStore) Create(ctx context.Context, in dto.CreateWorkOrderReque
 		Tax2:                  in.Tax2,
 		Tax2Type:              orDefault(in.Tax2Type, "PERCENTAGE"),
 		Tax2Percentage:        in.Tax2Percentage,
-		TotalAmount:           in.TotalAmount,
 		InvoiceNumber:         in.InvoiceNumber,
 		PurchaseOrderNumber:   in.PurchaseOrderNumber,
 		CommentsCount:         in.CommentsCount,
@@ -138,6 +134,15 @@ func (s *WorkOrderStore) Create(ctx context.Context, in dto.CreateWorkOrderReque
 	// A work order opens in a status, and that is the first thing its history has
 	// to show — Django logged on create for the same reason.
 	if err := logStatusChange(ctx, qtx, r.ID, r.StatusID, company, now); err != nil {
+		return dto.WorkOrderResponse{}, err
+	}
+	// A new order has no lines, so this stores zeros — but it stores computed
+	// zeros rather than whatever the request happened to send.
+	if err := recalcWorkOrder(ctx, qtx, r.ID, now); err != nil {
+		return dto.WorkOrderResponse{}, err
+	}
+	r, err = qtx.GetWorkOrder(ctx, gen.GetWorkOrderParams{ID: r.ID, CompanyID: company})
+	if err != nil {
 		return dto.WorkOrderResponse{}, err
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -192,9 +197,6 @@ func (s *WorkOrderStore) Update(ctx context.Context, id int64, in dto.UpdateWork
 		LaborMarkupType:       in.LaborMarkupType,
 		LaborMarkup:           in.LaborMarkup,
 		LaborMarkupPercentage: in.LaborMarkupPercentage,
-		PartsSubtotal:         in.PartsSubtotal,
-		LaborSubtotal:         in.LaborSubtotal,
-		Subtotal:              in.Subtotal,
 		Discount:              in.Discount,
 		DiscountType:          in.DiscountType,
 		Tax1:                  in.Tax1,
@@ -203,7 +205,6 @@ func (s *WorkOrderStore) Update(ctx context.Context, id int64, in dto.UpdateWork
 		Tax2:                  in.Tax2,
 		Tax2Type:              in.Tax2Type,
 		Tax2Percentage:        in.Tax2Percentage,
-		TotalAmount:           in.TotalAmount,
 		InvoiceNumber:         in.InvoiceNumber,
 		PurchaseOrderNumber:   in.PurchaseOrderNumber,
 		CommentsCount:         in.CommentsCount,
@@ -223,6 +224,15 @@ func (s *WorkOrderStore) Update(ctx context.Context, id int64, in dto.UpdateWork
 		if err := logStatusChange(ctx, qtx, r.ID, r.StatusID, company, now); err != nil {
 			return dto.WorkOrderResponse{}, err
 		}
+	}
+	// This write can change the markup, discount and tax terms, so the totals
+	// are recomputed from them and re-read.
+	if err := recalcWorkOrder(ctx, qtx, id, now); err != nil {
+		return dto.WorkOrderResponse{}, err
+	}
+	r, err = qtx.GetWorkOrder(ctx, gen.GetWorkOrderParams{ID: id, CompanyID: company})
+	if err != nil {
+		return dto.WorkOrderResponse{}, err
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return dto.WorkOrderResponse{}, err

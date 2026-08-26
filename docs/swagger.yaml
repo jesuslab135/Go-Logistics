@@ -1439,12 +1439,14 @@ definitions:
   dto.CreatePurchaseOrderLineItemRequest:
     properties:
       part_id:
+        description: |-
+          The money columns this record derives are response-only: the server
+          computes them from the line items and the rate terms above, in the same
+          transaction as the write. See internal/domain/money.
         type: integer
       position:
         type: integer
       quantity:
-        type: number
-      subtotal:
         type: number
       total_received:
         type: number
@@ -1478,11 +1480,13 @@ definitions:
           type: integer
         type: array
       number:
+        description: |-
+          The money columns this record derives are response-only: the server
+          computes them from the line items and the rate terms above, in the same
+          transaction as the write. See internal/domain/money.
         maxLength: 50
         type: string
       shipping:
-        type: number
-      subtotal:
         type: number
       tax_1:
         type: number
@@ -1498,8 +1502,6 @@ definitions:
       tax_2_type:
         maxLength: 10
         type: string
-      total_amount:
-        type: number
       vendor_id:
         type: integer
     type: object
@@ -1523,6 +1525,10 @@ definitions:
       labor_cost:
         type: number
       line_item_type:
+        description: |-
+          The money columns this record derives are response-only: the server
+          computes them from the line items and the rate terms above, in the same
+          transaction as the write. See internal/domain/money.
         maxLength: 20
         type: string
       part_id:
@@ -1537,8 +1543,6 @@ definitions:
         type: integer
       service_task_id:
         type: integer
-      subtotal:
-        type: number
       technician_id:
         type: integer
       tire_id:
@@ -1569,15 +1573,15 @@ definitions:
         items:
           type: integer
         type: array
-      labor_subtotal:
-        type: number
       labor_time_seconds:
         type: integer
       meter_value:
         type: number
-      parts_subtotal:
-        type: number
       reference:
+        description: |-
+          The money columns this record derives are response-only: the server
+          computes them from the line items and the rate terms above, in the same
+          transaction as the write. See internal/domain/money.
         maxLength: 100
         type: string
       started_at:
@@ -1585,8 +1589,6 @@ definitions:
       status:
         maxLength: 20
         type: string
-      subtotal:
-        type: number
       tax_1:
         type: number
       tax_1_percentage:
@@ -1601,8 +1603,6 @@ definitions:
       tax_2_type:
         maxLength: 10
         type: string
-      total_amount:
-        type: number
       vendor_id:
         type: integer
       work_order_id:
@@ -1927,20 +1927,18 @@ definitions:
     properties:
       description:
         type: string
-      labor_cost:
-        type: number
       line_item_type:
+        description: |-
+          The money columns this record derives are response-only: the server
+          computes them from the line items and the rate terms above, in the same
+          transaction as the write. See internal/domain/money.
         maxLength: 20
         type: string
-      parts_cost:
-        type: number
       position:
         type: integer
       service_task:
         maxLength: 255
         type: string
-      subtotal:
-        type: number
       title:
         maxLength: 255
         type: string
@@ -1996,11 +1994,13 @@ definitions:
       labor_markup_type:
         maxLength: 10
         type: string
-      labor_subtotal:
-        type: number
       labor_time_seconds:
         type: integer
       location_id:
+        description: |-
+          The money columns this record derives are response-only: the server
+          computes them from the line items and the rate terms above, in the same
+          transaction as the write. See internal/domain/money.
         type: integer
       number:
         maxLength: 50
@@ -2012,8 +2012,6 @@ definitions:
       parts_markup_type:
         maxLength: 10
         type: string
-      parts_subtotal:
-        type: number
       purchase_order_number:
         maxLength: 100
         type: string
@@ -2025,8 +2023,6 @@ definitions:
         type: number
       status_id:
         type: integer
-      subtotal:
-        type: number
       tax_1:
         type: number
       tax_1_percentage:
@@ -2041,8 +2037,6 @@ definitions:
       tax_2_type:
         maxLength: 10
         type: string
-      total_amount:
-        type: number
       vendor_id:
         type: integer
     type: object
@@ -4200,6 +4194,20 @@ definitions:
       vendor_id:
         type: integer
     type: object
+  dto.TotalOverrideRequest:
+    properties:
+      amount:
+        description: |-
+          Amount is the figure to charge. Null clears the override and returns the
+          document to its computed total.
+        type: number
+      reason:
+        description: |-
+          Reason is required whenever Amount is given: an unexplained override is a
+          number nobody can defend later.
+        maxLength: 2000
+        type: string
+    type: object
   dto.TrailerResponse:
     properties:
       aero_kit_type:
@@ -5192,12 +5200,14 @@ definitions:
   dto.UpdatePurchaseOrderLineItemRequest:
     properties:
       part_id:
+        description: |-
+          The money columns this record derives are response-only: the server
+          computes them from the line items and the rate terms above, in the same
+          transaction as the write. See internal/domain/money.
         type: integer
       position:
         type: integer
       quantity:
-        type: number
-      subtotal:
         type: number
       total_received:
         type: number
@@ -5231,11 +5241,13 @@ definitions:
           type: integer
         type: array
       number:
+        description: |-
+          The money columns this record derives are response-only: the server
+          computes them from the line items and the rate terms above, in the same
+          transaction as the write. See internal/domain/money.
         maxLength: 50
         type: string
       shipping:
-        type: number
-      subtotal:
         type: number
       tax_1:
         type: number
@@ -5251,8 +5263,6 @@ definitions:
       tax_2_type:
         maxLength: 10
         type: string
-      total_amount:
-        type: number
       vendor_id:
         type: integer
     type: object
@@ -5276,6 +5286,10 @@ definitions:
       labor_cost:
         type: number
       line_item_type:
+        description: |-
+          The money columns this record derives are response-only: the server
+          computes them from the line items and the rate terms above, in the same
+          transaction as the write. See internal/domain/money.
         maxLength: 20
         type: string
       part_id:
@@ -5290,8 +5304,6 @@ definitions:
         type: integer
       service_task_id:
         type: integer
-      subtotal:
-        type: number
       technician_id:
         type: integer
       tire_id:
@@ -5322,15 +5334,15 @@ definitions:
         items:
           type: integer
         type: array
-      labor_subtotal:
-        type: number
       labor_time_seconds:
         type: integer
       meter_value:
         type: number
-      parts_subtotal:
-        type: number
       reference:
+        description: |-
+          The money columns this record derives are response-only: the server
+          computes them from the line items and the rate terms above, in the same
+          transaction as the write. See internal/domain/money.
         maxLength: 100
         type: string
       started_at:
@@ -5338,8 +5350,6 @@ definitions:
       status:
         maxLength: 20
         type: string
-      subtotal:
-        type: number
       tax_1:
         type: number
       tax_1_percentage:
@@ -5354,8 +5364,6 @@ definitions:
       tax_2_type:
         maxLength: 10
         type: string
-      total_amount:
-        type: number
       vendor_id:
         type: integer
       work_order_id:
@@ -5687,20 +5695,18 @@ definitions:
     properties:
       description:
         type: string
-      labor_cost:
-        type: number
       line_item_type:
+        description: |-
+          The money columns this record derives are response-only: the server
+          computes them from the line items and the rate terms above, in the same
+          transaction as the write. See internal/domain/money.
         maxLength: 20
         type: string
-      parts_cost:
-        type: number
       position:
         type: integer
       service_task:
         maxLength: 255
         type: string
-      subtotal:
-        type: number
       title:
         maxLength: 255
         type: string
@@ -5756,11 +5762,13 @@ definitions:
       labor_markup_type:
         maxLength: 10
         type: string
-      labor_subtotal:
-        type: number
       labor_time_seconds:
         type: integer
       location_id:
+        description: |-
+          The money columns this record derives are response-only: the server
+          computes them from the line items and the rate terms above, in the same
+          transaction as the write. See internal/domain/money.
         type: integer
       number:
         maxLength: 50
@@ -5772,8 +5780,6 @@ definitions:
       parts_markup_type:
         maxLength: 10
         type: string
-      parts_subtotal:
-        type: number
       purchase_order_number:
         maxLength: 100
         type: string
@@ -5785,8 +5791,6 @@ definitions:
         type: number
       status_id:
         type: integer
-      subtotal:
-        type: number
       tax_1:
         type: number
       tax_1_percentage:
@@ -5801,8 +5805,6 @@ definitions:
       tax_2_type:
         maxLength: 10
         type: string
-      total_amount:
-        type: number
       vendor_id:
         type: integer
     type: object
@@ -12968,6 +12970,48 @@ paths:
       summary: Update purchase-order-line-items
       tags:
       - purchase-order-line-items
+  /api/v1/purchase-orders/{id}/override-total:
+    post:
+      consumes:
+      - application/json
+      description: 'As for work orders: replaces the computed total with an audited
+        figure, null clears it, and a line-item edit clears it automatically.'
+      parameters:
+      - description: Purchase order id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Override
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.TotalOverrideRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PurchaseOrderResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Override a purchase order's total
+      tags:
+      - purchase-orders
   /api/v1/purchase-orders/{id}/purchase:
     post:
       description: APPROVED to PURCHASED. Stamps purchased_at.
@@ -13618,6 +13662,48 @@ paths:
       summary: Update service-entry-line-items
       tags:
       - service-entry-line-items
+  /api/v1/service-entries/{id}/override-total:
+    post:
+      consumes:
+      - application/json
+      description: 'As for work orders: replaces the computed total with an audited
+        figure, null clears it, and a line-item edit clears it automatically.'
+      parameters:
+      - description: Service entry id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Override
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.TotalOverrideRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.ServiceEntryResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Override a service entry's total
+      tags:
+      - service-entries
   /api/v1/service-entry-line-items/{id}/issues:
     get:
       parameters:
@@ -16784,6 +16870,52 @@ paths:
       summary: Update work-order-line-items
       tags:
       - work-order-line-items
+  /api/v1/work-orders/{id}/override-total:
+    post:
+      consumes:
+      - application/json
+      description: Replaces the computed total with an explicit figure, recording
+        who set it and why. The component columns (parts_subtotal, labor_subtotal,
+        subtotal) stay computed, so the difference between what the document adds
+        up to and what it is being charged at stays visible — which is the reason
+        an override is audited. Send a null amount to drop the override and return
+        to the computed total. Any later edit to the line items clears it automatically.
+      parameters:
+      - description: Work order id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Override
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.TotalOverrideRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.WorkOrderResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Override a work order's total
+      tags:
+      - work-orders
   /api/v1/work-orders/{id}/status-logs:
     get:
       description: Append-only status history, newest first. Rows are written by the

@@ -29,7 +29,7 @@ INSERT INTO service_entry (
 ) VALUES (
     $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28
 )
-RETURNING id, company_id, reference, status, asset_id, vendor_id, work_order_id, started_at, completed_at, meter_value, parts_subtotal, labor_subtotal, subtotal, discount, discount_type, tax_1, tax_1_type, tax_1_percentage, tax_2, tax_2_type, tax_2_percentage, total_amount, general_notes, is_roadside_assistance, labor_time_seconds, labels, custom_fields, created_at, updated_at
+RETURNING id, company_id, reference, status, asset_id, vendor_id, work_order_id, started_at, completed_at, meter_value, parts_subtotal, labor_subtotal, subtotal, discount, discount_type, tax_1, tax_1_type, tax_1_percentage, tax_2, tax_2_type, tax_2_percentage, total_amount, general_notes, is_roadside_assistance, labor_time_seconds, labels, custom_fields, created_at, updated_at, discount_percentage, total_override, total_override_reason, total_override_by_id, total_override_at
 `
 
 type CreateServiceEntryParams struct {
@@ -125,6 +125,11 @@ func (q *Queries) CreateServiceEntry(ctx context.Context, arg CreateServiceEntry
 		&i.CustomFields,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DiscountPercentage,
+		&i.TotalOverride,
+		&i.TotalOverrideReason,
+		&i.TotalOverrideByID,
+		&i.TotalOverrideAt,
 	)
 	return i, err
 }
@@ -144,7 +149,7 @@ func (q *Queries) DeleteServiceEntry(ctx context.Context, arg DeleteServiceEntry
 }
 
 const getServiceEntry = `-- name: GetServiceEntry :one
-SELECT id, company_id, reference, status, asset_id, vendor_id, work_order_id, started_at, completed_at, meter_value, parts_subtotal, labor_subtotal, subtotal, discount, discount_type, tax_1, tax_1_type, tax_1_percentage, tax_2, tax_2_type, tax_2_percentage, total_amount, general_notes, is_roadside_assistance, labor_time_seconds, labels, custom_fields, created_at, updated_at FROM service_entry WHERE id = $1 AND company_id = $2
+SELECT id, company_id, reference, status, asset_id, vendor_id, work_order_id, started_at, completed_at, meter_value, parts_subtotal, labor_subtotal, subtotal, discount, discount_type, tax_1, tax_1_type, tax_1_percentage, tax_2, tax_2_type, tax_2_percentage, total_amount, general_notes, is_roadside_assistance, labor_time_seconds, labels, custom_fields, created_at, updated_at, discount_percentage, total_override, total_override_reason, total_override_by_id, total_override_at FROM service_entry WHERE id = $1 AND company_id = $2
 `
 
 type GetServiceEntryParams struct {
@@ -185,12 +190,17 @@ func (q *Queries) GetServiceEntry(ctx context.Context, arg GetServiceEntryParams
 		&i.CustomFields,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DiscountPercentage,
+		&i.TotalOverride,
+		&i.TotalOverrideReason,
+		&i.TotalOverrideByID,
+		&i.TotalOverrideAt,
 	)
 	return i, err
 }
 
 const listServiceEntries = `-- name: ListServiceEntries :many
-SELECT id, company_id, reference, status, asset_id, vendor_id, work_order_id, started_at, completed_at, meter_value, parts_subtotal, labor_subtotal, subtotal, discount, discount_type, tax_1, tax_1_type, tax_1_percentage, tax_2, tax_2_type, tax_2_percentage, total_amount, general_notes, is_roadside_assistance, labor_time_seconds, labels, custom_fields, created_at, updated_at FROM service_entry WHERE company_id = $1 ORDER BY created_at DESC, id LIMIT $2 OFFSET $3
+SELECT id, company_id, reference, status, asset_id, vendor_id, work_order_id, started_at, completed_at, meter_value, parts_subtotal, labor_subtotal, subtotal, discount, discount_type, tax_1, tax_1_type, tax_1_percentage, tax_2, tax_2_type, tax_2_percentage, total_amount, general_notes, is_roadside_assistance, labor_time_seconds, labels, custom_fields, created_at, updated_at, discount_percentage, total_override, total_override_reason, total_override_by_id, total_override_at FROM service_entry WHERE company_id = $1 ORDER BY created_at DESC, id LIMIT $2 OFFSET $3
 `
 
 type ListServiceEntriesParams struct {
@@ -238,6 +248,11 @@ func (q *Queries) ListServiceEntries(ctx context.Context, arg ListServiceEntries
 			&i.CustomFields,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.DiscountPercentage,
+			&i.TotalOverride,
+			&i.TotalOverrideReason,
+			&i.TotalOverrideByID,
+			&i.TotalOverrideAt,
 		); err != nil {
 			return nil, err
 		}
@@ -252,7 +267,7 @@ func (q *Queries) ListServiceEntries(ctx context.Context, arg ListServiceEntries
 const updateServiceEntry = `-- name: UpdateServiceEntry :one
 UPDATE service_entry SET reference = $3, status = $4, asset_id = $5, vendor_id = $6, work_order_id = $7, started_at = $8, completed_at = $9, meter_value = $10, parts_subtotal = $11, labor_subtotal = $12, subtotal = $13, discount = $14, discount_type = $15, tax_1 = $16, tax_1_type = $17, tax_1_percentage = $18, tax_2 = $19, tax_2_type = $20, tax_2_percentage = $21, total_amount = $22, general_notes = $23, is_roadside_assistance = $24, labor_time_seconds = $25, labels = $26, custom_fields = $27, updated_at = $28
 WHERE id = $1 AND company_id = $2
-RETURNING id, company_id, reference, status, asset_id, vendor_id, work_order_id, started_at, completed_at, meter_value, parts_subtotal, labor_subtotal, subtotal, discount, discount_type, tax_1, tax_1_type, tax_1_percentage, tax_2, tax_2_type, tax_2_percentage, total_amount, general_notes, is_roadside_assistance, labor_time_seconds, labels, custom_fields, created_at, updated_at
+RETURNING id, company_id, reference, status, asset_id, vendor_id, work_order_id, started_at, completed_at, meter_value, parts_subtotal, labor_subtotal, subtotal, discount, discount_type, tax_1, tax_1_type, tax_1_percentage, tax_2, tax_2_type, tax_2_percentage, total_amount, general_notes, is_roadside_assistance, labor_time_seconds, labels, custom_fields, created_at, updated_at, discount_percentage, total_override, total_override_reason, total_override_by_id, total_override_at
 `
 
 type UpdateServiceEntryParams struct {
@@ -348,6 +363,11 @@ func (q *Queries) UpdateServiceEntry(ctx context.Context, arg UpdateServiceEntry
 		&i.CustomFields,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DiscountPercentage,
+		&i.TotalOverride,
+		&i.TotalOverrideReason,
+		&i.TotalOverrideByID,
+		&i.TotalOverrideAt,
 	)
 	return i, err
 }

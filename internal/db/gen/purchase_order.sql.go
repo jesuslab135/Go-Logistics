@@ -29,7 +29,7 @@ INSERT INTO purchase_order (
 ) VALUES (
     $1, $2, $3, 'DRAFT', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22
 )
-RETURNING id, company_id, number, description, state, vendor_id, destination_id, discount_type, discount, discount_percentage, tax_1_type, tax_1, tax_1_percentage, tax_2_type, tax_2, tax_2_percentage, shipping, subtotal, total_amount, created_by_id, submitted_at, submitted_by_id, rejected_at, rejected_by_id, approved_at, approved_by_id, purchased_at, received_partial_at, received_full_at, closed_at, labels, custom_fields, created_at, updated_at, rejection_reason
+RETURNING id, company_id, number, description, state, vendor_id, destination_id, discount_type, discount, discount_percentage, tax_1_type, tax_1, tax_1_percentage, tax_2_type, tax_2, tax_2_percentage, shipping, subtotal, total_amount, created_by_id, submitted_at, submitted_by_id, rejected_at, rejected_by_id, approved_at, approved_by_id, purchased_at, received_partial_at, received_full_at, closed_at, labels, custom_fields, created_at, updated_at, rejection_reason, total_override, total_override_reason, total_override_by_id, total_override_at
 `
 
 type CreatePurchaseOrderParams struct {
@@ -124,6 +124,10 @@ func (q *Queries) CreatePurchaseOrder(ctx context.Context, arg CreatePurchaseOrd
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.RejectionReason,
+		&i.TotalOverride,
+		&i.TotalOverrideReason,
+		&i.TotalOverrideByID,
+		&i.TotalOverrideAt,
 	)
 	return i, err
 }
@@ -143,7 +147,7 @@ func (q *Queries) DeletePurchaseOrder(ctx context.Context, arg DeletePurchaseOrd
 }
 
 const getPurchaseOrder = `-- name: GetPurchaseOrder :one
-SELECT id, company_id, number, description, state, vendor_id, destination_id, discount_type, discount, discount_percentage, tax_1_type, tax_1, tax_1_percentage, tax_2_type, tax_2, tax_2_percentage, shipping, subtotal, total_amount, created_by_id, submitted_at, submitted_by_id, rejected_at, rejected_by_id, approved_at, approved_by_id, purchased_at, received_partial_at, received_full_at, closed_at, labels, custom_fields, created_at, updated_at, rejection_reason FROM purchase_order WHERE id = $1 AND company_id = $2
+SELECT id, company_id, number, description, state, vendor_id, destination_id, discount_type, discount, discount_percentage, tax_1_type, tax_1, tax_1_percentage, tax_2_type, tax_2, tax_2_percentage, shipping, subtotal, total_amount, created_by_id, submitted_at, submitted_by_id, rejected_at, rejected_by_id, approved_at, approved_by_id, purchased_at, received_partial_at, received_full_at, closed_at, labels, custom_fields, created_at, updated_at, rejection_reason, total_override, total_override_reason, total_override_by_id, total_override_at FROM purchase_order WHERE id = $1 AND company_id = $2
 `
 
 type GetPurchaseOrderParams struct {
@@ -190,12 +194,16 @@ func (q *Queries) GetPurchaseOrder(ctx context.Context, arg GetPurchaseOrderPara
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.RejectionReason,
+		&i.TotalOverride,
+		&i.TotalOverrideReason,
+		&i.TotalOverrideByID,
+		&i.TotalOverrideAt,
 	)
 	return i, err
 }
 
 const listPurchaseOrders = `-- name: ListPurchaseOrders :many
-SELECT id, company_id, number, description, state, vendor_id, destination_id, discount_type, discount, discount_percentage, tax_1_type, tax_1, tax_1_percentage, tax_2_type, tax_2, tax_2_percentage, shipping, subtotal, total_amount, created_by_id, submitted_at, submitted_by_id, rejected_at, rejected_by_id, approved_at, approved_by_id, purchased_at, received_partial_at, received_full_at, closed_at, labels, custom_fields, created_at, updated_at, rejection_reason FROM purchase_order WHERE company_id = $1 ORDER BY created_at DESC, id LIMIT $2 OFFSET $3
+SELECT id, company_id, number, description, state, vendor_id, destination_id, discount_type, discount, discount_percentage, tax_1_type, tax_1, tax_1_percentage, tax_2_type, tax_2, tax_2_percentage, shipping, subtotal, total_amount, created_by_id, submitted_at, submitted_by_id, rejected_at, rejected_by_id, approved_at, approved_by_id, purchased_at, received_partial_at, received_full_at, closed_at, labels, custom_fields, created_at, updated_at, rejection_reason, total_override, total_override_reason, total_override_by_id, total_override_at FROM purchase_order WHERE company_id = $1 ORDER BY created_at DESC, id LIMIT $2 OFFSET $3
 `
 
 type ListPurchaseOrdersParams struct {
@@ -249,6 +257,10 @@ func (q *Queries) ListPurchaseOrders(ctx context.Context, arg ListPurchaseOrders
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.RejectionReason,
+			&i.TotalOverride,
+			&i.TotalOverrideReason,
+			&i.TotalOverrideByID,
+			&i.TotalOverrideAt,
 		); err != nil {
 			return nil, err
 		}
@@ -269,7 +281,7 @@ UPDATE purchase_order SET
     shipping = $14, subtotal = $15, total_amount = $16,
     labels = $17, custom_fields = $18, updated_at = $19
 WHERE id = $20 AND company_id = $21
-RETURNING id, company_id, number, description, state, vendor_id, destination_id, discount_type, discount, discount_percentage, tax_1_type, tax_1, tax_1_percentage, tax_2_type, tax_2, tax_2_percentage, shipping, subtotal, total_amount, created_by_id, submitted_at, submitted_by_id, rejected_at, rejected_by_id, approved_at, approved_by_id, purchased_at, received_partial_at, received_full_at, closed_at, labels, custom_fields, created_at, updated_at, rejection_reason
+RETURNING id, company_id, number, description, state, vendor_id, destination_id, discount_type, discount, discount_percentage, tax_1_type, tax_1, tax_1_percentage, tax_2_type, tax_2, tax_2_percentage, shipping, subtotal, total_amount, created_by_id, submitted_at, submitted_by_id, rejected_at, rejected_by_id, approved_at, approved_by_id, purchased_at, received_partial_at, received_full_at, closed_at, labels, custom_fields, created_at, updated_at, rejection_reason, total_override, total_override_reason, total_override_by_id, total_override_at
 `
 
 type UpdatePurchaseOrderParams struct {
@@ -363,6 +375,10 @@ func (q *Queries) UpdatePurchaseOrder(ctx context.Context, arg UpdatePurchaseOrd
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.RejectionReason,
+		&i.TotalOverride,
+		&i.TotalOverrideReason,
+		&i.TotalOverrideByID,
+		&i.TotalOverrideAt,
 	)
 	return i, err
 }

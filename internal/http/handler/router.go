@@ -137,6 +137,10 @@ func NewRouter(d Deps) *gin.Engine {
 	crud.NewHandler[dto.LocationResponse, dto.CreateLocationRequest, dto.UpdateLocationRequest](NewLocationStore(d.Queries)).Register(member, "/locations")
 	registerCrudWithList(workOrders, "/work-orders",
 		crud.NewHandler[dto.WorkOrderResponse, dto.CreateWorkOrderRequest, dto.UpdateWorkOrderRequest](NewWorkOrderStore(d.Queries, d.Pool)), lists.WorkOrders)
+	// Totals are computed; this is the audited way to depart from the formula.
+	overrides := NewTotalOverrideHandler(d.Queries, d.Pool)
+	workOrders.POST("/work-orders/:id/override-total", overrides.WorkOrder)
+	service.POST("/service-entries/:id/override-total", overrides.ServiceEntry)
 	registerCrudWithList(issues, "/issues",
 		crud.NewHandler[dto.IssueResponse, dto.CreateIssueRequest, dto.UpdateIssueRequest](NewIssueStore(d.Queries)), lists.Issues)
 	crud.NewHandler[dto.IssuePriorityResponse, dto.CreateIssuePriorityRequest, dto.UpdateIssuePriorityRequest](NewIssuePriorityStore(d.Queries)).Register(issues, "/issue-priorities")
@@ -146,7 +150,7 @@ func NewRouter(d Deps) *gin.Engine {
 	registerPurchaseOrderRoutes(purchaseOrders, d, lists.PurchaseOrders)
 	crud.NewHandler[dto.ServiceTaskResponse, dto.CreateServiceTaskRequest, dto.UpdateServiceTaskRequest](NewServiceTaskStore(d.Queries)).Register(service, "/service-tasks")
 	crud.NewHandler[dto.ServiceReminderResponse, dto.CreateServiceReminderRequest, dto.UpdateServiceReminderRequest](NewServiceReminderStore(d.Queries)).Register(service, "/service-reminders")
-	crud.NewHandler[dto.ServiceEntryResponse, dto.CreateServiceEntryRequest, dto.UpdateServiceEntryRequest](NewServiceEntryStore(d.Queries)).Register(service, "/service-entries")
+	crud.NewHandler[dto.ServiceEntryResponse, dto.CreateServiceEntryRequest, dto.UpdateServiceEntryRequest](NewServiceEntryStore(d.Queries, d.Pool)).Register(service, "/service-entries")
 
 	// Phase 6: tires
 	crud.NewHandler[dto.TireResponse, dto.CreateTireRequest, dto.UpdateTireRequest](NewTireStore(d.Queries)).Register(tires, "/tires")
@@ -216,14 +220,14 @@ func NewRouter(d Deps) *gin.Engine {
 		NewGroupStore(d.Queries)).Register(employees, "/groups")
 
 	// Phase 8: nested, parent-scoped child resources
-	crud.NewNestedHandler[dto.WorkOrderLineItemResponse, dto.CreateWorkOrderLineItemRequest, dto.UpdateWorkOrderLineItemRequest](NewWorkOrderLineItemStore(d.Queries)).Register(workOrders, "/work-orders", "/line-items")
+	crud.NewNestedHandler[dto.WorkOrderLineItemResponse, dto.CreateWorkOrderLineItemRequest, dto.UpdateWorkOrderLineItemRequest](NewWorkOrderLineItemStore(d.Queries, d.Pool)).Register(workOrders, "/work-orders", "/line-items")
 	crud.NewReadOnlyNestedHandler[dto.WorkOrderStatusLogResponse](
 		NewWorkOrderStatusLogStore(d.Queries),
 		"the status history is append-only: change the work order's status_id with PUT /api/v1/work-orders/{id} and the transition is recorded automatically",
 	).Register(workOrders, "/work-orders", "/status-logs")
-	crud.NewNestedHandler[dto.PurchaseOrderLineItemResponse, dto.CreatePurchaseOrderLineItemRequest, dto.UpdatePurchaseOrderLineItemRequest](NewPurchaseOrderLineItemStore(d.Queries)).Register(purchaseOrders, "/purchase-orders", "/line-items")
+	crud.NewNestedHandler[dto.PurchaseOrderLineItemResponse, dto.CreatePurchaseOrderLineItemRequest, dto.UpdatePurchaseOrderLineItemRequest](NewPurchaseOrderLineItemStore(d.Queries, d.Pool)).Register(purchaseOrders, "/purchase-orders", "/line-items")
 	crud.NewNestedHandler[dto.ServiceTaskPartResponse, dto.CreateServiceTaskPartRequest, dto.UpdateServiceTaskPartRequest](NewServiceTaskPartStore(d.Queries)).Register(service, "/service-tasks", "/parts")
-	crud.NewNestedHandler[dto.ServiceEntryLineItemResponse, dto.CreateServiceEntryLineItemRequest, dto.UpdateServiceEntryLineItemRequest](NewServiceEntryLineItemStore(d.Queries)).Register(service, "/service-entries", "/line-items")
+	crud.NewNestedHandler[dto.ServiceEntryLineItemResponse, dto.CreateServiceEntryLineItemRequest, dto.UpdateServiceEntryLineItemRequest](NewServiceEntryLineItemStore(d.Queries, d.Pool)).Register(service, "/service-entries", "/line-items")
 	crud.NewNestedHandler[dto.InspectionFormItemResponse, dto.CreateInspectionFormItemRequest, dto.UpdateInspectionFormItemRequest](NewInspectionFormItemStore(d.Queries)).Register(inspections, "/inspection-forms", "/items")
 	crud.NewNestedHandler[dto.InspectionSubmissionItemResponse, dto.CreateInspectionSubmissionItemRequest, dto.UpdateInspectionSubmissionItemRequest](NewInspectionSubmissionItemStore(d.Queries, d.Storage, d.Logger)).Register(inspections, "/inspection-submissions", "/items")
 	crud.NewNestedHandler[dto.AxleDefinitionResponse, dto.CreateAxleDefinitionRequest, dto.UpdateAxleDefinitionRequest](NewAxleDefinitionStore(d.Queries)).Register(tires, "/axle-templates", "/definitions")
@@ -240,7 +244,7 @@ func NewRouter(d Deps) *gin.Engine {
 	tires.GET("/tire-mount-logs", lists.TireMountLogs)
 
 	// Phase 8b: deeper (grandchild) nested resources, scoped up the chain to company
-	crud.NewNestedHandler[dto.WorkOrderSubLineItemResponse, dto.CreateWorkOrderSubLineItemRequest, dto.UpdateWorkOrderSubLineItemRequest](NewWorkOrderSubLineItemStore(d.Queries)).Register(workOrders, "/work-order-line-items", "/sub-line-items")
+	crud.NewNestedHandler[dto.WorkOrderSubLineItemResponse, dto.CreateWorkOrderSubLineItemRequest, dto.UpdateWorkOrderSubLineItemRequest](NewWorkOrderSubLineItemStore(d.Queries, d.Pool)).Register(workOrders, "/work-order-line-items", "/sub-line-items")
 	crud.NewNestedHandler[dto.LaborTimeEntryResponse, dto.CreateLaborTimeEntryRequest, dto.UpdateLaborTimeEntryRequest](NewLaborTimeEntryStore(d.Queries)).Register(workOrders, "/work-order-sub-line-items", "/labor-entries")
 	crud.NewNestedHandler[dto.WheelPositionDefinitionResponse, dto.CreateWheelPositionDefinitionRequest, dto.UpdateWheelPositionDefinitionRequest](NewWheelPositionDefinitionStore(d.Queries)).Register(tires, "/axle-definitions", "/wheel-positions")
 	crud.NewNestedHandler[dto.FuelCommentResponse, dto.CreateFuelCommentRequest, dto.UpdateFuelCommentRequest](NewFuelCommentStore(d.Queries)).Register(fuel, "/fuel-entries", "/comments")
@@ -295,7 +299,9 @@ func registerPurchaseOrderRoutes(r *gin.RouterGroup, d Deps, list gin.HandlerFun
 	// handler, which is the one that understands vendor and state.
 	registerCrudWithList(r, path,
 		crud.NewHandler[dto.PurchaseOrderResponse, dto.CreatePurchaseOrderRequest, dto.UpdatePurchaseOrderRequest](
-			NewPurchaseOrderStore(d.Queries)), list)
+			NewPurchaseOrderStore(d.Queries, d.Pool)), list)
+
+	r.POST(path+"/:id/override-total", NewTotalOverrideHandler(d.Queries, d.Pool).PurchaseOrder)
 
 	actions := NewPurchaseOrderActionHandler(d.Queries, d.Pool)
 	approve := r.Group("", middleware.RequireAction("purchase_orders", "approve"))

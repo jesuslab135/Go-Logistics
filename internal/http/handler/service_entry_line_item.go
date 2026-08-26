@@ -4,16 +4,27 @@ import (
 	"context"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"fleet/internal/db/gen"
 	"fleet/internal/http/dto"
 	"fleet/internal/http/middleware"
 	"fleet/internal/platform/paginate"
 )
 
-type ServiceEntryLineItemStore struct{ q *gen.Queries }
+// A line's subtotal is derived (quantity x unit_cost) and the entry sums its
+// lines, so every write recomputes both in the same transaction.
+//
+// parts_cost and labor_cost stay inputs: they are the operator's split of the
+// line between the two buckets, which the schema gives every line and which
+// nothing else can infer. The entry's parts_subtotal and labor_subtotal sum them.
+type ServiceEntryLineItemStore struct {
+	q    *gen.Queries
+	pool *pgxpool.Pool
+}
 
-func NewServiceEntryLineItemStore(q *gen.Queries) *ServiceEntryLineItemStore {
-	return &ServiceEntryLineItemStore{q: q}
+func NewServiceEntryLineItemStore(q *gen.Queries, pool *pgxpool.Pool) *ServiceEntryLineItemStore {
+	return &ServiceEntryLineItemStore{q: q, pool: pool}
 }
 
 func (s *ServiceEntryLineItemStore) List(ctx context.Context, parentID int64, p paginate.Params) ([]dto.ServiceEntryLineItemResponse, int64, error) {
@@ -43,60 +54,94 @@ func (s *ServiceEntryLineItemStore) Get(ctx context.Context, parentID, id int64)
 
 func (s *ServiceEntryLineItemStore) Create(ctx context.Context, parentID int64, in dto.CreateServiceEntryLineItemRequest) (dto.ServiceEntryLineItemResponse, error) {
 	now := time.Now().UTC()
-	r, err := s.q.CreateServiceEntryLineItem(ctx, gen.CreateServiceEntryLineItemParams{
-		ParentID:          parentID,
-		CompanyID:         middleware.CompanyFromContext(ctx),
-		LineItemType:      in.LineItemType,
-		Description:       in.Description,
-		ServiceTaskID:     in.ServiceTaskID,
-		PartID:            in.PartID,
-		TechnicianID:      in.TechnicianID,
-		TireID:            in.TireID,
-		ServiceReminderID: in.ServiceReminderID,
-		UnitCost:          in.UnitCost,
-		Quantity:          decimalOrDefault(in.Quantity, 1),
-		PartsCost:         in.PartsCost,
-		LaborCost:         in.LaborCost,
-		Subtotal:          in.Subtotal,
-		Position:          in.Position,
-		CreatedAt:         now,
-		UpdatedAt:         now,
+	company := middleware.CompanyFromContext(ctx)
+
+	var out dto.ServiceEntryLineItemResponse
+	err := inTx(ctx, s.pool, s.q, func(qtx *gen.Queries) error {
+		r, err := qtx.CreateServiceEntryLineItem(ctx, gen.CreateServiceEntryLineItemParams{
+			ParentID:          parentID,
+			CompanyID:         company,
+			LineItemType:      in.LineItemType,
+			Description:       in.Description,
+			ServiceTaskID:     in.ServiceTaskID,
+			PartID:            in.PartID,
+			TechnicianID:      in.TechnicianID,
+			TireID:            in.TireID,
+			ServiceReminderID: in.ServiceReminderID,
+			UnitCost:          in.UnitCost,
+			Quantity:          decimalOrDefault(in.Quantity, 1),
+			PartsCost:         in.PartsCost,
+			LaborCost:         in.LaborCost,
+			Position:          in.Position,
+			CreatedAt:         now,
+			UpdatedAt:         now,
+		})
+		if err != nil {
+			return err
+		}
+		if err := recalcServiceEntryLineItem(ctx, qtx, r.ID, now); err != nil {
+			return err
+		}
+		r, err = qtx.GetServiceEntryLineItem(ctx, gen.GetServiceEntryLineItemParams{ID: r.ID, ParentID: parentID, CompanyID: company})
+		if err != nil {
+			return err
+		}
+		out = toServiceEntryLineItemResponse(r)
+		return nil
 	})
-	if err != nil {
-		return dto.ServiceEntryLineItemResponse{}, err
-	}
-	return toServiceEntryLineItemResponse(r), nil
+	return out, err
 }
 
 func (s *ServiceEntryLineItemStore) Update(ctx context.Context, parentID, id int64, in dto.UpdateServiceEntryLineItemRequest) (dto.ServiceEntryLineItemResponse, error) {
 	now := time.Now().UTC()
-	r, err := s.q.UpdateServiceEntryLineItem(ctx, gen.UpdateServiceEntryLineItemParams{
-		ID:                id,
-		ParentID:          parentID,
-		CompanyID:         middleware.CompanyFromContext(ctx),
-		LineItemType:      in.LineItemType,
-		Description:       in.Description,
-		ServiceTaskID:     in.ServiceTaskID,
-		PartID:            in.PartID,
-		TechnicianID:      in.TechnicianID,
-		TireID:            in.TireID,
-		ServiceReminderID: in.ServiceReminderID,
-		UnitCost:          in.UnitCost,
-		Quantity:          in.Quantity,
-		PartsCost:         in.PartsCost,
-		LaborCost:         in.LaborCost,
-		Subtotal:          in.Subtotal,
-		Position:          in.Position,
-		UpdatedAt:         now,
+	company := middleware.CompanyFromContext(ctx)
+
+	var out dto.ServiceEntryLineItemResponse
+	err := inTx(ctx, s.pool, s.q, func(qtx *gen.Queries) error {
+		r, err := qtx.UpdateServiceEntryLineItem(ctx, gen.UpdateServiceEntryLineItemParams{
+			ID:                id,
+			ParentID:          parentID,
+			CompanyID:         company,
+			LineItemType:      in.LineItemType,
+			Description:       in.Description,
+			ServiceTaskID:     in.ServiceTaskID,
+			PartID:            in.PartID,
+			TechnicianID:      in.TechnicianID,
+			TireID:            in.TireID,
+			ServiceReminderID: in.ServiceReminderID,
+			UnitCost:          in.UnitCost,
+			Quantity:          in.Quantity,
+			PartsCost:         in.PartsCost,
+			LaborCost:         in.LaborCost,
+			Position:          in.Position,
+			UpdatedAt:         now,
+		})
+		if err != nil {
+			return err
+		}
+		if err := recalcServiceEntryLineItem(ctx, qtx, r.ID, now); err != nil {
+			return err
+		}
+		r, err = qtx.GetServiceEntryLineItem(ctx, gen.GetServiceEntryLineItemParams{ID: id, ParentID: parentID, CompanyID: company})
+		if err != nil {
+			return err
+		}
+		out = toServiceEntryLineItemResponse(r)
+		return nil
 	})
-	if err != nil {
-		return dto.ServiceEntryLineItemResponse{}, err
-	}
-	return toServiceEntryLineItemResponse(r), nil
+	return out, err
 }
 
 func (s *ServiceEntryLineItemStore) Delete(ctx context.Context, parentID, id int64) error {
-	return s.q.DeleteServiceEntryLineItem(ctx, gen.DeleteServiceEntryLineItemParams{ID: id, ParentID: parentID, CompanyID: middleware.CompanyFromContext(ctx)})
+	now := time.Now().UTC()
+	return inTx(ctx, s.pool, s.q, func(qtx *gen.Queries) error {
+		if err := qtx.DeleteServiceEntryLineItem(ctx, gen.DeleteServiceEntryLineItemParams{
+			ID: id, ParentID: parentID, CompanyID: middleware.CompanyFromContext(ctx),
+		}); err != nil {
+			return err
+		}
+		return recalcServiceEntry(ctx, qtx, parentID, now)
+	})
 }
 
 func toServiceEntryLineItemResponse(r gen.ServiceEntryLineItem) dto.ServiceEntryLineItemResponse {
