@@ -620,6 +620,7 @@ type PurchaseOrder struct {
 	CustomFields       []byte
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
+	RejectionReason    string
 }
 
 type PurchaseOrderLineItem struct {
@@ -633,6 +634,17 @@ type PurchaseOrderLineItem struct {
 	Position        int32
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
+}
+
+type PurchaseOrderStatusLog struct {
+	ID              int64
+	PurchaseOrderID int64
+	FromState       string
+	ToState         string
+	ActorEmployeeID *int64
+	ActorType       string
+	Reason          string
+	ChangedAt       time.Time
 }
 
 type RevokedToken struct {

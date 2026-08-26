@@ -7,17 +7,34 @@ SELECT * FROM purchase_order WHERE company_id = $1 ORDER BY created_at DESC, id 
 -- name: CountPurchaseOrders :one
 SELECT count(*) FROM purchase_order WHERE company_id = $1;
 
+-- CreatePurchaseOrder opens an order in DRAFT. state and the workflow stamps are
+-- absent on purpose: an order reaches any other state by being moved through
+-- POST /purchase-orders/{id}/{action}, which checks the move is legal and
+-- records who made it. Accepting them here would let a client create an order
+-- that is already approved, by nobody.
 -- name: CreatePurchaseOrder :one
 INSERT INTO purchase_order (
-    company_id, number, description, state, vendor_id, destination_id, discount_type, discount, discount_percentage, tax_1_type, tax_1, tax_1_percentage, tax_2_type, tax_2, tax_2_percentage, shipping, subtotal, total_amount, created_by_id, submitted_at, submitted_by_id, rejected_at, rejected_by_id, approved_at, approved_by_id, purchased_at, received_partial_at, received_full_at, closed_at, labels, custom_fields, created_at, updated_at
+    company_id, number, description, state, vendor_id, destination_id, discount_type, discount, discount_percentage, tax_1_type, tax_1, tax_1_percentage, tax_2_type, tax_2, tax_2_percentage, shipping, subtotal, total_amount, created_by_id, labels, custom_fields, created_at, updated_at
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33
+    sqlc.arg(company_id), sqlc.arg(number), sqlc.arg(description), 'DRAFT', sqlc.arg(vendor_id), sqlc.arg(destination_id), sqlc.arg(discount_type), sqlc.arg(discount), sqlc.arg(discount_percentage), sqlc.arg(tax_1_type), sqlc.arg(tax_1), sqlc.arg(tax_1_percentage), sqlc.arg(tax_2_type), sqlc.arg(tax_2), sqlc.arg(tax_2_percentage), sqlc.arg(shipping), sqlc.arg(subtotal), sqlc.arg(total_amount), sqlc.narg(created_by_id), sqlc.arg(labels), sqlc.arg(custom_fields), sqlc.arg(created_at), sqlc.arg(updated_at)
 )
 RETURNING *;
 
+-- UpdatePurchaseOrder edits the order's content. It does not touch state, the
+-- workflow timestamps, the actor ids or rejection_reason: those belong to the
+-- transition routes, which are the only thing that can decide whether a move is
+-- legal and who made it. A whole-record replace that accepted them would let a
+-- client set CLOSED without ever passing through approval, and name anybody as
+-- the approver.
 -- name: UpdatePurchaseOrder :one
-UPDATE purchase_order SET number = $3, description = $4, state = $5, vendor_id = $6, destination_id = $7, discount_type = $8, discount = $9, discount_percentage = $10, tax_1_type = $11, tax_1 = $12, tax_1_percentage = $13, tax_2_type = $14, tax_2 = $15, tax_2_percentage = $16, shipping = $17, subtotal = $18, total_amount = $19, created_by_id = $20, submitted_at = $21, submitted_by_id = $22, rejected_at = $23, rejected_by_id = $24, approved_at = $25, approved_by_id = $26, purchased_at = $27, received_partial_at = $28, received_full_at = $29, closed_at = $30, labels = $31, custom_fields = $32, updated_at = $33
-WHERE id = $1 AND company_id = $2
+UPDATE purchase_order SET
+    number = sqlc.arg(number), description = sqlc.arg(description), vendor_id = sqlc.arg(vendor_id), destination_id = sqlc.arg(destination_id),
+    discount_type = sqlc.arg(discount_type), discount = sqlc.arg(discount), discount_percentage = sqlc.arg(discount_percentage),
+    tax_1_type = sqlc.arg(tax_1_type), tax_1 = sqlc.arg(tax_1), tax_1_percentage = sqlc.arg(tax_1_percentage),
+    tax_2_type = sqlc.arg(tax_2_type), tax_2 = sqlc.arg(tax_2), tax_2_percentage = sqlc.arg(tax_2_percentage),
+    shipping = sqlc.arg(shipping), subtotal = sqlc.arg(subtotal), total_amount = sqlc.arg(total_amount),
+    labels = sqlc.arg(labels), custom_fields = sqlc.arg(custom_fields), updated_at = sqlc.arg(updated_at)
+WHERE id = sqlc.arg(id) AND company_id = sqlc.arg(company_id)
 RETURNING *;
 
 -- name: DeletePurchaseOrder :exec

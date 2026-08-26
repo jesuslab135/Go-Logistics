@@ -165,7 +165,15 @@ Two roles are seeded per company, both ported from Django:
 | Role | `is_admin` | Permissions |
 |---|---|---|
 | `Administrador` | yes | `{}` — access comes from `is_admin`, not an enumeration |
-| `Almacén` | no | `seed_warehouse_role.py` verbatim: full `tire_approvals` (including the custom `approve` action), read on `tires`/`parts`/`assets`, read+update on `inventory` |
+| `Almacén` | no | `seed_warehouse_role.py`: full `tire_approvals` (including the custom `approve` action), read on `tires`/`parts`/`assets`, read+update on `inventory` and `purchase_orders` |
+
+`purchase_orders` is the one entry Django did not have: purchase orders sat
+under `inventory` there, so this role's `inventory` read+update already covered
+them. They are a module of their own here because approving an order commits
+money, which is a different privilege from adjusting stock — and a permission
+cannot be granted separately from a module it shares. The two actions are
+restated so the split does not silently strip access; `approve` deliberately is
+not among them.
 
 Seeding is idempotent by role name, so re-running it never disturbs a role an
 operator has since edited — that is also how companies created before `Almacén`

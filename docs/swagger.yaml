@@ -1453,14 +1453,6 @@ definitions:
     type: object
   dto.CreatePurchaseOrderRequest:
     properties:
-      approved_at:
-        type: string
-      approved_by_id:
-        type: integer
-      closed_at:
-        type: string
-      created_by_id:
-        type: integer
       custom_fields:
         items:
           type: integer
@@ -1477,31 +1469,19 @@ definitions:
         maxLength: 10
         type: string
       labels:
+        description: |-
+          state, the workflow timestamps, the actor ids and rejection_reason are
+          response-only. They are moved by POST /purchase-orders/{id}/{action},
+          which is the only thing that can check a transition is legal and record
+          who made it; created_by_id is stamped from the caller.
         items:
           type: integer
         type: array
       number:
         maxLength: 50
         type: string
-      purchased_at:
-        type: string
-      received_full_at:
-        type: string
-      received_partial_at:
-        type: string
-      rejected_at:
-        type: string
-      rejected_by_id:
-        type: integer
       shipping:
         type: number
-      state:
-        maxLength: 20
-        type: string
-      submitted_at:
-        type: string
-      submitted_by_id:
-        type: integer
       subtotal:
         type: number
       tax_1:
@@ -3593,6 +3573,49 @@ definitions:
       vendor_id:
         type: integer
     type: object
+  dto.PurchaseOrderStatusLogPage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.PurchaseOrderStatusLogResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.PurchaseOrderStatusLogResponse:
+    properties:
+      actor_employee_id:
+        type: integer
+      actor_type:
+        type: string
+      changed_at:
+        type: string
+      from_state:
+        type: string
+      id:
+        type: integer
+      purchase_order_id:
+        type: integer
+      reason:
+        type: string
+      to_state:
+        type: string
+    type: object
+  dto.PurchaseOrderTransitionRequest:
+    properties:
+      reason:
+        description: |-
+          Reason is required when rejecting and ignored otherwise. It is recorded on
+          the order and in its status log.
+        maxLength: 2000
+        type: string
+    type: object
   dto.RefreshRequest:
     properties:
       refresh_token:
@@ -5183,14 +5206,6 @@ definitions:
     type: object
   dto.UpdatePurchaseOrderRequest:
     properties:
-      approved_at:
-        type: string
-      approved_by_id:
-        type: integer
-      closed_at:
-        type: string
-      created_by_id:
-        type: integer
       custom_fields:
         items:
           type: integer
@@ -5207,31 +5222,19 @@ definitions:
         maxLength: 10
         type: string
       labels:
+        description: |-
+          state, the workflow timestamps, the actor ids and rejection_reason are
+          response-only. They are moved by POST /purchase-orders/{id}/{action},
+          which is the only thing that can check a transition is legal and record
+          who made it; created_by_id is stamped from the caller.
         items:
           type: integer
         type: array
       number:
         maxLength: 50
         type: string
-      purchased_at:
-        type: string
-      received_full_at:
-        type: string
-      received_partial_at:
-        type: string
-      rejected_at:
-        type: string
-      rejected_by_id:
-        type: integer
       shipping:
         type: number
-      state:
-        maxLength: 20
-        type: string
-      submitted_at:
-        type: string
-      submitted_by_id:
-        type: integer
       subtotal:
         type: number
       tax_1:
@@ -12758,6 +12761,61 @@ paths:
       summary: Update purchase-orders
       tags:
       - purchase-orders
+  /api/v1/purchase-orders/{id}/approve:
+    post:
+      description: PENDING_APPROVAL to APPROVED. Requires the purchase_orders.approve
+        permission. Stamps approved_at and approved_by_id from the caller.
+      parameters:
+      - description: Purchase order id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PurchaseOrderResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Approve a purchase order
+      tags:
+      - purchase-orders
+  /api/v1/purchase-orders/{id}/close:
+    post:
+      description: RECEIVED_FULL to CLOSED, which is terminal. Stamps closed_at.
+      parameters:
+      - description: Purchase order id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PurchaseOrderResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Close a purchase order
+      tags:
+      - purchase-orders
   /api/v1/purchase-orders/{id}/line-items:
     get:
       parameters:
@@ -12910,6 +12968,250 @@ paths:
       summary: Update purchase-order-line-items
       tags:
       - purchase-order-line-items
+  /api/v1/purchase-orders/{id}/purchase:
+    post:
+      description: APPROVED to PURCHASED. Stamps purchased_at.
+      parameters:
+      - description: Purchase order id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PurchaseOrderResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Mark a purchase order as purchased
+      tags:
+      - purchase-orders
+  /api/v1/purchase-orders/{id}/receive-full:
+    post:
+      description: PURCHASED or RECEIVED_PARTIAL to RECEIVED_FULL. Stamps received_full_at.
+      parameters:
+      - description: Purchase order id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PurchaseOrderResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Record full receipt
+      tags:
+      - purchase-orders
+  /api/v1/purchase-orders/{id}/receive-partial:
+    post:
+      description: PURCHASED to RECEIVED_PARTIAL. Stamps received_partial_at.
+      parameters:
+      - description: Purchase order id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PurchaseOrderResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Record a partial receipt
+      tags:
+      - purchase-orders
+  /api/v1/purchase-orders/{id}/reject:
+    post:
+      consumes:
+      - application/json
+      description: PENDING_APPROVAL to REJECTED. Requires the purchase_orders.approve
+        permission and a reason, which is stored on the order and in its history.
+        Rejection is not terminal — the order is revised back to DRAFT and resubmitted.
+      parameters:
+      - description: Purchase order id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Rejection reason
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.PurchaseOrderTransitionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PurchaseOrderResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Reject a purchase order
+      tags:
+      - purchase-orders
+  /api/v1/purchase-orders/{id}/revise:
+    post:
+      description: 'REJECTED back to DRAFT so it can be edited and resubmitted. Stamps
+        nothing: it undoes a decision rather than making one, and the rejection stays
+        in the history.'
+      parameters:
+      - description: Purchase order id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PurchaseOrderResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Revise a rejected purchase order
+      tags:
+      - purchase-orders
+  /api/v1/purchase-orders/{id}/status-logs:
+    get:
+      description: Append-only transition history, newest first. Each row records
+        the state moved from and to, who moved it, and the reason where one was required.
+        Written inside the transaction that moved the order, so it cannot disagree
+        with the order.
+      parameters:
+      - description: Purchase order id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Page size
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PurchaseOrderStatusLogPage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List purchase-order transitions
+      tags:
+      - purchase-orders
+  /api/v1/purchase-orders/{id}/status-logs/{child_id}:
+    get:
+      parameters:
+      - description: Purchase order id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Transition id
+        in: path
+        name: child_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PurchaseOrderStatusLogResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get one purchase-order transition
+      tags:
+      - purchase-orders
+  /api/v1/purchase-orders/{id}/submit:
+    post:
+      description: DRAFT or REJECTED to PENDING_APPROVAL. Stamps submitted_at and
+        submitted_by_id.
+      parameters:
+      - description: Purchase order id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PurchaseOrderResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Submit a purchase order for approval
+      tags:
+      - purchase-orders
   /api/v1/roles:
     get:
       parameters:

@@ -70,6 +70,11 @@ var Modules = []string{
 	"issues",
 	"mileage_goals",
 	"parts",
+	// purchase_orders is not a Django module: there, purchase orders sat under
+	// inventory. They are separated here because approving one commits money,
+	// which is a different privilege from adjusting stock, and a permission
+	// cannot be granted separately from a module it shares.
+	"purchase_orders",
 	"roles",
 	"service",
 	"tire_approvals",

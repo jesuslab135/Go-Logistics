@@ -11,6 +11,7 @@ import (
 
 	"fleet/internal/auth"
 	"fleet/internal/db/gen"
+	"fleet/internal/domain/purchaseorder"
 	"fleet/internal/platform/storage"
 )
 
@@ -207,6 +208,32 @@ func TestInventoryJournalRoutes(t *testing.T) {
 		// Retired, but routed: they answer 405 route_retired.
 		"PUT /api/v1/inventory-journal-entries/:id",
 		"DELETE /api/v1/inventory-journal-entries/:id",
+	} {
+		if !routes[want] {
+			t.Errorf("missing route %q", want)
+		}
+	}
+}
+
+// Every transition the state machine defines must be routed, or an order can
+// reach a state nothing moves it out of. Driven off the machine itself, so
+// adding a transition without a route fails here.
+func TestPurchaseOrderTransitionRoutes(t *testing.T) {
+	routes := make(map[string]bool)
+	for _, r := range newTestRouter(t).Routes() {
+		routes[r.Method+" "+r.Path] = true
+	}
+
+	for _, action := range purchaseorder.Actions() {
+		want := "POST /api/v1/purchase-orders/:id/" + action
+		if !routes[want] {
+			t.Errorf("missing route %q", want)
+		}
+	}
+
+	for _, want := range []string{
+		"GET /api/v1/purchase-orders/:id/status-logs",
+		"GET /api/v1/purchase-orders/:id/status-logs/:child_id",
 	} {
 		if !routes[want] {
 			t.Errorf("missing route %q", want)

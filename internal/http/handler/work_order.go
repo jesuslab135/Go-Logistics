@@ -34,13 +34,7 @@ func NewWorkOrderStore(q *gen.Queries, pool *pgxpool.Pool) *WorkOrderStore {
 // caller is a system transition, which is why actor_employee_id is nullable and
 // actor_type carries the distinction rather than leaving a null to interpret.
 func logStatusChange(ctx context.Context, qtx *gen.Queries, workOrderID, statusID, companyID int64, at time.Time) error {
-	actor := middleware.EmployeeFromContext(ctx)
-
-	actorID := &actor
-	actorType := workOrderActorEmployee
-	if actor == 0 {
-		actorID, actorType = nil, workOrderActorSystem
-	}
+	actorID, actorType := actorOf(ctx)
 
 	_, err := qtx.CreateWorkOrderStatusLog(ctx, gen.CreateWorkOrderStatusLogParams{
 		ParentID:        workOrderID,
@@ -52,13 +46,6 @@ func logStatusChange(ctx context.Context, qtx *gen.Queries, workOrderID, statusI
 	})
 	return err
 }
-
-// Actor kinds recorded on a status transition. Two values cover both producers;
-// a third can be added without a migration.
-const (
-	workOrderActorEmployee = "employee"
-	workOrderActorSystem   = "system"
-)
 
 func (s *WorkOrderStore) List(ctx context.Context, p paginate.Params) ([]dto.WorkOrderResponse, int64, error) {
 	company := middleware.CompanyFromContext(ctx)

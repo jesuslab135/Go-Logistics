@@ -35,15 +35,24 @@ var DefaultRoles = []struct {
 	Permissions string
 }{
 	{AdminRoleName, true, `{}`},
-	// WAREHOUSE_PERMISSIONS from seed_warehouse_role.py, verbatim. "approve"
-	// is not one of the four method-derived actions; it gated the tire
-	// assignment approve/reject endpoints.
+	// WAREHOUSE_PERMISSIONS from seed_warehouse_role.py. "approve" is not one of
+	// the four method-derived actions; it gated the tire assignment
+	// approve/reject endpoints.
+	//
+	// purchase_orders is the one addition. Django had no such module — purchase
+	// orders sat under inventory, so this role's inventory read+update already
+	// covered them. Splitting them out (approving an order commits money, which
+	// is a different privilege from adjusting stock) would otherwise have
+	// silently stripped that access, so the same two actions are restated here.
+	// Deliberately not "approve": that is exactly the privilege the split exists
+	// to keep separate.
 	{WarehouseRoleName, false, `{
-        "tire_approvals": {"read": true, "create": true, "update": true, "delete": true, "approve": true},
-        "tires":          {"read": true},
-        "inventory":      {"read": true, "update": true},
-        "parts":          {"read": true},
-        "assets":         {"read": true}
+        "tire_approvals":  {"read": true, "create": true, "update": true, "delete": true, "approve": true},
+        "tires":           {"read": true},
+        "inventory":       {"read": true, "update": true},
+        "purchase_orders": {"read": true, "update": true},
+        "parts":           {"read": true},
+        "assets":          {"read": true}
     }`},
 }
 

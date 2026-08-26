@@ -11,6 +11,7 @@ import (
 
 	"fleet/internal/auth"
 	"fleet/internal/db/gen"
+	"fleet/internal/domain/purchaseorder"
 	"fleet/internal/http/dto"
 	"fleet/internal/http/middleware"
 	"fleet/internal/platform/crud"
@@ -94,6 +95,7 @@ func NewRouter(d Deps) *gin.Engine {
 	warranties := member.Group("", middleware.RequireModule("warranties"))
 	mileageGoals := member.Group("", middleware.RequireModule("mileage_goals"))
 	employees := member.Group("", middleware.RequireModule("employees"))
+	purchaseOrders := member.Group("", middleware.RequireModule("purchase_orders"))
 	// Django gated roles on IsAdminRole rather than on a module entry.
 	roles := member.Group("", middleware.RequireAdminRole())
 
@@ -141,8 +143,7 @@ func NewRouter(d Deps) *gin.Engine {
 	crud.NewHandler[dto.FaultResponse, dto.CreateFaultRequest, dto.UpdateFaultRequest](NewFaultStore(d.Queries)).Register(issues, "/faults")
 
 	// Phase 5: purchase orders & service
-	registerCrudWithList(inventory, "/purchase-orders",
-		crud.NewHandler[dto.PurchaseOrderResponse, dto.CreatePurchaseOrderRequest, dto.UpdatePurchaseOrderRequest](NewPurchaseOrderStore(d.Queries)), lists.PurchaseOrders)
+	registerPurchaseOrderRoutes(purchaseOrders, d, lists.PurchaseOrders)
 	crud.NewHandler[dto.ServiceTaskResponse, dto.CreateServiceTaskRequest, dto.UpdateServiceTaskRequest](NewServiceTaskStore(d.Queries)).Register(service, "/service-tasks")
 	crud.NewHandler[dto.ServiceReminderResponse, dto.CreateServiceReminderRequest, dto.UpdateServiceReminderRequest](NewServiceReminderStore(d.Queries)).Register(service, "/service-reminders")
 	crud.NewHandler[dto.ServiceEntryResponse, dto.CreateServiceEntryRequest, dto.UpdateServiceEntryRequest](NewServiceEntryStore(d.Queries)).Register(service, "/service-entries")
@@ -220,7 +221,7 @@ func NewRouter(d Deps) *gin.Engine {
 		NewWorkOrderStatusLogStore(d.Queries),
 		"the status history is append-only: change the work order's status_id with PUT /api/v1/work-orders/{id} and the transition is recorded automatically",
 	).Register(workOrders, "/work-orders", "/status-logs")
-	crud.NewNestedHandler[dto.PurchaseOrderLineItemResponse, dto.CreatePurchaseOrderLineItemRequest, dto.UpdatePurchaseOrderLineItemRequest](NewPurchaseOrderLineItemStore(d.Queries)).Register(inventory, "/purchase-orders", "/line-items")
+	crud.NewNestedHandler[dto.PurchaseOrderLineItemResponse, dto.CreatePurchaseOrderLineItemRequest, dto.UpdatePurchaseOrderLineItemRequest](NewPurchaseOrderLineItemStore(d.Queries)).Register(purchaseOrders, "/purchase-orders", "/line-items")
 	crud.NewNestedHandler[dto.ServiceTaskPartResponse, dto.CreateServiceTaskPartRequest, dto.UpdateServiceTaskPartRequest](NewServiceTaskPartStore(d.Queries)).Register(service, "/service-tasks", "/parts")
 	crud.NewNestedHandler[dto.ServiceEntryLineItemResponse, dto.CreateServiceEntryLineItemRequest, dto.UpdateServiceEntryLineItemRequest](NewServiceEntryLineItemStore(d.Queries)).Register(service, "/service-entries", "/line-items")
 	crud.NewNestedHandler[dto.InspectionFormItemResponse, dto.CreateInspectionFormItemRequest, dto.UpdateInspectionFormItemRequest](NewInspectionFormItemStore(d.Queries)).Register(inspections, "/inspection-forms", "/items")
@@ -274,6 +275,44 @@ func registerCrudWithList[T, C, U any](r gin.IRouter, path string, h *crud.Handl
 	r.GET(path+"/:id", h.Get)
 	r.PUT(path+"/:id", h.Update)
 	r.DELETE(path+"/:id", h.Delete)
+}
+
+// registerPurchaseOrderRoutes wires the order plus its workflow.
+//
+// The transitions are separate routes rather than fields on the PUT because
+// each one has to decide whether it is legal from the current state, stamp its
+// own timestamp, and record who did it. A whole-record replace can do none of
+// that: it takes whatever the client sends.
+//
+// Approve and reject additionally require the purchase_orders.approve action.
+// Deciding to commit money is the privileged act; submitting an order for that
+// decision, and receiving the goods afterwards, are ordinary work and need only
+// update. The pattern is the one tire_approvals already uses.
+func registerPurchaseOrderRoutes(r *gin.RouterGroup, d Deps, list gin.HandlerFunc) {
+	const path = "/purchase-orders"
+
+	// registerCrudWithList, not Register: the list comes from the filtered
+	// handler, which is the one that understands vendor and state.
+	registerCrudWithList(r, path,
+		crud.NewHandler[dto.PurchaseOrderResponse, dto.CreatePurchaseOrderRequest, dto.UpdatePurchaseOrderRequest](
+			NewPurchaseOrderStore(d.Queries)), list)
+
+	actions := NewPurchaseOrderActionHandler(d.Queries, d.Pool)
+	approve := r.Group("", middleware.RequireAction("purchase_orders", "approve"))
+
+	for _, action := range purchaseorder.Actions() {
+		t, _ := purchaseorder.Lookup(action)
+		group := r
+		if t.RequiresApproval {
+			group = approve
+		}
+		group.POST(path+"/:id/"+action, actions.Handle(action))
+	}
+
+	crud.NewReadOnlyNestedHandler[dto.PurchaseOrderStatusLogResponse](
+		NewPurchaseOrderStatusLogStore(d.Queries),
+		"the transition history is append-only: move the order with POST /api/v1/purchase-orders/{id}/{action} and the transition is recorded automatically",
+	).Register(r, path, "/status-logs")
 }
 
 // registerInventoryJournalRoutes wires the ledger. It is not registerCrudWithList

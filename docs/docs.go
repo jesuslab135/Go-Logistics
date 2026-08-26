@@ -9153,6 +9153,92 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/purchase-orders/{id}/approve": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "PENDING_APPROVAL to APPROVED. Requires the purchase_orders.approve permission. Stamps approved_at and approved_by_id from the caller.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "purchase-orders"
+                ],
+                "summary": "Approve a purchase order",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Purchase order id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PurchaseOrderResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/purchase-orders/{id}/close": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "RECEIVED_FULL to CLOSED, which is terminal. Stamps closed_at.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "purchase-orders"
+                ],
+                "summary": "Close a purchase order",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Purchase order id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PurchaseOrderResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/purchase-orders/{id}/line-items": {
             "get": {
                 "security": [
@@ -9386,6 +9472,380 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/purchase-orders/{id}/purchase": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "APPROVED to PURCHASED. Stamps purchased_at.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "purchase-orders"
+                ],
+                "summary": "Mark a purchase order as purchased",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Purchase order id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PurchaseOrderResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/purchase-orders/{id}/receive-full": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "PURCHASED or RECEIVED_PARTIAL to RECEIVED_FULL. Stamps received_full_at.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "purchase-orders"
+                ],
+                "summary": "Record full receipt",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Purchase order id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PurchaseOrderResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/purchase-orders/{id}/receive-partial": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "PURCHASED to RECEIVED_PARTIAL. Stamps received_partial_at.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "purchase-orders"
+                ],
+                "summary": "Record a partial receipt",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Purchase order id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PurchaseOrderResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/purchase-orders/{id}/reject": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "PENDING_APPROVAL to REJECTED. Requires the purchase_orders.approve permission and a reason, which is stored on the order and in its history. Rejection is not terminal — the order is revised back to DRAFT and resubmitted.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "purchase-orders"
+                ],
+                "summary": "Reject a purchase order",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Purchase order id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Rejection reason",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.PurchaseOrderTransitionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PurchaseOrderResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/purchase-orders/{id}/revise": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "REJECTED back to DRAFT so it can be edited and resubmitted. Stamps nothing: it undoes a decision rather than making one, and the rejection stays in the history.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "purchase-orders"
+                ],
+                "summary": "Revise a rejected purchase order",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Purchase order id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PurchaseOrderResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/purchase-orders/{id}/status-logs": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Append-only transition history, newest first. Each row records the state moved from and to, who moved it, and the reason where one was required. Written inside the transaction that moved the order, so it cannot disagree with the order.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "purchase-orders"
+                ],
+                "summary": "List purchase-order transitions",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Purchase order id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Offset",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PurchaseOrderStatusLogPage"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/purchase-orders/{id}/status-logs/{child_id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "purchase-orders"
+                ],
+                "summary": "Get one purchase-order transition",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Purchase order id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Transition id",
+                        "name": "child_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PurchaseOrderStatusLogResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/purchase-orders/{id}/submit": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "DRAFT or REJECTED to PENDING_APPROVAL. Stamps submitted_at and submitted_by_id.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "purchase-orders"
+                ],
+                "summary": "Submit a purchase order for approval",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Purchase order id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PurchaseOrderResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -17519,18 +17979,6 @@ const docTemplate = `{
         "dto.CreatePurchaseOrderRequest": {
             "type": "object",
             "properties": {
-                "approved_at": {
-                    "type": "string"
-                },
-                "approved_by_id": {
-                    "type": "integer"
-                },
-                "closed_at": {
-                    "type": "string"
-                },
-                "created_by_id": {
-                    "type": "integer"
-                },
                 "custom_fields": {
                     "type": "array",
                     "items": {
@@ -17554,6 +18002,7 @@ const docTemplate = `{
                     "maxLength": 10
                 },
                 "labels": {
+                    "description": "state, the workflow timestamps, the actor ids and rejection_reason are\nresponse-only. They are moved by POST /purchase-orders/{id}/{action},\nwhich is the only thing that can check a transition is legal and record\nwho made it; created_by_id is stamped from the caller.",
                     "type": "array",
                     "items": {
                         "type": "integer"
@@ -17563,33 +18012,8 @@ const docTemplate = `{
                     "type": "string",
                     "maxLength": 50
                 },
-                "purchased_at": {
-                    "type": "string"
-                },
-                "received_full_at": {
-                    "type": "string"
-                },
-                "received_partial_at": {
-                    "type": "string"
-                },
-                "rejected_at": {
-                    "type": "string"
-                },
-                "rejected_by_id": {
-                    "type": "integer"
-                },
                 "shipping": {
                     "type": "number"
-                },
-                "state": {
-                    "type": "string",
-                    "maxLength": 20
-                },
-                "submitted_at": {
-                    "type": "string"
-                },
-                "submitted_by_id": {
-                    "type": "integer"
                 },
                 "subtotal": {
                     "type": "number"
@@ -20658,6 +21082,68 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.PurchaseOrderStatusLogPage": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.PurchaseOrderStatusLogResponse"
+                    }
+                },
+                "has_next": {
+                    "type": "boolean"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.PurchaseOrderStatusLogResponse": {
+            "type": "object",
+            "properties": {
+                "actor_employee_id": {
+                    "type": "integer"
+                },
+                "actor_type": {
+                    "type": "string"
+                },
+                "changed_at": {
+                    "type": "string"
+                },
+                "from_state": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "purchase_order_id": {
+                    "type": "integer"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "to_state": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.PurchaseOrderTransitionRequest": {
+            "type": "object",
+            "properties": {
+                "reason": {
+                    "description": "Reason is required when rejecting and ignored otherwise. It is recorded on\nthe order and in its status log.",
+                    "type": "string",
+                    "maxLength": 2000
+                }
+            }
+        },
         "dto.RefreshRequest": {
             "type": "object",
             "required": [
@@ -22986,18 +23472,6 @@ const docTemplate = `{
         "dto.UpdatePurchaseOrderRequest": {
             "type": "object",
             "properties": {
-                "approved_at": {
-                    "type": "string"
-                },
-                "approved_by_id": {
-                    "type": "integer"
-                },
-                "closed_at": {
-                    "type": "string"
-                },
-                "created_by_id": {
-                    "type": "integer"
-                },
                 "custom_fields": {
                     "type": "array",
                     "items": {
@@ -23021,6 +23495,7 @@ const docTemplate = `{
                     "maxLength": 10
                 },
                 "labels": {
+                    "description": "state, the workflow timestamps, the actor ids and rejection_reason are\nresponse-only. They are moved by POST /purchase-orders/{id}/{action},\nwhich is the only thing that can check a transition is legal and record\nwho made it; created_by_id is stamped from the caller.",
                     "type": "array",
                     "items": {
                         "type": "integer"
@@ -23030,33 +23505,8 @@ const docTemplate = `{
                     "type": "string",
                     "maxLength": 50
                 },
-                "purchased_at": {
-                    "type": "string"
-                },
-                "received_full_at": {
-                    "type": "string"
-                },
-                "received_partial_at": {
-                    "type": "string"
-                },
-                "rejected_at": {
-                    "type": "string"
-                },
-                "rejected_by_id": {
-                    "type": "integer"
-                },
                 "shipping": {
                     "type": "number"
-                },
-                "state": {
-                    "type": "string",
-                    "maxLength": 20
-                },
-                "submitted_at": {
-                    "type": "string"
-                },
-                "submitted_by_id": {
-                    "type": "integer"
                 },
                 "subtotal": {
                     "type": "number"
