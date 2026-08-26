@@ -169,6 +169,9 @@ func NewRouter(d Deps) *gin.Engine {
 
 	// Phase 7: fuel, inspections, org & misc
 	crud.NewHandler[dto.FuelTypeResponse, dto.CreateFuelTypeRequest, dto.UpdateFuelTypeRequest](NewFuelTypeStore(d.Queries)).Register(fuel, "/fuel-types")
+	// The trailer classification vocabulary, a Settings catalog like the others.
+	crud.NewHandler[dto.TrailerClassificationResponse, dto.CreateTrailerClassificationRequest, dto.UpdateTrailerClassificationRequest](
+		NewTrailerClassificationStore(d.Queries)).Register(assets, "/trailer-classifications")
 	crud.NewHandler[dto.InspectionFormResponse, dto.CreateInspectionFormRequest, dto.UpdateInspectionFormRequest](NewInspectionFormStore(d.Queries)).Register(inspections, "/inspection-forms")
 	crud.NewHandler[dto.InspectionSubmissionResponse, dto.CreateInspectionSubmissionRequest, dto.UpdateInspectionSubmissionRequest](NewInspectionSubmissionStore(d.Queries, d.Storage, d.Logger)).Register(inspections, "/inspection-submissions")
 	registerCrudWithList(assets, "/media",

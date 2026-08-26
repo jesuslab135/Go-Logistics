@@ -255,8 +255,9 @@ func (h *FilteredListHandler) Assets(c *gin.Context) {
 	}
 
 	spec := newListSpec[assetListRow]("asset", "a").
-		join("LEFT JOIN vehicle v ON v.asset_id = a.id", "LEFT JOIN trailer t ON t.asset_id = a.id").
-		selecting("v.operator", "t.trailer_type", "t.classification", "t.size").
+		join("LEFT JOIN vehicle v ON v.asset_id = a.id", "LEFT JOIN trailer t ON t.asset_id = a.id",
+			"LEFT JOIN trailer_classification tc ON tc.id = t.classification_id").
+		selecting("v.operator", "t.trailer_type", "tc.name", "t.size").
 		filter(where).
 		orderBy(orderClause(c, map[string]string{
 			"name":         "a.name",

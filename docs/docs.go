@@ -13045,6 +13045,219 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/trailer-classifications": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "The company's own vocabulary for classifying trailers. It replaced two free-text columns, where \"Dry Van\", \"DRY VAN\" and \"dry van\" counted as three classifications to every filter and report. Each company's catalog was seeded from the values that company was already using; no list is seeded on top of that.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "trailer-classifications"
+                ],
+                "summary": "List trailer classifications",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page size",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Offset",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.TrailerClassificationPage"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "trailer-classifications"
+                ],
+                "summary": "Create a trailer classification",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.CreateTrailerClassificationRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/dto.TrailerClassificationResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/trailer-classifications/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "trailer-classifications"
+                ],
+                "summary": "Get a trailer classification",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.TrailerClassificationResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "trailer-classifications"
+                ],
+                "summary": "Update a trailer classification",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.UpdateTrailerClassificationRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.TrailerClassificationResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Trailers referencing it become unclassified rather than blocking the delete: retiring a term nobody uses should not require re-classifying every trailer that ever carried it.",
+                "tags": [
+                    "trailer-classifications"
+                ],
+                "summary": "Delete a trailer classification",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/uploads": {
             "post": {
                 "security": [
@@ -18693,6 +18906,22 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.CreateTrailerClassificationRequest": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "position": {
+                    "description": "Position orders the picker. Ties fall back to name.",
+                    "type": "integer"
+                }
+            }
+        },
         "dto.CreateVehicleMakeRequest": {
             "type": "object",
             "required": [
@@ -22238,6 +22467,46 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.TrailerClassificationPage": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.TrailerClassificationResponse"
+                    }
+                },
+                "has_next": {
+                    "type": "boolean"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.TrailerClassificationResponse": {
+            "type": "object",
+            "properties": {
+                "company_id": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "position": {
+                    "type": "integer"
+                }
+            }
+        },
         "dto.TrailerResponse": {
             "type": "object",
             "properties": {
@@ -22248,13 +22517,19 @@ const docTemplate = `{
                 "asset_id": {
                     "type": "integer"
                 },
-                "classification": {
-                    "type": "string",
-                    "maxLength": 100
+                "classification_2_id": {
+                    "type": "integer"
                 },
-                "classification_2": {
-                    "type": "string",
-                    "maxLength": 100
+                "classification_2_name": {
+                    "type": "string"
+                },
+                "classification_id": {
+                    "description": "Classification names a row in the company's trailer_classification\ncatalog. It used to be free text, which meant \"Dry Van\", \"DRY VAN\" and\n\"dry van\" were three different classifications to every filter and report.",
+                    "type": "integer"
+                },
+                "classification_name": {
+                    "description": "The resolved catalog names, empty when no classification is set.",
+                    "type": "string"
                 },
                 "contract_end": {
                     "type": "string"
@@ -24170,6 +24445,21 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.UpdateTrailerClassificationRequest": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "position": {
+                    "type": "integer"
+                }
+            }
+        },
         "dto.UpdateVehicleMakeRequest": {
             "type": "object",
             "required": [
@@ -24618,13 +24908,12 @@ const docTemplate = `{
                     "type": "string",
                     "maxLength": 50
                 },
-                "classification": {
-                    "type": "string",
-                    "maxLength": 100
+                "classification_2_id": {
+                    "type": "integer"
                 },
-                "classification_2": {
-                    "type": "string",
-                    "maxLength": 100
+                "classification_id": {
+                    "description": "Classification names a row in the company's trailer_classification\ncatalog. It used to be free text, which meant \"Dry Van\", \"DRY VAN\" and\n\"dry van\" were three different classifications to every filter and report.",
+                    "type": "integer"
                 },
                 "contract_end": {
                     "type": "string"

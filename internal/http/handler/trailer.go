@@ -2,10 +2,12 @@ package handler
 
 import (
 	"context"
+	"slices"
 
 	"fleet/internal/db/gen"
 	"fleet/internal/http/dto"
 	"fleet/internal/http/middleware"
+	"fleet/internal/platform/apierr"
 )
 
 type TrailerStore struct{ q *gen.Queries }
@@ -17,16 +19,32 @@ func (s *TrailerStore) Get(ctx context.Context, parentID int64) (dto.TrailerResp
 	if err != nil {
 		return dto.TrailerResponse{}, err
 	}
-	return toTrailerResponse(r), nil
+	out := toTrailerResponse(r)
+	// Names resolved separately; a trailer with no classification set simply has
+	// none, which is not an error.
+	if names, err := s.q.GetTrailerClassificationNames(ctx, parentID); err == nil {
+		out.ClassificationName = names.ClassificationName
+		out.Classification2Name = names.Classification2Name
+	}
+	return out, nil
 }
 
 func (s *TrailerStore) Upsert(ctx context.Context, parentID int64, in dto.UpsertTrailerRequest) (dto.TrailerResponse, error) {
+	company := middleware.CompanyFromContext(ctx)
+
+	// The classification ids must belong to the caller's company. Without this a
+	// trailer could be linked to another tenant's vocabulary — a value its own
+	// fleet cannot see, edit or filter by, and which leaks that tenant's terms.
+	if err := s.validateClassifications(ctx, company, in.ClassificationID, in.Classification2ID); err != nil {
+		return dto.TrailerResponse{}, err
+	}
+
 	r, err := s.q.UpsertTrailer(ctx, gen.UpsertTrailerParams{
 		ParentID:             parentID,
-		CompanyID:            middleware.CompanyFromContext(ctx),
+		CompanyID:            company,
 		TrailerType:          in.TrailerType,
-		Classification:       in.Classification,
-		Classification2:      in.Classification2,
+		ClassificationID:     in.ClassificationID,
+		Classification2ID:    in.Classification2ID,
 		Size:                 in.Size,
 		Suspension:           in.Suspension,
 		OwnerName:            in.OwnerName,
@@ -76,8 +94,8 @@ func toTrailerResponse(r gen.Trailer) dto.TrailerResponse {
 	return dto.TrailerResponse{
 		AssetID:              r.AssetID,
 		TrailerType:          r.TrailerType,
-		Classification:       r.Classification,
-		Classification2:      r.Classification2,
+		ClassificationID:     r.ClassificationID,
+		Classification2ID:    r.Classification2ID,
 		Size:                 r.Size,
 		Suspension:           r.Suspension,
 		OwnerName:            r.OwnerName,
@@ -113,4 +131,43 @@ func toTrailerResponse(r gen.Trailer) dto.TrailerResponse {
 		OperationalUse:       r.OperationalUse,
 		OperationZone:        r.OperationZone,
 	}
+}
+
+// validateClassifications refuses ids that do not name a classification in this
+// company, as a 422 against the offending field rather than the 409 a foreign
+// key would raise from somewhere the caller cannot see.
+func (s *TrailerStore) validateClassifications(ctx context.Context, companyID int64, ids ...*int64) error {
+	var want []int64
+	fields := []string{"classification_id", "classification_2_id"}
+	details := map[string]string{}
+
+	for i, id := range ids {
+		if id != nil {
+			want = append(want, *id)
+			details[fields[i]] = "must name a classification in your company"
+		}
+	}
+	if len(want) == 0 {
+		return nil
+	}
+
+	n, err := s.q.CountTrailerClassificationsByIDs(ctx, gen.CountTrailerClassificationsByIDsParams{
+		CompanyID: companyID,
+		Ids:       want,
+	})
+	if err != nil {
+		return err
+	}
+	if int(n) != len(dedupe(want)) {
+		return apierr.Validation(details)
+	}
+	return nil
+}
+
+// dedupe is needed because both columns may legitimately name the same
+// classification, and the count would then be one where two ids were sent.
+func dedupe(ids []int64) []int64 {
+	out := slices.Clone(ids)
+	slices.Sort(out)
+	return slices.Compact(out)
 }

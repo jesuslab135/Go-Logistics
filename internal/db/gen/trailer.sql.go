@@ -26,7 +26,7 @@ func (q *Queries) DeleteTrailer(ctx context.Context, arg DeleteTrailerParams) er
 }
 
 const getTrailer = `-- name: GetTrailer :one
-SELECT c.asset_id, c.trailer_type, c.classification, c.classification_2, c.size, c.suspension, c.owner_name, c.financing, c.supplier, c.license_plate_us, c.license_plate_us_state, c.license_plate_mx, c.doors, c.walls, c.rail_post, c.skylight, c.floor_type, c.roof_type, c.hazmat_type, c.aero_kit_type, c.gps_provider, c.gps_serial, c.gps_signal_status, c.gps_contract_start, c.gps_contract_end, c.gps_contract_reference, c.contract_start, c.contract_end, c.contract_period, c.contract_reference, c.fumigation_date, c.fumigation_cert, c.registration_date, c.waterproofing_date, c.decommission_reason, c.decommission_date, c.operational_use, c.operation_zone FROM trailer c JOIN asset a ON a.id = c.asset_id
+SELECT c.asset_id, c.trailer_type, c.classification, c.classification_2, c.size, c.suspension, c.owner_name, c.financing, c.supplier, c.license_plate_us, c.license_plate_us_state, c.license_plate_mx, c.doors, c.walls, c.rail_post, c.skylight, c.floor_type, c.roof_type, c.hazmat_type, c.aero_kit_type, c.gps_provider, c.gps_serial, c.gps_signal_status, c.gps_contract_start, c.gps_contract_end, c.gps_contract_reference, c.contract_start, c.contract_end, c.contract_period, c.contract_reference, c.fumigation_date, c.fumigation_cert, c.registration_date, c.waterproofing_date, c.decommission_reason, c.decommission_date, c.operational_use, c.operation_zone, c.classification_id, c.classification_2_id FROM trailer c JOIN asset a ON a.id = c.asset_id
 WHERE c.asset_id = $1 AND a.company_id = $2
 `
 
@@ -77,25 +77,55 @@ func (q *Queries) GetTrailer(ctx context.Context, arg GetTrailerParams) (Trailer
 		&i.DecommissionDate,
 		&i.OperationalUse,
 		&i.OperationZone,
+		&i.ClassificationID,
+		&i.Classification2ID,
 	)
+	return i, err
+}
+
+const getTrailerClassificationNames = `-- name: GetTrailerClassificationNames :one
+SELECT
+    COALESCE(tc1.name, '')::varchar AS classification_name,
+    COALESCE(tc2.name, '')::varchar AS classification_2_name
+FROM trailer c
+LEFT JOIN trailer_classification tc1 ON tc1.id = c.classification_id
+LEFT JOIN trailer_classification tc2 ON tc2.id = c.classification_2_id
+WHERE c.asset_id = $1
+`
+
+type GetTrailerClassificationNamesRow struct {
+	ClassificationName  string
+	Classification2Name string
+}
+
+// GetTrailerClassificationNames resolves both catalog names for one trailer, so
+// a client renders words rather than an id it would have to look up itself.
+//
+// A second statement rather than a join on GetTrailer: sqlc flattens a joined
+// row into a new struct, which would mean a second copy of the trailer field
+// mapping - and two mappings of forty columns is how one of them goes stale.
+func (q *Queries) GetTrailerClassificationNames(ctx context.Context, parentID int64) (GetTrailerClassificationNamesRow, error) {
+	row := q.db.QueryRow(ctx, getTrailerClassificationNames, parentID)
+	var i GetTrailerClassificationNamesRow
+	err := row.Scan(&i.ClassificationName, &i.Classification2Name)
 	return i, err
 }
 
 const upsertTrailer = `-- name: UpsertTrailer :one
 INSERT INTO trailer (
-    asset_id, trailer_type, classification, classification_2, size, suspension, owner_name, financing, supplier, license_plate_us, license_plate_us_state, license_plate_mx, doors, walls, rail_post, skylight, floor_type, roof_type, hazmat_type, aero_kit_type, gps_provider, gps_serial, gps_signal_status, gps_contract_start, gps_contract_end, gps_contract_reference, contract_start, contract_end, contract_period, contract_reference, fumigation_date, fumigation_cert, registration_date, waterproofing_date, decommission_reason, decommission_date, operational_use, operation_zone
+    asset_id, trailer_type, classification_id, classification_2_id, size, suspension, owner_name, financing, supplier, license_plate_us, license_plate_us_state, license_plate_mx, doors, walls, rail_post, skylight, floor_type, roof_type, hazmat_type, aero_kit_type, gps_provider, gps_serial, gps_signal_status, gps_contract_start, gps_contract_end, gps_contract_reference, contract_start, contract_end, contract_period, contract_reference, fumigation_date, fumigation_cert, registration_date, waterproofing_date, decommission_reason, decommission_date, operational_use, operation_zone
 )
 SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38
 WHERE EXISTS (SELECT 1 FROM asset WHERE id = $1 AND company_id = $39)
-ON CONFLICT (asset_id) DO UPDATE SET trailer_type = EXCLUDED.trailer_type, classification = EXCLUDED.classification, classification_2 = EXCLUDED.classification_2, size = EXCLUDED.size, suspension = EXCLUDED.suspension, owner_name = EXCLUDED.owner_name, financing = EXCLUDED.financing, supplier = EXCLUDED.supplier, license_plate_us = EXCLUDED.license_plate_us, license_plate_us_state = EXCLUDED.license_plate_us_state, license_plate_mx = EXCLUDED.license_plate_mx, doors = EXCLUDED.doors, walls = EXCLUDED.walls, rail_post = EXCLUDED.rail_post, skylight = EXCLUDED.skylight, floor_type = EXCLUDED.floor_type, roof_type = EXCLUDED.roof_type, hazmat_type = EXCLUDED.hazmat_type, aero_kit_type = EXCLUDED.aero_kit_type, gps_provider = EXCLUDED.gps_provider, gps_serial = EXCLUDED.gps_serial, gps_signal_status = EXCLUDED.gps_signal_status, gps_contract_start = EXCLUDED.gps_contract_start, gps_contract_end = EXCLUDED.gps_contract_end, gps_contract_reference = EXCLUDED.gps_contract_reference, contract_start = EXCLUDED.contract_start, contract_end = EXCLUDED.contract_end, contract_period = EXCLUDED.contract_period, contract_reference = EXCLUDED.contract_reference, fumigation_date = EXCLUDED.fumigation_date, fumigation_cert = EXCLUDED.fumigation_cert, registration_date = EXCLUDED.registration_date, waterproofing_date = EXCLUDED.waterproofing_date, decommission_reason = EXCLUDED.decommission_reason, decommission_date = EXCLUDED.decommission_date, operational_use = EXCLUDED.operational_use, operation_zone = EXCLUDED.operation_zone
-RETURNING asset_id, trailer_type, classification, classification_2, size, suspension, owner_name, financing, supplier, license_plate_us, license_plate_us_state, license_plate_mx, doors, walls, rail_post, skylight, floor_type, roof_type, hazmat_type, aero_kit_type, gps_provider, gps_serial, gps_signal_status, gps_contract_start, gps_contract_end, gps_contract_reference, contract_start, contract_end, contract_period, contract_reference, fumigation_date, fumigation_cert, registration_date, waterproofing_date, decommission_reason, decommission_date, operational_use, operation_zone
+ON CONFLICT (asset_id) DO UPDATE SET trailer_type = EXCLUDED.trailer_type, classification_id = EXCLUDED.classification_id, classification_2_id = EXCLUDED.classification_2_id, size = EXCLUDED.size, suspension = EXCLUDED.suspension, owner_name = EXCLUDED.owner_name, financing = EXCLUDED.financing, supplier = EXCLUDED.supplier, license_plate_us = EXCLUDED.license_plate_us, license_plate_us_state = EXCLUDED.license_plate_us_state, license_plate_mx = EXCLUDED.license_plate_mx, doors = EXCLUDED.doors, walls = EXCLUDED.walls, rail_post = EXCLUDED.rail_post, skylight = EXCLUDED.skylight, floor_type = EXCLUDED.floor_type, roof_type = EXCLUDED.roof_type, hazmat_type = EXCLUDED.hazmat_type, aero_kit_type = EXCLUDED.aero_kit_type, gps_provider = EXCLUDED.gps_provider, gps_serial = EXCLUDED.gps_serial, gps_signal_status = EXCLUDED.gps_signal_status, gps_contract_start = EXCLUDED.gps_contract_start, gps_contract_end = EXCLUDED.gps_contract_end, gps_contract_reference = EXCLUDED.gps_contract_reference, contract_start = EXCLUDED.contract_start, contract_end = EXCLUDED.contract_end, contract_period = EXCLUDED.contract_period, contract_reference = EXCLUDED.contract_reference, fumigation_date = EXCLUDED.fumigation_date, fumigation_cert = EXCLUDED.fumigation_cert, registration_date = EXCLUDED.registration_date, waterproofing_date = EXCLUDED.waterproofing_date, decommission_reason = EXCLUDED.decommission_reason, decommission_date = EXCLUDED.decommission_date, operational_use = EXCLUDED.operational_use, operation_zone = EXCLUDED.operation_zone
+RETURNING asset_id, trailer_type, classification, classification_2, size, suspension, owner_name, financing, supplier, license_plate_us, license_plate_us_state, license_plate_mx, doors, walls, rail_post, skylight, floor_type, roof_type, hazmat_type, aero_kit_type, gps_provider, gps_serial, gps_signal_status, gps_contract_start, gps_contract_end, gps_contract_reference, contract_start, contract_end, contract_period, contract_reference, fumigation_date, fumigation_cert, registration_date, waterproofing_date, decommission_reason, decommission_date, operational_use, operation_zone, classification_id, classification_2_id
 `
 
 type UpsertTrailerParams struct {
 	ParentID             int64
 	TrailerType          string
-	Classification       string
-	Classification2      string
+	ClassificationID     *int64
+	Classification2ID    *int64
 	Size                 string
 	Suspension           string
 	OwnerName            string
@@ -137,8 +167,8 @@ func (q *Queries) UpsertTrailer(ctx context.Context, arg UpsertTrailerParams) (T
 	row := q.db.QueryRow(ctx, upsertTrailer,
 		arg.ParentID,
 		arg.TrailerType,
-		arg.Classification,
-		arg.Classification2,
+		arg.ClassificationID,
+		arg.Classification2ID,
 		arg.Size,
 		arg.Suspension,
 		arg.OwnerName,
@@ -215,6 +245,8 @@ func (q *Queries) UpsertTrailer(ctx context.Context, arg UpsertTrailerParams) (T
 		&i.DecommissionDate,
 		&i.OperationalUse,
 		&i.OperationZone,
+		&i.ClassificationID,
+		&i.Classification2ID,
 	)
 	return i, err
 }

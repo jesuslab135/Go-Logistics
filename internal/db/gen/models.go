@@ -853,9 +853,11 @@ type TireMountLog struct {
 }
 
 type Trailer struct {
-	AssetID              int64
-	TrailerType          string
-	Classification       string
+	AssetID     int64
+	TrailerType string
+	// Deprecated: superseded by classification_id. Retained for one release; no longer written.
+	Classification string
+	// Deprecated: superseded by classification_2_id. Retained for one release; no longer written.
 	Classification2      string
 	Size                 string
 	Suspension           string
@@ -891,6 +893,15 @@ type Trailer struct {
 	DecommissionDate     *time.Time
 	OperationalUse       string
 	OperationZone        string
+	ClassificationID     *int64
+	Classification2ID    *int64
+}
+
+type TrailerClassification struct {
+	ID        int64
+	CompanyID int64
+	Name      string
+	Position  int32
 }
 
 type Vehicle struct {

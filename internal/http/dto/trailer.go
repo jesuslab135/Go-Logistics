@@ -5,9 +5,12 @@ import (
 )
 
 type UpsertTrailerRequest struct {
-	TrailerType          string     `json:"trailer_type" binding:"omitempty,max=20"`
-	Classification       string     `json:"classification" binding:"omitempty,max=100"`
-	Classification2      string     `json:"classification_2" binding:"omitempty,max=100"`
+	TrailerType string `json:"trailer_type" binding:"omitempty,max=20"`
+	// Classification names a row in the company's trailer_classification
+	// catalog. It used to be free text, which meant "Dry Van", "DRY VAN" and
+	// "dry van" were three different classifications to every filter and report.
+	ClassificationID     *int64     `json:"classification_id"`
+	Classification2ID    *int64     `json:"classification_2_id"`
 	Size                 string     `json:"size" binding:"omitempty,max=20"`
 	Suspension           string     `json:"suspension" binding:"omitempty,max=100"`
 	OwnerName            string     `json:"owner_name" binding:"omitempty,max=200"`
@@ -45,10 +48,16 @@ type UpsertTrailerRequest struct {
 }
 
 type TrailerResponse struct {
-	AssetID              int64      `json:"asset_id"`
-	TrailerType          string     `json:"trailer_type" binding:"omitempty,max=20"`
-	Classification       string     `json:"classification" binding:"omitempty,max=100"`
-	Classification2      string     `json:"classification_2" binding:"omitempty,max=100"`
+	AssetID     int64  `json:"asset_id"`
+	TrailerType string `json:"trailer_type" binding:"omitempty,max=20"`
+	// Classification names a row in the company's trailer_classification
+	// catalog. It used to be free text, which meant "Dry Van", "DRY VAN" and
+	// "dry van" were three different classifications to every filter and report.
+	ClassificationID  *int64 `json:"classification_id"`
+	Classification2ID *int64 `json:"classification_2_id"`
+	// The resolved catalog names, empty when no classification is set.
+	ClassificationName   string     `json:"classification_name"`
+	Classification2Name  string     `json:"classification_2_name"`
 	Size                 string     `json:"size" binding:"omitempty,max=20"`
 	Suspension           string     `json:"suspension" binding:"omitempty,max=100"`
 	OwnerName            string     `json:"owner_name" binding:"omitempty,max=200"`

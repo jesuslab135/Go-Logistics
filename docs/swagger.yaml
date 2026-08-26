@@ -1789,6 +1789,17 @@ definitions:
       vendor_id:
         type: integer
     type: object
+  dto.CreateTrailerClassificationRequest:
+    properties:
+      name:
+        maxLength: 100
+        type: string
+      position:
+        description: Position orders the picker. Ties fall back to name.
+        type: integer
+    required:
+    - name
+    type: object
   dto.CreateVehicleMakeRequest:
     properties:
       name:
@@ -4206,6 +4217,32 @@ definitions:
         maxLength: 2000
         type: string
     type: object
+  dto.TrailerClassificationPage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.TrailerClassificationResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.TrailerClassificationResponse:
+    properties:
+      company_id:
+        type: integer
+      id:
+        type: integer
+      name:
+        type: string
+      position:
+        type: integer
+    type: object
   dto.TrailerResponse:
     properties:
       aero_kit_type:
@@ -4213,11 +4250,18 @@ definitions:
         type: string
       asset_id:
         type: integer
-      classification:
-        maxLength: 100
+      classification_2_id:
+        type: integer
+      classification_2_name:
         type: string
-      classification_2:
-        maxLength: 100
+      classification_id:
+        description: |-
+          Classification names a row in the company's trailer_classification
+          catalog. It used to be free text, which meant "Dry Van", "DRY VAN" and
+          "dry van" were three different classifications to every filter and report.
+        type: integer
+      classification_name:
+        description: The resolved catalog names, empty when no classification is set.
         type: string
       contract_end:
         type: string
@@ -5555,6 +5599,16 @@ definitions:
       vendor_id:
         type: integer
     type: object
+  dto.UpdateTrailerClassificationRequest:
+    properties:
+      name:
+        maxLength: 100
+        type: string
+      position:
+        type: integer
+    required:
+    - name
+    type: object
   dto.UpdateVehicleMakeRequest:
     properties:
       name:
@@ -5872,12 +5926,14 @@ definitions:
       aero_kit_type:
         maxLength: 50
         type: string
-      classification:
-        maxLength: 100
-        type: string
-      classification_2:
-        maxLength: 100
-        type: string
+      classification_2_id:
+        type: integer
+      classification_id:
+        description: |-
+          Classification names a row in the company's trailer_classification
+          catalog. It used to be free text, which meant "Dry Van", "DRY VAN" and
+          "dry van" were three different classifications to every filter and report.
+        type: integer
       contract_end:
         type: string
       contract_period:
@@ -15228,6 +15284,145 @@ paths:
       summary: Update tire-mount-logs
       tags:
       - tire-mount-logs
+  /api/v1/trailer-classifications:
+    get:
+      description: The company's own vocabulary for classifying trailers. It replaced
+        two free-text columns, where "Dry Van", "DRY VAN" and "dry van" counted as
+        three classifications to every filter and report. Each company's catalog was
+        seeded from the values that company was already using; no list is seeded on
+        top of that.
+      parameters:
+      - description: Page size
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.TrailerClassificationPage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List trailer classifications
+      tags:
+      - trailer-classifications
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateTrailerClassificationRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.TrailerClassificationResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a trailer classification
+      tags:
+      - trailer-classifications
+  /api/v1/trailer-classifications/{id}:
+    delete:
+      description: 'Trailers referencing it become unclassified rather than blocking
+        the delete: retiring a term nobody uses should not require re-classifying
+        every trailer that ever carried it.'
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete a trailer classification
+      tags:
+      - trailer-classifications
+    get:
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.TrailerClassificationResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get a trailer classification
+      tags:
+      - trailer-classifications
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateTrailerClassificationRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.TrailerClassificationResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update a trailer classification
+      tags:
+      - trailer-classifications
   /api/v1/uploads:
     post:
       consumes:
