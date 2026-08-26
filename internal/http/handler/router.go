@@ -126,9 +126,7 @@ func NewRouter(d Deps) *gin.Engine {
 	// parent. Forms need them as foreign-key sources; mutations stay nested.
 	inventory.GET("/part-inventory", lists.PartInventory)
 	inventory.GET("/purchase-order-line-items", lists.PurchaseOrderLineItems)
-	registerCrudWithList(inventory, "/inventory-journal-entries",
-		crud.NewHandler[dto.InventoryJournalEntryResponse, dto.CreateInventoryJournalEntryRequest, dto.UpdateInventoryJournalEntryRequest](
-			NewInventoryJournalEntryStore(d.Queries)), lists.InventoryJournalEntries)
+	registerInventoryJournalRoutes(inventory, d, lists.InventoryJournalEntries)
 
 	// Phase 4: vendors, work orders & issues
 	crud.NewHandler[dto.VendorResponse, dto.CreateVendorRequest, dto.UpdateVendorRequest](NewVendorStore(d.Queries)).Register(vendors, "/vendors")
@@ -276,6 +274,27 @@ func registerCrudWithList[T, C, U any](r gin.IRouter, path string, h *crud.Handl
 	r.GET(path+"/:id", h.Get)
 	r.PUT(path+"/:id", h.Update)
 	r.DELETE(path+"/:id", h.Delete)
+}
+
+// registerInventoryJournalRoutes wires the ledger. It is not registerCrudWithList
+// because the ledger is append-only: PUT and DELETE are retired, answering 405
+// with the replacement rather than 404, and a reversal route takes their place.
+func registerInventoryJournalRoutes(r gin.IRouter, d Deps, list gin.HandlerFunc) {
+	const path = "/inventory-journal-entries"
+
+	store := NewInventoryJournalEntryStore(d.Queries, d.Pool)
+	entries := crud.NewAppendOnlyHandler[dto.InventoryJournalEntryResponse, dto.CreateInventoryJournalEntryRequest](
+		store, journalRetiredMessage)
+
+	// The verbs are wired individually rather than through Register because the
+	// list comes from the filtered handler: the generic one has no part_id or
+	// date filter, and this is the one collection that never plateaus.
+	r.GET(path, list)
+	r.POST(path, entries.Create)
+	r.GET(path+"/:id", entries.Get)
+	r.PUT(path+"/:id", entries.Retired)
+	r.DELETE(path+"/:id", entries.Retired)
+	r.POST(path+"/:id/reverse", NewInventoryJournalEntryHandler(store).Reverse)
 }
 
 // registerCompanyRoutes wires /companies with Django's split gating: creating a

@@ -12,6 +12,47 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+const applyPartInventoryAdjustment = `-- name: ApplyPartInventoryAdjustment :one
+UPDATE part_inventory
+SET available_quantity = available_quantity + $1,
+    available_quantity_updated_at = $2,
+    updated_at = $2
+WHERE id = $3
+RETURNING id, part_id, location_id, available_quantity, expiry_date, aisle, row, bin, reorder_point, reorder_point_enabled, reorder_quantity, reorder_point_lead_time_days, active, track_inventory, average_unit_cost, available_quantity_updated_at, created_at, updated_at
+`
+
+type ApplyPartInventoryAdjustmentParams struct {
+	AdjustmentQuantity decimal.Decimal
+	UpdatedAt          *time.Time
+	ID                 int64
+}
+
+func (q *Queries) ApplyPartInventoryAdjustment(ctx context.Context, arg ApplyPartInventoryAdjustmentParams) (PartInventory, error) {
+	row := q.db.QueryRow(ctx, applyPartInventoryAdjustment, arg.AdjustmentQuantity, arg.UpdatedAt, arg.ID)
+	var i PartInventory
+	err := row.Scan(
+		&i.ID,
+		&i.PartID,
+		&i.LocationID,
+		&i.AvailableQuantity,
+		&i.ExpiryDate,
+		&i.Aisle,
+		&i.Row,
+		&i.Bin,
+		&i.ReorderPoint,
+		&i.ReorderPointEnabled,
+		&i.ReorderQuantity,
+		&i.ReorderPointLeadTimeDays,
+		&i.Active,
+		&i.TrackInventory,
+		&i.AverageUnitCost,
+		&i.AvailableQuantityUpdatedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const countInventoryJournalEntries = `-- name: CountInventoryJournalEntries :one
 SELECT count(*) FROM inventory_journal_entry WHERE company_id = $1
 `
@@ -25,11 +66,11 @@ func (q *Queries) CountInventoryJournalEntries(ctx context.Context, companyID in
 
 const createInventoryJournalEntry = `-- name: CreateInventoryJournalEntry :one
 INSERT INTO inventory_journal_entry (
-    company_id, part_id, part_location_detail_id, user_id, previous_quantity, adjustment_quantity, current_quantity, unit_cost, reason_id, work_order_id, purchase_order_line_id, vendor_id, adjustment_type, transfer_part_location_id, notes, created_at
+    company_id, part_id, part_location_detail_id, user_id, previous_quantity, adjustment_quantity, current_quantity, unit_cost, reason_id, work_order_id, purchase_order_line_id, vendor_id, adjustment_type, transfer_part_location_id, notes, reversal_of_id, created_at
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17
 )
-RETURNING id, company_id, part_id, part_location_detail_id, user_id, previous_quantity, adjustment_quantity, current_quantity, unit_cost, reason_id, work_order_id, purchase_order_line_id, vendor_id, adjustment_type, transfer_part_location_id, notes, created_at
+RETURNING id, company_id, part_id, part_location_detail_id, user_id, previous_quantity, adjustment_quantity, current_quantity, unit_cost, reason_id, work_order_id, purchase_order_line_id, vendor_id, adjustment_type, transfer_part_location_id, notes, created_at, reversal_of_id
 `
 
 type CreateInventoryJournalEntryParams struct {
@@ -48,6 +89,7 @@ type CreateInventoryJournalEntryParams struct {
 	AdjustmentType         string
 	TransferPartLocationID *int64
 	Notes                  string
+	ReversalOfID           *int64
 	CreatedAt              time.Time
 }
 
@@ -68,6 +110,7 @@ func (q *Queries) CreateInventoryJournalEntry(ctx context.Context, arg CreateInv
 		arg.AdjustmentType,
 		arg.TransferPartLocationID,
 		arg.Notes,
+		arg.ReversalOfID,
 		arg.CreatedAt,
 	)
 	var i InventoryJournalEntry
@@ -89,26 +132,14 @@ func (q *Queries) CreateInventoryJournalEntry(ctx context.Context, arg CreateInv
 		&i.TransferPartLocationID,
 		&i.Notes,
 		&i.CreatedAt,
+		&i.ReversalOfID,
 	)
 	return i, err
 }
 
-const deleteInventoryJournalEntry = `-- name: DeleteInventoryJournalEntry :exec
-DELETE FROM inventory_journal_entry WHERE id = $1 AND company_id = $2
-`
-
-type DeleteInventoryJournalEntryParams struct {
-	ID        int64
-	CompanyID int64
-}
-
-func (q *Queries) DeleteInventoryJournalEntry(ctx context.Context, arg DeleteInventoryJournalEntryParams) error {
-	_, err := q.db.Exec(ctx, deleteInventoryJournalEntry, arg.ID, arg.CompanyID)
-	return err
-}
-
 const getInventoryJournalEntry = `-- name: GetInventoryJournalEntry :one
-SELECT id, company_id, part_id, part_location_detail_id, user_id, previous_quantity, adjustment_quantity, current_quantity, unit_cost, reason_id, work_order_id, purchase_order_line_id, vendor_id, adjustment_type, transfer_part_location_id, notes, created_at FROM inventory_journal_entry WHERE id = $1 AND company_id = $2
+
+SELECT id, company_id, part_id, part_location_detail_id, user_id, previous_quantity, adjustment_quantity, current_quantity, unit_cost, reason_id, work_order_id, purchase_order_line_id, vendor_id, adjustment_type, transfer_part_location_id, notes, created_at, reversal_of_id FROM inventory_journal_entry WHERE id = $1 AND company_id = $2
 `
 
 type GetInventoryJournalEntryParams struct {
@@ -116,6 +147,9 @@ type GetInventoryJournalEntryParams struct {
 	CompanyID int64
 }
 
+// The journal is append-only: an entry is a stock movement that happened, and
+// history is not editable. There is deliberately no update or delete here.
+// Correcting an entry means reversing it, which is itself an entry.
 func (q *Queries) GetInventoryJournalEntry(ctx context.Context, arg GetInventoryJournalEntryParams) (InventoryJournalEntry, error) {
 	row := q.db.QueryRow(ctx, getInventoryJournalEntry, arg.ID, arg.CompanyID)
 	var i InventoryJournalEntry
@@ -137,12 +171,98 @@ func (q *Queries) GetInventoryJournalEntry(ctx context.Context, arg GetInventory
 		&i.TransferPartLocationID,
 		&i.Notes,
 		&i.CreatedAt,
+		&i.ReversalOfID,
 	)
 	return i, err
 }
 
+const getInventoryJournalReversal = `-- name: GetInventoryJournalReversal :one
+SELECT id, company_id, part_id, part_location_detail_id, user_id, previous_quantity, adjustment_quantity, current_quantity, unit_cost, reason_id, work_order_id, purchase_order_line_id, vendor_id, adjustment_type, transfer_part_location_id, notes, created_at, reversal_of_id FROM inventory_journal_entry WHERE reversal_of_id = $1
+`
+
+// The reversal of an entry, if one exists. Reversing twice is refused, so this
+// is what a second attempt is checked against.
+func (q *Queries) GetInventoryJournalReversal(ctx context.Context, reversalOfID *int64) (InventoryJournalEntry, error) {
+	row := q.db.QueryRow(ctx, getInventoryJournalReversal, reversalOfID)
+	var i InventoryJournalEntry
+	err := row.Scan(
+		&i.ID,
+		&i.CompanyID,
+		&i.PartID,
+		&i.PartLocationDetailID,
+		&i.UserID,
+		&i.PreviousQuantity,
+		&i.AdjustmentQuantity,
+		&i.CurrentQuantity,
+		&i.UnitCost,
+		&i.ReasonID,
+		&i.WorkOrderID,
+		&i.PurchaseOrderLineID,
+		&i.VendorID,
+		&i.AdjustmentType,
+		&i.TransferPartLocationID,
+		&i.Notes,
+		&i.CreatedAt,
+		&i.ReversalOfID,
+	)
+	return i, err
+}
+
+const inventoryDrift = `-- name: InventoryDrift :many
+SELECT
+    pi.id                                  AS part_inventory_id,
+    pi.part_id,
+    p.company_id,
+    pi.available_quantity,
+    COALESCE(SUM(ije.adjustment_quantity), 0)::numeric(14,2) AS ledger_sum
+FROM part_inventory pi
+JOIN part p ON p.id = pi.part_id
+LEFT JOIN inventory_journal_entry ije ON ije.part_location_detail_id = pi.id
+GROUP BY pi.id, pi.part_id, p.company_id, pi.available_quantity
+HAVING pi.available_quantity <> COALESCE(SUM(ije.adjustment_quantity), 0)
+ORDER BY p.company_id, pi.part_id, pi.id
+`
+
+type InventoryDriftRow struct {
+	PartInventoryID   int64
+	PartID            int64
+	CompanyID         int64
+	AvailableQuantity decimal.Decimal
+	LedgerSum         decimal.Decimal
+}
+
+// InventoryDrift reports where the ledger and the stock row disagree. Entries
+// written before the journal moved stock recorded movements the inventory never
+// made, so the two diverge by an unknown amount per part; this is what
+// `fleet-cli inventory-drift` prints rather than silently reconciling.
+func (q *Queries) InventoryDrift(ctx context.Context) ([]InventoryDriftRow, error) {
+	rows, err := q.db.Query(ctx, inventoryDrift)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []InventoryDriftRow{}
+	for rows.Next() {
+		var i InventoryDriftRow
+		if err := rows.Scan(
+			&i.PartInventoryID,
+			&i.PartID,
+			&i.CompanyID,
+			&i.AvailableQuantity,
+			&i.LedgerSum,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listInventoryJournalEntries = `-- name: ListInventoryJournalEntries :many
-SELECT id, company_id, part_id, part_location_detail_id, user_id, previous_quantity, adjustment_quantity, current_quantity, unit_cost, reason_id, work_order_id, purchase_order_line_id, vendor_id, adjustment_type, transfer_part_location_id, notes, created_at FROM inventory_journal_entry WHERE company_id = $1 ORDER BY created_at DESC, id LIMIT $2 OFFSET $3
+SELECT id, company_id, part_id, part_location_detail_id, user_id, previous_quantity, adjustment_quantity, current_quantity, unit_cost, reason_id, work_order_id, purchase_order_line_id, vendor_id, adjustment_type, transfer_part_location_id, notes, created_at, reversal_of_id FROM inventory_journal_entry WHERE company_id = $1 ORDER BY created_at DESC, id LIMIT $2 OFFSET $3
 `
 
 type ListInventoryJournalEntriesParams struct {
@@ -178,6 +298,7 @@ func (q *Queries) ListInventoryJournalEntries(ctx context.Context, arg ListInven
 			&i.TransferPartLocationID,
 			&i.Notes,
 			&i.CreatedAt,
+			&i.ReversalOfID,
 		); err != nil {
 			return nil, err
 		}
@@ -189,69 +310,47 @@ func (q *Queries) ListInventoryJournalEntries(ctx context.Context, arg ListInven
 	return items, nil
 }
 
-const updateInventoryJournalEntry = `-- name: UpdateInventoryJournalEntry :one
-UPDATE inventory_journal_entry SET part_id = $3, part_location_detail_id = $4, user_id = $5, previous_quantity = $6, adjustment_quantity = $7, current_quantity = $8, unit_cost = $9, reason_id = $10, work_order_id = $11, purchase_order_line_id = $12, vendor_id = $13, adjustment_type = $14, transfer_part_location_id = $15, notes = $16
-WHERE id = $1 AND company_id = $2
-RETURNING id, company_id, part_id, part_location_detail_id, user_id, previous_quantity, adjustment_quantity, current_quantity, unit_cost, reason_id, work_order_id, purchase_order_line_id, vendor_id, adjustment_type, transfer_part_location_id, notes, created_at
+const lockPartInventory = `-- name: LockPartInventory :one
+SELECT pi.id, pi.part_id, pi.location_id, pi.available_quantity, pi.expiry_date, pi.aisle, pi.row, pi.bin, pi.reorder_point, pi.reorder_point_enabled, pi.reorder_quantity, pi.reorder_point_lead_time_days, pi.active, pi.track_inventory, pi.average_unit_cost, pi.available_quantity_updated_at, pi.created_at, pi.updated_at FROM part_inventory pi
+JOIN part p ON p.id = pi.part_id
+WHERE pi.id = $1 AND p.company_id = $2
+FOR UPDATE OF pi
 `
 
-type UpdateInventoryJournalEntryParams struct {
-	ID                     int64
-	CompanyID              int64
-	PartID                 int64
-	PartLocationDetailID   int64
-	UserID                 *int64
-	PreviousQuantity       decimal.Decimal
-	AdjustmentQuantity     decimal.Decimal
-	CurrentQuantity        decimal.Decimal
-	UnitCost               decimal.Decimal
-	ReasonID               *int64
-	WorkOrderID            *int64
-	PurchaseOrderLineID    *int64
-	VendorID               *int64
-	AdjustmentType         string
-	TransferPartLocationID *int64
-	Notes                  string
+type LockPartInventoryParams struct {
+	ID        int64
+	CompanyID int64
 }
 
-func (q *Queries) UpdateInventoryJournalEntry(ctx context.Context, arg UpdateInventoryJournalEntryParams) (InventoryJournalEntry, error) {
-	row := q.db.QueryRow(ctx, updateInventoryJournalEntry,
-		arg.ID,
-		arg.CompanyID,
-		arg.PartID,
-		arg.PartLocationDetailID,
-		arg.UserID,
-		arg.PreviousQuantity,
-		arg.AdjustmentQuantity,
-		arg.CurrentQuantity,
-		arg.UnitCost,
-		arg.ReasonID,
-		arg.WorkOrderID,
-		arg.PurchaseOrderLineID,
-		arg.VendorID,
-		arg.AdjustmentType,
-		arg.TransferPartLocationID,
-		arg.Notes,
-	)
-	var i InventoryJournalEntry
+// LockPartInventory reads the stock row the entry will move, and holds it for
+// the rest of the transaction. Without the lock two concurrent adjustments read
+// the same previous_quantity and the second overwrites the first, losing a
+// movement the ledger still claims happened.
+//
+// It is scoped through part so a caller cannot move another tenant's stock by
+// naming its part_inventory id.
+func (q *Queries) LockPartInventory(ctx context.Context, arg LockPartInventoryParams) (PartInventory, error) {
+	row := q.db.QueryRow(ctx, lockPartInventory, arg.ID, arg.CompanyID)
+	var i PartInventory
 	err := row.Scan(
 		&i.ID,
-		&i.CompanyID,
 		&i.PartID,
-		&i.PartLocationDetailID,
-		&i.UserID,
-		&i.PreviousQuantity,
-		&i.AdjustmentQuantity,
-		&i.CurrentQuantity,
-		&i.UnitCost,
-		&i.ReasonID,
-		&i.WorkOrderID,
-		&i.PurchaseOrderLineID,
-		&i.VendorID,
-		&i.AdjustmentType,
-		&i.TransferPartLocationID,
-		&i.Notes,
+		&i.LocationID,
+		&i.AvailableQuantity,
+		&i.ExpiryDate,
+		&i.Aisle,
+		&i.Row,
+		&i.Bin,
+		&i.ReorderPoint,
+		&i.ReorderPointEnabled,
+		&i.ReorderQuantity,
+		&i.ReorderPointLeadTimeDays,
+		&i.Active,
+		&i.TrackInventory,
+		&i.AverageUnitCost,
+		&i.AvailableQuantityUpdatedAt,
 		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }

@@ -385,6 +385,7 @@ type InventoryJournalEntry struct {
 	TransferPartLocationID *int64
 	Notes                  string
 	CreatedAt              time.Time
+	ReversalOfID           *int64
 }
 
 type Issue struct {

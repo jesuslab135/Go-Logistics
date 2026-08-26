@@ -6056,6 +6056,7 @@
                         "BearerAuth": []
                     }
                 ],
+                "description": "Files a stock movement and applies it: part_inventory.available_quantity moves by adjustment_quantity in the same transaction. adjustment_quantity is signed — negative consumes, positive receives. previous_quantity and current_quantity are server-derived and returned, not sent; user_id is stamped from the caller.",
                 "consumes": [
                     "application/json"
                 ],
@@ -6086,6 +6087,12 @@
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -6130,46 +6137,55 @@
                         }
                     }
                 }
-            },
-            "put": {
+            }
+        },
+        "/api/v1/inventory-journal-entries/{id}/reverse": {
+            "post": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "consumes": [
-                    "application/json"
-                ],
+                "description": "Files an offsetting entry and moves the stock back, in one transaction. The original is left untouched — the correction is itself a movement, and both rows stay visible. An entry can be reversed once: a second attempt is 409, because repeated reversals would drive the stock arbitrarily far from what the ledger sums to. A reversal cannot itself be reversed; reverse the original instead.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "inventory-journal-entries"
                 ],
-                "summary": "Update inventory-journal-entries",
+                "summary": "Reverse an inventory journal entry",
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "id",
+                        "description": "Entry id",
                         "name": "id",
                         "in": "path",
                         "required": true
-                    },
-                    {
-                        "description": "body",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dto.UpdateInventoryJournalEntryRequest"
-                        }
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "OK",
+                    "201": {
+                        "description": "Created",
                         "schema": {
                             "$ref": "#/definitions/dto.InventoryJournalEntryResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "404": {
@@ -6177,34 +6193,9 @@
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "tags": [
-                    "inventory-journal-entries"
-                ],
-                "summary": "Delete inventory-journal-entries",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "id",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
                     },
-                    "401": {
-                        "description": "Unauthorized",
+                    "409": {
+                        "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -17084,14 +17075,12 @@
             "type": "object",
             "properties": {
                 "adjustment_quantity": {
+                    "description": "AdjustmentQuantity is signed: negative consumes stock, positive receives it.",
                     "type": "number"
                 },
                 "adjustment_type": {
                     "type": "string",
                     "maxLength": 20
-                },
-                "current_quantity": {
-                    "type": "number"
                 },
                 "notes": {
                     "type": "string"
@@ -17101,9 +17090,6 @@
                 },
                 "part_location_detail_id": {
                     "type": "integer"
-                },
-                "previous_quantity": {
-                    "type": "number"
                 },
                 "purchase_order_line_id": {
                     "type": "integer"
@@ -17116,9 +17102,6 @@
                 },
                 "unit_cost": {
                     "type": "number"
-                },
-                "user_id": {
-                    "type": "integer"
                 },
                 "vendor_id": {
                     "type": "integer"
@@ -19489,6 +19472,10 @@
                     "type": "integer"
                 },
                 "reason_id": {
+                    "type": "integer"
+                },
+                "reversal_of_id": {
+                    "description": "ReversalOfID names the entry this one offsets, and is null for an ordinary\nmovement. An entry that has been reversed keeps its own values: the\ncorrection is a second movement, not an edit of the first.",
                     "type": "integer"
                 },
                 "transfer_part_location_id": {
@@ -22588,54 +22575,6 @@
                 "name": {
                     "type": "string",
                     "maxLength": 100
-                }
-            }
-        },
-        "dto.UpdateInventoryJournalEntryRequest": {
-            "type": "object",
-            "properties": {
-                "adjustment_quantity": {
-                    "type": "number"
-                },
-                "adjustment_type": {
-                    "type": "string",
-                    "maxLength": 20
-                },
-                "current_quantity": {
-                    "type": "number"
-                },
-                "notes": {
-                    "type": "string"
-                },
-                "part_id": {
-                    "type": "integer"
-                },
-                "part_location_detail_id": {
-                    "type": "integer"
-                },
-                "previous_quantity": {
-                    "type": "number"
-                },
-                "purchase_order_line_id": {
-                    "type": "integer"
-                },
-                "reason_id": {
-                    "type": "integer"
-                },
-                "transfer_part_location_id": {
-                    "type": "integer"
-                },
-                "unit_cost": {
-                    "type": "number"
-                },
-                "user_id": {
-                    "type": "integer"
-                },
-                "vendor_id": {
-                    "type": "integer"
-                },
-                "work_order_id": {
-                    "type": "integer"
                 }
             }
         },

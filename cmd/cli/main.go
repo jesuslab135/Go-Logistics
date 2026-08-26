@@ -32,6 +32,8 @@ func main() {
 		err = bootstrapCompany(os.Args[2:])
 	case "platform-admin":
 		err = platformAdmin(os.Args[2:])
+	case "inventory-drift":
+		err = inventoryDrift(os.Args[2:])
 	default:
 		usage()
 		os.Exit(2)
@@ -156,6 +158,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "  fleet-cli setpass   --email <email> --password <password>")
 	fmt.Fprintln(os.Stderr, "  fleet-cli bootstrap --email <email> [--company-id <id>]")
 	fmt.Fprintln(os.Stderr, "  fleet-cli platform-admin --email <email> [--revoke] | --list")
+	fmt.Fprintln(os.Stderr, "  fleet-cli inventory-drift")
 }
 
 // platformAdmin grants or revokes the flag that opens /api/v1/admin/*. It is a
@@ -222,5 +225,49 @@ func platformAdmin(args []string) error {
 		verb = "revoked from"
 	}
 	fmt.Printf("platform administrator %s employee %d (%s)\n", verb, updated.ID, updated.Email)
+	return nil
+}
+
+// inventoryDrift reports parts whose stock row disagrees with the sum of their
+// ledger entries. Before migration 000012 the journal recorded movements that
+// nothing applied, so the two diverged silently by an unknown amount.
+//
+// It reports rather than reconciles, deliberately. Rewriting either side to
+// match the other would destroy the only evidence of what actually happened,
+// and which side is right is a question about the business, not the data:
+// somebody has to count the shelf.
+func inventoryDrift(args []string) error {
+	fs := flag.NewFlagSet("inventory-drift", flag.ExitOnError)
+	_ = fs.Parse(args)
+
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+
+	ctx := context.Background()
+	pool, err := db.NewPool(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	rows, err := gen.New(pool).InventoryDrift(ctx)
+	if err != nil {
+		return err
+	}
+	if len(rows) == 0 {
+		fmt.Println("no drift: every stock row matches the sum of its ledger entries")
+		return nil
+	}
+
+	fmt.Printf("%-10s %-10s %-14s %14s %14s %14s\n", "COMPANY", "PART", "STOCK ROW", "AVAILABLE", "LEDGER SUM", "DIFFERENCE")
+	for _, r := range rows {
+		fmt.Printf("%-10d %-10d %-14d %14s %14s %14s\n",
+			r.CompanyID, r.PartID, r.PartInventoryID,
+			r.AvailableQuantity.String(), r.LedgerSum.String(),
+			r.AvailableQuantity.Sub(r.LedgerSum).String())
+	}
+	fmt.Printf("\n%d stock rows disagree with their ledger. Nothing was changed.\n", len(rows))
 	return nil
 }

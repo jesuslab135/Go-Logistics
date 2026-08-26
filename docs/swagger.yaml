@@ -1159,20 +1159,18 @@ definitions:
   dto.CreateInventoryJournalEntryRequest:
     properties:
       adjustment_quantity:
+        description: 'AdjustmentQuantity is signed: negative consumes stock, positive
+          receives it.'
         type: number
       adjustment_type:
         maxLength: 20
         type: string
-      current_quantity:
-        type: number
       notes:
         type: string
       part_id:
         type: integer
       part_location_detail_id:
         type: integer
-      previous_quantity:
-        type: number
       purchase_order_line_id:
         type: integer
       reason_id:
@@ -1181,8 +1179,6 @@ definitions:
         type: integer
       unit_cost:
         type: number
-      user_id:
-        type: integer
       vendor_id:
         type: integer
       work_order_id:
@@ -2800,6 +2796,12 @@ definitions:
       purchase_order_line_id:
         type: integer
       reason_id:
+        type: integer
+      reversal_of_id:
+        description: |-
+          ReversalOfID names the entry this one offsets, and is null for an ordinary
+          movement. An entry that has been reversed keeps its own values: the
+          correction is a second movement, not an edit of the first.
         type: integer
       transfer_part_location_id:
         type: integer
@@ -4911,38 +4913,6 @@ definitions:
       name:
         maxLength: 100
         type: string
-    type: object
-  dto.UpdateInventoryJournalEntryRequest:
-    properties:
-      adjustment_quantity:
-        type: number
-      adjustment_type:
-        maxLength: 20
-        type: string
-      current_quantity:
-        type: number
-      notes:
-        type: string
-      part_id:
-        type: integer
-      part_location_detail_id:
-        type: integer
-      previous_quantity:
-        type: number
-      purchase_order_line_id:
-        type: integer
-      reason_id:
-        type: integer
-      transfer_part_location_id:
-        type: integer
-      unit_cost:
-        type: number
-      user_id:
-        type: integer
-      vendor_id:
-        type: integer
-      work_order_id:
-        type: integer
     type: object
   dto.UpdateIssuePriorityRequest:
     properties:
@@ -10839,6 +10809,10 @@ paths:
     post:
       consumes:
       - application/json
+      description: 'Files a stock movement and applies it: part_inventory.available_quantity
+        moves by adjustment_quantity in the same transaction. adjustment_quantity
+        is signed — negative consumes, positive receives. previous_quantity and current_quantity
+        are server-derived and returned, not sent; user_id is stamped from the caller.'
       parameters:
       - description: body
         in: body
@@ -10857,31 +10831,16 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Create inventory-journal-entries
       tags:
       - inventory-journal-entries
   /api/v1/inventory-journal-entries/{id}:
-    delete:
-      parameters:
-      - description: id
-        in: path
-        name: id
-        required: true
-        type: integer
-      responses:
-        "204":
-          description: No Content
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/dto.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Delete inventory-journal-entries
-      tags:
-      - inventory-journal-entries
     get:
       parameters:
       - description: id
@@ -10905,35 +10864,50 @@ paths:
       summary: Get inventory-journal-entries
       tags:
       - inventory-journal-entries
-    put:
-      consumes:
-      - application/json
+  /api/v1/inventory-journal-entries/{id}/reverse:
+    post:
+      description: 'Files an offsetting entry and moves the stock back, in one transaction.
+        The original is left untouched — the correction is itself a movement, and
+        both rows stay visible. An entry can be reversed once: a second attempt is
+        409, because repeated reversals would drive the stock arbitrarily far from
+        what the ledger sums to. A reversal cannot itself be reversed; reverse the
+        original instead.'
       parameters:
-      - description: id
+      - description: Entry id
         in: path
         name: id
         required: true
         type: integer
-      - description: body
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/dto.UpdateInventoryJournalEntryRequest'
       produces:
       - application/json
       responses:
-        "200":
-          description: OK
+        "201":
+          description: Created
           schema:
             $ref: '#/definitions/dto.InventoryJournalEntryResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
         "404":
           description: Not Found
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Update inventory-journal-entries
+      summary: Reverse an inventory journal entry
       tags:
       - inventory-journal-entries
   /api/v1/issue-priorities:

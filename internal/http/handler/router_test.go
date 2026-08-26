@@ -190,3 +190,26 @@ func TestStatusLogReadsSurvive(t *testing.T) {
 		}
 	}
 }
+
+// The ledger's retired verbs must stay routed for the same reason the status
+// log's do: a 404 reads as a wrong path, a 405 tells the client to reverse.
+func TestInventoryJournalRoutes(t *testing.T) {
+	routes := make(map[string]bool)
+	for _, r := range newTestRouter(t).Routes() {
+		routes[r.Method+" "+r.Path] = true
+	}
+
+	for _, want := range []string{
+		"GET /api/v1/inventory-journal-entries",
+		"POST /api/v1/inventory-journal-entries",
+		"GET /api/v1/inventory-journal-entries/:id",
+		"POST /api/v1/inventory-journal-entries/:id/reverse",
+		// Retired, but routed: they answer 405 route_retired.
+		"PUT /api/v1/inventory-journal-entries/:id",
+		"DELETE /api/v1/inventory-journal-entries/:id",
+	} {
+		if !routes[want] {
+			t.Errorf("missing route %q", want)
+		}
+	}
+}
