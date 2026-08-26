@@ -7174,8 +7174,15 @@ paths:
     get:
       description: 'Cross-company employee register. Unlike GET /api/v1/employees
         this is not scoped to the caller''s company: it answers "who exists anywhere",
-        which is what assigning an employee to a second company needs.'
+        which is what assigning an employee to a second company needs. Pass company_id
+        to narrow it to one tenant''s staff — that is membership (employee_companies),
+        not default_company_id, so an employee who belongs to a company that is not
+        their default is still listed.'
       parameters:
+      - description: Only employees who belong to this company
+        in: query
+        name: company_id
+        type: integer
       - description: Page size
         in: query
         name: limit

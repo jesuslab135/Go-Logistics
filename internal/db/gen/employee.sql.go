@@ -29,11 +29,18 @@ func (q *Queries) AddEmployeeCompany(ctx context.Context, arg AddEmployeeCompany
 }
 
 const countAllEmployees = `-- name: CountAllEmployees :one
-SELECT count(*) FROM employee
+SELECT count(*) FROM employee e
+WHERE (
+    $1::bigint IS NULL
+    OR EXISTS (
+        SELECT 1 FROM employee_companies ec
+        WHERE ec.employee_id = e.id AND ec.company_id = $1
+    )
+)
 `
 
-func (q *Queries) CountAllEmployees(ctx context.Context) (int64, error) {
-	row := q.db.QueryRow(ctx, countAllEmployees)
+func (q *Queries) CountAllEmployees(ctx context.Context, companyID *int64) (int64, error) {
+	row := q.db.QueryRow(ctx, countAllEmployees, companyID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -386,19 +393,34 @@ func (q *Queries) GetEmployeeIdentity(ctx context.Context, arg GetEmployeeIdenti
 }
 
 const listAllEmployees = `-- name: ListAllEmployees :many
-SELECT id, user_id, default_company_id, first_name, last_name, employee_id, role_id, is_active, email, mobile_phone, work_phone, job_title, start_date, leave_date, birth_date, hourly_labor_rate, is_technician, is_vehicle_operator, is_account_owner, license_class, license_number, license_state, license_expiry, street_address, city, region, postal_code, country, group_id, custom_fields, table_preferences, dashboard_preferences, updated_at, password_hash, is_platform_admin FROM employee ORDER BY id LIMIT $2 OFFSET $1
+SELECT e.id, e.user_id, e.default_company_id, e.first_name, e.last_name, e.employee_id, e.role_id, e.is_active, e.email, e.mobile_phone, e.work_phone, e.job_title, e.start_date, e.leave_date, e.birth_date, e.hourly_labor_rate, e.is_technician, e.is_vehicle_operator, e.is_account_owner, e.license_class, e.license_number, e.license_state, e.license_expiry, e.street_address, e.city, e.region, e.postal_code, e.country, e.group_id, e.custom_fields, e.table_preferences, e.dashboard_preferences, e.updated_at, e.password_hash, e.is_platform_admin FROM employee e
+WHERE (
+    $1::bigint IS NULL
+    OR EXISTS (
+        SELECT 1 FROM employee_companies ec
+        WHERE ec.employee_id = e.id AND ec.company_id = $1
+    )
+)
+ORDER BY e.id LIMIT $3 OFFSET $2
 `
 
 type ListAllEmployeesParams struct {
-	Off int32
-	Lim int32
+	CompanyID *int64
+	Off       int32
+	Lim       int32
 }
 
 // Cross-company employee list for the admin namespace. Unlike ListEmployees
 // this is deliberately unscoped: it exists to answer "who exists anywhere",
 // which the company-scoped route cannot.
+//
+// company_id narrows it to one tenant's staff, through employee_companies -
+// membership, not default_company_id. "Belongs to company X" is what a
+// membership row says; default_company_id only says where a session lands, and
+// an employee can belong to a company that is not their default. A null
+// argument means no filter, so one query serves both questions.
 func (q *Queries) ListAllEmployees(ctx context.Context, arg ListAllEmployeesParams) ([]Employee, error) {
-	rows, err := q.db.Query(ctx, listAllEmployees, arg.Off, arg.Lim)
+	rows, err := q.db.Query(ctx, listAllEmployees, arg.CompanyID, arg.Off, arg.Lim)
 	if err != nil {
 		return nil, err
 	}

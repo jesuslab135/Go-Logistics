@@ -95,10 +95,11 @@ func membershipDelta(before, after []int64) []membershipChange {
 // List godoc
 //
 //	@Summary		List employees across every company
-//	@Description	Cross-company employee register. Unlike GET /api/v1/employees this is not scoped to the caller's company: it answers "who exists anywhere", which is what assigning an employee to a second company needs.
+//	@Description	Cross-company employee register. Unlike GET /api/v1/employees this is not scoped to the caller's company: it answers "who exists anywhere", which is what assigning an employee to a second company needs. Pass company_id to narrow it to one tenant's staff — that is membership (employee_companies), not default_company_id, so an employee who belongs to a company that is not their default is still listed.
 //	@Tags			admin
 //	@Produce		json
 //	@Security		BearerAuth
+//	@Param		company_id	query		int	false	"Only employees who belong to this company"
 //	@Param		limit		query		int	false	"Page size"
 //	@Param		offset		query		int	false	"Offset"
 //	@Success		200			{object}	dto.EmployeePage
@@ -110,12 +111,27 @@ func (h *AdminEmployeeHandler) List(c *gin.Context) {
 	ctx := c.Request.Context()
 	p := paginate.Parse(c)
 
-	rows, err := h.q.ListAllEmployees(ctx, gen.ListAllEmployeesParams{Lim: int32(p.Limit), Off: int32(p.Offset)})
+	// A filter on the existing route rather than a second
+	// GET /admin/companies/{id}/employees: that would return the same DTO from a
+	// second path, and this one already carries the pagination and the gate.
+	companyID, err := queryInt64(c, "company_id")
 	if err != nil {
 		apierr.Abort(c, err)
 		return
 	}
-	total, err := h.q.CountAllEmployees(ctx)
+
+	rows, err := h.q.ListAllEmployees(ctx, gen.ListAllEmployeesParams{
+		CompanyID: companyID,
+		Lim:       int32(p.Limit),
+		Off:       int32(p.Offset),
+	})
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	// The count takes the same filter, or the page envelope would report a total
+	// from a different question than the rows answer.
+	total, err := h.q.CountAllEmployees(ctx, companyID)
 	if err != nil {
 		apierr.Abort(c, err)
 		return

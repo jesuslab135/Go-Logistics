@@ -302,7 +302,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Cross-company employee register. Unlike GET /api/v1/employees this is not scoped to the caller's company: it answers \"who exists anywhere\", which is what assigning an employee to a second company needs.",
+                "description": "Cross-company employee register. Unlike GET /api/v1/employees this is not scoped to the caller's company: it answers \"who exists anywhere\", which is what assigning an employee to a second company needs. Pass company_id to narrow it to one tenant's staff — that is membership (employee_companies), not default_company_id, so an employee who belongs to a company that is not their default is still listed.",
                 "produces": [
                     "application/json"
                 ],
@@ -311,6 +311,12 @@ const docTemplate = `{
                 ],
                 "summary": "List employees across every company",
                 "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Only employees who belong to this company",
+                        "name": "company_id",
+                        "in": "query"
+                    },
                     {
                         "type": "integer",
                         "description": "Page size",
