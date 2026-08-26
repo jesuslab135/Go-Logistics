@@ -79,6 +79,8 @@ func NewRouter(d Deps) *gin.Engine {
 	// module the resource belonged to in Django (its viewset's module_name).
 	// Groups below are named for that module.
 	member := api.Group("", middleware.RequireCompanyMember())
+	// Archived rows are hidden from every list unless the caller opts in.
+	member.Use(WithIncludeArchived())
 
 	registerCompanyRoutes(api, member, d)
 	registerAdminRoutes(member, d)
@@ -99,6 +101,10 @@ func NewRouter(d Deps) *gin.Engine {
 	purchaseOrders := member.Group("", middleware.RequireModule("purchase_orders"))
 	// Django gated roles on IsAdminRole rather than on a module entry.
 	roles := member.Group("", middleware.RequireAdminRole())
+
+	// Archive/restore for the five catalogs that carry archived_at. A referenced
+	// record cannot be deleted; archiving is what retires it instead.
+	registerArchiveRoutes(assets, parts, vendors, service, inspections, d.Queries)
 
 	// Collections whose filters vary per request take their List verb from
 	// here instead of from the generic CRUD handler.

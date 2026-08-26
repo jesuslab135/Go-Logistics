@@ -11,11 +11,18 @@ import (
 )
 
 const countInspectionForms = `-- name: CountInspectionForms :one
-SELECT count(*) FROM inspection_form WHERE company_id = $1
+SELECT count(*) FROM inspection_form
+WHERE company_id = $1
+  AND ($2::boolean OR archived_at IS NULL)
 `
 
-func (q *Queries) CountInspectionForms(ctx context.Context, companyID int64) (int64, error) {
-	row := q.db.QueryRow(ctx, countInspectionForms, companyID)
+type CountInspectionFormsParams struct {
+	CompanyID       int64
+	IncludeArchived bool
+}
+
+func (q *Queries) CountInspectionForms(ctx context.Context, arg CountInspectionFormsParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countInspectionForms, arg.CompanyID, arg.IncludeArchived)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -23,9 +30,9 @@ func (q *Queries) CountInspectionForms(ctx context.Context, companyID int64) (in
 
 const createInspectionForm = `-- name: CreateInspectionForm :one
 INSERT INTO inspection_form (
-    company_id, title, description, version, require_live_photo, auto_create_issues, color, archived_at, created_at, updated_at
+    company_id, title, description, version, require_live_photo, auto_create_issues, color, created_at, updated_at
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+    $1, $2, $3, $4, $5, $6, $7, $8, $9
 )
 RETURNING id, company_id, title, description, version, require_live_photo, auto_create_issues, color, archived_at, created_at, updated_at
 `
@@ -38,7 +45,6 @@ type CreateInspectionFormParams struct {
 	RequireLivePhoto bool
 	AutoCreateIssues bool
 	Color            string
-	ArchivedAt       *time.Time
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
 }
@@ -52,7 +58,6 @@ func (q *Queries) CreateInspectionForm(ctx context.Context, arg CreateInspection
 		arg.RequireLivePhoto,
 		arg.AutoCreateIssues,
 		arg.Color,
-		arg.ArchivedAt,
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)
@@ -116,17 +121,29 @@ func (q *Queries) GetInspectionForm(ctx context.Context, arg GetInspectionFormPa
 }
 
 const listInspectionForms = `-- name: ListInspectionForms :many
-SELECT id, company_id, title, description, version, require_live_photo, auto_create_issues, color, archived_at, created_at, updated_at FROM inspection_form WHERE company_id = $1 ORDER BY title, id LIMIT $2 OFFSET $3
+SELECT id, company_id, title, description, version, require_live_photo, auto_create_issues, color, archived_at, created_at, updated_at FROM inspection_form
+WHERE company_id = $1
+  AND ($2::boolean OR archived_at IS NULL)
+ORDER BY title, id LIMIT $4 OFFSET $3
 `
 
 type ListInspectionFormsParams struct {
-	CompanyID int64
-	Limit     int32
-	Offset    int32
+	CompanyID       int64
+	IncludeArchived bool
+	Off             int32
+	Lim             int32
 }
 
+// Archived rows are excluded unless include_archived is true. An archived
+// record is one somebody retired; showing it in the default list, and in the
+// pickers built from that list, is how it gets referenced again.
 func (q *Queries) ListInspectionForms(ctx context.Context, arg ListInspectionFormsParams) ([]InspectionForm, error) {
-	rows, err := q.db.Query(ctx, listInspectionForms, arg.CompanyID, arg.Limit, arg.Offset)
+	rows, err := q.db.Query(ctx, listInspectionForms,
+		arg.CompanyID,
+		arg.IncludeArchived,
+		arg.Off,
+		arg.Lim,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +175,7 @@ func (q *Queries) ListInspectionForms(ctx context.Context, arg ListInspectionFor
 }
 
 const updateInspectionForm = `-- name: UpdateInspectionForm :one
-UPDATE inspection_form SET title = $3, description = $4, version = $5, require_live_photo = $6, auto_create_issues = $7, color = $8, archived_at = $9, updated_at = $10
+UPDATE inspection_form SET title = $3, description = $4, version = $5, require_live_photo = $6, auto_create_issues = $7, color = $8, updated_at = $9
 WHERE id = $1 AND company_id = $2
 RETURNING id, company_id, title, description, version, require_live_photo, auto_create_issues, color, archived_at, created_at, updated_at
 `
@@ -172,7 +189,6 @@ type UpdateInspectionFormParams struct {
 	RequireLivePhoto bool
 	AutoCreateIssues bool
 	Color            string
-	ArchivedAt       *time.Time
 	UpdatedAt        time.Time
 }
 
@@ -186,7 +202,6 @@ func (q *Queries) UpdateInspectionForm(ctx context.Context, arg UpdateInspection
 		arg.RequireLivePhoto,
 		arg.AutoCreateIssues,
 		arg.Color,
-		arg.ArchivedAt,
 		arg.UpdatedAt,
 	)
 	var i InspectionForm

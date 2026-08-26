@@ -16,11 +16,11 @@ func NewInspectionFormStore(q *gen.Queries) *InspectionFormStore { return &Inspe
 
 func (s *InspectionFormStore) List(ctx context.Context, p paginate.Params) ([]dto.InspectionFormResponse, int64, error) {
 	company := middleware.CompanyFromContext(ctx)
-	rows, err := s.q.ListInspectionForms(ctx, gen.ListInspectionFormsParams{CompanyID: company, Limit: int32(p.Limit), Offset: int32(p.Offset)})
+	rows, err := s.q.ListInspectionForms(ctx, gen.ListInspectionFormsParams{CompanyID: company, IncludeArchived: includeArchived(ctx), Lim: int32(p.Limit), Off: int32(p.Offset)})
 	if err != nil {
 		return nil, 0, err
 	}
-	total, err := s.q.CountInspectionForms(ctx, company)
+	total, err := s.q.CountInspectionForms(ctx, gen.CountInspectionFormsParams{CompanyID: company, IncludeArchived: includeArchived(ctx)})
 	if err != nil {
 		return nil, 0, err
 	}
@@ -49,7 +49,6 @@ func (s *InspectionFormStore) Create(ctx context.Context, in dto.CreateInspectio
 		RequireLivePhoto: in.RequireLivePhoto,
 		AutoCreateIssues: boolOrDefault(in.AutoCreateIssues, true),
 		Color:            orDefault(in.Color, "#3B82F6"),
-		ArchivedAt:       in.ArchivedAt,
 		CreatedAt:        now,
 		UpdatedAt:        now,
 	})
@@ -70,7 +69,6 @@ func (s *InspectionFormStore) Update(ctx context.Context, id int64, in dto.Updat
 		RequireLivePhoto: in.RequireLivePhoto,
 		AutoCreateIssues: in.AutoCreateIssues,
 		Color:            in.Color,
-		ArchivedAt:       in.ArchivedAt,
 		UpdatedAt:        now,
 	})
 	if err != nil {
@@ -80,6 +78,9 @@ func (s *InspectionFormStore) Update(ctx context.Context, id int64, in dto.Updat
 }
 
 func (s *InspectionFormStore) Delete(ctx context.Context, id int64) error {
+	if err := guardDelete(ctx, "inspection form", id, s.q.InspectionFormReferences); err != nil {
+		return err
+	}
 	return s.q.DeleteInspectionForm(ctx, gen.DeleteInspectionFormParams{ID: id, CompanyID: middleware.CompanyFromContext(ctx)})
 }
 

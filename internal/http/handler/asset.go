@@ -24,11 +24,11 @@ func NewAssetStore(q *gen.Queries, files storage.Storage, log *slog.Logger) *Ass
 
 func (s *AssetStore) List(ctx context.Context, p paginate.Params) ([]dto.AssetResponse, int64, error) {
 	company := middleware.CompanyFromContext(ctx)
-	rows, err := s.q.ListAssets(ctx, gen.ListAssetsParams{CompanyID: company, Limit: int32(p.Limit), Offset: int32(p.Offset)})
+	rows, err := s.q.ListAssets(ctx, gen.ListAssetsParams{CompanyID: company, IncludeArchived: includeArchived(ctx), Lim: int32(p.Limit), Off: int32(p.Offset)})
 	if err != nil {
 		return nil, 0, err
 	}
-	total, err := s.q.CountAssets(ctx, company)
+	total, err := s.q.CountAssets(ctx, gen.CountAssetsParams{CompanyID: company, IncludeArchived: includeArchived(ctx)})
 	if err != nil {
 		return nil, 0, err
 	}
@@ -127,7 +127,6 @@ func (s *AssetStore) Create(ctx context.Context, in dto.CreateAssetRequest) (dto
 		ResidualValue:               in.ResidualValue,
 		MileageCap:                  in.MileageCap,
 		Notes:                       in.Notes,
-		ArchivedAt:                  in.ArchivedAt,
 		ExternalID:                  in.ExternalID,
 		CustomFields:                jsonbOrDefault(in.CustomFields, "{}"),
 		FuelVolumeUnits:             orDefault(in.FuelVolumeUnits, "liters"),
@@ -214,7 +213,6 @@ func (s *AssetStore) Update(ctx context.Context, id int64, in dto.UpdateAssetReq
 		ResidualValue:               in.ResidualValue,
 		MileageCap:                  in.MileageCap,
 		Notes:                       in.Notes,
-		ArchivedAt:                  in.ArchivedAt,
 		ExternalID:                  in.ExternalID,
 		CustomFields:                jsonbOrDefault(in.CustomFields, "{}"),
 		FuelVolumeUnits:             in.FuelVolumeUnits,
@@ -234,6 +232,9 @@ func (s *AssetStore) Update(ctx context.Context, id int64, in dto.UpdateAssetReq
 }
 
 func (s *AssetStore) Delete(ctx context.Context, id int64) error {
+	if err := guardDelete(ctx, "asset", id, s.q.AssetReferences); err != nil {
+		return err
+	}
 	company := middleware.CompanyFromContext(ctx)
 
 	previous, err := s.q.GetAsset(ctx, gen.GetAssetParams{ID: id, CompanyID: company})

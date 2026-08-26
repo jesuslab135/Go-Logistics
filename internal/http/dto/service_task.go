@@ -5,19 +5,23 @@ import (
 )
 
 type CreateServiceTaskRequest struct {
-	Name                    string     `json:"name" binding:"omitempty,max=255"`
-	Description             string     `json:"description"`
-	ExpectedDurationSeconds *int32     `json:"expected_duration_seconds"`
-	ParentTaskID            *int64     `json:"parent_task_id"`
-	ArchivedAt              *time.Time `json:"archived_at"`
+	// archived_at is not writable: archiving is an action
+	// (POST .../archive and .../restore), because a referenced record must be
+	// archived rather than deleted and that is a decision, not a field.
+	Name                    string `json:"name" binding:"omitempty,max=255"`
+	Description             string `json:"description"`
+	ExpectedDurationSeconds *int32 `json:"expected_duration_seconds"`
+	ParentTaskID            *int64 `json:"parent_task_id"`
 }
 
 type UpdateServiceTaskRequest struct {
-	Name                    string     `json:"name" binding:"omitempty,max=255"`
-	Description             string     `json:"description"`
-	ExpectedDurationSeconds *int32     `json:"expected_duration_seconds"`
-	ParentTaskID            *int64     `json:"parent_task_id"`
-	ArchivedAt              *time.Time `json:"archived_at"`
+	// archived_at is not writable: archiving is an action
+	// (POST .../archive and .../restore), because a referenced record must be
+	// archived rather than deleted and that is a decision, not a field.
+	Name                    string `json:"name" binding:"omitempty,max=255"`
+	Description             string `json:"description"`
+	ExpectedDurationSeconds *int32 `json:"expected_duration_seconds"`
+	ParentTaskID            *int64 `json:"parent_task_id"`
 }
 
 type ServiceTaskResponse struct {

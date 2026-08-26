@@ -17,11 +17,11 @@ func NewVendorStore(q *gen.Queries) *VendorStore { return &VendorStore{q: q} }
 
 func (s *VendorStore) List(ctx context.Context, p paginate.Params) ([]dto.VendorResponse, int64, error) {
 	company := middleware.CompanyFromContext(ctx)
-	rows, err := s.q.ListVendors(ctx, gen.ListVendorsParams{CompanyID: company, Limit: int32(p.Limit), Offset: int32(p.Offset)})
+	rows, err := s.q.ListVendors(ctx, gen.ListVendorsParams{CompanyID: company, IncludeArchived: includeArchived(ctx), Lim: int32(p.Limit), Off: int32(p.Offset)})
 	if err != nil {
 		return nil, 0, err
 	}
-	total, err := s.q.CountVendors(ctx, company)
+	total, err := s.q.CountVendors(ctx, gen.CountVendorsParams{CompanyID: company, IncludeArchived: includeArchived(ctx)})
 	if err != nil {
 		return nil, 0, err
 	}
@@ -64,7 +64,6 @@ func (s *VendorStore) Create(ctx context.Context, in dto.CreateVendorRequest) (d
 		IsServiceVendor:    in.IsServiceVendor,
 		IsPartsVendor:      in.IsPartsVendor,
 		Labels:             jsonbOrDefault(in.Labels, "[]"),
-		ArchivedAt:         in.ArchivedAt,
 		CustomFields:       jsonbOrDefault(in.CustomFields, "{}"),
 		CreatedAt:          now,
 		UpdatedAt:          now,
@@ -100,7 +99,6 @@ func (s *VendorStore) Update(ctx context.Context, id int64, in dto.UpdateVendorR
 		IsServiceVendor:    in.IsServiceVendor,
 		IsPartsVendor:      in.IsPartsVendor,
 		Labels:             jsonbOrDefault(in.Labels, "[]"),
-		ArchivedAt:         in.ArchivedAt,
 		CustomFields:       jsonbOrDefault(in.CustomFields, "{}"),
 		UpdatedAt:          now,
 	})
@@ -111,6 +109,9 @@ func (s *VendorStore) Update(ctx context.Context, id int64, in dto.UpdateVendorR
 }
 
 func (s *VendorStore) Delete(ctx context.Context, id int64) error {
+	if err := guardDelete(ctx, "vendor", id, s.q.VendorReferences); err != nil {
+		return err
+	}
 	return s.q.DeleteVendor(ctx, gen.DeleteVendorParams{ID: id, CompanyID: middleware.CompanyFromContext(ctx)})
 }
 

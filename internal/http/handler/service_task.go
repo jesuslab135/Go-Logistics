@@ -16,11 +16,11 @@ func NewServiceTaskStore(q *gen.Queries) *ServiceTaskStore { return &ServiceTask
 
 func (s *ServiceTaskStore) List(ctx context.Context, p paginate.Params) ([]dto.ServiceTaskResponse, int64, error) {
 	company := middleware.CompanyFromContext(ctx)
-	rows, err := s.q.ListServiceTasks(ctx, gen.ListServiceTasksParams{CompanyID: company, Limit: int32(p.Limit), Offset: int32(p.Offset)})
+	rows, err := s.q.ListServiceTasks(ctx, gen.ListServiceTasksParams{CompanyID: company, IncludeArchived: includeArchived(ctx), Lim: int32(p.Limit), Off: int32(p.Offset)})
 	if err != nil {
 		return nil, 0, err
 	}
-	total, err := s.q.CountServiceTasks(ctx, company)
+	total, err := s.q.CountServiceTasks(ctx, gen.CountServiceTasksParams{CompanyID: company, IncludeArchived: includeArchived(ctx)})
 	if err != nil {
 		return nil, 0, err
 	}
@@ -47,7 +47,6 @@ func (s *ServiceTaskStore) Create(ctx context.Context, in dto.CreateServiceTaskR
 		Description:             in.Description,
 		ExpectedDurationSeconds: in.ExpectedDurationSeconds,
 		ParentTaskID:            in.ParentTaskID,
-		ArchivedAt:              in.ArchivedAt,
 		CreatedAt:               now,
 		UpdatedAt:               now,
 	})
@@ -66,7 +65,6 @@ func (s *ServiceTaskStore) Update(ctx context.Context, id int64, in dto.UpdateSe
 		Description:             in.Description,
 		ExpectedDurationSeconds: in.ExpectedDurationSeconds,
 		ParentTaskID:            in.ParentTaskID,
-		ArchivedAt:              in.ArchivedAt,
 		UpdatedAt:               now,
 	})
 	if err != nil {
@@ -76,6 +74,9 @@ func (s *ServiceTaskStore) Update(ctx context.Context, id int64, in dto.UpdateSe
 }
 
 func (s *ServiceTaskStore) Delete(ctx context.Context, id int64) error {
+	if err := guardDelete(ctx, "service task", id, s.q.ServiceTaskReferences); err != nil {
+		return err
+	}
 	return s.q.DeleteServiceTask(ctx, gen.DeleteServiceTaskParams{ID: id, CompanyID: middleware.CompanyFromContext(ctx)})
 }
 

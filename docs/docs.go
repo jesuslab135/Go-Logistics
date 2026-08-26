@@ -16097,6 +16097,92 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/{resource}/{id}/archive": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retires the record. Use this instead of DELETE for anything other records reference — DELETE answers 409 resource_referenced in that case. Archived records disappear from lists and pickers unless ?include_archived=true. Archiving needs the same permission as editing: deciding a vendor is no longer used is the same kind of decision as correcting its address.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "archive"
+                ],
+                "summary": "Archive a record",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The archived record, in its own resource's shape"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/{resource}/{id}/restore": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Clears archived_at, returning the record to the lists and pickers it was hidden from.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "archive"
+                ],
+                "summary": "Restore an archived record",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The restored record, in its own resource's shape"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/auth/login": {
             "post": {
                 "consumes": [
@@ -17088,9 +17174,6 @@ const docTemplate = `{
                 "annual_percentage_rate": {
                     "type": "number"
                 },
-                "archived_at": {
-                    "type": "string"
-                },
                 "asset_type_id": {
                     "type": "integer"
                 },
@@ -17243,6 +17326,7 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "name": {
+                    "description": "archived_at is not writable: archiving is an action\n(POST .../archive and .../restore), because a referenced record must be\narchived rather than deleted and that is a decision, not a field.",
                     "type": "string",
                     "maxLength": 100
                 },
@@ -17871,9 +17955,6 @@ const docTemplate = `{
         "dto.CreateInspectionFormRequest": {
             "type": "object",
             "properties": {
-                "archived_at": {
-                    "type": "string"
-                },
                 "auto_create_issues": {
                     "type": "boolean"
                 },
@@ -17888,6 +17969,7 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "title": {
+                    "description": "archived_at is not writable: archiving is an action\n(POST .../archive and .../restore), because a referenced record must be\narchived rather than deleted and that is a decision, not a field.",
                     "type": "string",
                     "maxLength": 255
                 },
@@ -18357,9 +18439,6 @@ const docTemplate = `{
         "dto.CreatePartRequest": {
             "type": "object",
             "properties": {
-                "archived_at": {
-                    "type": "string"
-                },
                 "custom_fields": {
                     "type": "array",
                     "items": {
@@ -18386,6 +18465,7 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "part_number": {
+                    "description": "archived_at is not writable: archiving is an action\n(POST .../archive and .../restore), because a referenced record must be\narchived rather than deleted and that is a decision, not a field.",
                     "type": "string",
                     "maxLength": 100
                 },
@@ -18705,9 +18785,6 @@ const docTemplate = `{
         "dto.CreateServiceTaskRequest": {
             "type": "object",
             "properties": {
-                "archived_at": {
-                    "type": "string"
-                },
                 "description": {
                     "type": "string"
                 },
@@ -18715,6 +18792,7 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "name": {
+                    "description": "archived_at is not writable: archiving is an action\n(POST .../archive and .../restore), because a referenced record must be\narchived rather than deleted and that is a decision, not a field.",
                     "type": "string",
                     "maxLength": 255
                 },
@@ -18952,9 +19030,6 @@ const docTemplate = `{
         "dto.CreateVendorRequest": {
             "type": "object",
             "properties": {
-                "archived_at": {
-                    "type": "string"
-                },
                 "city": {
                     "type": "string",
                     "maxLength": 100
@@ -19010,6 +19085,7 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "name": {
+                    "description": "archived_at is not writable: archiving is an action\n(POST .../archive and .../restore), because a referenced record must be\narchived rather than deleted and that is a decision, not a field.",
                     "type": "string",
                     "maxLength": 200
                 },
@@ -22671,9 +22747,6 @@ const docTemplate = `{
                 "annual_percentage_rate": {
                     "type": "number"
                 },
-                "archived_at": {
-                    "type": "string"
-                },
                 "asset_type_id": {
                     "type": "integer"
                 },
@@ -22826,6 +22899,7 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "name": {
+                    "description": "archived_at is not writable: archiving is an action\n(POST .../archive and .../restore), because a referenced record must be\narchived rather than deleted and that is a decision, not a field.",
                     "type": "string",
                     "maxLength": 100
                 },
@@ -23438,9 +23512,6 @@ const docTemplate = `{
         "dto.UpdateInspectionFormRequest": {
             "type": "object",
             "properties": {
-                "archived_at": {
-                    "type": "string"
-                },
                 "auto_create_issues": {
                     "type": "boolean"
                 },
@@ -23455,6 +23526,7 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "title": {
+                    "description": "archived_at is not writable: archiving is an action\n(POST .../archive and .../restore), because a referenced record must be\narchived rather than deleted and that is a decision, not a field.",
                     "type": "string",
                     "maxLength": 255
                 },
@@ -23884,9 +23956,6 @@ const docTemplate = `{
         "dto.UpdatePartRequest": {
             "type": "object",
             "properties": {
-                "archived_at": {
-                    "type": "string"
-                },
                 "custom_fields": {
                     "type": "array",
                     "items": {
@@ -23913,6 +23982,7 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "part_number": {
+                    "description": "archived_at is not writable: archiving is an action\n(POST .../archive and .../restore), because a referenced record must be\narchived rather than deleted and that is a decision, not a field.",
                     "type": "string",
                     "maxLength": 100
                 },
@@ -24232,9 +24302,6 @@ const docTemplate = `{
         "dto.UpdateServiceTaskRequest": {
             "type": "object",
             "properties": {
-                "archived_at": {
-                    "type": "string"
-                },
                 "description": {
                     "type": "string"
                 },
@@ -24242,6 +24309,7 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "name": {
+                    "description": "archived_at is not writable: archiving is an action\n(POST .../archive and .../restore), because a referenced record must be\narchived rather than deleted and that is a decision, not a field.",
                     "type": "string",
                     "maxLength": 255
                 },
@@ -24490,9 +24558,6 @@ const docTemplate = `{
         "dto.UpdateVendorRequest": {
             "type": "object",
             "properties": {
-                "archived_at": {
-                    "type": "string"
-                },
                 "city": {
                     "type": "string",
                     "maxLength": 100
@@ -24548,6 +24613,7 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "name": {
+                    "description": "archived_at is not writable: archiving is an action\n(POST .../archive and .../restore), because a referenced record must be\narchived rather than deleted and that is a decision, not a field.",
                     "type": "string",
                     "maxLength": 200
                 },

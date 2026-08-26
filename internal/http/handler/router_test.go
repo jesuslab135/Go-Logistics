@@ -259,3 +259,28 @@ func TestTotalOverrideRoutes(t *testing.T) {
 		}
 	}
 }
+
+// A referenced record cannot be deleted, so every archivable resource needs the
+// pair of routes that retire it instead. A missing one leaves that catalog with
+// no way to retire anything.
+func TestArchiveRoutes(t *testing.T) {
+	routes := make(map[string]bool)
+	for _, r := range newTestRouter(t).Routes() {
+		routes[r.Method+" "+r.Path] = true
+	}
+
+	for _, resource := range []string{
+		"/api/v1/assets",
+		"/api/v1/parts",
+		"/api/v1/vendors",
+		"/api/v1/service-tasks",
+		"/api/v1/inspection-forms",
+	} {
+		for _, action := range []string{"/archive", "/restore"} {
+			want := "POST " + resource + "/:id" + action
+			if !routes[want] {
+				t.Errorf("missing route %q", want)
+			}
+		}
+	}
+}
