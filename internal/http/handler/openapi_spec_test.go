@@ -188,6 +188,35 @@ func TestMoneyResponsesExposeComputedAndOverrideFields(t *testing.T) {
 	}
 }
 
+// The facet endpoints are cheap grouped counts alongside each list; the spec
+// must expose them with a typed 200 so a generated client can call them.
+func TestFacetPathsExist(t *testing.T) {
+	paths, _ := loadSpec(t)["paths"].(map[string]any)
+	want := map[string]string{
+		"/api/v1/work-orders/facets": "dto.WorkOrderFacetsResponse",
+		"/api/v1/issues/facets":      "dto.IssueFacetsResponse",
+		"/api/v1/assets/facets":      "dto.AssetFacetsResponse",
+	}
+	for path, def := range want {
+		op, ok := paths[path].(map[string]any)
+		if !ok {
+			t.Errorf("missing path %s", path)
+			continue
+		}
+		get, _ := op["get"].(map[string]any)
+		if get == nil {
+			t.Errorf("%s has no GET operation", path)
+			continue
+		}
+		resp, _ := get["responses"].(map[string]any)
+		ok200, _ := resp["200"].(map[string]any)
+		schema, _ := ok200["schema"].(map[string]any)
+		if ref, _ := schema["$ref"].(string); ref != "#/definitions/"+def {
+			t.Errorf("%s GET 200 schema = %v, want ref to %s", path, schema, def)
+		}
+	}
+}
+
 func TestArchivableListsDocumentIncludeArchived(t *testing.T) {
 	paths, _ := loadSpec(t)["paths"].(map[string]any)
 	for _, res := range []string{"assets", "parts", "vendors", "service-tasks", "inspection-forms"} {

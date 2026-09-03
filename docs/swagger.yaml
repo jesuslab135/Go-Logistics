@@ -24,6 +24,21 @@ definitions:
         minimum: 0
         type: integer
     type: object
+  dto.AssetFacetsResponse:
+    properties:
+      status:
+        items:
+          $ref: '#/definitions/dto.FacetCount'
+        type: array
+      trailer_type:
+        items:
+          $ref: '#/definitions/dto.FacetCount'
+        type: array
+      vehicle_type:
+        items:
+          $ref: '#/definitions/dto.FacetCount'
+        type: array
+    type: object
   dto.AssetPage:
     properties:
       data:
@@ -2303,6 +2318,15 @@ definitions:
       error:
         $ref: '#/definitions/dto.ErrorBody'
     type: object
+  dto.FacetCount:
+    properties:
+      count:
+        type: integer
+      label:
+        type: string
+      value:
+        type: string
+    type: object
   dto.FaultPage:
     properties:
       data:
@@ -2863,6 +2887,13 @@ definitions:
         type: integer
       work_order_id:
         type: integer
+    type: object
+  dto.IssueFacetsResponse:
+    properties:
+      state:
+        items:
+          $ref: '#/definitions/dto.FacetCount'
+        type: array
     type: object
   dto.IssuePage:
     properties:
@@ -6850,6 +6881,13 @@ definitions:
       slot:
         type: integer
     type: object
+  dto.WorkOrderFacetsResponse:
+    properties:
+      status:
+        items:
+          $ref: '#/definitions/dto.FacetCount'
+        type: array
+    type: object
   dto.WorkOrderLineItemPage:
     properties:
       data:
@@ -8545,6 +8583,51 @@ paths:
       summary: Create or update vehicle
       tags:
       - vehicle
+  /api/v1/assets/facets:
+    get:
+      description: Applies the assets list's archived-visibility rule and filters,
+        each query omitting only the dimension it groups by.
+      parameters:
+      - description: Search name, VIN/serial and license plate
+        in: query
+        name: q
+        type: string
+      - description: Filter by vehicle type
+        in: query
+        name: vehicle_type
+        type: string
+      - description: Filter by status
+        in: query
+        name: status_id
+        type: integer
+      - description: Include archived records
+        in: query
+        name: include_archived
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.AssetFacetsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Asset counts by vehicle type, trailer type and status
+      tags:
+      - assets
   /api/v1/axle-definitions/{id}/wheel-positions:
     get:
       parameters:
@@ -11900,6 +11983,37 @@ paths:
       security:
       - BearerAuth: []
       summary: Remove a watcher from an issue
+      tags:
+      - issues
+  /api/v1/issues/facets:
+    get:
+      parameters:
+      - description: Filter by asset
+        in: query
+        name: asset_id
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.IssueFacetsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Issue counts by state
       tags:
       - issues
   /api/v1/locations:
@@ -17840,6 +17954,37 @@ paths:
       summary: Get work-order-status-logs
       tags:
       - work-order-status-logs
+  /api/v1/work-orders/facets:
+    get:
+      parameters:
+      - description: Filter by asset
+        in: query
+        name: asset_id
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.WorkOrderFacetsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Work order counts by status
+      tags:
+      - work-orders
   /auth/login:
     post:
       consumes:

@@ -1110,6 +1110,75 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/assets/facets": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Applies the assets list's archived-visibility rule and filters, each query omitting only the dimension it groups by.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "assets"
+                ],
+                "summary": "Asset counts by vehicle type, trailer type and status",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Search name, VIN/serial and license plate",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by vehicle type",
+                        "name": "vehicle_type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Filter by status",
+                        "name": "status_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Include archived records",
+                        "name": "include_archived",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.AssetFacetsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/assets/{id}": {
             "get": {
                 "security": [
@@ -7036,6 +7105,56 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/issues/facets": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "issues"
+                ],
+                "summary": "Issue counts by state",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Filter by asset",
+                        "name": "asset_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.IssueFacetsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -16031,6 +16150,56 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/work-orders/facets": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "work-orders"
+                ],
+                "summary": "Work order counts by status",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Filter by asset",
+                        "name": "asset_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.WorkOrderFacetsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/work-orders/{id}": {
             "get": {
                 "security": [
@@ -17103,6 +17272,29 @@ const docTemplate = `{
                 "tread_depth_at_install_32nds": {
                     "type": "integer",
                     "minimum": 0
+                }
+            }
+        },
+        "dto.AssetFacetsResponse": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.FacetCount"
+                    }
+                },
+                "trailer_type": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.FacetCount"
+                    }
+                },
+                "vehicle_type": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.FacetCount"
+                    }
                 }
             }
         },
@@ -20360,6 +20552,20 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.FacetCount": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "label": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "string"
+                }
+            }
+        },
         "dto.FaultPage": {
             "type": "object",
             "properties": {
@@ -21175,6 +21381,17 @@ const docTemplate = `{
                 },
                 "work_order_id": {
                     "type": "integer"
+                }
+            }
+        },
+        "dto.IssueFacetsResponse": {
+            "type": "object",
+            "properties": {
+                "state": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.FacetCount"
+                    }
                 }
             }
         },
@@ -26898,6 +27115,17 @@ const docTemplate = `{
                 },
                 "slot": {
                     "type": "integer"
+                }
+            }
+        },
+        "dto.WorkOrderFacetsResponse": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.FacetCount"
+                    }
                 }
             }
         },
