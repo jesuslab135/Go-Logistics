@@ -6484,7 +6484,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "The ledger grows forever, so it is filtered in SQL and always returned newest first.",
+                "description": "The ledger grows forever, so it is filtered in SQL and always returned newest first. A transfer entry is attributed to its source part_location_detail_id, so the location_id filter matches the source bin's location; a reversal entry carries the same part_location_detail_id as the entry it reverses, so both appear under the same location_id.",
                 "produces": [
                     "application/json"
                 ],
@@ -6497,6 +6497,24 @@ const docTemplate = `{
                         "type": "integer",
                         "description": "Filter by part",
                         "name": "part_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Exact movement type (e.g. manual, transfer, reversal)",
+                        "name": "adjustment_type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Filter by storage location (joins part_inventory)",
+                        "name": "location_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Filter by a specific part_inventory bin",
+                        "name": "part_location_detail_id",
                         "in": "query"
                     },
                     {

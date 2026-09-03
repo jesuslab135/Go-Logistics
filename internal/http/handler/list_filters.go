@@ -157,45 +157,74 @@ func (h *FilteredListHandler) Issues(c *gin.Context) {
 // InventoryJournalEntries godoc
 //
 //	@Summary		List inventory journal entries
-//	@Description	The ledger grows forever, so it is filtered in SQL and always returned newest first.
+//	@Description	The ledger grows forever, so it is filtered in SQL and always returned newest first. A transfer entry is attributed to its source part_location_detail_id, so the location_id filter matches the source bin's location; a reversal entry carries the same part_location_detail_id as the entry it reverses, so both appear under the same location_id.
 //	@Tags			inventory-journal-entries
 //	@Produce		json
 //	@Security		BearerAuth
-//	@Param			part_id			query		int		false	"Filter by part"
-//	@Param			created_from	query		string	false	"Inclusive lower bound (RFC3339 or YYYY-MM-DD)"
-//	@Param			created_to		query		string	false	"Inclusive upper bound (RFC3339 or YYYY-MM-DD)"
-//	@Param			limit			query		int		false	"Page size"
-//	@Param			offset			query		int		false	"Offset"
-//	@Success		200				{object}	dto.InventoryJournalEntryPage
-//	@Failure		400				{object}	dto.ErrorResponse
-//	@Failure		401				{object}	dto.ErrorResponse
-//	@Failure		403				{object}	dto.ErrorResponse
+//	@Param			part_id					query		int		false	"Filter by part"
+//	@Param			adjustment_type			query		string	false	"Exact movement type (e.g. manual, transfer, reversal)"
+//	@Param			location_id				query		int		false	"Filter by storage location (joins part_inventory)"
+//	@Param			part_location_detail_id	query		int		false	"Filter by a specific part_inventory bin"
+//	@Param			created_from			query		string	false	"Inclusive lower bound (RFC3339 or YYYY-MM-DD)"
+//	@Param			created_to				query		string	false	"Inclusive upper bound (RFC3339 or YYYY-MM-DD)"
+//	@Param			limit					query		int		false	"Page size"
+//	@Param			offset					query		int		false	"Offset"
+//	@Success		200						{object}	dto.InventoryJournalEntryPage
+//	@Failure		400						{object}	dto.ErrorResponse
+//	@Failure		401						{object}	dto.ErrorResponse
+//	@Failure		403						{object}	dto.ErrorResponse
 //	@Router			/api/v1/inventory-journal-entries [get]
 func (h *FilteredListHandler) InventoryJournalEntries(c *gin.Context) {
 	ctx := c.Request.Context()
 	p := paginate.Parse(c)
 
-	where := filter.NewWhere(1).Add("ije.company_id", filter.Eq, middleware.CompanyFromContext(ctx))
-	partID, err := queryInt64(c, "part_id")
+	spec, err := inventoryJournalListSpec(c, middleware.CompanyFromContext(ctx))
 	if err != nil {
 		apierr.Abort(c, err)
 		return
+	}
+	rows, total, err := runList(ctx, h.pool, *spec, p)
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	renderPage(c, rows, total, p, toInventoryJournalEntryResponse)
+}
+
+// inventoryJournalListSpec builds the filtered ledger query without touching the
+// database, so the filter set is unit-testable. location_id filters through the
+// entry's part_location_detail_id (which points at part_inventory.id); the join
+// cannot widen tenant scope because ije.company_id already bounds the rows.
+func inventoryJournalListSpec(c *gin.Context, company int64) (*listSpec[gen.InventoryJournalEntry], error) {
+	where := filter.NewWhere(1).Add("ije.company_id", filter.Eq, company)
+
+	partID, err := queryInt64(c, "part_id")
+	if err != nil {
+		return nil, err
 	}
 	if partID != nil {
 		where.Add("ije.part_id", filter.Eq, *partID)
 	}
+	if adjType := queryStr(c, "adjustment_type"); adjType != nil {
+		where.Add("ije.adjustment_type", filter.Eq, *adjType)
+	}
+	pld, err := queryInt64(c, "part_location_detail_id")
+	if err != nil {
+		return nil, err
+	}
+	if pld != nil {
+		where.Add("ije.part_location_detail_id", filter.Eq, *pld)
+	}
 	from, err := queryTime(c, "created_from")
 	if err != nil {
-		apierr.Abort(c, err)
-		return
+		return nil, err
 	}
 	if from != nil {
 		where.Add("ije.created_at", filter.Gte, *from)
 	}
 	to, err := queryTime(c, "created_to")
 	if err != nil {
-		apierr.Abort(c, err)
-		return
+		return nil, err
 	}
 	if to != nil {
 		where.Add("ije.created_at", filter.Lte, *to)
@@ -205,12 +234,15 @@ func (h *FilteredListHandler) InventoryJournalEntries(c *gin.Context) {
 		filter(where).
 		orderBy("ije.created_at DESC, ije.id DESC")
 
-	rows, total, err := runList(ctx, h.pool, spec, p)
+	locationID, err := queryInt64(c, "location_id")
 	if err != nil {
-		apierr.Abort(c, err)
-		return
+		return nil, err
 	}
-	renderPage(c, rows, total, p, toInventoryJournalEntryResponse)
+	if locationID != nil {
+		spec = spec.join("JOIN part_inventory pi ON pi.id = ije.part_location_detail_id")
+		where.Add("pi.location_id", filter.Eq, *locationID)
+	}
+	return &spec, nil
 }
 
 // assetListRow is an asset plus its 1:1 subtype columns. The embedded row must
