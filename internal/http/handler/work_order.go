@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"fleet/internal/db/gen"
+	"fleet/internal/domain/money"
 	"fleet/internal/http/dto"
 	"fleet/internal/http/middleware"
 	"fleet/internal/platform/paginate"
@@ -263,6 +264,15 @@ func (s *WorkOrderStore) Delete(ctx context.Context, id int64) error {
 }
 
 func toWorkOrderResponse(r gen.WorkOrder) dto.WorkOrderResponse {
+	t := money.Compute(money.Document{
+		PartsSubtotal: r.PartsSubtotal,
+		LaborSubtotal: r.LaborSubtotal,
+		PartsMarkup:   money.Rate{Type: r.PartsMarkupType, Fixed: r.PartsMarkup, Percentage: r.PartsMarkupPercentage},
+		LaborMarkup:   money.Rate{Type: r.LaborMarkupType, Fixed: r.LaborMarkup, Percentage: r.LaborMarkupPercentage},
+		Discount:      money.Rate{Type: r.DiscountType, Fixed: r.Discount, Percentage: r.DiscountPercentage},
+		Tax1:          money.Rate{Type: r.Tax1Type, Fixed: r.Tax1, Percentage: r.Tax1Percentage},
+		Tax2:          money.Rate{Type: r.Tax2Type, Fixed: r.Tax2, Percentage: r.Tax2Percentage},
+	})
 	return dto.WorkOrderResponse{
 		ID:                    r.ID,
 		LocationID:            r.LocationID,
@@ -295,13 +305,22 @@ func toWorkOrderResponse(r gen.WorkOrder) dto.WorkOrderResponse {
 		Subtotal:              r.Subtotal,
 		Discount:              r.Discount,
 		DiscountType:          r.DiscountType,
+		DiscountPercentage:    r.DiscountPercentage,
+		DiscountAmount:        t.DiscountAmount,
+		Net:                   t.Net,
 		Tax1:                  r.Tax1,
 		Tax1Type:              r.Tax1Type,
 		Tax1Percentage:        r.Tax1Percentage,
+		Tax1Amount:            t.Tax1Amount,
 		Tax2:                  r.Tax2,
 		Tax2Type:              r.Tax2Type,
 		Tax2Percentage:        r.Tax2Percentage,
+		Tax2Amount:            t.Tax2Amount,
 		TotalAmount:           r.TotalAmount,
+		TotalOverride:         r.TotalOverride,
+		TotalOverrideReason:   r.TotalOverrideReason,
+		TotalOverrideByID:     r.TotalOverrideByID,
+		TotalOverrideAt:       r.TotalOverrideAt,
 		InvoiceNumber:         r.InvoiceNumber,
 		PurchaseOrderNumber:   r.PurchaseOrderNumber,
 		CommentsCount:         r.CommentsCount,

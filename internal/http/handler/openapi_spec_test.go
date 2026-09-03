@@ -170,6 +170,24 @@ func TestArchiveContractIsConcreteAndTyped(t *testing.T) {
 	}
 }
 
+// The four computed amounts and four override fields are recomputed/mapped
+// on read (see money_response_test.go); this guards against a forgotten
+// swag regen leaving the generated spec stale.
+func TestMoneyResponsesExposeComputedAndOverrideFields(t *testing.T) {
+	want := []string{
+		"discount_amount", "tax_1_amount", "tax_2_amount", "net",
+		"total_override", "total_override_reason", "total_override_by_id", "total_override_at",
+	}
+	for _, def := range []string{"dto.PurchaseOrderResponse", "dto.WorkOrderResponse", "dto.ServiceEntryResponse"} {
+		props := definitionProps(t, def)
+		for _, name := range want {
+			if _, ok := props[name]; !ok {
+				t.Errorf("%s is missing property %q", def, name)
+			}
+		}
+	}
+}
+
 func TestArchivableListsDocumentIncludeArchived(t *testing.T) {
 	paths, _ := loadSpec(t)["paths"].(map[string]any)
 	for _, res := range []string{"assets", "parts", "vendors", "service-tasks", "inspection-forms"} {

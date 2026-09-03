@@ -22234,6 +22234,9 @@
                 "discount": {
                     "type": "number"
                 },
+                "discount_amount": {
+                    "type": "number"
+                },
                 "discount_percentage": {
                     "type": "number"
                 },
@@ -22249,6 +22252,9 @@
                     "items": {
                         "type": "integer"
                     }
+                },
+                "net": {
+                    "type": "number"
                 },
                 "number": {
                     "type": "string",
@@ -22288,6 +22294,9 @@
                 "tax_1": {
                     "type": "number"
                 },
+                "tax_1_amount": {
+                    "type": "number"
+                },
                 "tax_1_percentage": {
                     "type": "number"
                 },
@@ -22296,6 +22305,9 @@
                     "maxLength": 10
                 },
                 "tax_2": {
+                    "type": "number"
+                },
+                "tax_2_amount": {
                     "type": "number"
                 },
                 "tax_2_percentage": {
@@ -22307,6 +22319,18 @@
                 },
                 "total_amount": {
                     "type": "number"
+                },
+                "total_override": {
+                    "type": "number"
+                },
+                "total_override_at": {
+                    "type": "string"
+                },
+                "total_override_by_id": {
+                    "type": "integer"
+                },
+                "total_override_reason": {
+                    "type": "string"
                 },
                 "updated_at": {
                     "type": "string"
@@ -22578,6 +22602,12 @@
                 "discount": {
                     "type": "number"
                 },
+                "discount_amount": {
+                    "type": "number"
+                },
+                "discount_percentage": {
+                    "type": "number"
+                },
                 "discount_type": {
                     "type": "string",
                     "maxLength": 10
@@ -22606,6 +22636,9 @@
                 "meter_value": {
                     "type": "number"
                 },
+                "net": {
+                    "type": "number"
+                },
                 "parts_subtotal": {
                     "type": "number"
                 },
@@ -22626,6 +22659,9 @@
                 "tax_1": {
                     "type": "number"
                 },
+                "tax_1_amount": {
+                    "type": "number"
+                },
                 "tax_1_percentage": {
                     "type": "number"
                 },
@@ -22634,6 +22670,9 @@
                     "maxLength": 10
                 },
                 "tax_2": {
+                    "type": "number"
+                },
+                "tax_2_amount": {
                     "type": "number"
                 },
                 "tax_2_percentage": {
@@ -22645,6 +22684,18 @@
                 },
                 "total_amount": {
                     "type": "number"
+                },
+                "total_override": {
+                    "type": "number"
+                },
+                "total_override_at": {
+                    "type": "string"
+                },
+                "total_override_by_id": {
+                    "type": "integer"
+                },
+                "total_override_reason": {
+                    "type": "string"
                 },
                 "updated_at": {
                     "type": "string"
@@ -26963,6 +27014,12 @@
                 "discount": {
                     "type": "number"
                 },
+                "discount_amount": {
+                    "type": "number"
+                },
+                "discount_percentage": {
+                    "type": "number"
+                },
                 "discount_type": {
                     "type": "string",
                     "maxLength": 10
@@ -27023,6 +27080,9 @@
                 "location_id": {
                     "type": "integer"
                 },
+                "net": {
+                    "type": "number"
+                },
                 "number": {
                     "type": "string",
                     "maxLength": 50
@@ -27062,6 +27122,9 @@
                 "tax_1": {
                     "type": "number"
                 },
+                "tax_1_amount": {
+                    "type": "number"
+                },
                 "tax_1_percentage": {
                     "type": "number"
                 },
@@ -27070,6 +27133,9 @@
                     "maxLength": 10
                 },
                 "tax_2": {
+                    "type": "number"
+                },
+                "tax_2_amount": {
                     "type": "number"
                 },
                 "tax_2_percentage": {
@@ -27081,6 +27147,18 @@
                 },
                 "total_amount": {
                     "type": "number"
+                },
+                "total_override": {
+                    "type": "number"
+                },
+                "total_override_at": {
+                    "type": "string"
+                },
+                "total_override_by_id": {
+                    "type": "integer"
+                },
+                "total_override_reason": {
+                    "type": "string"
                 },
                 "updated_at": {
                     "type": "string"

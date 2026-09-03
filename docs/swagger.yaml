@@ -3587,6 +3587,8 @@ definitions:
         type: integer
       discount:
         type: number
+      discount_amount:
+        type: number
       discount_percentage:
         type: number
       discount_type:
@@ -3598,6 +3600,8 @@ definitions:
         items:
           type: integer
         type: array
+      net:
+        type: number
       number:
         maxLength: 50
         type: string
@@ -3624,12 +3628,16 @@ definitions:
         type: number
       tax_1:
         type: number
+      tax_1_amount:
+        type: number
       tax_1_percentage:
         type: number
       tax_1_type:
         maxLength: 10
         type: string
       tax_2:
+        type: number
+      tax_2_amount:
         type: number
       tax_2_percentage:
         type: number
@@ -3638,6 +3646,14 @@ definitions:
         type: string
       total_amount:
         type: number
+      total_override:
+        type: number
+      total_override_at:
+        type: string
+      total_override_by_id:
+        type: integer
+      total_override_reason:
+        type: string
       updated_at:
         type: string
       vendor_id:
@@ -3818,6 +3834,10 @@ definitions:
         type: object
       discount:
         type: number
+      discount_amount:
+        type: number
+      discount_percentage:
+        type: number
       discount_type:
         maxLength: 10
         type: string
@@ -3837,6 +3857,8 @@ definitions:
         type: integer
       meter_value:
         type: number
+      net:
+        type: number
       parts_subtotal:
         type: number
       reference:
@@ -3851,12 +3873,16 @@ definitions:
         type: number
       tax_1:
         type: number
+      tax_1_amount:
+        type: number
       tax_1_percentage:
         type: number
       tax_1_type:
         maxLength: 10
         type: string
       tax_2:
+        type: number
+      tax_2_amount:
         type: number
       tax_2_percentage:
         type: number
@@ -3865,6 +3891,14 @@ definitions:
         type: string
       total_amount:
         type: number
+      total_override:
+        type: number
+      total_override_at:
+        type: string
+      total_override_by_id:
+        type: integer
+      total_override_reason:
+        type: string
       updated_at:
         type: string
       vendor_id:
@@ -6896,6 +6930,10 @@ definitions:
         type: string
       discount:
         type: number
+      discount_amount:
+        type: number
+      discount_percentage:
+        type: number
       discount_type:
         maxLength: 10
         type: string
@@ -6937,6 +6975,8 @@ definitions:
         type: integer
       location_id:
         type: integer
+      net:
+        type: number
       number:
         maxLength: 50
         type: string
@@ -6964,12 +7004,16 @@ definitions:
         type: number
       tax_1:
         type: number
+      tax_1_amount:
+        type: number
       tax_1_percentage:
         type: number
       tax_1_type:
         maxLength: 10
         type: string
       tax_2:
+        type: number
+      tax_2_amount:
         type: number
       tax_2_percentage:
         type: number
@@ -6978,6 +7022,14 @@ definitions:
         type: string
       total_amount:
         type: number
+      total_override:
+        type: number
+      total_override_at:
+        type: string
+      total_override_by_id:
+        type: integer
+      total_override_reason:
+        type: string
       updated_at:
         type: string
       vendor_id:

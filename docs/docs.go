@@ -22241,6 +22241,9 @@ const docTemplate = `{
                 "discount": {
                     "type": "number"
                 },
+                "discount_amount": {
+                    "type": "number"
+                },
                 "discount_percentage": {
                     "type": "number"
                 },
@@ -22256,6 +22259,9 @@ const docTemplate = `{
                     "items": {
                         "type": "integer"
                     }
+                },
+                "net": {
+                    "type": "number"
                 },
                 "number": {
                     "type": "string",
@@ -22295,6 +22301,9 @@ const docTemplate = `{
                 "tax_1": {
                     "type": "number"
                 },
+                "tax_1_amount": {
+                    "type": "number"
+                },
                 "tax_1_percentage": {
                     "type": "number"
                 },
@@ -22303,6 +22312,9 @@ const docTemplate = `{
                     "maxLength": 10
                 },
                 "tax_2": {
+                    "type": "number"
+                },
+                "tax_2_amount": {
                     "type": "number"
                 },
                 "tax_2_percentage": {
@@ -22314,6 +22326,18 @@ const docTemplate = `{
                 },
                 "total_amount": {
                     "type": "number"
+                },
+                "total_override": {
+                    "type": "number"
+                },
+                "total_override_at": {
+                    "type": "string"
+                },
+                "total_override_by_id": {
+                    "type": "integer"
+                },
+                "total_override_reason": {
+                    "type": "string"
                 },
                 "updated_at": {
                     "type": "string"
@@ -22585,6 +22609,12 @@ const docTemplate = `{
                 "discount": {
                     "type": "number"
                 },
+                "discount_amount": {
+                    "type": "number"
+                },
+                "discount_percentage": {
+                    "type": "number"
+                },
                 "discount_type": {
                     "type": "string",
                     "maxLength": 10
@@ -22613,6 +22643,9 @@ const docTemplate = `{
                 "meter_value": {
                     "type": "number"
                 },
+                "net": {
+                    "type": "number"
+                },
                 "parts_subtotal": {
                     "type": "number"
                 },
@@ -22633,6 +22666,9 @@ const docTemplate = `{
                 "tax_1": {
                     "type": "number"
                 },
+                "tax_1_amount": {
+                    "type": "number"
+                },
                 "tax_1_percentage": {
                     "type": "number"
                 },
@@ -22641,6 +22677,9 @@ const docTemplate = `{
                     "maxLength": 10
                 },
                 "tax_2": {
+                    "type": "number"
+                },
+                "tax_2_amount": {
                     "type": "number"
                 },
                 "tax_2_percentage": {
@@ -22652,6 +22691,18 @@ const docTemplate = `{
                 },
                 "total_amount": {
                     "type": "number"
+                },
+                "total_override": {
+                    "type": "number"
+                },
+                "total_override_at": {
+                    "type": "string"
+                },
+                "total_override_by_id": {
+                    "type": "integer"
+                },
+                "total_override_reason": {
+                    "type": "string"
                 },
                 "updated_at": {
                     "type": "string"
@@ -26970,6 +27021,12 @@ const docTemplate = `{
                 "discount": {
                     "type": "number"
                 },
+                "discount_amount": {
+                    "type": "number"
+                },
+                "discount_percentage": {
+                    "type": "number"
+                },
                 "discount_type": {
                     "type": "string",
                     "maxLength": 10
@@ -27030,6 +27087,9 @@ const docTemplate = `{
                 "location_id": {
                     "type": "integer"
                 },
+                "net": {
+                    "type": "number"
+                },
                 "number": {
                     "type": "string",
                     "maxLength": 50
@@ -27069,6 +27129,9 @@ const docTemplate = `{
                 "tax_1": {
                     "type": "number"
                 },
+                "tax_1_amount": {
+                    "type": "number"
+                },
                 "tax_1_percentage": {
                     "type": "number"
                 },
@@ -27077,6 +27140,9 @@ const docTemplate = `{
                     "maxLength": 10
                 },
                 "tax_2": {
+                    "type": "number"
+                },
+                "tax_2_amount": {
                     "type": "number"
                 },
                 "tax_2_percentage": {
@@ -27088,6 +27154,18 @@ const docTemplate = `{
                 },
                 "total_amount": {
                     "type": "number"
+                },
+                "total_override": {
+                    "type": "number"
+                },
+                "total_override_at": {
+                    "type": "string"
+                },
+                "total_override_by_id": {
+                    "type": "integer"
+                },
+                "total_override_reason": {
+                    "type": "string"
                 },
                 "updated_at": {
                     "type": "string"
