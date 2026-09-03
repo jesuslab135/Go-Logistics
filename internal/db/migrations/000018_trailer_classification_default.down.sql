@@ -1,0 +1,2 @@
+ALTER TABLE trailer ALTER COLUMN classification   DROP DEFAULT;
+ALTER TABLE trailer ALTER COLUMN classification_2 DROP DEFAULT;
