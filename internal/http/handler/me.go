@@ -60,12 +60,13 @@ func (h *MeHandler) Permissions(c *gin.Context) {
 			IsVehicleOperator: profile.IsVehicleOperator,
 			DefaultCompanyID:  profile.DefaultCompanyID,
 		},
-		CompanyID:      identity.CompanyID,
-		IsAdmin:        identity.IsAdmin,
-		IsAccountOwner: identity.IsAccountOwner,
-		Permissions:    identity.EffectivePermissions(),
-		Modules:        readableModules(identity),
-		Companies:      make([]dto.MeCompany, len(companies)),
+		CompanyID:       identity.CompanyID,
+		IsAdmin:         identity.IsAdmin,
+		IsAccountOwner:  identity.IsAccountOwner,
+		IsPlatformAdmin: identity.IsPlatformAdmin,
+		Permissions:     identity.EffectivePermissions(),
+		Modules:         readableModules(identity),
+		Companies:       make([]dto.MeCompany, len(companies)),
 	}
 
 	if profile.RoleID != nil {

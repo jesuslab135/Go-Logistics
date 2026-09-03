@@ -21221,6 +21221,10 @@ const docTemplate = `{
                 "is_admin": {
                     "type": "boolean"
                 },
+                "is_platform_admin": {
+                    "description": "IsPlatformAdmin gates the /api/v1/admin/* namespace. It is distinct from\nIsAdmin (a tenant administrator): only a platform administrator, granted via\nthe CLI, receives true. Re-read every call, so a revocation shows next request.",
+                    "type": "boolean"
+                },
                 "modules": {
                     "description": "Modules lists the modules the caller can read, ready for navigation\nfiltering.",
                     "type": "array",

@@ -80,3 +80,33 @@ func TestGeneratedSpecUsesLimitOffset(t *testing.T) {
 		}
 	})
 }
+
+// definitionProps returns the properties map of a generated definition
+// (e.g. "dto.MePermissionsResponse"), or fails the test if absent.
+func definitionProps(t *testing.T, name string) map[string]any {
+	t.Helper()
+	defs, ok := loadSpec(t)["definitions"].(map[string]any)
+	if !ok {
+		t.Fatal("spec has no definitions object")
+	}
+	def, ok := defs[name].(map[string]any)
+	if !ok {
+		t.Fatalf("spec has no definition %q", name)
+	}
+	props, ok := def["properties"].(map[string]any)
+	if !ok {
+		t.Fatalf("definition %q has no properties", name)
+	}
+	return props
+}
+
+func TestMePermissionsExposesPlatformAdmin(t *testing.T) {
+	props := definitionProps(t, "dto.MePermissionsResponse")
+	prop, ok := props["is_platform_admin"].(map[string]any)
+	if !ok {
+		t.Fatal("MePermissionsResponse is missing is_platform_admin")
+	}
+	if prop["type"] != "boolean" {
+		t.Errorf("is_platform_admin type = %v, want boolean", prop["type"])
+	}
+}

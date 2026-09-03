@@ -9,6 +9,10 @@ type MePermissionsResponse struct {
 	Role           *MeRole    `json:"role"`
 	IsAdmin        bool       `json:"is_admin"`
 	IsAccountOwner bool       `json:"is_account_owner"`
+	// IsPlatformAdmin gates the /api/v1/admin/* namespace. It is distinct from
+	// IsAdmin (a tenant administrator): only a platform administrator, granted via
+	// the CLI, receives true. Re-read every call, so a revocation shows next request.
+	IsPlatformAdmin bool `json:"is_platform_admin"`
 	// Permissions is the effective answer per module and action, with the
 	// empty-object ("whole module") convention and the admin bypass already
 	// applied — clients should not have to re-derive either.
