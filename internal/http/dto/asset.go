@@ -78,6 +78,13 @@ type CreateAssetRequest struct {
 	LoanVendorID                *int64           `json:"loan_vendor_id"`
 	LoanStartedAt               *time.Time       `json:"loan_started_at"`
 	LoanEndedAt                 *time.Time       `json:"loan_ended_at"`
+
+	// Vehicle/Trailer, when present, are upserted in the SAME transaction as the
+	// asset write: a failure on either rolls the whole request back, so no asset
+	// row is ever persisted without its subtype. Omit both for an asset-only edit
+	// (status, photo), which keeps the single-write path unchanged.
+	Vehicle *UpsertVehicleRequest `json:"vehicle,omitempty"`
+	Trailer *UpsertTrailerRequest `json:"trailer,omitempty"`
 }
 
 type UpdateAssetRequest struct {
@@ -151,6 +158,13 @@ type UpdateAssetRequest struct {
 	LoanVendorID                *int64           `json:"loan_vendor_id"`
 	LoanStartedAt               *time.Time       `json:"loan_started_at"`
 	LoanEndedAt                 *time.Time       `json:"loan_ended_at"`
+
+	// Vehicle/Trailer, when present, are upserted in the SAME transaction as the
+	// asset write: a failure on either rolls the whole request back, so no asset
+	// row is ever persisted without its subtype. Omit both for an asset-only edit
+	// (status, photo), which keeps the single-write path unchanged.
+	Vehicle *UpsertVehicleRequest `json:"vehicle,omitempty"`
+	Trailer *UpsertTrailerRequest `json:"trailer,omitempty"`
 }
 
 type AssetResponse struct {

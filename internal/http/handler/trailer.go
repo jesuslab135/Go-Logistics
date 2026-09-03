@@ -30,16 +30,22 @@ func (s *TrailerStore) Get(ctx context.Context, parentID int64) (dto.TrailerResp
 }
 
 func (s *TrailerStore) Upsert(ctx context.Context, parentID int64, in dto.UpsertTrailerRequest) (dto.TrailerResponse, error) {
-	company := middleware.CompanyFromContext(ctx)
+	return upsertTrailerTx(ctx, s.q, parentID, middleware.CompanyFromContext(ctx), in)
+}
 
+// upsertTrailerTx is the tx-friendly core of TrailerStore.Upsert: it takes its
+// *gen.Queries and company explicitly so it can run against either the
+// singleton store's own queries or a transaction-scoped one, e.g. when an
+// asset create/update needs the trailer write to commit or roll back with it.
+func upsertTrailerTx(ctx context.Context, q *gen.Queries, parentID, company int64, in dto.UpsertTrailerRequest) (dto.TrailerResponse, error) {
 	// The classification ids must belong to the caller's company. Without this a
 	// trailer could be linked to another tenant's vocabulary — a value its own
 	// fleet cannot see, edit or filter by, and which leaks that tenant's terms.
-	if err := s.validateClassifications(ctx, company, in.ClassificationID, in.Classification2ID); err != nil {
+	if err := validateTrailerClassificationsTx(ctx, q, company, in.ClassificationID, in.Classification2ID); err != nil {
 		return dto.TrailerResponse{}, err
 	}
 
-	r, err := s.q.UpsertTrailer(ctx, gen.UpsertTrailerParams{
+	r, err := q.UpsertTrailer(ctx, gen.UpsertTrailerParams{
 		ParentID:             parentID,
 		CompanyID:            company,
 		TrailerType:          in.TrailerType,
@@ -137,6 +143,14 @@ func toTrailerResponse(r gen.Trailer) dto.TrailerResponse {
 // company, as a 422 against the offending field rather than the 409 a foreign
 // key would raise from somewhere the caller cannot see.
 func (s *TrailerStore) validateClassifications(ctx context.Context, companyID int64, ids ...*int64) error {
+	return validateTrailerClassificationsTx(ctx, s.q, companyID, ids...)
+}
+
+// validateTrailerClassificationsTx is the tx-friendly core of
+// TrailerStore.validateClassifications: it takes its *gen.Queries explicitly
+// so it can run inside an asset create/update transaction, where a bad
+// classification id must roll back the asset row along with the trailer.
+func validateTrailerClassificationsTx(ctx context.Context, q *gen.Queries, companyID int64, ids ...*int64) error {
 	var want []int64
 	fields := []string{"classification_id", "classification_2_id"}
 	details := map[string]string{}
@@ -151,7 +165,7 @@ func (s *TrailerStore) validateClassifications(ctx context.Context, companyID in
 		return nil
 	}
 
-	n, err := s.q.CountTrailerClassificationsByIDs(ctx, gen.CountTrailerClassificationsByIDsParams{
+	n, err := q.CountTrailerClassificationsByIDs(ctx, gen.CountTrailerClassificationsByIDsParams{
 		CompanyID: companyID,
 		Ids:       want,
 	})

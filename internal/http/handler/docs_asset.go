@@ -3,6 +3,7 @@ package handler
 // docCreateAsset godoc
 //
 //	@Summary	Create assets
+//	@Description	Supplying a nested "vehicle" or "trailer" object makes the write atomic: the asset row and its subtype are created in one transaction, so a validation or write failure on the subtype rolls back the asset too. Omit both for an asset-only create.
 //	@Tags	assets
 //	@Security	BearerAuth
 //	@Accept	json
@@ -28,6 +29,7 @@ func docGetAsset() {}
 // docUpdateAsset godoc
 //
 //	@Summary	Update assets
+//	@Description	Supplying a nested "vehicle" or "trailer" object makes the write atomic: the asset row and its subtype are updated in one transaction, so a validation or write failure on the subtype rolls back the asset update too. Omit both for an asset-only edit (status, photo, etc.), which keeps the single-write path unchanged.
 //	@Tags	assets
 //	@Security	BearerAuth
 //	@Accept	json

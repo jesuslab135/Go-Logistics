@@ -119,7 +119,7 @@ func NewRouter(d Deps) *gin.Engine {
 	// Phase 2: assets
 	registerCrudWithList(assets, "/assets",
 		crud.NewHandler[dto.AssetResponse, dto.CreateAssetRequest, dto.UpdateAssetRequest](
-			NewAssetStore(d.Queries, d.Storage, d.Logger)), lists.Assets)
+			NewAssetStore(d.Queries, d.Pool, d.Storage, d.Logger)), lists.Assets)
 	// Read-only reverse view of the nested /assets/{id}/trailer-assignments;
 	// mutations stay on the nested route that owns the parent scope.
 	assets.GET("/asset-trailer-assignments", lists.AssetTrailerAssignments)

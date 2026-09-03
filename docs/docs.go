@@ -1073,6 +1073,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Supplying a nested \"vehicle\" or \"trailer\" object makes the write atomic: the asset row and its subtype are created in one transaction, so a validation or write failure on the subtype rolls back the asset too. Omit both for an asset-only create.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1223,6 +1224,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Supplying a nested \"vehicle\" or \"trailer\" object makes the write atomic: the asset row and its subtype are updated in one transaction, so a validation or write failure on the subtype rolls back the asset update too. Omit both for an asset-only edit (status, photo, etc.), which keeps the single-write path unchanged.",
                 "consumes": [
                     "application/json"
                 ],
@@ -18230,9 +18232,20 @@ const docTemplate = `{
                 "status_id": {
                     "type": "integer"
                 },
+                "trailer": {
+                    "$ref": "#/definitions/dto.UpsertTrailerRequest"
+                },
                 "trim": {
                     "type": "string",
                     "maxLength": 100
+                },
+                "vehicle": {
+                    "description": "Vehicle/Trailer, when present, are upserted in the SAME transaction as the\nasset write: a failure on either rolls the whole request back, so no asset\nrow is ever persisted without its subtype. Omit both for an asset-only edit\n(status, photo), which keeps the single-write path unchanged.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.UpsertVehicleRequest"
+                        }
+                    ]
                 },
                 "vehicle_type": {
                     "type": "string",
@@ -23951,9 +23964,20 @@ const docTemplate = `{
                 "status_id": {
                     "type": "integer"
                 },
+                "trailer": {
+                    "$ref": "#/definitions/dto.UpsertTrailerRequest"
+                },
                 "trim": {
                     "type": "string",
                     "maxLength": 100
+                },
+                "vehicle": {
+                    "description": "Vehicle/Trailer, when present, are upserted in the SAME transaction as the\nasset write: a failure on either rolls the whole request back, so no asset\nrow is ever persisted without its subtype. Omit both for an asset-only edit\n(status, photo), which keeps the single-write path unchanged.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.UpsertVehicleRequest"
+                        }
+                    ]
                 },
                 "vehicle_type": {
                     "type": "string",

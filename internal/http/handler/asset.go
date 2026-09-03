@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"fleet/internal/db/gen"
 	"fleet/internal/http/dto"
 	"fleet/internal/http/middleware"
@@ -15,11 +17,12 @@ import (
 
 type AssetStore struct {
 	fileOwner
-	q *gen.Queries
+	q    *gen.Queries
+	pool *pgxpool.Pool
 }
 
-func NewAssetStore(q *gen.Queries, files storage.Storage, log *slog.Logger) *AssetStore {
-	return &AssetStore{fileOwner: newFileOwner(files, log), q: q}
+func NewAssetStore(q *gen.Queries, pool *pgxpool.Pool, files storage.Storage, log *slog.Logger) *AssetStore {
+	return &AssetStore{fileOwner: newFileOwner(files, log), q: q, pool: pool}
 }
 
 func (s *AssetStore) List(ctx context.Context, p paginate.Params) ([]dto.AssetResponse, int64, error) {
@@ -71,10 +74,54 @@ func (s *AssetStore) Create(ctx context.Context, in dto.CreateAssetRequest) (dto
 	if err := validateCustomFields(ctx, s.q, "assets", in.CustomFields); err != nil {
 		return dto.AssetResponse{}, err
 	}
+	company := middleware.CompanyFromContext(ctx)
 
+	// Asset-only: unchanged single-write path.
+	if in.Vehicle == nil && in.Trailer == nil {
+		r, err := createAssetRow(ctx, s.q, company, in)
+		if err != nil {
+			return dto.AssetResponse{}, err
+		}
+		return s.withSubtypes(ctx, s.response(ctx, r))
+	}
+
+	// Asset + subtype: both writes in one transaction, or neither — a failed
+	// extension write must never leave an orphan asset row.
+	var created gen.Asset
+	err := inTx(ctx, s.pool, s.q, func(qtx *gen.Queries) error {
+		r, err := createAssetRow(ctx, qtx, company, in)
+		if err != nil {
+			return err
+		}
+		created = r
+		if in.Vehicle != nil {
+			if _, err := upsertVehicleTx(ctx, qtx, r.ID, company, *in.Vehicle); err != nil {
+				return err
+			}
+		}
+		if in.Trailer != nil {
+			if err := validateTrailerClassificationsTx(ctx, qtx, company, in.Trailer.ClassificationID, in.Trailer.Classification2ID); err != nil {
+				return err // 422 rolls back the asset insert
+			}
+			if _, err := upsertTrailerTx(ctx, qtx, r.ID, company, *in.Trailer); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return dto.AssetResponse{}, err
+	}
+	return s.withSubtypes(ctx, s.response(ctx, created))
+}
+
+// createAssetRow builds the CreateAsset params from the request and inserts
+// through q, so it can run against either the store's own queries or a
+// transaction-scoped one.
+func createAssetRow(ctx context.Context, q *gen.Queries, company int64, in dto.CreateAssetRequest) (gen.Asset, error) {
 	now := time.Now().UTC()
-	r, err := s.q.CreateAsset(ctx, gen.CreateAssetParams{
-		CompanyID:                   middleware.CompanyFromContext(ctx),
+	return q.CreateAsset(ctx, gen.CreateAssetParams{
+		CompanyID:                   company,
 		Name:                        in.Name,
 		VinSn:                       in.VinSn,
 		Msrp:                        in.Msrp,
@@ -144,10 +191,6 @@ func (s *AssetStore) Create(ctx context.Context, in dto.CreateAssetRequest) (dto
 		LoanEndedAt:                 in.LoanEndedAt,
 		UpdatedAt:                   now,
 	})
-	if err != nil {
-		return dto.AssetResponse{}, err
-	}
-	return s.withSubtypes(ctx, s.response(ctx, r))
 }
 
 func (s *AssetStore) Update(ctx context.Context, id int64, in dto.UpdateAssetRequest) (dto.AssetResponse, error) {
@@ -156,17 +199,62 @@ func (s *AssetStore) Update(ctx context.Context, id int64, in dto.UpdateAssetReq
 	if err := validateCustomFields(ctx, s.q, "assets", in.CustomFields); err != nil {
 		return dto.AssetResponse{}, err
 	}
+	company := middleware.CompanyFromContext(ctx)
 
-	now := time.Now().UTC()
-
-	previous, err := s.q.GetAsset(ctx, gen.GetAssetParams{ID: id, CompanyID: middleware.CompanyFromContext(ctx)})
+	previous, err := s.q.GetAsset(ctx, gen.GetAssetParams{ID: id, CompanyID: company})
 	if err != nil {
 		return dto.AssetResponse{}, err
 	}
 
-	r, err := s.q.UpdateAsset(ctx, gen.UpdateAssetParams{
+	// Asset-only: unchanged single-write path.
+	if in.Vehicle == nil && in.Trailer == nil {
+		r, err := updateAssetRow(ctx, s.q, id, company, in)
+		if err != nil {
+			return dto.AssetResponse{}, err
+		}
+		s.reclaimReplaced(ctx, previous.Photo, r.Photo)
+		return s.withSubtypes(ctx, s.response(ctx, r))
+	}
+
+	// Asset + subtype: both writes in one transaction, or neither — a failed
+	// extension write must never leave the asset row and its subtype out of sync.
+	var updated gen.Asset
+	err = inTx(ctx, s.pool, s.q, func(qtx *gen.Queries) error {
+		r, err := updateAssetRow(ctx, qtx, id, company, in)
+		if err != nil {
+			return err
+		}
+		updated = r
+		if in.Vehicle != nil {
+			if _, err := upsertVehicleTx(ctx, qtx, r.ID, company, *in.Vehicle); err != nil {
+				return err
+			}
+		}
+		if in.Trailer != nil {
+			if err := validateTrailerClassificationsTx(ctx, qtx, company, in.Trailer.ClassificationID, in.Trailer.Classification2ID); err != nil {
+				return err // 422 rolls back the asset update
+			}
+			if _, err := upsertTrailerTx(ctx, qtx, r.ID, company, *in.Trailer); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return dto.AssetResponse{}, err
+	}
+	s.reclaimReplaced(ctx, previous.Photo, updated.Photo)
+	return s.withSubtypes(ctx, s.response(ctx, updated))
+}
+
+// updateAssetRow builds the UpdateAsset params from the request and updates
+// through q, so it can run against either the store's own queries or a
+// transaction-scoped one.
+func updateAssetRow(ctx context.Context, q *gen.Queries, id, company int64, in dto.UpdateAssetRequest) (gen.Asset, error) {
+	now := time.Now().UTC()
+	return q.UpdateAsset(ctx, gen.UpdateAssetParams{
 		ID:                          id,
-		CompanyID:                   middleware.CompanyFromContext(ctx),
+		CompanyID:                   company,
 		Name:                        in.Name,
 		VinSn:                       in.VinSn,
 		Msrp:                        in.Msrp,
@@ -236,11 +324,6 @@ func (s *AssetStore) Update(ctx context.Context, id int64, in dto.UpdateAssetReq
 		LoanEndedAt:                 in.LoanEndedAt,
 		UpdatedAt:                   now,
 	})
-	if err != nil {
-		return dto.AssetResponse{}, err
-	}
-	s.reclaimReplaced(ctx, previous.Photo, r.Photo)
-	return s.withSubtypes(ctx, s.response(ctx, r))
 }
 
 func (s *AssetStore) Delete(ctx context.Context, id int64) error {

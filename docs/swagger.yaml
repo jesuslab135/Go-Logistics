@@ -678,9 +678,19 @@ definitions:
         type: number
       status_id:
         type: integer
+      trailer:
+        $ref: '#/definitions/dto.UpsertTrailerRequest'
       trim:
         maxLength: 100
         type: string
+      vehicle:
+        allOf:
+        - $ref: '#/definitions/dto.UpsertVehicleRequest'
+        description: |-
+          Vehicle/Trailer, when present, are upserted in the SAME transaction as the
+          asset write: a failure on either rolls the whole request back, so no asset
+          row is ever persisted without its subtype. Omit both for an asset-only edit
+          (status, photo), which keeps the single-write path unchanged.
       vehicle_type:
         maxLength: 20
         type: string
@@ -4641,9 +4651,19 @@ definitions:
         type: number
       status_id:
         type: integer
+      trailer:
+        $ref: '#/definitions/dto.UpsertTrailerRequest'
       trim:
         maxLength: 100
         type: string
+      vehicle:
+        allOf:
+        - $ref: '#/definitions/dto.UpsertVehicleRequest'
+        description: |-
+          Vehicle/Trailer, when present, are upserted in the SAME transaction as the
+          asset write: a failure on either rolls the whole request back, so no asset
+          row is ever persisted without its subtype. Omit both for an asset-only edit
+          (status, photo), which keeps the single-write path unchanged.
       vehicle_type:
         maxLength: 20
         type: string
@@ -7899,6 +7919,10 @@ paths:
     post:
       consumes:
       - application/json
+      description: 'Supplying a nested "vehicle" or "trailer" object makes the write
+        atomic: the asset row and its subtype are created in one transaction, so a
+        validation or write failure on the subtype rolls back the asset too. Omit
+        both for an asset-only create.'
       parameters:
       - description: body
         in: body
@@ -7968,6 +7992,11 @@ paths:
     put:
       consumes:
       - application/json
+      description: 'Supplying a nested "vehicle" or "trailer" object makes the write
+        atomic: the asset row and its subtype are updated in one transaction, so a
+        validation or write failure on the subtype rolls back the asset update too.
+        Omit both for an asset-only edit (status, photo, etc.), which keeps the single-write
+        path unchanged.'
       parameters:
       - description: id
         in: path
