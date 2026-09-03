@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"fleet/internal/http/dto"
 	"fleet/internal/platform/filter"
 )
 
@@ -39,6 +40,45 @@ func TestFacetQueryGroupsWithLabelJoin(t *testing.T) {
 		t.Errorf("args = %v, want [7]", args)
 	}
 }
+
+func TestFacetCountFormatsValueAndLabel(t *testing.T) {
+	cases := []struct {
+		name  string
+		value any
+		label *string
+		want  dto.FacetCount
+	}{
+		{
+			name:  "nil value and nil label becomes the no-status sentinel",
+			value: nil,
+			label: nil,
+			want:  dto.FacetCount{Value: "", Label: "No status"},
+		},
+		{
+			name:  "non-nil value with nil label defaults the label to the value",
+			value: int64(3),
+			label: nil,
+			want:  dto.FacetCount{Value: "3", Label: "3"},
+		},
+		{
+			name:  "non-nil value and non-nil label keeps both",
+			value: int64(3),
+			label: strPtr("Active"),
+			want:  dto.FacetCount{Value: "3", Label: "Active"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := facetCount(tc.value, tc.label)
+			if got.Value != tc.want.Value || got.Label != tc.want.Label {
+				t.Errorf("facetCount(%v, %v) = %+v, want Value=%q Label=%q",
+					tc.value, tc.label, got, tc.want.Value, tc.want.Label)
+			}
+		})
+	}
+}
+
+func strPtr(s string) *string { return &s }
 
 func TestWorkOrderFacetsExcludeStatusDimension(t *testing.T) {
 	c := getCtx(t, "asset_id=3&status_id=9")
@@ -142,8 +182,11 @@ func TestAssetFacetsQueryShapes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	stSQL, _ := facetQuery("FROM asset a JOIN asset_status st ON st.id = a.status_id", stWhere, "a.status_id", "st.name")
-	if !strings.Contains(stSQL, "JOIN asset_status st ON st.id = a.status_id") ||
+	// asset.status_id is nullable, so this must be a LEFT (not INNER) join: an
+	// INNER join would silently drop null-status assets from the facet
+	// entirely, breaking the "counts stay exact" guarantee.
+	stSQL, _ := facetQuery("FROM asset a LEFT JOIN asset_status st ON st.id = a.status_id", stWhere, "a.status_id", "st.name")
+	if !strings.Contains(stSQL, "LEFT JOIN asset_status st ON st.id = a.status_id") ||
 		!strings.Contains(stSQL, "GROUP BY a.status_id, st.name") {
 		t.Errorf("status facet query shape wrong: %s", stSQL)
 	}

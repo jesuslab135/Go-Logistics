@@ -15,11 +15,35 @@ import (
 	"fleet/internal/platform/filter"
 )
 
+// facetCount formats one scanned facet row into its DTO. It is split out from
+// scanFacets, which is DB-touching and untested, so this formatting — the part
+// with actual branching to get wrong — has direct unit coverage.
+//
+// A nil value means the grouped dimension is itself null (e.g. an asset with
+// no status, via a LEFT join): fmt.Sprint(nil) would render the literal string
+// "<nil>", which is not an acceptable facet key, so that bucket gets the
+// sentinel Value "" / Label "No status" instead. A non-nil value with no label
+// (an unjoined dimension that is its own label) falls back the label to the
+// value's string form.
+func facetCount(value any, label *string) dto.FacetCount {
+	if value == nil {
+		l := "No status"
+		if label != nil {
+			l = *label
+		}
+		return dto.FacetCount{Value: "", Label: l}
+	}
+	v := fmt.Sprint(value)
+	l := v
+	if label != nil {
+		l = *label
+	}
+	return dto.FacetCount{Value: v, Label: l}
+}
+
 // scanFacets executes a facetQuery statement and collects its rows. It is a
-// thin DB-touching shell around facetQuery's pure SQL, kept small because it
-// is not unit-tested: value is formatted with fmt.Sprint so both numeric ids
-// and text dimensions (issue state) render the same way, and a null label
-// (an unjoined dimension that is its own label) falls back to the value.
+// thin DB-touching shell around facetQuery's pure SQL and facetCount's pure
+// formatting, kept small because the DB round trip itself is not unit-tested.
 func scanFacets(ctx context.Context, pool *pgxpool.Pool, sql string, args []any) ([]dto.FacetCount, error) {
 	rows, err := pool.Query(ctx, sql, args...)
 	if err != nil {
@@ -35,12 +59,9 @@ func scanFacets(ctx context.Context, pool *pgxpool.Pool, sql string, args []any)
 		if err := rows.Scan(&value, &label, &count); err != nil {
 			return nil, err
 		}
-		v := fmt.Sprint(value)
-		l := v
-		if label != nil {
-			l = *label
-		}
-		out = append(out, dto.FacetCount{Value: v, Label: l, Count: count})
+		fc := facetCount(value, label)
+		fc.Count = count
+		out = append(out, fc)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -253,7 +274,10 @@ func (h *FilteredListHandler) AssetFacets(c *gin.Context) {
 		return
 	}
 
-	stSQL, stArgs := facetQuery("FROM asset a JOIN asset_status st ON st.id = a.status_id",
+	// LEFT, not INNER: asset.status_id is nullable, and an unassigned asset is
+	// a real, reachable state — an INNER join would drop it from the facet
+	// silently instead of counting it in a null bucket.
+	stSQL, stArgs := facetQuery("FROM asset a LEFT JOIN asset_status st ON st.id = a.status_id",
 		statusWhere, "a.status_id", "st.name")
 	statusCounts, err := scanFacets(ctx, h.pool, stSQL, stArgs)
 	if err != nil {
