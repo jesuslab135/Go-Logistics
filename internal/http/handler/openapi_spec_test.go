@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -79,4 +80,158 @@ func TestGeneratedSpecUsesLimitOffset(t *testing.T) {
 			}
 		}
 	})
+}
+
+// definitionProps returns the properties map of a generated definition
+// (e.g. "dto.MePermissionsResponse"), or fails the test if absent.
+func definitionProps(t *testing.T, name string) map[string]any {
+	t.Helper()
+	defs, ok := loadSpec(t)["definitions"].(map[string]any)
+	if !ok {
+		t.Fatal("spec has no definitions object")
+	}
+	def, ok := defs[name].(map[string]any)
+	if !ok {
+		t.Fatalf("spec has no definition %q", name)
+	}
+	props, ok := def["properties"].(map[string]any)
+	if !ok {
+		t.Fatalf("definition %q has no properties", name)
+	}
+	return props
+}
+
+func TestMePermissionsExposesPlatformAdmin(t *testing.T) {
+	props := definitionProps(t, "dto.MePermissionsResponse")
+	prop, ok := props["is_platform_admin"].(map[string]any)
+	if !ok {
+		t.Fatal("MePermissionsResponse is missing is_platform_admin")
+	}
+	if prop["type"] != "boolean" {
+		t.Errorf("is_platform_admin type = %v, want boolean", prop["type"])
+	}
+}
+
+// custom_fields is a keyed object ({key: value}), never an array. json.RawMessage
+// defaults to an int array in swaggo; every DTO must override it.
+func TestCustomFieldsAreObjectsNotArrays(t *testing.T) {
+	defs, ok := loadSpec(t)["definitions"].(map[string]any)
+	if !ok {
+		t.Fatal("spec has no definitions object")
+	}
+	found := 0
+	for name, raw := range defs {
+		def, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		props, ok := def["properties"].(map[string]any)
+		if !ok {
+			continue
+		}
+		cf, ok := props["custom_fields"].(map[string]any)
+		if !ok {
+			continue
+		}
+		found++
+		if cf["type"] != "object" {
+			t.Errorf("%s.custom_fields type = %v, want object", name, cf["type"])
+		}
+	}
+	if found == 0 {
+		t.Fatal("no custom_fields properties found in spec")
+	}
+}
+
+func TestArchiveContractIsConcreteAndTyped(t *testing.T) {
+	paths, _ := loadSpec(t)["paths"].(map[string]any)
+	// No templated {resource} path may survive — that is the param the frontend patches.
+	for path := range paths {
+		if strings.Contains(path, "{resource}") {
+			t.Errorf("spec still contains templated path %q", path)
+		}
+	}
+	// Each concrete archive/restore op must have a schema-bearing 200.
+	for _, res := range []string{"assets", "parts", "vendors", "service-tasks", "inspection-forms"} {
+		for _, action := range []string{"archive", "restore"} {
+			p := "/api/v1/" + res + "/{id}/" + action
+			op, ok := paths[p].(map[string]any)
+			if !ok {
+				t.Errorf("missing path %s", p)
+				continue
+			}
+			post, _ := op["post"].(map[string]any)
+			resp, _ := post["responses"].(map[string]any)
+			ok200, _ := resp["200"].(map[string]any)
+			if _, hasSchema := ok200["schema"]; !hasSchema {
+				t.Errorf("%s POST 200 has no schema", p)
+			}
+		}
+	}
+}
+
+// The four computed amounts and four override fields are recomputed/mapped
+// on read (see money_response_test.go); this guards against a forgotten
+// swag regen leaving the generated spec stale.
+func TestMoneyResponsesExposeComputedAndOverrideFields(t *testing.T) {
+	want := []string{
+		"discount_amount", "tax_1_amount", "tax_2_amount", "net",
+		"total_override", "total_override_reason", "total_override_by_id", "total_override_at",
+	}
+	for _, def := range []string{"dto.PurchaseOrderResponse", "dto.WorkOrderResponse", "dto.ServiceEntryResponse"} {
+		props := definitionProps(t, def)
+		for _, name := range want {
+			if _, ok := props[name]; !ok {
+				t.Errorf("%s is missing property %q", def, name)
+			}
+		}
+	}
+}
+
+// The facet endpoints are cheap grouped counts alongside each list; the spec
+// must expose them with a typed 200 so a generated client can call them.
+func TestFacetPathsExist(t *testing.T) {
+	paths, _ := loadSpec(t)["paths"].(map[string]any)
+	want := map[string]string{
+		"/api/v1/work-orders/facets": "dto.WorkOrderFacetsResponse",
+		"/api/v1/issues/facets":      "dto.IssueFacetsResponse",
+		"/api/v1/assets/facets":      "dto.AssetFacetsResponse",
+	}
+	for path, def := range want {
+		op, ok := paths[path].(map[string]any)
+		if !ok {
+			t.Errorf("missing path %s", path)
+			continue
+		}
+		get, _ := op["get"].(map[string]any)
+		if get == nil {
+			t.Errorf("%s has no GET operation", path)
+			continue
+		}
+		resp, _ := get["responses"].(map[string]any)
+		ok200, _ := resp["200"].(map[string]any)
+		schema, _ := ok200["schema"].(map[string]any)
+		if ref, _ := schema["$ref"].(string); ref != "#/definitions/"+def {
+			t.Errorf("%s GET 200 schema = %v, want ref to %s", path, schema, def)
+		}
+	}
+}
+
+func TestArchivableListsDocumentIncludeArchived(t *testing.T) {
+	paths, _ := loadSpec(t)["paths"].(map[string]any)
+	for _, res := range []string{"assets", "parts", "vendors", "service-tasks", "inspection-forms"} {
+		p := "/api/v1/" + res
+		op, _ := paths[p].(map[string]any)
+		get, _ := op["get"].(map[string]any)
+		params, _ := get["parameters"].([]any)
+		has := false
+		for _, raw := range params {
+			if pm, ok := raw.(map[string]any); ok && pm["name"] == "include_archived" {
+				has = true
+			}
+		}
+		if !has {
+			t.Errorf("%s GET does not document include_archived", p)
+		}
+	}
 }

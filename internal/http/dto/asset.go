@@ -70,7 +70,7 @@ type CreateAssetRequest struct {
 	MileageCap                  *int32           `json:"mileage_cap"`
 	Notes                       string           `json:"notes"`
 	ExternalID                  string           `json:"external_id" binding:"omitempty,max=100"`
-	CustomFields                json.RawMessage  `json:"custom_fields"`
+	CustomFields                json.RawMessage  `json:"custom_fields" swaggertype:"object"`
 	FuelVolumeUnits             string           `json:"fuel_volume_units" binding:"omitempty,max=20"`
 	CurrentMeterDate            *time.Time       `json:"current_meter_date"`
 	LoanAccountNumber           string           `json:"loan_account_number" binding:"omitempty,max=100"`
@@ -78,6 +78,13 @@ type CreateAssetRequest struct {
 	LoanVendorID                *int64           `json:"loan_vendor_id"`
 	LoanStartedAt               *time.Time       `json:"loan_started_at"`
 	LoanEndedAt                 *time.Time       `json:"loan_ended_at"`
+
+	// Vehicle/Trailer, when present, are upserted in the SAME transaction as the
+	// asset write: a failure on either rolls the whole request back, so no asset
+	// row is ever persisted without its subtype. Omit both for an asset-only edit
+	// (status, photo), which keeps the single-write path unchanged.
+	Vehicle *UpsertVehicleRequest `json:"vehicle,omitempty"`
+	Trailer *UpsertTrailerRequest `json:"trailer,omitempty"`
 }
 
 type UpdateAssetRequest struct {
@@ -143,7 +150,7 @@ type UpdateAssetRequest struct {
 	MileageCap                  *int32           `json:"mileage_cap"`
 	Notes                       string           `json:"notes"`
 	ExternalID                  string           `json:"external_id" binding:"omitempty,max=100"`
-	CustomFields                json.RawMessage  `json:"custom_fields"`
+	CustomFields                json.RawMessage  `json:"custom_fields" swaggertype:"object"`
 	FuelVolumeUnits             string           `json:"fuel_volume_units" binding:"omitempty,max=20"`
 	CurrentMeterDate            *time.Time       `json:"current_meter_date"`
 	LoanAccountNumber           string           `json:"loan_account_number" binding:"omitempty,max=100"`
@@ -151,6 +158,13 @@ type UpdateAssetRequest struct {
 	LoanVendorID                *int64           `json:"loan_vendor_id"`
 	LoanStartedAt               *time.Time       `json:"loan_started_at"`
 	LoanEndedAt                 *time.Time       `json:"loan_ended_at"`
+
+	// Vehicle/Trailer, when present, are upserted in the SAME transaction as the
+	// asset write: a failure on either rolls the whole request back, so no asset
+	// row is ever persisted without its subtype. Omit both for an asset-only edit
+	// (status, photo), which keeps the single-write path unchanged.
+	Vehicle *UpsertVehicleRequest `json:"vehicle,omitempty"`
+	Trailer *UpsertTrailerRequest `json:"trailer,omitempty"`
 }
 
 type AssetResponse struct {
@@ -216,7 +230,7 @@ type AssetResponse struct {
 	Notes                       string           `json:"notes"`
 	ArchivedAt                  *time.Time       `json:"archived_at"`
 	ExternalID                  string           `json:"external_id" binding:"omitempty,max=100"`
-	CustomFields                json.RawMessage  `json:"custom_fields"`
+	CustomFields                json.RawMessage  `json:"custom_fields" swaggertype:"object"`
 	FuelVolumeUnits             string           `json:"fuel_volume_units" binding:"omitempty,max=20"`
 	CurrentMeterDate            *time.Time       `json:"current_meter_date"`
 	LoanAccountNumber           string           `json:"loan_account_number" binding:"omitempty,max=100"`

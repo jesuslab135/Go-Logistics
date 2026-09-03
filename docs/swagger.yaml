@@ -24,6 +24,21 @@ definitions:
         minimum: 0
         type: integer
     type: object
+  dto.AssetFacetsResponse:
+    properties:
+      status:
+        items:
+          $ref: '#/definitions/dto.FacetCount'
+        type: array
+      trailer_type:
+        items:
+          $ref: '#/definitions/dto.FacetCount'
+        type: array
+      vehicle_type:
+        items:
+          $ref: '#/definitions/dto.FacetCount'
+        type: array
+    type: object
   dto.AssetPage:
     properties:
       data:
@@ -70,9 +85,7 @@ definitions:
       current_meter_date:
         type: string
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       down_payment:
         type: number
       estimated_replacement_mileage:
@@ -536,9 +549,7 @@ definitions:
       current_meter_date:
         type: string
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       down_payment:
         type: number
       estimated_replacement_mileage:
@@ -667,9 +678,19 @@ definitions:
         type: number
       status_id:
         type: integer
+      trailer:
+        $ref: '#/definitions/dto.UpsertTrailerRequest'
       trim:
         maxLength: 100
         type: string
+      vehicle:
+        allOf:
+        - $ref: '#/definitions/dto.UpsertVehicleRequest'
+        description: |-
+          Vehicle/Trailer, when present, are upserted in the SAME transaction as the
+          asset write: a failure on either rolls the whole request back, so no asset
+          row is ever persisted without its subtype. Omit both for an asset-only edit
+          (status, photo), which keeps the single-write path unchanged.
       vehicle_type:
         maxLength: 20
         type: string
@@ -869,9 +890,7 @@ definitions:
         maxLength: 50
         type: string
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       dashboard_preferences:
         items:
           type: integer
@@ -1250,9 +1269,7 @@ definitions:
       created_by_workflow:
         type: boolean
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       description:
         type: string
       documents_count:
@@ -1439,9 +1456,7 @@ definitions:
   dto.CreatePartRequest:
     properties:
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       description:
         type: string
       inventory_item:
@@ -1495,9 +1510,7 @@ definitions:
   dto.CreatePurchaseOrderRequest:
     properties:
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       description:
         type: string
       destination_id:
@@ -1596,9 +1609,7 @@ definitions:
       completed_at:
         type: string
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       discount:
         type: number
       discount_type:
@@ -1879,9 +1890,7 @@ definitions:
         maxLength: 50
         type: string
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       external_id:
         maxLength: 100
         type: string
@@ -2008,9 +2017,7 @@ definitions:
       completed_at:
         type: string
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       description:
         type: string
       discount:
@@ -2231,9 +2238,7 @@ definitions:
         maxLength: 50
         type: string
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       dashboard_preferences:
         items:
           type: integer
@@ -2322,6 +2327,15 @@ definitions:
     properties:
       error:
         $ref: '#/definitions/dto.ErrorBody'
+    type: object
+  dto.FacetCount:
+    properties:
+      count:
+        type: integer
+      label:
+        type: string
+      value:
+        type: string
     type: object
   dto.FaultPage:
     properties:
@@ -2884,6 +2898,13 @@ definitions:
       work_order_id:
         type: integer
     type: object
+  dto.IssueFacetsResponse:
+    properties:
+      state:
+        items:
+          $ref: '#/definitions/dto.FacetCount'
+        type: array
+    type: object
   dto.IssuePage:
     properties:
       data:
@@ -2951,9 +2972,7 @@ definitions:
       created_by_workflow:
         type: boolean
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       description:
         type: string
       documents_count:
@@ -3173,6 +3192,12 @@ definitions:
       is_account_owner:
         type: boolean
       is_admin:
+        type: boolean
+      is_platform_admin:
+        description: |-
+          IsPlatformAdmin gates the /api/v1/admin/* namespace. It is distinct from
+          IsAdmin (a tenant administrator): only a platform administrator, granted via
+          the CLI, receives true. Re-read every call, so a revocation shows next request.
         type: boolean
       modules:
         description: |-
@@ -3494,9 +3519,7 @@ definitions:
       created_at:
         type: string
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       description:
         type: string
       id:
@@ -3598,14 +3621,14 @@ definitions:
       created_by_id:
         type: integer
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       description:
         type: string
       destination_id:
         type: integer
       discount:
+        type: number
+      discount_amount:
         type: number
       discount_percentage:
         type: number
@@ -3618,6 +3641,8 @@ definitions:
         items:
           type: integer
         type: array
+      net:
+        type: number
       number:
         maxLength: 50
         type: string
@@ -3644,12 +3669,16 @@ definitions:
         type: number
       tax_1:
         type: number
+      tax_1_amount:
+        type: number
       tax_1_percentage:
         type: number
       tax_1_type:
         maxLength: 10
         type: string
       tax_2:
+        type: number
+      tax_2_amount:
         type: number
       tax_2_percentage:
         type: number
@@ -3658,6 +3687,14 @@ definitions:
         type: string
       total_amount:
         type: number
+      total_override:
+        type: number
+      total_override_at:
+        type: string
+      total_override_by_id:
+        type: integer
+      total_override_reason:
+        type: string
       updated_at:
         type: string
       vendor_id:
@@ -3835,10 +3872,12 @@ definitions:
       created_at:
         type: string
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       discount:
+        type: number
+      discount_amount:
+        type: number
+      discount_percentage:
         type: number
       discount_type:
         maxLength: 10
@@ -3859,6 +3898,8 @@ definitions:
         type: integer
       meter_value:
         type: number
+      net:
+        type: number
       parts_subtotal:
         type: number
       reference:
@@ -3873,12 +3914,16 @@ definitions:
         type: number
       tax_1:
         type: number
+      tax_1_amount:
+        type: number
       tax_1_percentage:
         type: number
       tax_1_type:
         maxLength: 10
         type: string
       tax_2:
+        type: number
+      tax_2_amount:
         type: number
       tax_2_percentage:
         type: number
@@ -3887,6 +3932,14 @@ definitions:
         type: string
       total_amount:
         type: number
+      total_override:
+        type: number
+      total_override_at:
+        type: string
+      total_override_by_id:
+        type: integer
+      total_override_reason:
+        type: string
       updated_at:
         type: string
       vendor_id:
@@ -4469,9 +4522,7 @@ definitions:
       current_meter_date:
         type: string
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       down_payment:
         type: number
       estimated_replacement_mileage:
@@ -4600,9 +4651,19 @@ definitions:
         type: number
       status_id:
         type: integer
+      trailer:
+        $ref: '#/definitions/dto.UpsertTrailerRequest'
       trim:
         maxLength: 100
         type: string
+      vehicle:
+        allOf:
+        - $ref: '#/definitions/dto.UpsertVehicleRequest'
+        description: |-
+          Vehicle/Trailer, when present, are upserted in the SAME transaction as the
+          asset write: a failure on either rolls the whole request back, so no asset
+          row is ever persisted without its subtype. Omit both for an asset-only edit
+          (status, photo), which keeps the single-write path unchanged.
       vehicle_type:
         maxLength: 20
         type: string
@@ -4775,9 +4836,7 @@ definitions:
         maxLength: 50
         type: string
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       dashboard_preferences:
         items:
           type: integer
@@ -5125,9 +5184,7 @@ definitions:
       created_by_workflow:
         type: boolean
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       description:
         type: string
       documents_count:
@@ -5314,9 +5371,7 @@ definitions:
   dto.UpdatePartRequest:
     properties:
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       description:
         type: string
       inventory_item:
@@ -5370,9 +5425,7 @@ definitions:
   dto.UpdatePurchaseOrderRequest:
     properties:
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       description:
         type: string
       destination_id:
@@ -5471,9 +5524,7 @@ definitions:
       completed_at:
         type: string
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       discount:
         type: number
       discount_type:
@@ -5760,9 +5811,7 @@ definitions:
         maxLength: 50
         type: string
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       external_id:
         maxLength: 100
         type: string
@@ -5889,9 +5938,7 @@ definitions:
       completed_at:
         type: string
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       description:
         type: string
       discount:
@@ -6692,9 +6739,7 @@ definitions:
       created_at:
         type: string
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       external_id:
         maxLength: 100
         type: string
@@ -6856,6 +6901,13 @@ definitions:
       slot:
         type: integer
     type: object
+  dto.WorkOrderFacetsResponse:
+    properties:
+      status:
+        items:
+          $ref: '#/definitions/dto.FacetCount'
+        type: array
+    type: object
   dto.WorkOrderLineItemPage:
     properties:
       data:
@@ -6931,12 +6983,14 @@ definitions:
       created_at:
         type: string
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       description:
         type: string
       discount:
+        type: number
+      discount_amount:
+        type: number
+      discount_percentage:
         type: number
       discount_type:
         maxLength: 10
@@ -6979,6 +7033,8 @@ definitions:
         type: integer
       location_id:
         type: integer
+      net:
+        type: number
       number:
         maxLength: 50
         type: string
@@ -7006,12 +7062,16 @@ definitions:
         type: number
       tax_1:
         type: number
+      tax_1_amount:
+        type: number
       tax_1_percentage:
         type: number
       tax_1_type:
         maxLength: 10
         type: string
       tax_2:
+        type: number
+      tax_2_amount:
         type: number
       tax_2_percentage:
         type: number
@@ -7020,6 +7080,14 @@ definitions:
         type: string
       total_amount:
         type: number
+      total_override:
+        type: number
+      total_override_at:
+        type: string
+      total_override_by_id:
+        type: integer
+      total_override_reason:
+        type: string
       updated_at:
         type: string
       vendor_id:
@@ -7148,65 +7216,6 @@ info:
   title: Fleet API
   version: "1.0"
 paths:
-  /api/v1/{resource}/{id}/archive:
-    post:
-      description: 'Retires the record. Use this instead of DELETE for anything other
-        records reference — DELETE answers 409 resource_referenced in that case. Archived
-        records disappear from lists and pickers unless ?include_archived=true. Archiving
-        needs the same permission as editing: deciding a vendor is no longer used
-        is the same kind of decision as correcting its address.'
-      parameters:
-      - description: id
-        in: path
-        name: id
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: The archived record, in its own resource's shape
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/dto.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/dto.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Archive a record
-      tags:
-      - archive
-  /api/v1/{resource}/{id}/restore:
-    post:
-      description: Clears archived_at, returning the record to the lists and pickers
-        it was hidden from.
-      parameters:
-      - description: id
-        in: path
-        name: id
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: The restored record, in its own resource's shape
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/dto.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/dto.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Restore an archived record
-      tags:
-      - archive
   /api/v1/admin/companies/{id}/owner:
     get:
       description: 'employee.is_account_owner is a single global boolean, not a per-company
@@ -7879,6 +7888,10 @@ paths:
         in: query
         name: offset
         type: integer
+      - description: Include archived records
+        in: query
+        name: include_archived
+        type: boolean
       produces:
       - application/json
       responses:
@@ -7906,6 +7919,10 @@ paths:
     post:
       consumes:
       - application/json
+      description: 'Supplying a nested "vehicle" or "trailer" object makes the write
+        atomic: the asset row and its subtype are created in one transaction, so a
+        validation or write failure on the subtype rolls back the asset too. Omit
+        both for an asset-only create.'
       parameters:
       - description: body
         in: body
@@ -7975,6 +7992,11 @@ paths:
     put:
       consumes:
       - application/json
+      description: 'Supplying a nested "vehicle" or "trailer" object makes the write
+        atomic: the asset row and its subtype are updated in one transaction, so a
+        validation or write failure on the subtype rolls back the asset update too.
+        Omit both for an asset-only edit (status, photo, etc.), which keeps the single-write
+        path unchanged.'
       parameters:
       - description: id
         in: path
@@ -8003,6 +8025,37 @@ paths:
       summary: Update assets
       tags:
       - assets
+  /api/v1/assets/{id}/archive:
+    post:
+      description: Retires the record. Use instead of DELETE for anything other records
+        reference — DELETE answers 409 resource_referenced in that case. Archived
+        records disappear from lists and pickers unless ?include_archived=true.
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.AssetResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Archive an asset
+      tags:
+      - archive
   /api/v1/assets/{id}/axle-config:
     delete:
       parameters:
@@ -8229,6 +8282,36 @@ paths:
       summary: Update fuel-entries
       tags:
       - fuel-entries
+  /api/v1/assets/{id}/restore:
+    post:
+      description: Clears archived_at, returning the record to the lists and pickers
+        it was hidden from.
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.AssetResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Restore an archived asset
+      tags:
+      - archive
   /api/v1/assets/{id}/trailer:
     delete:
       parameters:
@@ -8529,6 +8612,51 @@ paths:
       summary: Create or update vehicle
       tags:
       - vehicle
+  /api/v1/assets/facets:
+    get:
+      description: Applies the assets list's archived-visibility rule and filters,
+        each query omitting only the dimension it groups by.
+      parameters:
+      - description: Search name, VIN/serial and license plate
+        in: query
+        name: q
+        type: string
+      - description: Filter by vehicle type
+        in: query
+        name: vehicle_type
+        type: string
+      - description: Filter by status
+        in: query
+        name: status_id
+        type: integer
+      - description: Include archived records
+        in: query
+        name: include_archived
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.AssetFacetsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Asset counts by vehicle type, trailer type and status
+      tags:
+      - assets
   /api/v1/axle-definitions/{id}/wheel-positions:
     get:
       parameters:
@@ -10521,6 +10649,10 @@ paths:
         in: query
         name: offset
         type: integer
+      - description: Include archived records
+        in: query
+        name: include_archived
+        type: boolean
       produces:
       - application/json
       responses:
@@ -10637,6 +10769,37 @@ paths:
       summary: Update inspection-forms
       tags:
       - inspection-forms
+  /api/v1/inspection-forms/{id}/archive:
+    post:
+      description: Retires the record. Use instead of DELETE for anything other records
+        reference — DELETE answers 409 resource_referenced in that case. Archived
+        records disappear from lists and pickers unless ?include_archived=true.
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.InspectionFormResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Archive an inspection form
+      tags:
+      - archive
   /api/v1/inspection-forms/{id}/items:
     get:
       parameters:
@@ -10789,6 +10952,36 @@ paths:
       summary: Update inspection-form-items
       tags:
       - inspection-form-items
+  /api/v1/inspection-forms/{id}/restore:
+    post:
+      description: Clears archived_at, returning the record to the lists and pickers
+        it was hidden from.
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.InspectionFormResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Restore an archived inspection form
+      tags:
+      - archive
   /api/v1/inspection-submissions:
     get:
       parameters:
@@ -11198,11 +11391,26 @@ paths:
   /api/v1/inventory-journal-entries:
     get:
       description: The ledger grows forever, so it is filtered in SQL and always returned
-        newest first.
+        newest first. A transfer entry is attributed to its source part_location_detail_id,
+        so the location_id filter matches the source bin's location; a reversal entry
+        carries the same part_location_detail_id as the entry it reverses, so both
+        appear under the same location_id.
       parameters:
       - description: Filter by part
         in: query
         name: part_id
+        type: integer
+      - description: Exact movement type (e.g. manual, transfer, reversal)
+        in: query
+        name: adjustment_type
+        type: string
+      - description: Filter by storage location (joins part_inventory)
+        in: query
+        name: location_id
+        type: integer
+      - description: Filter by a specific part_inventory bin
+        in: query
+        name: part_location_detail_id
         type: integer
       - description: Inclusive lower bound (RFC3339 or YYYY-MM-DD)
         in: query
@@ -11804,6 +12012,37 @@ paths:
       security:
       - BearerAuth: []
       summary: Remove a watcher from an issue
+      tags:
+      - issues
+  /api/v1/issues/facets:
+    get:
+      parameters:
+      - description: Filter by asset
+        in: query
+        name: asset_id
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.IssueFacetsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Issue counts by state
       tags:
       - issues
   /api/v1/locations:
@@ -12730,6 +12969,10 @@ paths:
         in: query
         name: offset
         type: integer
+      - description: Include archived records
+        in: query
+        name: include_archived
+        type: boolean
       produces:
       - application/json
       responses:
@@ -12846,6 +13089,37 @@ paths:
       summary: Update parts
       tags:
       - parts
+  /api/v1/parts/{id}/archive:
+    post:
+      description: Retires the record. Use instead of DELETE for anything other records
+        reference — DELETE answers 409 resource_referenced in that case. Archived
+        records disappear from lists and pickers unless ?include_archived=true.
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PartResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Archive a part
+      tags:
+      - archive
   /api/v1/parts/{id}/inventory:
     get:
       parameters:
@@ -12998,6 +13272,36 @@ paths:
       summary: Update part-inventory
       tags:
       - part-inventory
+  /api/v1/parts/{id}/restore:
+    post:
+      description: Clears archived_at, returning the record to the lists and pickers
+        it was hidden from.
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PartResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Restore an archived part
+      tags:
+      - archive
   /api/v1/purchase-order-line-items:
     get:
       description: Flat, filterable view of the rows nested under /purchase-orders/{id}/line-items,
@@ -14362,6 +14666,10 @@ paths:
         in: query
         name: offset
         type: integer
+      - description: Include archived records
+        in: query
+        name: include_archived
+        type: boolean
       produces:
       - application/json
       responses:
@@ -14478,6 +14786,37 @@ paths:
       summary: Update service-tasks
       tags:
       - service-tasks
+  /api/v1/service-tasks/{id}/archive:
+    post:
+      description: Retires the record. Use instead of DELETE for anything other records
+        reference — DELETE answers 409 resource_referenced in that case. Archived
+        records disappear from lists and pickers unless ?include_archived=true.
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.ServiceTaskResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Archive a service task
+      tags:
+      - archive
   /api/v1/service-tasks/{id}/parts:
     get:
       parameters:
@@ -14630,6 +14969,36 @@ paths:
       summary: Update service-task-parts
       tags:
       - service-task-parts
+  /api/v1/service-tasks/{id}/restore:
+    post:
+      description: Clears archived_at, returning the record to the lists and pickers
+        it was hidden from.
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.ServiceTaskResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Restore an archived service task
+      tags:
+      - archive
   /api/v1/tire-assignment-requests:
     get:
       description: 'The approval inbox: filter to PENDING for work waiting on someone.'
@@ -16069,6 +16438,10 @@ paths:
         in: query
         name: offset
         type: integer
+      - description: Include archived records
+        in: query
+        name: include_archived
+        type: boolean
       produces:
       - application/json
       responses:
@@ -16185,6 +16558,67 @@ paths:
       summary: Update vendors
       tags:
       - vendors
+  /api/v1/vendors/{id}/archive:
+    post:
+      description: Retires the record. Use instead of DELETE for anything other records
+        reference — DELETE answers 409 resource_referenced in that case. Archived
+        records disappear from lists and pickers unless ?include_archived=true.
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.VendorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Archive a vendor
+      tags:
+      - archive
+  /api/v1/vendors/{id}/restore:
+    post:
+      description: Clears archived_at, returning the record to the lists and pickers
+        it was hidden from.
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.VendorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Restore an archived vendor
+      tags:
+      - archive
   /api/v1/warranties:
     get:
       parameters:
@@ -17549,6 +17983,37 @@ paths:
       summary: Get work-order-status-logs
       tags:
       - work-order-status-logs
+  /api/v1/work-orders/facets:
+    get:
+      parameters:
+      - description: Filter by asset
+        in: query
+        name: asset_id
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.WorkOrderFacetsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Work order counts by status
+      tags:
+      - work-orders
   /auth/login:
     post:
       consumes:

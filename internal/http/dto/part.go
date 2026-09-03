@@ -23,7 +23,7 @@ type CreatePartRequest struct {
 	Upc                    string           `json:"upc" binding:"omitempty,max=50"`
 	UnitCost               *decimal.Decimal `json:"unit_cost"`
 	InventoryItem          *bool            `json:"inventory_item"`
-	CustomFields           json.RawMessage  `json:"custom_fields"`
+	CustomFields           json.RawMessage  `json:"custom_fields" swaggertype:"object"`
 }
 
 type UpdatePartRequest struct {
@@ -42,7 +42,7 @@ type UpdatePartRequest struct {
 	Upc                    string           `json:"upc" binding:"omitempty,max=50"`
 	UnitCost               *decimal.Decimal `json:"unit_cost"`
 	InventoryItem          bool             `json:"inventory_item"`
-	CustomFields           json.RawMessage  `json:"custom_fields"`
+	CustomFields           json.RawMessage  `json:"custom_fields" swaggertype:"object"`
 }
 
 type PartResponse struct {
@@ -61,7 +61,7 @@ type PartResponse struct {
 	UnitCost               *decimal.Decimal `json:"unit_cost"`
 	InventoryItem          bool             `json:"inventory_item"`
 	ArchivedAt             *time.Time       `json:"archived_at"`
-	CustomFields           json.RawMessage  `json:"custom_fields"`
+	CustomFields           json.RawMessage  `json:"custom_fields" swaggertype:"object"`
 	CreatedAt              time.Time        `json:"created_at"`
 	UpdatedAt              time.Time        `json:"updated_at"`
 }

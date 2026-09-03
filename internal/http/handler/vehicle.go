@@ -21,9 +21,17 @@ func (s *VehicleStore) Get(ctx context.Context, parentID int64) (dto.VehicleResp
 }
 
 func (s *VehicleStore) Upsert(ctx context.Context, parentID int64, in dto.UpsertVehicleRequest) (dto.VehicleResponse, error) {
-	r, err := s.q.UpsertVehicle(ctx, gen.UpsertVehicleParams{
+	return upsertVehicleTx(ctx, s.q, parentID, middleware.CompanyFromContext(ctx), in)
+}
+
+// upsertVehicleTx is the tx-friendly core of VehicleStore.Upsert: it takes its
+// *gen.Queries and company explicitly so it can run against either the
+// singleton store's own queries or a transaction-scoped one, e.g. when an
+// asset create/update needs the vehicle write to commit or roll back with it.
+func upsertVehicleTx(ctx context.Context, q *gen.Queries, parentID, company int64, in dto.UpsertVehicleRequest) (dto.VehicleResponse, error) {
+	r, err := q.UpsertVehicle(ctx, gen.UpsertVehicleParams{
 		ParentID:                parentID,
-		CompanyID:               middleware.CompanyFromContext(ctx),
+		CompanyID:               company,
 		EngineSerial:            in.EngineSerial,
 		EngineDescription:       in.EngineDescription,
 		EngineBrand:             in.EngineBrand,

@@ -30,7 +30,7 @@ type CreatePurchaseOrderRequest struct {
 	// which is the only thing that can check a transition is legal and record
 	// who made it; created_by_id is stamped from the caller.
 	Labels       json.RawMessage `json:"labels"`
-	CustomFields json.RawMessage `json:"custom_fields"`
+	CustomFields json.RawMessage `json:"custom_fields" swaggertype:"object"`
 }
 
 type UpdatePurchaseOrderRequest struct {
@@ -56,44 +56,52 @@ type UpdatePurchaseOrderRequest struct {
 	// which is the only thing that can check a transition is legal and record
 	// who made it; created_by_id is stamped from the caller.
 	Labels       json.RawMessage `json:"labels"`
-	CustomFields json.RawMessage `json:"custom_fields"`
+	CustomFields json.RawMessage `json:"custom_fields" swaggertype:"object"`
 }
 
 type PurchaseOrderResponse struct {
-	ID                 int64           `json:"id"`
-	CompanyID          int64           `json:"company_id"`
-	Number             string          `json:"number" binding:"omitempty,max=50"`
-	Description        string          `json:"description"`
-	State              string          `json:"state" binding:"omitempty,max=20"`
-	VendorID           int64           `json:"vendor_id"`
-	DestinationID      int64           `json:"destination_id"`
-	DiscountType       string          `json:"discount_type" binding:"omitempty,max=10"`
-	Discount           decimal.Decimal `json:"discount"`
-	DiscountPercentage decimal.Decimal `json:"discount_percentage"`
-	Tax1Type           string          `json:"tax_1_type" binding:"omitempty,max=10"`
-	Tax1               decimal.Decimal `json:"tax_1"`
-	Tax1Percentage     decimal.Decimal `json:"tax_1_percentage"`
-	Tax2Type           string          `json:"tax_2_type" binding:"omitempty,max=10"`
-	Tax2               decimal.Decimal `json:"tax_2"`
-	Tax2Percentage     decimal.Decimal `json:"tax_2_percentage"`
-	Shipping           decimal.Decimal `json:"shipping"`
-	Subtotal           decimal.Decimal `json:"subtotal"`
-	TotalAmount        decimal.Decimal `json:"total_amount"`
-	CreatedByID        *int64          `json:"created_by_id"`
-	SubmittedAt        *time.Time      `json:"submitted_at"`
-	SubmittedByID      *int64          `json:"submitted_by_id"`
-	RejectedAt         *time.Time      `json:"rejected_at"`
-	RejectedByID       *int64          `json:"rejected_by_id"`
-	ApprovedAt         *time.Time      `json:"approved_at"`
-	ApprovedByID       *int64          `json:"approved_by_id"`
-	PurchasedAt        *time.Time      `json:"purchased_at"`
-	ReceivedPartialAt  *time.Time      `json:"received_partial_at"`
-	ReceivedFullAt     *time.Time      `json:"received_full_at"`
-	ClosedAt           *time.Time      `json:"closed_at"`
-	Labels             json.RawMessage `json:"labels"`
-	CustomFields       json.RawMessage `json:"custom_fields"`
-	CreatedAt          time.Time       `json:"created_at"`
-	UpdatedAt          time.Time       `json:"updated_at"`
+	ID                  int64            `json:"id"`
+	CompanyID           int64            `json:"company_id"`
+	Number              string           `json:"number" binding:"omitempty,max=50"`
+	Description         string           `json:"description"`
+	State               string           `json:"state" binding:"omitempty,max=20"`
+	VendorID            int64            `json:"vendor_id"`
+	DestinationID       int64            `json:"destination_id"`
+	DiscountType        string           `json:"discount_type" binding:"omitempty,max=10"`
+	Discount            decimal.Decimal  `json:"discount"`
+	DiscountPercentage  decimal.Decimal  `json:"discount_percentage"`
+	Tax1Type            string           `json:"tax_1_type" binding:"omitempty,max=10"`
+	Tax1                decimal.Decimal  `json:"tax_1"`
+	Tax1Percentage      decimal.Decimal  `json:"tax_1_percentage"`
+	Tax2Type            string           `json:"tax_2_type" binding:"omitempty,max=10"`
+	Tax2                decimal.Decimal  `json:"tax_2"`
+	Tax2Percentage      decimal.Decimal  `json:"tax_2_percentage"`
+	Shipping            decimal.Decimal  `json:"shipping"`
+	Subtotal            decimal.Decimal  `json:"subtotal"`
+	DiscountAmount      decimal.Decimal  `json:"discount_amount"`
+	Net                 decimal.Decimal  `json:"net"`
+	Tax1Amount          decimal.Decimal  `json:"tax_1_amount"`
+	Tax2Amount          decimal.Decimal  `json:"tax_2_amount"`
+	TotalAmount         decimal.Decimal  `json:"total_amount"`
+	TotalOverride       *decimal.Decimal `json:"total_override"`
+	TotalOverrideReason *string          `json:"total_override_reason"`
+	TotalOverrideByID   *int64           `json:"total_override_by_id"`
+	TotalOverrideAt     *time.Time       `json:"total_override_at"`
+	CreatedByID         *int64           `json:"created_by_id"`
+	SubmittedAt         *time.Time       `json:"submitted_at"`
+	SubmittedByID       *int64           `json:"submitted_by_id"`
+	RejectedAt          *time.Time       `json:"rejected_at"`
+	RejectedByID        *int64           `json:"rejected_by_id"`
+	ApprovedAt          *time.Time       `json:"approved_at"`
+	ApprovedByID        *int64           `json:"approved_by_id"`
+	PurchasedAt         *time.Time       `json:"purchased_at"`
+	ReceivedPartialAt   *time.Time       `json:"received_partial_at"`
+	ReceivedFullAt      *time.Time       `json:"received_full_at"`
+	ClosedAt            *time.Time       `json:"closed_at"`
+	Labels              json.RawMessage  `json:"labels"`
+	CustomFields        json.RawMessage  `json:"custom_fields" swaggertype:"object"`
+	CreatedAt           time.Time        `json:"created_at"`
+	UpdatedAt           time.Time        `json:"updated_at"`
 }
 
 type PurchaseOrderPage struct {

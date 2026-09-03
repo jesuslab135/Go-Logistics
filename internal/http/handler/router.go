@@ -119,10 +119,13 @@ func NewRouter(d Deps) *gin.Engine {
 	// Phase 2: assets
 	registerCrudWithList(assets, "/assets",
 		crud.NewHandler[dto.AssetResponse, dto.CreateAssetRequest, dto.UpdateAssetRequest](
-			NewAssetStore(d.Queries, d.Storage, d.Logger)), lists.Assets)
+			NewAssetStore(d.Queries, d.Pool, d.Storage, d.Logger)), lists.Assets)
 	// Read-only reverse view of the nested /assets/{id}/trailer-assignments;
 	// mutations stay on the nested route that owns the parent scope.
 	assets.GET("/asset-trailer-assignments", lists.AssetTrailerAssignments)
+	// Cheap aggregate counts alongside the list, so a registry can draw its
+	// tab/facet chips from one grouped query instead of one list call per bucket.
+	assets.GET("/assets/facets", lists.AssetFacets)
 
 	// Phase 3: parts & inventory
 	crud.NewHandler[dto.PartCategoryResponse, dto.CreatePartCategoryRequest, dto.UpdatePartCategoryRequest](
@@ -150,12 +153,14 @@ func NewRouter(d Deps) *gin.Engine {
 	crud.NewHandler[dto.LocationResponse, dto.CreateLocationRequest, dto.UpdateLocationRequest](NewLocationStore(d.Queries)).Register(member, "/locations")
 	registerCrudWithList(workOrders, "/work-orders",
 		crud.NewHandler[dto.WorkOrderResponse, dto.CreateWorkOrderRequest, dto.UpdateWorkOrderRequest](NewWorkOrderStore(d.Queries, d.Pool)), lists.WorkOrders)
+	workOrders.GET("/work-orders/facets", lists.WorkOrderFacets)
 	// Totals are computed; this is the audited way to depart from the formula.
 	overrides := NewTotalOverrideHandler(d.Queries, d.Pool)
 	workOrders.POST("/work-orders/:id/override-total", overrides.WorkOrder)
 	service.POST("/service-entries/:id/override-total", overrides.ServiceEntry)
 	registerCrudWithList(issues, "/issues",
 		crud.NewHandler[dto.IssueResponse, dto.CreateIssueRequest, dto.UpdateIssueRequest](NewIssueStore(d.Queries)), lists.Issues)
+	issues.GET("/issues/facets", lists.IssueFacets)
 	crud.NewHandler[dto.IssuePriorityResponse, dto.CreateIssuePriorityRequest, dto.UpdateIssuePriorityRequest](NewIssuePriorityStore(d.Queries)).Register(issues, "/issue-priorities")
 	crud.NewHandler[dto.FaultResponse, dto.CreateFaultRequest, dto.UpdateFaultRequest](NewFaultStore(d.Queries)).Register(issues, "/faults")
 

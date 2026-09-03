@@ -1032,6 +1032,12 @@ const docTemplate = `{
                         "description": "Offset",
                         "name": "offset",
                         "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Include archived records",
+                        "name": "include_archived",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1067,6 +1073,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Supplying a nested \"vehicle\" or \"trailer\" object makes the write atomic: the asset row and its subtype are created in one transaction, so a validation or write failure on the subtype rolls back the asset too. Omit both for an asset-only create.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1097,6 +1104,75 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/assets/facets": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Applies the assets list's archived-visibility rule and filters, each query omitting only the dimension it groups by.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "assets"
+                ],
+                "summary": "Asset counts by vehicle type, trailer type and status",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Search name, VIN/serial and license plate",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by vehicle type",
+                        "name": "vehicle_type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Filter by status",
+                        "name": "status_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Include archived records",
+                        "name": "include_archived",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.AssetFacetsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -1148,6 +1224,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Supplying a nested \"vehicle\" or \"trailer\" object makes the write atomic: the asset row and its subtype are updated in one transaction, so a validation or write failure on the subtype rolls back the asset update too. Omit both for an asset-only edit (status, photo, etc.), which keeps the single-write path unchanged.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1216,6 +1293,52 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/assets/{id}/archive": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retires the record. Use instead of DELETE for anything other records reference — DELETE answers 409 resource_referenced in that case. Archived records disappear from lists and pickers unless ?include_archived=true.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "archive"
+                ],
+                "summary": "Archive an asset",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.AssetResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -1575,6 +1698,52 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/assets/{id}/restore": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Clears archived_at, returning the record to the lists and pickers it was hidden from.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "archive"
+                ],
+                "summary": "Restore an archived asset",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.AssetResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -5212,6 +5381,12 @@ const docTemplate = `{
                         "description": "Offset",
                         "name": "offset",
                         "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Include archived records",
+                        "name": "include_archived",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -5384,6 +5559,52 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/inspection-forms/{id}/archive": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retires the record. Use instead of DELETE for anything other records reference — DELETE answers 409 resource_referenced in that case. Archived records disappear from lists and pickers unless ?include_archived=true.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "archive"
+                ],
+                "summary": "Archive an inspection form",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.InspectionFormResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -5624,6 +5845,52 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/inspection-forms/{id}/restore": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Clears archived_at, returning the record to the lists and pickers it was hidden from.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "archive"
+                ],
+                "summary": "Restore an archived inspection form",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.InspectionFormResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -6288,7 +6555,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "The ledger grows forever, so it is filtered in SQL and always returned newest first.",
+                "description": "The ledger grows forever, so it is filtered in SQL and always returned newest first. A transfer entry is attributed to its source part_location_detail_id, so the location_id filter matches the source bin's location; a reversal entry carries the same part_location_detail_id as the entry it reverses, so both appear under the same location_id.",
                 "produces": [
                     "application/json"
                 ],
@@ -6301,6 +6568,24 @@ const docTemplate = `{
                         "type": "integer",
                         "description": "Filter by part",
                         "name": "part_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Exact movement type (e.g. manual, transfer, reversal)",
+                        "name": "adjustment_type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Filter by storage location (joins part_inventory)",
+                        "name": "location_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Filter by a specific part_inventory bin",
+                        "name": "part_location_detail_id",
                         "in": "query"
                     },
                     {
@@ -6822,6 +7107,56 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/issues/facets": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "issues"
+                ],
+                "summary": "Issue counts by state",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Filter by asset",
+                        "name": "asset_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.IssueFacetsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -8722,6 +9057,12 @@ const docTemplate = `{
                         "description": "Offset",
                         "name": "offset",
                         "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Include archived records",
+                        "name": "include_archived",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -8894,6 +9235,52 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/parts/{id}/archive": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retires the record. Use instead of DELETE for anything other records reference — DELETE answers 409 resource_referenced in that case. Archived records disappear from lists and pickers unless ?include_archived=true.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "archive"
+                ],
+                "summary": "Archive a part",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PartResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -9134,6 +9521,52 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/parts/{id}/restore": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Clears archived_at, returning the record to the lists and pickers it was hidden from.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "archive"
+                ],
+                "summary": "Restore an archived part",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PartResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -11300,6 +11733,12 @@ const docTemplate = `{
                         "description": "Offset",
                         "name": "offset",
                         "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Include archived records",
+                        "name": "include_archived",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -11472,6 +11911,52 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/service-tasks/{id}/archive": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retires the record. Use instead of DELETE for anything other records reference — DELETE answers 409 resource_referenced in that case. Archived records disappear from lists and pickers unless ?include_archived=true.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "archive"
+                ],
+                "summary": "Archive a service task",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ServiceTaskResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -11712,6 +12197,52 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/service-tasks/{id}/restore": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Clears archived_at, returning the record to the lists and pickers it was hidden from.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "archive"
+                ],
+                "summary": "Restore an archived service task",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ServiceTaskResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -13999,6 +14530,12 @@ const docTemplate = `{
                         "description": "Offset",
                         "name": "offset",
                         "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Include archived records",
+                        "name": "include_archived",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -14171,6 +14708,98 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/vendors/{id}/archive": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retires the record. Use instead of DELETE for anything other records reference — DELETE answers 409 resource_referenced in that case. Archived records disappear from lists and pickers unless ?include_archived=true.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "archive"
+                ],
+                "summary": "Archive a vendor",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.VendorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/vendors/{id}/restore": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Clears archived_at, returning the record to the lists and pickers it was hidden from.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "archive"
+                ],
+                "summary": "Restore an archived vendor",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.VendorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -15523,6 +16152,56 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/work-orders/facets": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "work-orders"
+                ],
+                "summary": "Work order counts by status",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Filter by asset",
+                        "name": "asset_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.WorkOrderFacetsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/work-orders/{id}": {
             "get": {
                 "security": [
@@ -16336,92 +17015,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/{resource}/{id}/archive": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Retires the record. Use this instead of DELETE for anything other records reference — DELETE answers 409 resource_referenced in that case. Archived records disappear from lists and pickers unless ?include_archived=true. Archiving needs the same permission as editing: deciding a vendor is no longer used is the same kind of decision as correcting its address.",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "archive"
-                ],
-                "summary": "Archive a record",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "id",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "The archived record, in its own resource's shape"
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/{resource}/{id}/restore": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Clears archived_at, returning the record to the lists and pickers it was hidden from.",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "archive"
-                ],
-                "summary": "Restore an archived record",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "id",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "The restored record, in its own resource's shape"
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/auth/login": {
             "post": {
                 "consumes": [
@@ -16684,6 +17277,29 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.AssetFacetsResponse": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.FacetCount"
+                    }
+                },
+                "trailer_type": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.FacetCount"
+                    }
+                },
+                "vehicle_type": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.FacetCount"
+                    }
+                }
+            }
+        },
         "dto.AssetPage": {
             "type": "object",
             "properties": {
@@ -16751,10 +17367,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "down_payment": {
                     "type": "number"
@@ -17438,10 +18051,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "down_payment": {
                     "type": "number"
@@ -17622,9 +18232,20 @@ const docTemplate = `{
                 "status_id": {
                     "type": "integer"
                 },
+                "trailer": {
+                    "$ref": "#/definitions/dto.UpsertTrailerRequest"
+                },
                 "trim": {
                     "type": "string",
                     "maxLength": 100
+                },
+                "vehicle": {
+                    "description": "Vehicle/Trailer, when present, are upserted in the SAME transaction as the\nasset write: a failure on either rolls the whole request back, so no asset\nrow is ever persisted without its subtype. Omit both for an asset-only edit\n(status, photo), which keeps the single-write path unchanged.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.UpsertVehicleRequest"
+                        }
+                    ]
                 },
                 "vehicle_type": {
                     "type": "string",
@@ -17902,10 +18523,7 @@ const docTemplate = `{
                     "maxLength": 50
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "dashboard_preferences": {
                     "type": "array",
@@ -18445,10 +19063,7 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "description": {
                     "type": "string"
@@ -18722,10 +19337,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "description": {
                     "type": "string"
@@ -18795,10 +19407,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "description": {
                     "type": "string"
@@ -18928,10 +19537,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "discount": {
                     "type": "number"
@@ -19333,10 +19939,7 @@ const docTemplate = `{
                     "maxLength": 50
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "external_id": {
                     "type": "string",
@@ -19512,10 +20115,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "description": {
                     "type": "string"
@@ -19835,10 +20435,7 @@ const docTemplate = `{
                     "maxLength": 50
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "dashboard_preferences": {
                     "type": "array",
@@ -19965,6 +20562,20 @@ const docTemplate = `{
             "properties": {
                 "error": {
                     "$ref": "#/definitions/dto.ErrorBody"
+                }
+            }
+        },
+        "dto.FacetCount": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "label": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "string"
                 }
             }
         },
@@ -20786,6 +21397,17 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.IssueFacetsResponse": {
+            "type": "object",
+            "properties": {
+                "state": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.FacetCount"
+                    }
+                }
+            }
+        },
         "dto.IssuePage": {
             "type": "object",
             "properties": {
@@ -20886,10 +21508,7 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "description": {
                     "type": "string"
@@ -21219,6 +21838,10 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "is_admin": {
+                    "type": "boolean"
+                },
+                "is_platform_admin": {
+                    "description": "IsPlatformAdmin gates the /api/v1/admin/* namespace. It is distinct from\nIsAdmin (a tenant administrator): only a platform administrator, granted via\nthe CLI, receives true. Re-read every call, so a revocation shows next request.",
                     "type": "boolean"
                 },
                 "modules": {
@@ -21684,10 +22307,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "description": {
                     "type": "string"
@@ -21840,10 +22460,7 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "description": {
                     "type": "string"
@@ -21852,6 +22469,9 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "discount": {
+                    "type": "number"
+                },
+                "discount_amount": {
                     "type": "number"
                 },
                 "discount_percentage": {
@@ -21869,6 +22489,9 @@ const docTemplate = `{
                     "items": {
                         "type": "integer"
                     }
+                },
+                "net": {
+                    "type": "number"
                 },
                 "number": {
                     "type": "string",
@@ -21908,6 +22531,9 @@ const docTemplate = `{
                 "tax_1": {
                     "type": "number"
                 },
+                "tax_1_amount": {
+                    "type": "number"
+                },
                 "tax_1_percentage": {
                     "type": "number"
                 },
@@ -21916,6 +22542,9 @@ const docTemplate = `{
                     "maxLength": 10
                 },
                 "tax_2": {
+                    "type": "number"
+                },
+                "tax_2_amount": {
                     "type": "number"
                 },
                 "tax_2_percentage": {
@@ -21927,6 +22556,18 @@ const docTemplate = `{
                 },
                 "total_amount": {
                     "type": "number"
+                },
+                "total_override": {
+                    "type": "number"
+                },
+                "total_override_at": {
+                    "type": "string"
+                },
+                "total_override_by_id": {
+                    "type": "integer"
+                },
+                "total_override_reason": {
+                    "type": "string"
                 },
                 "updated_at": {
                     "type": "string"
@@ -22193,12 +22834,15 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "discount": {
+                    "type": "number"
+                },
+                "discount_amount": {
+                    "type": "number"
+                },
+                "discount_percentage": {
                     "type": "number"
                 },
                 "discount_type": {
@@ -22229,6 +22873,9 @@ const docTemplate = `{
                 "meter_value": {
                     "type": "number"
                 },
+                "net": {
+                    "type": "number"
+                },
                 "parts_subtotal": {
                     "type": "number"
                 },
@@ -22249,6 +22896,9 @@ const docTemplate = `{
                 "tax_1": {
                     "type": "number"
                 },
+                "tax_1_amount": {
+                    "type": "number"
+                },
                 "tax_1_percentage": {
                     "type": "number"
                 },
@@ -22257,6 +22907,9 @@ const docTemplate = `{
                     "maxLength": 10
                 },
                 "tax_2": {
+                    "type": "number"
+                },
+                "tax_2_amount": {
                     "type": "number"
                 },
                 "tax_2_percentage": {
@@ -22268,6 +22921,18 @@ const docTemplate = `{
                 },
                 "total_amount": {
                     "type": "number"
+                },
+                "total_override": {
+                    "type": "number"
+                },
+                "total_override_at": {
+                    "type": "string"
+                },
+                "total_override_by_id": {
+                    "type": "integer"
+                },
+                "total_override_reason": {
+                    "type": "string"
                 },
                 "updated_at": {
                     "type": "string"
@@ -23118,10 +23783,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "down_payment": {
                     "type": "number"
@@ -23302,9 +23964,20 @@ const docTemplate = `{
                 "status_id": {
                     "type": "integer"
                 },
+                "trailer": {
+                    "$ref": "#/definitions/dto.UpsertTrailerRequest"
+                },
                 "trim": {
                     "type": "string",
                     "maxLength": 100
+                },
+                "vehicle": {
+                    "description": "Vehicle/Trailer, when present, are upserted in the SAME transaction as the\nasset write: a failure on either rolls the whole request back, so no asset\nrow is ever persisted without its subtype. Omit both for an asset-only edit\n(status, photo), which keeps the single-write path unchanged.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.UpsertVehicleRequest"
+                        }
+                    ]
                 },
                 "vehicle_type": {
                     "type": "string",
@@ -23553,10 +24226,7 @@ const docTemplate = `{
                     "maxLength": 50
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "dashboard_preferences": {
                     "type": "array",
@@ -24055,10 +24725,7 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "description": {
                     "type": "string"
@@ -24332,10 +24999,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "description": {
                     "type": "string"
@@ -24405,10 +25069,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "description": {
                     "type": "string"
@@ -24538,10 +25199,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "discount": {
                     "type": "number"
@@ -24954,10 +25612,7 @@ const docTemplate = `{
                     "maxLength": 50
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "external_id": {
                     "type": "string",
@@ -25133,10 +25788,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "description": {
                     "type": "string"
@@ -26252,10 +26904,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "external_id": {
                     "type": "string",
@@ -26493,6 +27142,17 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.WorkOrderFacetsResponse": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.FacetCount"
+                    }
+                }
+            }
+        },
         "dto.WorkOrderLineItemPage": {
             "type": "object",
             "properties": {
@@ -26605,15 +27265,18 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "description": {
                     "type": "string"
                 },
                 "discount": {
+                    "type": "number"
+                },
+                "discount_amount": {
+                    "type": "number"
+                },
+                "discount_percentage": {
                     "type": "number"
                 },
                 "discount_type": {
@@ -26676,6 +27339,9 @@ const docTemplate = `{
                 "location_id": {
                     "type": "integer"
                 },
+                "net": {
+                    "type": "number"
+                },
                 "number": {
                     "type": "string",
                     "maxLength": 50
@@ -26715,6 +27381,9 @@ const docTemplate = `{
                 "tax_1": {
                     "type": "number"
                 },
+                "tax_1_amount": {
+                    "type": "number"
+                },
                 "tax_1_percentage": {
                     "type": "number"
                 },
@@ -26723,6 +27392,9 @@ const docTemplate = `{
                     "maxLength": 10
                 },
                 "tax_2": {
+                    "type": "number"
+                },
+                "tax_2_amount": {
                     "type": "number"
                 },
                 "tax_2_percentage": {
@@ -26734,6 +27406,18 @@ const docTemplate = `{
                 },
                 "total_amount": {
                     "type": "number"
+                },
+                "total_override": {
+                    "type": "number"
+                },
+                "total_override_at": {
+                    "type": "string"
+                },
+                "total_override_by_id": {
+                    "type": "integer"
+                },
+                "total_override_reason": {
+                    "type": "string"
                 },
                 "updated_at": {
                     "type": "string"

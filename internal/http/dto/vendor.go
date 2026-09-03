@@ -31,7 +31,7 @@ type CreateVendorRequest struct {
 	IsServiceVendor    bool             `json:"is_service_vendor"`
 	IsPartsVendor      bool             `json:"is_parts_vendor"`
 	Labels             json.RawMessage  `json:"labels"`
-	CustomFields       json.RawMessage  `json:"custom_fields"`
+	CustomFields       json.RawMessage  `json:"custom_fields" swaggertype:"object"`
 }
 
 type UpdateVendorRequest struct {
@@ -58,7 +58,7 @@ type UpdateVendorRequest struct {
 	IsServiceVendor    bool             `json:"is_service_vendor"`
 	IsPartsVendor      bool             `json:"is_parts_vendor"`
 	Labels             json.RawMessage  `json:"labels"`
-	CustomFields       json.RawMessage  `json:"custom_fields"`
+	CustomFields       json.RawMessage  `json:"custom_fields" swaggertype:"object"`
 }
 
 type VendorResponse struct {
@@ -85,7 +85,7 @@ type VendorResponse struct {
 	IsPartsVendor      bool             `json:"is_parts_vendor"`
 	Labels             json.RawMessage  `json:"labels"`
 	ArchivedAt         *time.Time       `json:"archived_at"`
-	CustomFields       json.RawMessage  `json:"custom_fields"`
+	CustomFields       json.RawMessage  `json:"custom_fields" swaggertype:"object"`
 	CreatedAt          time.Time        `json:"created_at"`
 	UpdatedAt          time.Time        `json:"updated_at"`
 }

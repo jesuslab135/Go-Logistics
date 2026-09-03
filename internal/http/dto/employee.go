@@ -36,7 +36,7 @@ type CreateEmployeeRequest struct {
 	PostalCode           string           `json:"postal_code" binding:"omitempty,max=20"`
 	Country              string           `json:"country" binding:"omitempty,max=50"`
 	GroupID              *int64           `json:"group_id"`
-	CustomFields         json.RawMessage  `json:"custom_fields"`
+	CustomFields         json.RawMessage  `json:"custom_fields" swaggertype:"object"`
 	TablePreferences     json.RawMessage  `json:"table_preferences"`
 	DashboardPreferences json.RawMessage  `json:"dashboard_preferences"`
 }
@@ -70,7 +70,7 @@ type UpdateEmployeeRequest struct {
 	PostalCode           string           `json:"postal_code" binding:"omitempty,max=20"`
 	Country              string           `json:"country" binding:"omitempty,max=50"`
 	GroupID              *int64           `json:"group_id"`
-	CustomFields         json.RawMessage  `json:"custom_fields"`
+	CustomFields         json.RawMessage  `json:"custom_fields" swaggertype:"object"`
 	TablePreferences     json.RawMessage  `json:"table_preferences"`
 	DashboardPreferences json.RawMessage  `json:"dashboard_preferences"`
 }
@@ -105,7 +105,7 @@ type EmployeeResponse struct {
 	PostalCode           string           `json:"postal_code" binding:"omitempty,max=20"`
 	Country              string           `json:"country" binding:"omitempty,max=50"`
 	GroupID              *int64           `json:"group_id"`
-	CustomFields         json.RawMessage  `json:"custom_fields"`
+	CustomFields         json.RawMessage  `json:"custom_fields" swaggertype:"object"`
 	TablePreferences     json.RawMessage  `json:"table_preferences"`
 	DashboardPreferences json.RawMessage  `json:"dashboard_preferences"`
 	UpdatedAt            time.Time        `json:"updated_at"`

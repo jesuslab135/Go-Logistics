@@ -215,6 +215,20 @@ func (s listSpec[T]) build(p paginate.Params) (string, []any, string, []any) {
 	return listSQL, listArgs, countSQL, where.Args()
 }
 
+// facetQuery builds a grouped-count statement over the same FROM/WHERE a list
+// uses, minus the grouped dimension's own filter (the caller omits it). No LIMIT:
+// facet counts describe the whole filtered set, so they stay exact as a page
+// scrolls. labelExpr is the human label column (equal to groupExpr when the value
+// is its own label).
+func facetQuery(from string, where *filter.Where, groupExpr, labelExpr string) (string, []any) {
+	sql := "SELECT " + groupExpr + ", " + labelExpr + ", count(*) " + from
+	if cond := where.SQL(); cond != "" {
+		sql += " WHERE " + cond
+	}
+	sql += " GROUP BY " + groupExpr + ", " + labelExpr
+	return sql, where.Args()
+}
+
 // runList executes a spec and returns the page plus the filtered total.
 func runList[T any](ctx context.Context, pool *pgxpool.Pool, s listSpec[T], p paginate.Params) ([]T, int64, error) {
 	listSQL, listArgs, countSQL, countArgs := s.build(p)
