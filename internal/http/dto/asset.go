@@ -70,7 +70,7 @@ type CreateAssetRequest struct {
 	MileageCap                  *int32           `json:"mileage_cap"`
 	Notes                       string           `json:"notes"`
 	ExternalID                  string           `json:"external_id" binding:"omitempty,max=100"`
-	CustomFields                json.RawMessage  `json:"custom_fields"`
+	CustomFields                json.RawMessage  `json:"custom_fields" swaggertype:"object"`
 	FuelVolumeUnits             string           `json:"fuel_volume_units" binding:"omitempty,max=20"`
 	CurrentMeterDate            *time.Time       `json:"current_meter_date"`
 	LoanAccountNumber           string           `json:"loan_account_number" binding:"omitempty,max=100"`
@@ -143,7 +143,7 @@ type UpdateAssetRequest struct {
 	MileageCap                  *int32           `json:"mileage_cap"`
 	Notes                       string           `json:"notes"`
 	ExternalID                  string           `json:"external_id" binding:"omitempty,max=100"`
-	CustomFields                json.RawMessage  `json:"custom_fields"`
+	CustomFields                json.RawMessage  `json:"custom_fields" swaggertype:"object"`
 	FuelVolumeUnits             string           `json:"fuel_volume_units" binding:"omitempty,max=20"`
 	CurrentMeterDate            *time.Time       `json:"current_meter_date"`
 	LoanAccountNumber           string           `json:"loan_account_number" binding:"omitempty,max=100"`
@@ -216,7 +216,7 @@ type AssetResponse struct {
 	Notes                       string           `json:"notes"`
 	ArchivedAt                  *time.Time       `json:"archived_at"`
 	ExternalID                  string           `json:"external_id" binding:"omitempty,max=100"`
-	CustomFields                json.RawMessage  `json:"custom_fields"`
+	CustomFields                json.RawMessage  `json:"custom_fields" swaggertype:"object"`
 	FuelVolumeUnits             string           `json:"fuel_volume_units" binding:"omitempty,max=20"`
 	CurrentMeterDate            *time.Time       `json:"current_meter_date"`
 	LoanAccountNumber           string           `json:"loan_account_number" binding:"omitempty,max=100"`

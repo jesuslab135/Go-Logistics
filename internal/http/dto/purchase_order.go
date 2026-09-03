@@ -30,7 +30,7 @@ type CreatePurchaseOrderRequest struct {
 	// which is the only thing that can check a transition is legal and record
 	// who made it; created_by_id is stamped from the caller.
 	Labels       json.RawMessage `json:"labels"`
-	CustomFields json.RawMessage `json:"custom_fields"`
+	CustomFields json.RawMessage `json:"custom_fields" swaggertype:"object"`
 }
 
 type UpdatePurchaseOrderRequest struct {
@@ -56,7 +56,7 @@ type UpdatePurchaseOrderRequest struct {
 	// which is the only thing that can check a transition is legal and record
 	// who made it; created_by_id is stamped from the caller.
 	Labels       json.RawMessage `json:"labels"`
-	CustomFields json.RawMessage `json:"custom_fields"`
+	CustomFields json.RawMessage `json:"custom_fields" swaggertype:"object"`
 }
 
 type PurchaseOrderResponse struct {
@@ -91,7 +91,7 @@ type PurchaseOrderResponse struct {
 	ReceivedFullAt     *time.Time      `json:"received_full_at"`
 	ClosedAt           *time.Time      `json:"closed_at"`
 	Labels             json.RawMessage `json:"labels"`
-	CustomFields       json.RawMessage `json:"custom_fields"`
+	CustomFields       json.RawMessage `json:"custom_fields" swaggertype:"object"`
 	CreatedAt          time.Time       `json:"created_at"`
 	UpdatedAt          time.Time       `json:"updated_at"`
 }

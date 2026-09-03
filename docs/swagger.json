@@ -16744,10 +16744,7 @@
                     "type": "string"
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "down_payment": {
                     "type": "number"
@@ -17431,10 +17428,7 @@
                     "type": "string"
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "down_payment": {
                     "type": "number"
@@ -17895,10 +17889,7 @@
                     "maxLength": 50
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "dashboard_preferences": {
                     "type": "array",
@@ -18438,10 +18429,7 @@
                     "type": "boolean"
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "description": {
                     "type": "string"
@@ -18715,10 +18703,7 @@
             "type": "object",
             "properties": {
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "description": {
                     "type": "string"
@@ -18788,10 +18773,7 @@
             "type": "object",
             "properties": {
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "description": {
                     "type": "string"
@@ -18921,10 +18903,7 @@
                     "type": "string"
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "discount": {
                     "type": "number"
@@ -19326,10 +19305,7 @@
                     "maxLength": 50
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "external_id": {
                     "type": "string",
@@ -19505,10 +19481,7 @@
                     "type": "string"
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "description": {
                     "type": "string"
@@ -19828,10 +19801,7 @@
                     "maxLength": 50
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "dashboard_preferences": {
                     "type": "array",
@@ -20879,10 +20849,7 @@
                     "type": "boolean"
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "description": {
                     "type": "string"
@@ -21681,10 +21648,7 @@
                     "type": "string"
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "description": {
                     "type": "string"
@@ -21837,10 +21801,7 @@
                     "type": "integer"
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "description": {
                     "type": "string"
@@ -22190,10 +22151,7 @@
                     "type": "string"
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "discount": {
                     "type": "number"
@@ -23115,10 +23073,7 @@
                     "type": "string"
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "down_payment": {
                     "type": "number"
@@ -23550,10 +23505,7 @@
                     "maxLength": 50
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "dashboard_preferences": {
                     "type": "array",
@@ -24052,10 +24004,7 @@
                     "type": "boolean"
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "description": {
                     "type": "string"
@@ -24329,10 +24278,7 @@
             "type": "object",
             "properties": {
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "description": {
                     "type": "string"
@@ -24402,10 +24348,7 @@
             "type": "object",
             "properties": {
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "description": {
                     "type": "string"
@@ -24535,10 +24478,7 @@
                     "type": "string"
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "discount": {
                     "type": "number"
@@ -24951,10 +24891,7 @@
                     "maxLength": 50
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "external_id": {
                     "type": "string",
@@ -25130,10 +25067,7 @@
                     "type": "string"
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "description": {
                     "type": "string"
@@ -26249,10 +26183,7 @@
                     "type": "string"
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "external_id": {
                     "type": "string",
@@ -26602,10 +26533,7 @@
                     "type": "string"
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "description": {
                     "type": "string"

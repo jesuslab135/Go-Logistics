@@ -16751,10 +16751,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "down_payment": {
                     "type": "number"
@@ -17438,10 +17435,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "down_payment": {
                     "type": "number"
@@ -17902,10 +17896,7 @@ const docTemplate = `{
                     "maxLength": 50
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "dashboard_preferences": {
                     "type": "array",
@@ -18445,10 +18436,7 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "description": {
                     "type": "string"
@@ -18722,10 +18710,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "description": {
                     "type": "string"
@@ -18795,10 +18780,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "description": {
                     "type": "string"
@@ -18928,10 +18910,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "discount": {
                     "type": "number"
@@ -19333,10 +19312,7 @@ const docTemplate = `{
                     "maxLength": 50
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "external_id": {
                     "type": "string",
@@ -19512,10 +19488,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "description": {
                     "type": "string"
@@ -19835,10 +19808,7 @@ const docTemplate = `{
                     "maxLength": 50
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "dashboard_preferences": {
                     "type": "array",
@@ -20886,10 +20856,7 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "description": {
                     "type": "string"
@@ -21688,10 +21655,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "description": {
                     "type": "string"
@@ -21844,10 +21808,7 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "description": {
                     "type": "string"
@@ -22197,10 +22158,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "discount": {
                     "type": "number"
@@ -23122,10 +23080,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "down_payment": {
                     "type": "number"
@@ -23557,10 +23512,7 @@ const docTemplate = `{
                     "maxLength": 50
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "dashboard_preferences": {
                     "type": "array",
@@ -24059,10 +24011,7 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "description": {
                     "type": "string"
@@ -24336,10 +24285,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "description": {
                     "type": "string"
@@ -24409,10 +24355,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "description": {
                     "type": "string"
@@ -24542,10 +24485,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "discount": {
                     "type": "number"
@@ -24958,10 +24898,7 @@ const docTemplate = `{
                     "maxLength": 50
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "external_id": {
                     "type": "string",
@@ -25137,10 +25074,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "description": {
                     "type": "string"
@@ -26256,10 +26190,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "external_id": {
                     "type": "string",
@@ -26609,10 +26540,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "custom_fields": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "description": {
                     "type": "string"

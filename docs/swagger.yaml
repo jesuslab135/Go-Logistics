@@ -70,9 +70,7 @@ definitions:
       current_meter_date:
         type: string
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       down_payment:
         type: number
       estimated_replacement_mileage:
@@ -536,9 +534,7 @@ definitions:
       current_meter_date:
         type: string
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       down_payment:
         type: number
       estimated_replacement_mileage:
@@ -869,9 +865,7 @@ definitions:
         maxLength: 50
         type: string
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       dashboard_preferences:
         items:
           type: integer
@@ -1250,9 +1244,7 @@ definitions:
       created_by_workflow:
         type: boolean
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       description:
         type: string
       documents_count:
@@ -1439,9 +1431,7 @@ definitions:
   dto.CreatePartRequest:
     properties:
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       description:
         type: string
       inventory_item:
@@ -1495,9 +1485,7 @@ definitions:
   dto.CreatePurchaseOrderRequest:
     properties:
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       description:
         type: string
       destination_id:
@@ -1596,9 +1584,7 @@ definitions:
       completed_at:
         type: string
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       discount:
         type: number
       discount_type:
@@ -1879,9 +1865,7 @@ definitions:
         maxLength: 50
         type: string
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       external_id:
         maxLength: 100
         type: string
@@ -2008,9 +1992,7 @@ definitions:
       completed_at:
         type: string
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       description:
         type: string
       discount:
@@ -2231,9 +2213,7 @@ definitions:
         maxLength: 50
         type: string
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       dashboard_preferences:
         items:
           type: integer
@@ -2951,9 +2931,7 @@ definitions:
       created_by_workflow:
         type: boolean
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       description:
         type: string
       documents_count:
@@ -3500,9 +3478,7 @@ definitions:
       created_at:
         type: string
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       description:
         type: string
       id:
@@ -3604,9 +3580,7 @@ definitions:
       created_by_id:
         type: integer
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       description:
         type: string
       destination_id:
@@ -3841,9 +3815,7 @@ definitions:
       created_at:
         type: string
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       discount:
         type: number
       discount_type:
@@ -4475,9 +4447,7 @@ definitions:
       current_meter_date:
         type: string
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       down_payment:
         type: number
       estimated_replacement_mileage:
@@ -4781,9 +4751,7 @@ definitions:
         maxLength: 50
         type: string
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       dashboard_preferences:
         items:
           type: integer
@@ -5131,9 +5099,7 @@ definitions:
       created_by_workflow:
         type: boolean
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       description:
         type: string
       documents_count:
@@ -5320,9 +5286,7 @@ definitions:
   dto.UpdatePartRequest:
     properties:
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       description:
         type: string
       inventory_item:
@@ -5376,9 +5340,7 @@ definitions:
   dto.UpdatePurchaseOrderRequest:
     properties:
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       description:
         type: string
       destination_id:
@@ -5477,9 +5439,7 @@ definitions:
       completed_at:
         type: string
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       discount:
         type: number
       discount_type:
@@ -5766,9 +5726,7 @@ definitions:
         maxLength: 50
         type: string
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       external_id:
         maxLength: 100
         type: string
@@ -5895,9 +5853,7 @@ definitions:
       completed_at:
         type: string
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       description:
         type: string
       discount:
@@ -6698,9 +6654,7 @@ definitions:
       created_at:
         type: string
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       external_id:
         maxLength: 100
         type: string
@@ -6937,9 +6891,7 @@ definitions:
       created_at:
         type: string
       custom_fields:
-        items:
-          type: integer
-        type: array
+        type: object
       description:
         type: string
       discount:

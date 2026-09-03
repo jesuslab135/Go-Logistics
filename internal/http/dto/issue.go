@@ -41,7 +41,7 @@ type CreateIssueRequest struct {
 	ImagesCount            int32            `json:"images_count"`
 	DocumentsCount         int32            `json:"documents_count"`
 	Labels                 json.RawMessage  `json:"labels"`
-	CustomFields           json.RawMessage  `json:"custom_fields"`
+	CustomFields           json.RawMessage  `json:"custom_fields" swaggertype:"object"`
 }
 
 type UpdateIssueRequest struct {
@@ -78,7 +78,7 @@ type UpdateIssueRequest struct {
 	ImagesCount            int32            `json:"images_count"`
 	DocumentsCount         int32            `json:"documents_count"`
 	Labels                 json.RawMessage  `json:"labels"`
-	CustomFields           json.RawMessage  `json:"custom_fields"`
+	CustomFields           json.RawMessage  `json:"custom_fields" swaggertype:"object"`
 }
 
 type IssueResponse struct {
@@ -117,7 +117,7 @@ type IssueResponse struct {
 	ImagesCount            int32            `json:"images_count"`
 	DocumentsCount         int32            `json:"documents_count"`
 	Labels                 json.RawMessage  `json:"labels"`
-	CustomFields           json.RawMessage  `json:"custom_fields"`
+	CustomFields           json.RawMessage  `json:"custom_fields" swaggertype:"object"`
 	CreatedAt              time.Time        `json:"created_at"`
 	UpdatedAt              time.Time        `json:"updated_at"`
 }

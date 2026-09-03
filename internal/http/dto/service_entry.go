@@ -31,7 +31,7 @@ type CreateServiceEntryRequest struct {
 	IsRoadsideAssistance bool             `json:"is_roadside_assistance"`
 	LaborTimeSeconds     *int32           `json:"labor_time_seconds"`
 	Labels               json.RawMessage  `json:"labels"`
-	CustomFields         json.RawMessage  `json:"custom_fields"`
+	CustomFields         json.RawMessage  `json:"custom_fields" swaggertype:"object"`
 }
 
 type UpdateServiceEntryRequest struct {
@@ -58,7 +58,7 @@ type UpdateServiceEntryRequest struct {
 	IsRoadsideAssistance bool             `json:"is_roadside_assistance"`
 	LaborTimeSeconds     *int32           `json:"labor_time_seconds"`
 	Labels               json.RawMessage  `json:"labels"`
-	CustomFields         json.RawMessage  `json:"custom_fields"`
+	CustomFields         json.RawMessage  `json:"custom_fields" swaggertype:"object"`
 }
 
 type ServiceEntryResponse struct {
@@ -88,7 +88,7 @@ type ServiceEntryResponse struct {
 	IsRoadsideAssistance bool             `json:"is_roadside_assistance"`
 	LaborTimeSeconds     *int32           `json:"labor_time_seconds"`
 	Labels               json.RawMessage  `json:"labels"`
-	CustomFields         json.RawMessage  `json:"custom_fields"`
+	CustomFields         json.RawMessage  `json:"custom_fields" swaggertype:"object"`
 	CreatedAt            time.Time        `json:"created_at"`
 	UpdatedAt            time.Time        `json:"updated_at"`
 }

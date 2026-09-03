@@ -49,7 +49,7 @@ type CreateWorkOrderRequest struct {
 	ImagesCount           int32            `json:"images_count"`
 	DocumentsCount        int32            `json:"documents_count"`
 	Labels                json.RawMessage  `json:"labels"`
-	CustomFields          json.RawMessage  `json:"custom_fields"`
+	CustomFields          json.RawMessage  `json:"custom_fields" swaggertype:"object"`
 }
 
 type UpdateWorkOrderRequest struct {
@@ -94,7 +94,7 @@ type UpdateWorkOrderRequest struct {
 	ImagesCount           int32            `json:"images_count"`
 	DocumentsCount        int32            `json:"documents_count"`
 	Labels                json.RawMessage  `json:"labels"`
-	CustomFields          json.RawMessage  `json:"custom_fields"`
+	CustomFields          json.RawMessage  `json:"custom_fields" swaggertype:"object"`
 }
 
 type WorkOrderResponse struct {
@@ -142,7 +142,7 @@ type WorkOrderResponse struct {
 	ImagesCount           int32            `json:"images_count"`
 	DocumentsCount        int32            `json:"documents_count"`
 	Labels                json.RawMessage  `json:"labels"`
-	CustomFields          json.RawMessage  `json:"custom_fields"`
+	CustomFields          json.RawMessage  `json:"custom_fields" swaggertype:"object"`
 	CreatedAt             time.Time        `json:"created_at"`
 	UpdatedAt             time.Time        `json:"updated_at"`
 }

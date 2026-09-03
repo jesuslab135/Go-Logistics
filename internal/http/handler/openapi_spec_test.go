@@ -110,3 +110,34 @@ func TestMePermissionsExposesPlatformAdmin(t *testing.T) {
 		t.Errorf("is_platform_admin type = %v, want boolean", prop["type"])
 	}
 }
+
+// custom_fields is a keyed object ({key: value}), never an array. json.RawMessage
+// defaults to an int array in swaggo; every DTO must override it.
+func TestCustomFieldsAreObjectsNotArrays(t *testing.T) {
+	defs, ok := loadSpec(t)["definitions"].(map[string]any)
+	if !ok {
+		t.Fatal("spec has no definitions object")
+	}
+	found := 0
+	for name, raw := range defs {
+		def, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		props, ok := def["properties"].(map[string]any)
+		if !ok {
+			continue
+		}
+		cf, ok := props["custom_fields"].(map[string]any)
+		if !ok {
+			continue
+		}
+		found++
+		if cf["type"] != "object" {
+			t.Errorf("%s.custom_fields type = %v, want object", name, cf["type"])
+		}
+	}
+	if found == 0 {
+		t.Fatal("no custom_fields properties found in spec")
+	}
+}
