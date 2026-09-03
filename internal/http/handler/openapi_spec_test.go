@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -139,5 +140,51 @@ func TestCustomFieldsAreObjectsNotArrays(t *testing.T) {
 	}
 	if found == 0 {
 		t.Fatal("no custom_fields properties found in spec")
+	}
+}
+
+func TestArchiveContractIsConcreteAndTyped(t *testing.T) {
+	paths, _ := loadSpec(t)["paths"].(map[string]any)
+	// No templated {resource} path may survive — that is the param the frontend patches.
+	for path := range paths {
+		if strings.Contains(path, "{resource}") {
+			t.Errorf("spec still contains templated path %q", path)
+		}
+	}
+	// Each concrete archive/restore op must have a schema-bearing 200.
+	for _, res := range []string{"assets", "parts", "vendors", "service-tasks", "inspection-forms"} {
+		for _, action := range []string{"archive", "restore"} {
+			p := "/api/v1/" + res + "/{id}/" + action
+			op, ok := paths[p].(map[string]any)
+			if !ok {
+				t.Errorf("missing path %s", p)
+				continue
+			}
+			post, _ := op["post"].(map[string]any)
+			resp, _ := post["responses"].(map[string]any)
+			ok200, _ := resp["200"].(map[string]any)
+			if _, hasSchema := ok200["schema"]; !hasSchema {
+				t.Errorf("%s POST 200 has no schema", p)
+			}
+		}
+	}
+}
+
+func TestArchivableListsDocumentIncludeArchived(t *testing.T) {
+	paths, _ := loadSpec(t)["paths"].(map[string]any)
+	for _, res := range []string{"assets", "parts", "vendors", "service-tasks", "inspection-forms"} {
+		p := "/api/v1/" + res
+		op, _ := paths[p].(map[string]any)
+		get, _ := op["get"].(map[string]any)
+		params, _ := get["parameters"].([]any)
+		has := false
+		for _, raw := range params {
+			if pm, ok := raw.(map[string]any); ok && pm["name"] == "include_archived" {
+				has = true
+			}
+		}
+		if !has {
+			t.Errorf("%s GET does not document include_archived", p)
+		}
 	}
 }

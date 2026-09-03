@@ -236,6 +236,7 @@ type assetListRow struct {
 //	@Param			order			query		string	false	"name, vin_sn, vehicle_type, updated_at, id (prefix with - for descending)"
 //	@Param			limit			query		int		false	"Page size"
 //	@Param			offset			query		int		false	"Offset"
+//	@Param			include_archived	query		bool	false	"Include archived records"
 //	@Success		200				{object}	dto.AssetPage
 //	@Failure		400				{object}	dto.ErrorResponse
 //	@Failure		401				{object}	dto.ErrorResponse
@@ -246,6 +247,9 @@ func (h *FilteredListHandler) Assets(c *gin.Context) {
 	p := paginate.Parse(c)
 
 	where := filter.NewWhere(1).Add("a.company_id", filter.Eq, middleware.CompanyFromContext(ctx))
+	if !includeArchived(ctx) {
+		where.Raw("a.archived_at IS NULL")
+	}
 	if vehicleType := queryStr(c, "vehicle_type"); vehicleType != nil {
 		where.Add("a.vehicle_type", filter.Eq, *vehicleType)
 	}

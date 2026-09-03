@@ -1032,6 +1032,12 @@ const docTemplate = `{
                         "description": "Offset",
                         "name": "offset",
                         "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Include archived records",
+                        "name": "include_archived",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1216,6 +1222,52 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/assets/{id}/archive": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retires the record. Use instead of DELETE for anything other records reference — DELETE answers 409 resource_referenced in that case. Archived records disappear from lists and pickers unless ?include_archived=true.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "archive"
+                ],
+                "summary": "Archive an asset",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.AssetResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -1575,6 +1627,52 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/assets/{id}/restore": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Clears archived_at, returning the record to the lists and pickers it was hidden from.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "archive"
+                ],
+                "summary": "Restore an archived asset",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.AssetResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -5212,6 +5310,12 @@ const docTemplate = `{
                         "description": "Offset",
                         "name": "offset",
                         "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Include archived records",
+                        "name": "include_archived",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -5384,6 +5488,52 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/inspection-forms/{id}/archive": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retires the record. Use instead of DELETE for anything other records reference — DELETE answers 409 resource_referenced in that case. Archived records disappear from lists and pickers unless ?include_archived=true.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "archive"
+                ],
+                "summary": "Archive an inspection form",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.InspectionFormResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -5624,6 +5774,52 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/inspection-forms/{id}/restore": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Clears archived_at, returning the record to the lists and pickers it was hidden from.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "archive"
+                ],
+                "summary": "Restore an archived inspection form",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.InspectionFormResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -8722,6 +8918,12 @@ const docTemplate = `{
                         "description": "Offset",
                         "name": "offset",
                         "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Include archived records",
+                        "name": "include_archived",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -8894,6 +9096,52 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/parts/{id}/archive": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retires the record. Use instead of DELETE for anything other records reference — DELETE answers 409 resource_referenced in that case. Archived records disappear from lists and pickers unless ?include_archived=true.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "archive"
+                ],
+                "summary": "Archive a part",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PartResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -9134,6 +9382,52 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/parts/{id}/restore": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Clears archived_at, returning the record to the lists and pickers it was hidden from.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "archive"
+                ],
+                "summary": "Restore an archived part",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PartResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -11300,6 +11594,12 @@ const docTemplate = `{
                         "description": "Offset",
                         "name": "offset",
                         "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Include archived records",
+                        "name": "include_archived",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -11472,6 +11772,52 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/service-tasks/{id}/archive": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retires the record. Use instead of DELETE for anything other records reference — DELETE answers 409 resource_referenced in that case. Archived records disappear from lists and pickers unless ?include_archived=true.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "archive"
+                ],
+                "summary": "Archive a service task",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ServiceTaskResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -11712,6 +12058,52 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/service-tasks/{id}/restore": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Clears archived_at, returning the record to the lists and pickers it was hidden from.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "archive"
+                ],
+                "summary": "Restore an archived service task",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ServiceTaskResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -13999,6 +14391,12 @@ const docTemplate = `{
                         "description": "Offset",
                         "name": "offset",
                         "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Include archived records",
+                        "name": "include_archived",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -14171,6 +14569,98 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/vendors/{id}/archive": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retires the record. Use instead of DELETE for anything other records reference — DELETE answers 409 resource_referenced in that case. Archived records disappear from lists and pickers unless ?include_archived=true.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "archive"
+                ],
+                "summary": "Archive a vendor",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.VendorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/vendors/{id}/restore": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Clears archived_at, returning the record to the lists and pickers it was hidden from.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "archive"
+                ],
+                "summary": "Restore an archived vendor",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.VendorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -16325,92 +16815,6 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/dto.WorkOrderStatusLogResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/{resource}/{id}/archive": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Retires the record. Use this instead of DELETE for anything other records reference — DELETE answers 409 resource_referenced in that case. Archived records disappear from lists and pickers unless ?include_archived=true. Archiving needs the same permission as editing: deciding a vendor is no longer used is the same kind of decision as correcting its address.",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "archive"
-                ],
-                "summary": "Archive a record",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "id",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "The archived record, in its own resource's shape"
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/{resource}/{id}/restore": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Clears archived_at, returning the record to the lists and pickers it was hidden from.",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "archive"
-                ],
-                "summary": "Restore an archived record",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "id",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "The restored record, in its own resource's shape"
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "404": {

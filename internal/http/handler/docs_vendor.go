@@ -8,6 +8,7 @@ package handler
 //	@Produce	json
 //	@Param	limit	query	int	false	"Page size"
 //	@Param	offset	query	int	false	"Offset"
+//	@Param	include_archived	query	bool	false	"Include archived records"
 //	@Success	200	{object}	dto.VendorPage
 //	@Failure	401	{object}	dto.ErrorResponse
 //	@Router	/api/v1/vendors [get]
