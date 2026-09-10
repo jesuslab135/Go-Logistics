@@ -84,6 +84,7 @@ func NewRouter(d Deps) *gin.Engine {
 
 	registerCompanyRoutes(api, member, d)
 	registerAdminRoutes(api, d)
+	registerAccountEmployeeRoutes(api, d)
 
 	assets := member.Group("", middleware.RequireModule("assets"))
 	tires := member.Group("", middleware.RequireModule("tires"))
@@ -428,4 +429,23 @@ func registerAdminRoutes(api *gin.RouterGroup, d Deps) {
 	admin.POST("/admin/accounts", accounts.Create)
 	admin.GET("/admin/accounts", accounts.List)
 	admin.POST("/admin/accounts/:id/set-owner", accounts.SetOwner)
+}
+
+// registerAccountEmployeeRoutes wires the routes that let an account owner
+// appoint directors: list the account's people with the role they hold in
+// each company, and replace one person's memberships-with-roles.
+//
+// Account-scoped, deliberately NOT under /api/v1/admin: that namespace is
+// cross-tenant and platform-admin only. This one operates strictly inside the
+// caller's own account.
+//
+// Registered on api, not member: these are gated on RequireAccountOwner, and
+// an owner with no company of their own yet is not a company member —
+// registering on member would lock out exactly the person the routes exist to
+// serve. registerCompanyRoutes' POST /companies is the same precedent.
+func registerAccountEmployeeRoutes(api *gin.RouterGroup, d Deps) {
+	accountOwner := api.Group("", middleware.RequireAccountOwner())
+	accountEmployees := NewAccountEmployeeHandler(d.Queries, d.Pool)
+	accountOwner.GET("/account/employees", accountEmployees.List)
+	accountOwner.PUT("/account/employees/:id/companies", accountEmployees.ReplaceCompanies)
 }
