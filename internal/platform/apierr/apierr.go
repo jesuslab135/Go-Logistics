@@ -83,6 +83,15 @@ func Map(err error) *Error {
 	if errors.As(err, &pgErr) {
 		switch pgErr.Code {
 		case "23505": // unique_violation
+			// uq_employee_email_active is the one unique constraint a request body
+			// can realistically trip (see 000020_employee_email_unique.up.sql): a
+			// caller-supplied email colliding with an existing active employee's.
+			// Named the same way Validation's field-keyed details already do, so a
+			// client does not need two different shapes to find out which field.
+			if pgErr.ConstraintName == "uq_employee_email_active" {
+				return Conflict("email is already in use").
+					WithDetails(map[string]string{"email": "already in use"}).Wrap(err)
+			}
 			return Conflict("resource already exists").Wrap(err)
 		case "23503": // foreign_key_violation
 			return New(http.StatusConflict, "foreign_key_violation", "referenced resource constraint violated").Wrap(err)

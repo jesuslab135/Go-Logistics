@@ -48,6 +48,17 @@ func (h *MeHandler) Permissions(c *gin.Context) {
 		return
 	}
 
+	// identity.CompanyID uses 0 as its internal "absent" sentinel (the same
+	// convention CompanyFromContext uses for request-scoped plumbing), but
+	// company ids are bigserial and never legitimately 0 — so converting it
+	// back to a pointer here is lossless, and is what keeps this response
+	// from reporting a company that does not exist.
+	var companyID *int64
+	if identity.CompanyID != 0 {
+		id := identity.CompanyID
+		companyID = &id
+	}
+
 	out := dto.MePermissionsResponse{
 		Employee: dto.MeEmployee{
 			ID:                profile.ID,
@@ -60,7 +71,7 @@ func (h *MeHandler) Permissions(c *gin.Context) {
 			IsVehicleOperator: profile.IsVehicleOperator,
 			DefaultCompanyID:  profile.DefaultCompanyID,
 		},
-		CompanyID:       identity.CompanyID,
+		CompanyID:       companyID,
 		IsAdmin:         identity.IsAdmin,
 		IsAccountOwner:  identity.IsAccountOwner,
 		IsPlatformAdmin: identity.IsPlatformAdmin,

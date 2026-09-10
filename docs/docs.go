@@ -21829,6 +21829,7 @@ const docTemplate = `{
                     }
                 },
                 "company_id": {
+                    "description": "CompanyID is absent, not 0, for a company-less session — the same care\nthe access token itself takes (Claims.CompanyID omits the key entirely)\nso the one response such a client is meant to read to discover its own\nstate does not reintroduce the sentinel the token went to trouble to\nkeep out.",
                     "type": "integer"
                 },
                 "employee": {

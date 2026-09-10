@@ -1,0 +1,18 @@
+-- 000020_employee_email_unique.up.sql
+-- Login resolves an employee by email alone (GetEmployeeAuthByEmail), with no
+-- account or company yet known to disambiguate — that is the whole point,
+-- credentials are all it has until they are checked. Nothing enforced email
+-- to be unique, and GetEmployeeAuthByEmail's LIMIT 1 carried no ORDER BY, so
+-- if two employees ever shared an address which one logged in was up to the
+-- query planner. POST /admin/accounts could create exactly that: a second
+-- employee, in any account, sharing an existing customer's email.
+--
+-- Partial on is_active, not a plain unique index: only an active employee can
+-- ever log in (GetEmployeeAuthByEmail filters is_active = true), so that is
+-- the only state in which sharing an email is actually ambiguous. A
+-- deactivated employee's address is released for reuse — an offboarded
+-- person's email going to their replacement is an ordinary lifecycle, not a
+-- bug this needs to block. The index is global, not scoped to one account:
+-- the incident it prevents is exactly a second *active* employee in a
+-- different account colliding with an existing one.
+CREATE UNIQUE INDEX uq_employee_email_active ON employee (email) WHERE is_active;

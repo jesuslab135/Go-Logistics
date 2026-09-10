@@ -21,7 +21,7 @@ func TestCreateEmployeeDefaultsToActive(t *testing.T) {
 	if in.IsActive != nil {
 		t.Fatalf("omitted is_active should decode to nil, got %v", *in.IsActive)
 	}
-	if got := createEmployeeParams(in, time.Now()); !got.IsActive {
+	if got := createEmployeeParams(in, ptr(1), time.Now()); !got.IsActive {
 		t.Error("employee created without is_active must be active")
 	}
 }
@@ -33,7 +33,7 @@ func TestCreateEmployeeHonoursExplicitFalse(t *testing.T) {
 	if err := json.Unmarshal([]byte(`{"is_active":false}`), &in); err != nil {
 		t.Fatal(err)
 	}
-	if got := createEmployeeParams(in, time.Now()); got.IsActive {
+	if got := createEmployeeParams(in, ptr(1), time.Now()); got.IsActive {
 		t.Error(`"is_active":false was ignored`)
 	}
 }

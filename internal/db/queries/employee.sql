@@ -61,14 +61,20 @@ SELECT count(*) FROM employee e
 WHERE EXISTS (SELECT 1 FROM employee_companies ec WHERE ec.employee_id = e.id AND ec.company_id = sqlc.arg(company_id));
 
 -- name: CreateEmployee :one
+-- account_id is a required argument, never a column the caller's JSON body can
+-- reach (see dto.CreateEmployeeRequest and CreateEmployee's one call site,
+-- EmployeeStore.Create, which sources it from AccountFromContext — the same
+-- rule company creation follows). Without it the employee row is left with a
+-- NULL account_id, and the composite FK fk_ec_employee_account rejects the
+-- membership AddEmployeeCompany then tries to create for it.
 INSERT INTO employee (
-    user_id, default_company_id, first_name, last_name, employee_id, role_id, is_active,
+    account_id, user_id, default_company_id, first_name, last_name, employee_id, role_id, is_active,
     email, mobile_phone, work_phone, job_title, start_date, leave_date, birth_date,
     hourly_labor_rate, is_technician, is_vehicle_operator, is_account_owner, license_class,
     license_number, license_state, license_expiry, street_address, city, region, postal_code,
     country, group_id, custom_fields, table_preferences, dashboard_preferences, updated_at
 ) VALUES (
-    sqlc.arg(user_id), sqlc.arg(default_company_id), sqlc.arg(first_name), sqlc.arg(last_name),
+    sqlc.arg(account_id), sqlc.arg(user_id), sqlc.arg(default_company_id), sqlc.arg(first_name), sqlc.arg(last_name),
     sqlc.arg(employee_id), sqlc.arg(role_id), sqlc.arg(is_active), sqlc.arg(email),
     sqlc.arg(mobile_phone), sqlc.arg(work_phone), sqlc.arg(job_title), sqlc.arg(start_date),
     sqlc.arg(leave_date), sqlc.arg(birth_date), sqlc.arg(hourly_labor_rate), sqlc.arg(is_technician),
@@ -98,14 +104,24 @@ INSERT INTO employee (
 RETURNING id;
 
 -- name: AddEmployeeCompany :exec
--- account_id is derived from the company row rather than taken as a parameter:
--- that way it can never disagree with the company's own account, and it
--- always satisfies the composite FK invariant fk_ec_company_account by
--- construction rather than by trusting the caller.
+-- account_id is derived from the company row via a scalar subquery rather
+-- than taken as a parameter: that way it can never disagree with the
+-- company's own account, and it always satisfies the composite FK invariant
+-- fk_ec_company_account by construction rather than by trusting the caller.
+--
+-- A scalar subquery, not INSERT...SELECT...FROM company: the earlier shape
+-- silently inserted zero rows for a company_id that names no company, which
+-- the caller had no way to distinguish from an already-satisfied ON CONFLICT.
+-- Here a nonexistent company_id makes the subquery yield NULL, which the
+-- NOT NULL constraint on employee_companies.account_id rejects outright — a
+-- real, surfaced error, the same as the foreign key gave before this column
+-- existed, instead of a membership the database never actually created.
 INSERT INTO employee_companies (employee_id, company_id, account_id)
-SELECT sqlc.arg(employee_id), c.id, c.account_id
-FROM company c
-WHERE c.id = sqlc.arg(company_id)
+VALUES (
+    sqlc.arg(employee_id),
+    sqlc.arg(company_id),
+    (SELECT account_id FROM company WHERE id = sqlc.arg(company_id))
+)
 ON CONFLICT (employee_id, company_id) DO NOTHING;
 
 -- name: ListEmployeeCompanyIDs :many

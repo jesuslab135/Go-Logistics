@@ -67,6 +67,15 @@ func (s *EmployeeStore) Create(ctx context.Context, in dto.CreateEmployeeRequest
 		return dto.EmployeeResponse{}, err
 	}
 
+	// account_id comes from the caller, never from the body — the same rule
+	// company creation follows. This route requires company membership, and
+	// platform staff hold none, so a caller who reaches here always has one.
+	accountID := middleware.AccountFromContext(ctx)
+	if accountID == nil {
+		return dto.EmployeeResponse{}, apierr.Forbidden(
+			"only a member of a client account can create an employee")
+	}
+
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return dto.EmployeeResponse{}, err
@@ -74,7 +83,7 @@ func (s *EmployeeStore) Create(ctx context.Context, in dto.CreateEmployeeRequest
 	defer tx.Rollback(ctx)
 
 	qtx := s.q.WithTx(tx)
-	r, err := qtx.CreateEmployee(ctx, createEmployeeParams(in, time.Now().UTC()))
+	r, err := qtx.CreateEmployee(ctx, createEmployeeParams(in, accountID, time.Now().UTC()))
 	if err != nil {
 		return dto.EmployeeResponse{}, err
 	}
@@ -163,8 +172,9 @@ func validateDefaultCompany(defaultCompanyID *int64, memberships []int64) error 
 	})
 }
 
-func createEmployeeParams(in dto.CreateEmployeeRequest, now time.Time) gen.CreateEmployeeParams {
+func createEmployeeParams(in dto.CreateEmployeeRequest, accountID *int64, now time.Time) gen.CreateEmployeeParams {
 	return gen.CreateEmployeeParams{
+		AccountID:            accountID,
 		UserID:               in.UserID,
 		DefaultCompanyID:     in.DefaultCompanyID,
 		FirstName:            in.FirstName,
