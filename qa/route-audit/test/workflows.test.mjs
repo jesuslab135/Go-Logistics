@@ -177,7 +177,9 @@ test('runWorkOrderWorkflow deletes the extra work-order-status it created even w
       }
       if (method === 'GET' && path === '/api/v1/work-orders/5') {
         // A hard failure partway through the suite — a transport error, not
-        // an ordinary 4xx/5xx CheckResult. The delete below must still run.
+        // an ordinary 4xx/5xx CheckResult — thrown before `current` is ever
+        // captured. The delete below must still run; the restore cannot
+        // (there is nothing to restore from), and must not be attempted.
         throw new Error('simulated transport failure')
       }
       if (method === 'DELETE' && path === '/api/v1/work-order-statuses/77') {
@@ -193,9 +195,58 @@ test('runWorkOrderWorkflow deletes the extra work-order-status it created even w
 
   const deleteCall = calls.find(c => c.method === 'DELETE' && c.path === '/api/v1/work-order-statuses/77')
   assert.ok(deleteCall, 'the extra work-order-status must be deleted even though an earlier step threw')
+  assert.ok(!calls.some(c => c.method === 'PUT'), 'no restore PUT should be attempted — current was never captured')
 })
 
-test('runWorkOrderWorkflow reports a successful cleanup delete as a CheckResult', async () => {
+test('runWorkOrderWorkflow deletes the extra work-order-status even when a LATER step throws, restoring status first', async () => {
+  // Unlike the test above, `current` IS captured and the status change DOES
+  // happen here — the throw comes afterwards (simulating the append-only
+  // history check blowing up). This is the case where a restore is both
+  // possible and required before the delete has any chance of succeeding.
+  const calls = []
+  let logCalls = 0
+  const stubClient = {
+    async request(method, path, opts) {
+      calls.push({ method, path, body: opts?.body })
+      if (method === 'GET' && path === '/api/v1/work-orders/5/status-logs') {
+        logCalls++
+        return { status: 200, body: { data: Array(logCalls).fill({ id: logCalls }) } }
+      }
+      if (method === 'POST' && path === '/api/v1/work-order-statuses') {
+        return { status: 201, body: { id: 77, name: opts.body.name } }
+      }
+      if (method === 'GET' && path === '/api/v1/work-orders/5') {
+        return { status: 200, body: { id: 5, status_id: 9 } }
+      }
+      if (method === 'PUT' && path === '/api/v1/work-orders/5') {
+        return { status: 200, body: { ...opts.body } }
+      }
+      if (method === 'POST' && path === '/api/v1/work-orders/5/status-logs') {
+        throw new Error('simulated transport failure')
+      }
+      if (method === 'DELETE' && path === '/api/v1/work-order-statuses/77') {
+        return { status: 204, body: null }
+      }
+      throw new Error(`stub client received unexpected call: ${method} ${path}`)
+    },
+  }
+
+  const graph = { runId: 'stub', tag: 'ZZ-TEST-stub', ids: { workOrder: 5, workOrderStatus: 9 }, created: [], failed: [] }
+
+  await assert.rejects(() => runWorkOrderWorkflow(stubClient, graph), /simulated transport failure/)
+
+  const putCalls = calls.filter(c => c.method === 'PUT')
+  const deleteIndex = calls.findIndex(c => c.method === 'DELETE')
+  assert.equal(putCalls.length, 2, 'the status-change PUT and the restore PUT')
+  // The restore PUT sends the work order's original body straight back —
+  // status_id 9, not the 77 the status-change PUT sent.
+  const restorePut = putCalls[1]
+  assert.equal(restorePut.body.status_id, 9)
+  const restoreIndex = calls.indexOf(restorePut)
+  assert.ok(restoreIndex < deleteIndex, 'the restore must happen before the delete — deleting first is exactly the bug')
+})
+
+test('runWorkOrderWorkflow restores the original status before deleting, and reports both as CheckResults (success case)', async () => {
   const calls = []
   let logCalls = 0
   const stubClient = {
@@ -227,16 +278,39 @@ test('runWorkOrderWorkflow reports a successful cleanup delete as a CheckResult'
   const graph = { runId: 'stub', tag: 'ZZ-TEST-stub', ids: { workOrder: 5, workOrderStatus: 9 }, created: [], failed: [] }
   const results = await runWorkOrderWorkflow(stubClient, graph)
 
+  // ORDER: the restore PUT must be the second PUT call (after the
+  // status-change PUT) and must happen before the cleanup DELETE. Deleting
+  // before restoring is exactly the bug being fixed here.
+  const putCalls = calls.filter(c => c.method === 'PUT')
+  assert.equal(putCalls.length, 2)
+  assert.equal(putCalls[0].body.status_id, 77, 'first PUT is the status change, to the extra status')
+  assert.equal(putCalls[1].body.status_id, 9, 'second PUT is the restore, back to the original status')
+  const restoreIndex = calls.indexOf(putCalls[1])
+  const deleteIndex = calls.findIndex(c => c.method === 'DELETE')
+  assert.ok(restoreIndex < deleteIndex, 'restore must be issued before delete')
+
+  const restore = results.find(r => r.opKey === 'PUT /api/v1/work-orders/{id} (workflow cleanup: restore original status)')
+  assert.ok(restore, 'expected a CheckResult recording the restore')
+  assert.equal(restore.ok, true)
+
   const cleanup = results.find(r => r.opKey === 'DELETE /api/v1/work-order-statuses/{id} (workflow cleanup)')
   assert.ok(cleanup, 'expected a CheckResult recording the cleanup delete')
   assert.equal(cleanup.ok, true)
   assert.equal(calls.filter(c => c.method === 'DELETE').length, 1)
+
+  // The "status log is appended automatically" assertion must not be
+  // corrupted by the restore's own status-log row: it is computed and
+  // pushed before the finally block (and its restore) ever runs.
+  const logCheck = results.find(r => r.opKey === 'work-order status log is appended automatically')
+  assert.ok(logCheck)
+  assert.equal(logCheck.ok, true)
 })
 
-test('runWorkOrderWorkflow reports, rather than swallows, a refused cleanup delete', async () => {
-  // The work order's status_id was changed to the extra status above and
-  // never changed back, so a foreign-key refusal on delete is expected —
-  // but it must still show up as a failing CheckResult, not vanish.
+test('runWorkOrderWorkflow reports, rather than swallows, a refused cleanup delete even after a successful restore', async () => {
+  // The restore succeeds (the work order no longer references the status),
+  // but the delete is refused anyway — e.g. a status log row names it
+  // permanently. That is a genuine backend finding, not a harness defect,
+  // and must still show up as a failing CheckResult, not vanish.
   let logCalls = 0
   const stubClient = {
     async request(method, path, opts) {
@@ -266,8 +340,13 @@ test('runWorkOrderWorkflow reports, rather than swallows, a refused cleanup dele
   const graph = { runId: 'stub', tag: 'ZZ-TEST-stub', ids: { workOrder: 5, workOrderStatus: 9 }, created: [], failed: [] }
   const results = await runWorkOrderWorkflow(stubClient, graph)
 
+  const restore = results.find(r => r.opKey === 'PUT /api/v1/work-orders/{id} (workflow cleanup: restore original status)')
+  assert.ok(restore)
+  assert.equal(restore.ok, true, 'the restore itself succeeded')
+
   const cleanup = results.find(r => r.opKey === 'DELETE /api/v1/work-order-statuses/{id} (workflow cleanup)')
   assert.ok(cleanup, 'a refused cleanup delete must still be reported, not dropped')
   assert.equal(cleanup.ok, false)
   assert.match(String(cleanup.actual), /409/)
+  assert.match(cleanup.expected, /backend finding/)
 })

@@ -177,6 +177,12 @@ export async function runWorkOrderWorkflow(client, graph) {
   })
   const secondId = second.body?.id
 
+  // Captured inside the try below, before status_id is ever changed, so the
+  // finally block can restore the work order to exactly this state. Left
+  // null if we never got far enough to read it, in which case the work
+  // order's status was never touched and no restore is needed.
+  let current = null
+
   try {
     if (secondId) {
       // The PUT round-trips the GET response as the whole body. That is safe:
@@ -186,7 +192,7 @@ export async function runWorkOrderWorkflow(client, graph) {
       // carries (id, company_id, computed subtotals/totals, created_at,
       // updated_at, ...) are simply names Gin does not bind and silently
       // ignores, not names that collide with anything Update declares.
-      const current = await client.request('GET', `/api/v1/work-orders/${woId}`, {
+      current = await client.request('GET', `/api/v1/work-orders/${woId}`, {
         opKey: 'GET /api/v1/work-orders/{id} (workflow)',
       })
       const updated = await client.request('PUT', `/api/v1/work-orders/${woId}`, {
@@ -198,6 +204,12 @@ export async function runWorkOrderWorkflow(client, graph) {
         '2xx changing the status',
         String(updated.status), updated.body))
 
+      // This read-back must happen here, right after the one status change
+      // this assertion is about, and its result is pushed immediately — the
+      // finally block's own restore-then-delete runs strictly after this
+      // point and appends its own status-log rows, but beforeCount/afterCount
+      // are already computed and already consumed by the wf() call above by
+      // the time that happens, so the restore cannot corrupt this arithmetic.
       const after = await client.request('GET', `/api/v1/work-orders/${woId}/status-logs`, {
         opKey: 'GET /api/v1/work-orders/{id}/status-logs (after)',
       })
@@ -218,20 +230,38 @@ export async function runWorkOrderWorkflow(client, graph) {
       '404 or 405, because the history is append-only',
       String(direct.status), direct.body))
   } finally {
-    // Runs whether the checks above passed, failed, or threw. If the work
-    // order still references this status (its status_id was changed to
-    // secondId above and never changed back), the delete is legitimately
-    // refused by a foreign-key constraint — that is fine and expected, but
-    // it must show up as a reported (failing) CheckResult, not be dropped,
-    // or a leftover row goes unreported exactly the way this fix exists to
-    // prevent.
+    // Runs whether the checks above passed, failed, or threw — cleanup must
+    // not be skipped just because a check failed. Deleting the extra status
+    // first would always be refused: the work order still points at it
+    // (status_id was changed to secondId above and never changed back), so
+    // the FK is still live. Restoring the original status_id FIRST is what
+    // actually frees the row; the delete only has a chance of succeeding
+    // after that.
     if (secondId) {
+      if (current) {
+        const restored = await client.request('PUT', `/api/v1/work-orders/${woId}`, {
+          body: current.body,
+          opKey: 'PUT /api/v1/work-orders/{id} (workflow cleanup: restore original status)',
+        })
+        results.push(wf('workflow', 'PUT /api/v1/work-orders/{id} (workflow cleanup: restore original status)',
+          restored.status >= 200 && restored.status < 300,
+          '2xx restoring the work order to its original status before the extra one is deleted',
+          String(restored.status), restored.body))
+      }
+
+      // If this is still refused after the restore above, the work order no
+      // longer references the status but something else does (e.g. a status
+      // log row that names it permanently) — that is a genuine backend
+      // finding, not a harness defect, and must be reported as a failing
+      // check rather than hidden or worked around.
       const cleanup = await client.request('DELETE', `/api/v1/work-order-statuses/${secondId}`, {
         opKey: 'DELETE /api/v1/work-order-statuses/{id} (workflow cleanup)',
       })
       results.push(wf('workflow', 'DELETE /api/v1/work-order-statuses/{id} (workflow cleanup)',
         cleanup.status >= 200 && cleanup.status < 300,
-        '2xx removing the extra status this suite created',
+        current
+          ? '2xx removing the extra status now that the work order no longer references it — a persistent refusal here is a backend finding (something else still references the status), not a harness defect'
+          : '2xx removing the extra status this suite created',
         String(cleanup.status), cleanup.body))
     }
   }
