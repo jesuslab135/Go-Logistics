@@ -83,7 +83,7 @@ func NewRouter(d Deps) *gin.Engine {
 	member.Use(WithIncludeArchived())
 
 	registerCompanyRoutes(api, member, d)
-	registerAdminRoutes(member, d)
+	registerAdminRoutes(api, d)
 
 	assets := member.Group("", middleware.RequireModule("assets"))
 	tires := member.Group("", middleware.RequireModule("tires"))
@@ -405,8 +405,13 @@ func registerCompanyRoutes(api, member *gin.RouterGroup, d Deps) {
 // belong to — so the previous gate let any company admin read and rewrite
 // another tenant's employees. Granting the flag is a CLI act (cmd/cli
 // platform-admin); nothing in the API hands it out.
-func registerAdminRoutes(member *gin.RouterGroup, d Deps) {
-	admin := member.Group("", middleware.RequirePlatformAdmin())
+//
+// It is registered on api, not member: platform staff belong to no account and
+// hold no company memberships, so gating this namespace on RequireCompanyMember
+// would lock every genuine platform admin out of it. RequirePlatformAdmin is
+// gate enough — company membership is irrelevant to a cross-tenant route.
+func registerAdminRoutes(api *gin.RouterGroup, d Deps) {
+	admin := api.Group("", middleware.RequirePlatformAdmin())
 
 	employees := NewAdminEmployeeHandler(d.Queries, d.Pool)
 	admin.GET("/admin/employees", employees.List)

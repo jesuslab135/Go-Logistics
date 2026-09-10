@@ -13,8 +13,10 @@ import (
 )
 
 const addEmployeeCompany = `-- name: AddEmployeeCompany :exec
-INSERT INTO employee_companies (employee_id, company_id)
-VALUES ($1, $2)
+INSERT INTO employee_companies (employee_id, company_id, account_id)
+SELECT $1, c.id, c.account_id
+FROM company c
+WHERE c.id = $2
 ON CONFLICT (employee_id, company_id) DO NOTHING
 `
 
@@ -23,6 +25,10 @@ type AddEmployeeCompanyParams struct {
 	CompanyID  int64
 }
 
+// account_id is derived from the company row rather than taken as a parameter:
+// that way it can never disagree with the company's own account, and it
+// always satisfies the composite FK invariant fk_ec_company_account by
+// construction rather than by trusting the caller.
 func (q *Queries) AddEmployeeCompany(ctx context.Context, arg AddEmployeeCompanyParams) error {
 	_, err := q.db.Exec(ctx, addEmployeeCompany, arg.EmployeeID, arg.CompanyID)
 	return err

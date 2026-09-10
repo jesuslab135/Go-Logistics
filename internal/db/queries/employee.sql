@@ -98,8 +98,14 @@ INSERT INTO employee (
 RETURNING id;
 
 -- name: AddEmployeeCompany :exec
-INSERT INTO employee_companies (employee_id, company_id)
-VALUES (sqlc.arg(employee_id), sqlc.arg(company_id))
+-- account_id is derived from the company row rather than taken as a parameter:
+-- that way it can never disagree with the company's own account, and it
+-- always satisfies the composite FK invariant fk_ec_company_account by
+-- construction rather than by trusting the caller.
+INSERT INTO employee_companies (employee_id, company_id, account_id)
+SELECT sqlc.arg(employee_id), c.id, c.account_id
+FROM company c
+WHERE c.id = sqlc.arg(company_id)
 ON CONFLICT (employee_id, company_id) DO NOTHING;
 
 -- name: ListEmployeeCompanyIDs :many
