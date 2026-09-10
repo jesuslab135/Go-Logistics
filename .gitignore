@@ -31,3 +31,6 @@ Thumbs.db
 # Agent scratch (worktrees, SDD ledger) — never committed
 .claude/worktrees/
 .superpowers/
+
+# Route audit run artifacts
+qa/route-audit/out/
