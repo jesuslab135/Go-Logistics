@@ -14,7 +14,16 @@ export const MODULE_PROBES = [
   { module: 'purchase_orders', probe: { method: 'GET', path: '/api/v1/purchase-orders' } },
   { module: 'roles', probe: { method: 'GET', path: '/api/v1/roles' } },
   { module: 'service', probe: { method: 'GET', path: '/api/v1/service-tasks' } },
-  { module: 'tire_approvals', probe: { method: 'GET', path: '/api/v1/tire-assignment-requests' } },
+  // Unlike every other probe here, this one is a POST, not a GET. The list
+  // route (GET /tire-assignment-requests) is deliberately membership-only —
+  // Django's TireAssignmentRequestViewSet required membership only, and its
+  // approve/reject actions carried the extra warehouse-role check — so the
+  // tire_approvals gate lives entirely on the approve action
+  // (router.go:177-185). RequireAction runs as middleware before the
+  // handler, so a correctly-gated server answers 403 without ever touching
+  // a row; the id is deliberately nonexistent so that even a server with a
+  // broken gate answers 404 rather than approving anything real.
+  { module: 'tire_approvals', probe: { method: 'POST', path: '/api/v1/tire-assignment-requests/999999999/approve' } },
   { module: 'tires', probe: { method: 'GET', path: '/api/v1/tires' } },
   { module: 'vendors', probe: { method: 'GET', path: '/api/v1/vendors' } },
   { module: 'warranties', probe: { method: 'GET', path: '/api/v1/warranties' } },

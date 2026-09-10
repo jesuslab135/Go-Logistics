@@ -15,13 +15,21 @@ test('every module named by the permissions endpoint has a probe', () => {
   }
 })
 
-test('every probe targets a read verb, so a 403 cannot be confused with a write failure', () => {
+test('every probe targets a read verb, so a 403 cannot be confused with a write failure, except tire_approvals', () => {
   for (const p of MODULE_PROBES) {
+    if (p.module === 'tire_approvals') continue
     assert.equal(p.probe.method, 'GET', `${p.module} probe should be a GET`)
   }
 })
 
-test('every probe path is a collection, needing no fixture id', () => {
+test('tire_approvals is pinned as the one POST probe, against the approve action, with a nonexistent id', () => {
+  const p = MODULE_PROBES.find(m => m.module === 'tire_approvals')
+  assert.ok(p, 'expected a tire_approvals probe')
+  assert.equal(p.probe.method, 'POST')
+  assert.ok(p.probe.path.includes('999999999'), 'expected the nonexistent-id placeholder value')
+})
+
+test('every probe path is a collection or a literal id, needing no fixture id placeholder', () => {
   for (const p of MODULE_PROBES) {
     assert.ok(!p.probe.path.includes('{'), `${p.module} probe path has a placeholder`)
   }
