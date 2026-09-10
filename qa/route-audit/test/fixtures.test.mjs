@@ -54,16 +54,23 @@ test('every taggable fixture body carries the run tag so teardown can find it', 
 test('UNTAGGABLE fixtures have no free-text field to tag', () => {
   // Some UNTAGGABLE bodies legitimately carry string-typed values that are
   // NOT free text: decimal amounts serialised as strings (e.g. quantity:
-  // '2') and ISO-8601 timestamps (e.g. started_at). Those are format-
-  // constrained by the API and cannot hold a human-readable tag no matter
-  // what — they are not the "hole" this test guards against. A field that
-  // holds arbitrary text (name, notes, description, label, terms, ...)
-  // is the hole: it would mean the DTO grew a place for the tag and the
-  // exemption should be removed. So this test fails on any string field
-  // that is NOT a recognised constrained format, rather than on every
-  // string field.
+  // '2'), ISO-8601 timestamps (e.g. started_at), and short domain codes
+  // whose DB column is only a few characters wide (e.g. wheelPosition's
+  // code/side, which top out at 10 and 1 characters — nowhere near enough
+  // to hold `ZZ-TEST-<runId>` even if the DTO allowed free text there).
+  // Those are format-constrained by the API and cannot hold a human-
+  // readable tag no matter what — they are not the "hole" this test
+  // guards against. A field that holds arbitrary text (name, notes,
+  // description, label, terms, ...) is the hole: it would mean the DTO
+  // grew a place for the tag and the exemption should be removed. So this
+  // test fails on any string field that is NOT a recognised constrained
+  // format, rather than on every string field. Free text in this codebase
+  // is either much longer than a short code or contains whitespace/
+  // punctuation a code never has, so a short token with no whitespace is
+  // a reasonable proxy for "constrained", not "free text".
   const ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/
   const DECIMAL_STRING = /^\d+(\.\d+)?$/
+  const SHORT_CODE = /^[A-Za-z0-9_-]{1,20}$/
   const ids = Object.fromEntries(FIXTURE_PLAN.map(s => [s.key, 1]))
   const byKey = new Map(FIXTURE_PLAN.map(s => [s.key, s]))
   for (const key of UNTAGGABLE) {
@@ -73,7 +80,7 @@ test('UNTAGGABLE fixtures have no free-text field to tag', () => {
     for (const [field, value] of Object.entries(body)) {
       if (typeof value !== 'string') continue
       assert.ok(
-        ISO_TIMESTAMP.test(value) || DECIMAL_STRING.test(value),
+        ISO_TIMESTAMP.test(value) || DECIMAL_STRING.test(value) || SHORT_CODE.test(value),
         `${key}.${field} ("${value}") looks like free text — UNTAGGABLE exemption may be stale, tag it instead`
       )
     }

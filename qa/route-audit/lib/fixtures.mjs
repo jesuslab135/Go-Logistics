@@ -4,10 +4,17 @@
 const ARCHIVABLE = new Set(['vendor', 'part', 'asset', 'serviceTask', 'inspectionForm'])
 
 // Fixtures whose Create DTO has no free-text field, so there is nowhere to put
-// the run tag. Teardown still tracks them by id in `created`, and both are
-// grandchildren that die with their parent, so cleanup is unaffected — the tag
-// is a human-recovery aid, not the deletion mechanism.
-export const UNTAGGABLE = new Set(['laborEntry', 'purchaseOrderLineItem'])
+// the run tag. Teardown still tracks them by id in `created`, and all three
+// are grandchildren that die with their parent, so cleanup is unaffected —
+// the tag is a human-recovery aid, not the deletion mechanism.
+//
+// wheelPosition (dto/wheel_position_definition.go) has only code (varchar(10),
+// NOT NULL), side (varchar(1), NOT NULL) and slot (int) — none of them free
+// text, and code is far too short to hold `ZZ-TEST-<runId>` for most runIds
+// without truncating (a truncated tag is not a usable tag: it defeats the
+// human recovery sweep exactly as no tag would). code/side instead carry
+// plausible domain values ('L1', 'L') so the row is realistic.
+export const UNTAGGABLE = new Set(['laborEntry', 'purchaseOrderLineItem', 'wheelPosition'])
 
 // Rows on an append-only ledger cannot be deleted; reversing is the system's
 // own answer, exactly as archiving is for a referenced catalog row. The
@@ -68,7 +75,7 @@ export const FIXTURE_PLAN = [
   { key: 'fault', path: '/api/v1/faults', dependsOn: [],
     body: (_, tag) => ({ name: `${tag}-fault` }) },
   { key: 'inspectionForm', path: '/api/v1/inspection-forms', dependsOn: [],
-    body: (_, tag) => ({ name: `${tag}-inspection-form` }) },
+    body: (_, tag) => ({ title: `${tag}-inspection-form`, description: `${tag} audit form`, version: 1 }) },
   { key: 'tireModel', path: '/api/v1/tire-models', dependsOn: [],
     body: (_, tag) => ({ brand: `${tag}-brand`, model_name: `${tag}-tire-model`, size: '295/75R22.5' }) },
 
@@ -77,8 +84,8 @@ export const FIXTURE_PLAN = [
     body: (ids, tag) => ({ name: `${tag}-model`, make_id: ids.vehicleMake }) },
   { key: 'part', path: '/api/v1/parts', dependsOn: ['partCategory', 'partManufacturer', 'measurementUnit'],
     body: (ids, tag) => ({
-      name: `${tag}-part`, part_number: `${tag}-PN`,
-      category_id: ids.partCategory, manufacturer_id: ids.partManufacturer,
+      part_number: `${tag}-PN`, description: `${tag}-part`,
+      part_category_id: ids.partCategory, part_manufacturer_id: ids.partManufacturer,
       measurement_unit_id: ids.measurementUnit,
     }) },
   { key: 'asset', path: '/api/v1/assets', dependsOn: ['assetType', 'assetStatus'],
@@ -96,7 +103,7 @@ export const FIXTURE_PLAN = [
   { key: 'tire', path: '/api/v1/tires', dependsOn: ['tireModel'],
     body: (ids, tag) => ({ tire_identification_number: `${tag}-tire`, tire_model_id: ids.tireModel, status: 'IN_STOCK' }) },
   { key: 'axleDefinition', path: '/api/v1/axle-templates/{axleTemplate}/definitions', dependsOn: ['axleTemplate'],
-    body: (_, tag) => ({ name: `${tag}-axle-def`, position: 1, wheel_count: 2 }) },
+    body: (_, tag) => ({ label: `${tag}-axle-def`, position_index: 1, axle_role: 'DRIVE', positions_per_side: 2 }) },
   { key: 'employee', path: '/api/v1/employees', dependsOn: ['role', 'group'],
     body: (ids, tag) => ({
       first_name: 'ZZTEST', last_name: `${tag}-employee`,
@@ -133,7 +140,10 @@ export const FIXTURE_PLAN = [
       odometer: '1000', reference: `${tag}-FE`,
     }) },
   { key: 'partInventory', path: '/api/v1/parts/{part}/inventory', dependsOn: ['part', 'partLocation'],
-    body: (ids, tag) => ({ location_id: ids.partLocation, quantity: '10', notes: `${tag}-inv` }) },
+    body: (ids, tag) => ({
+      location_id: ids.partLocation, available_quantity: '10',
+      aisle: `${tag}-aisle`, row: 'R1', bin: 'B1',
+    }) },
   { key: 'warranty', path: '/api/v1/warranties', dependsOn: ['vendor', 'asset'],
     body: (ids, tag) => ({
       provider_id: ids.vendor, asset_id: ids.asset,
@@ -151,14 +161,14 @@ export const FIXTURE_PLAN = [
     body: (_, tag) => ({ label: `${tag}-form-item`, position: 1, item_type: 'PASS_FAIL' }) },
 
   // Level 3 — line items and logs.
-  { key: 'workOrderLineItem', path: '/api/v1/work-orders/{workOrder}/line-items', dependsOn: ['workOrder', 'serviceTask'],
-    body: (ids, tag) => ({ service_task_id: ids.serviceTask, description: `${tag}-wo-line` }) },
+  { key: 'workOrderLineItem', path: '/api/v1/work-orders/{workOrder}/line-items', dependsOn: ['workOrder'],
+    body: (_, tag) => ({ title: `${tag}-wo-line`, description: `${tag} work order line item` }) },
   { key: 'purchaseOrderLineItem', path: '/api/v1/purchase-orders/{purchaseOrder}/line-items', dependsOn: ['purchaseOrder', 'part'],
     body: (ids, tag) => ({ part_id: ids.part, quantity: '2', unit_cost: '5', position: 1 }) },
   { key: 'serviceEntryLineItem', path: '/api/v1/service-entries/{serviceEntry}/line-items', dependsOn: ['serviceEntry', 'serviceTask'],
     body: (ids, tag) => ({ service_task_id: ids.serviceTask, description: `${tag}-se-line` }) },
   { key: 'wheelPosition', path: '/api/v1/axle-definitions/{axleDefinition}/wheel-positions', dependsOn: ['axleDefinition'],
-    body: (_, tag) => ({ label: `${tag}-wheel`, position: 1 }) },
+    body: (_, tag) => ({ code: 'L1', side: 'L', slot: 1 }) },
   { key: 'journalEntry', path: '/api/v1/inventory-journal-entries', dependsOn: ['part', 'partInventory', 'adjustmentReason'],
     body: (ids, tag) => ({
       part_id: ids.part, part_location_detail_id: ids.partInventory,
