@@ -12,19 +12,32 @@ UPDATE employee SET password_hash = $2, updated_at = $3 WHERE id = $1;
 -- request.user.employee (and its role) from the database on every request, so
 -- revoking a role or deactivating an employee takes effect immediately rather
 -- than at the next token refresh; this query preserves that.
+--
+-- company_id is nullable: a company-less session (an account owner who has not
+-- created a company yet) has no tenant to scope to. sqlc.narg makes the
+-- membership EXISTS resolve to false for such a caller rather than requiring a
+-- sentinel id that does not exist.
+--
+-- is_account_owner no longer reads employee.is_account_owner, which was a global
+-- boolean meaning only "may create companies". It now means what it says: this
+-- employee owns the account they belong to.
 -- name: GetEmployeeIdentity :one
 SELECT
     e.id,
     e.is_active,
-    e.is_account_owner,
+    e.account_id,
     e.role_id,
     e.is_platform_admin,
-    COALESCE(r.is_admin, false)         AS is_admin,
+    COALESCE(r.is_admin, false)          AS is_admin,
     COALESCE(r.permissions, '{}'::jsonb) AS permissions,
     EXISTS (
         SELECT 1 FROM employee_companies ec
-        WHERE ec.employee_id = e.id AND ec.company_id = sqlc.arg(company_id)
-    ) AS is_member
+        WHERE ec.employee_id = e.id AND ec.company_id = sqlc.narg(company_id)
+    ) AS is_member,
+    EXISTS (
+        SELECT 1 FROM account a
+        WHERE a.id = e.account_id AND a.owner_employee_id = e.id
+    ) AS is_account_owner
 FROM employee e
 LEFT JOIN role r ON r.id = e.role_id
 WHERE e.id = sqlc.arg(id);

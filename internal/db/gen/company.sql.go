@@ -85,11 +85,11 @@ func (q *Queries) CountCompaniesByIDs(ctx context.Context, ids []int64) (int64, 
 const createCompany = `-- name: CreateCompany :one
 INSERT INTO company (
     name, tax_id, address, created_at, phone, email, website, logo,
-    city, region, postal_code, country, timezone, currency, system_of_measurement
+    city, region, postal_code, country, timezone, currency, system_of_measurement, account_id
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16
 )
-RETURNING id, name, tax_id, address, created_at, phone, email, website, logo, city, region, postal_code, country, timezone, currency, system_of_measurement
+RETURNING id, name, tax_id, address, created_at, phone, email, website, logo, city, region, postal_code, country, timezone, currency, system_of_measurement, account_id
 `
 
 type CreateCompanyParams struct {
@@ -108,6 +108,7 @@ type CreateCompanyParams struct {
 	Timezone            string
 	Currency            string
 	SystemOfMeasurement string
+	AccountID           int64
 }
 
 func (q *Queries) CreateCompany(ctx context.Context, arg CreateCompanyParams) (Company, error) {
@@ -127,6 +128,7 @@ func (q *Queries) CreateCompany(ctx context.Context, arg CreateCompanyParams) (C
 		arg.Timezone,
 		arg.Currency,
 		arg.SystemOfMeasurement,
+		arg.AccountID,
 	)
 	var i Company
 	err := row.Scan(
@@ -146,6 +148,7 @@ func (q *Queries) CreateCompany(ctx context.Context, arg CreateCompanyParams) (C
 		&i.Timezone,
 		&i.Currency,
 		&i.SystemOfMeasurement,
+		&i.AccountID,
 	)
 	return i, err
 }
@@ -168,7 +171,7 @@ func (q *Queries) DeleteCompany(ctx context.Context, arg DeleteCompanyParams) er
 
 const getCompany = `-- name: GetCompany :one
 
-SELECT c.id, c.name, c.tax_id, c.address, c.created_at, c.phone, c.email, c.website, c.logo, c.city, c.region, c.postal_code, c.country, c.timezone, c.currency, c.system_of_measurement FROM company c
+SELECT c.id, c.name, c.tax_id, c.address, c.created_at, c.phone, c.email, c.website, c.logo, c.city, c.region, c.postal_code, c.country, c.timezone, c.currency, c.system_of_measurement, c.account_id FROM company c
 WHERE c.id = $1
   AND EXISTS (SELECT 1 FROM employee_companies ec WHERE ec.company_id = c.id AND ec.employee_id = $2)
 `
@@ -202,12 +205,13 @@ func (q *Queries) GetCompany(ctx context.Context, arg GetCompanyParams) (Company
 		&i.Timezone,
 		&i.Currency,
 		&i.SystemOfMeasurement,
+		&i.AccountID,
 	)
 	return i, err
 }
 
 const getCompanyByID = `-- name: GetCompanyByID :one
-SELECT id, name, tax_id, address, created_at, phone, email, website, logo, city, region, postal_code, country, timezone, currency, system_of_measurement FROM company WHERE id = $1
+SELECT id, name, tax_id, address, created_at, phone, email, website, logo, city, region, postal_code, country, timezone, currency, system_of_measurement, account_id FROM company WHERE id = $1
 `
 
 // Unscoped single-company read for the admin namespace.
@@ -231,6 +235,7 @@ func (q *Queries) GetCompanyByID(ctx context.Context, id int64) (Company, error)
 		&i.Timezone,
 		&i.Currency,
 		&i.SystemOfMeasurement,
+		&i.AccountID,
 	)
 	return i, err
 }
@@ -270,7 +275,7 @@ func (q *Queries) GetCompanyOwner(ctx context.Context, companyID int64) (GetComp
 }
 
 const listCompanies = `-- name: ListCompanies :many
-SELECT c.id, c.name, c.tax_id, c.address, c.created_at, c.phone, c.email, c.website, c.logo, c.city, c.region, c.postal_code, c.country, c.timezone, c.currency, c.system_of_measurement FROM company c
+SELECT c.id, c.name, c.tax_id, c.address, c.created_at, c.phone, c.email, c.website, c.logo, c.city, c.region, c.postal_code, c.country, c.timezone, c.currency, c.system_of_measurement, c.account_id FROM company c
 WHERE EXISTS (SELECT 1 FROM employee_companies ec WHERE ec.company_id = c.id AND ec.employee_id = $1)
 ORDER BY c.name, c.id
 LIMIT $3 OFFSET $2
@@ -308,6 +313,7 @@ func (q *Queries) ListCompanies(ctx context.Context, arg ListCompaniesParams) ([
 			&i.Timezone,
 			&i.Currency,
 			&i.SystemOfMeasurement,
+			&i.AccountID,
 		); err != nil {
 			return nil, err
 		}
@@ -465,7 +471,7 @@ UPDATE company c SET
     system_of_measurement = $14
 WHERE c.id = $15
   AND EXISTS (SELECT 1 FROM employee_companies ec WHERE ec.company_id = c.id AND ec.employee_id = $16)
-RETURNING c.id, c.name, c.tax_id, c.address, c.created_at, c.phone, c.email, c.website, c.logo, c.city, c.region, c.postal_code, c.country, c.timezone, c.currency, c.system_of_measurement
+RETURNING c.id, c.name, c.tax_id, c.address, c.created_at, c.phone, c.email, c.website, c.logo, c.city, c.region, c.postal_code, c.country, c.timezone, c.currency, c.system_of_measurement, c.account_id
 `
 
 type UpdateCompanyParams struct {
@@ -524,6 +530,7 @@ func (q *Queries) UpdateCompany(ctx context.Context, arg UpdateCompanyParams) (C
 		&i.Timezone,
 		&i.Currency,
 		&i.SystemOfMeasurement,
+		&i.AccountID,
 	)
 	return i, err
 }

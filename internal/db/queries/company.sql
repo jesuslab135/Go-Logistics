@@ -21,9 +21,9 @@ WHERE EXISTS (SELECT 1 FROM employee_companies ec WHERE ec.company_id = c.id AND
 -- name: CreateCompany :one
 INSERT INTO company (
     name, tax_id, address, created_at, phone, email, website, logo,
-    city, region, postal_code, country, timezone, currency, system_of_measurement
+    city, region, postal_code, country, timezone, currency, system_of_measurement, account_id
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, sqlc.arg(account_id)
 )
 RETURNING *;
 
