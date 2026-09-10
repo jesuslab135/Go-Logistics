@@ -1,5 +1,5 @@
 -- name: GetEmployeeAuthByEmail :one
-SELECT e.id, e.default_company_id, e.password_hash, COALESCE(r.is_admin, false) AS is_admin
+SELECT e.id, e.default_company_id, e.account_id, e.password_hash, COALESCE(r.is_admin, false) AS is_admin
 FROM employee e
 LEFT JOIN role r ON r.id = e.role_id
 WHERE e.email = $1 AND e.is_active = true

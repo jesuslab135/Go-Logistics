@@ -39,24 +39,40 @@ func (v *EmployeeCredentialVerifier) Verify(ctx context.Context, email, password
 	if err != nil {
 		return Identity{}, ErrInvalidCredentials
 	}
-	companyID, ok := resolveLoginCompany(row.DefaultCompanyID, memberships)
-	if !ok {
+	companyID := resolveLoginCompany(row.DefaultCompanyID, memberships)
+
+	// An employee belonging to no account and holding no membership has nowhere
+	// to be: refuse, as before. An employee with an account but no company yet
+	// gets a company-less session, which can reach only /me/permissions,
+	// POST /companies and /auth/switch-company.
+	if companyID == nil && row.AccountID == nil {
 		return Identity{}, ErrNoCompanyMembership
 	}
 
-	return Identity{EmployeeID: row.ID, CompanyID: companyID, IsAdmin: row.IsAdmin}, nil
+	return Identity{
+		EmployeeID: row.ID,
+		CompanyID:  companyID,
+		AccountID:  row.AccountID,
+		IsAdmin:    row.IsAdmin,
+	}, nil
 }
 
 // resolveLoginCompany picks the company a session is scoped to. The employee's
 // default_company_id wins when it names a real membership; otherwise the lowest
-// membership id does, so the choice is deterministic across logins. An employee
-// with no membership resolves to nothing and must not be issued a token.
-func resolveLoginCompany(defaultCompanyID *int64, memberships []int64) (int64, bool) {
+// membership id does, so the choice is deterministic across logins.
+//
+// An employee with no membership resolves to nil, which is a company-less
+// session rather than a refusal: an account owner provisioned by a platform
+// admin has no company until they create one, and refusing them a token is the
+// deadlock this change exists to break. Whether they may log in at all is
+// decided by Verify, on whether they belong to an account.
+func resolveLoginCompany(defaultCompanyID *int64, memberships []int64) *int64 {
 	if len(memberships) == 0 {
-		return 0, false
+		return nil
 	}
 	if defaultCompanyID != nil && slices.Contains(memberships, *defaultCompanyID) {
-		return *defaultCompanyID, true
+		return defaultCompanyID
 	}
-	return slices.Min(memberships), true
+	lowest := slices.Min(memberships)
+	return &lowest
 }

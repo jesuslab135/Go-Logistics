@@ -266,7 +266,7 @@ func (q *Queries) GetEmployee(ctx context.Context, arg GetEmployeeParams) (Emplo
 }
 
 const getEmployeeAuthByEmail = `-- name: GetEmployeeAuthByEmail :one
-SELECT e.id, e.default_company_id, e.password_hash, COALESCE(r.is_admin, false) AS is_admin
+SELECT e.id, e.default_company_id, e.account_id, e.password_hash, COALESCE(r.is_admin, false) AS is_admin
 FROM employee e
 LEFT JOIN role r ON r.id = e.role_id
 WHERE e.email = $1 AND e.is_active = true
@@ -276,6 +276,7 @@ LIMIT 1
 type GetEmployeeAuthByEmailRow struct {
 	ID               int64
 	DefaultCompanyID *int64
+	AccountID        *int64
 	PasswordHash     string
 	IsAdmin          bool
 }
@@ -286,6 +287,7 @@ func (q *Queries) GetEmployeeAuthByEmail(ctx context.Context, email string) (Get
 	err := row.Scan(
 		&i.ID,
 		&i.DefaultCompanyID,
+		&i.AccountID,
 		&i.PasswordHash,
 		&i.IsAdmin,
 	)

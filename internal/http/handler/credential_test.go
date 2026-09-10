@@ -6,66 +6,31 @@ func ptr(v int64) *int64 { return &v }
 
 // A login token is only safe if its company_id claim names a company the
 // employee is actually a member of: every downstream query trusts that claim.
+// With no membership the answer is now "no company" rather than "no token" —
+// an account owner who has not created a company yet must be able to log in.
 func TestResolveLoginCompany(t *testing.T) {
 	tests := []struct {
 		name        string
 		defaultID   *int64
 		memberships []int64
-		want        int64
-		wantOK      bool
+		want        *int64
 	}{
-		{
-			name:        "default company that is a real membership wins",
-			defaultID:   ptr(7),
-			memberships: []int64{3, 7, 9},
-			want:        7,
-			wantOK:      true,
-		},
-		{
-			name:        "nil default falls back to the lowest membership",
-			defaultID:   nil,
-			memberships: []int64{9, 3, 7},
-			want:        3,
-			wantOK:      true,
-		},
-		{
-			name:        "default naming a company the employee does not belong to is ignored",
-			defaultID:   ptr(42),
-			memberships: []int64{9, 3},
-			want:        3,
-			wantOK:      true,
-		},
-		{
-			name:        "no membership at all refuses the login",
-			defaultID:   ptr(7),
-			memberships: nil,
-			want:        0,
-			wantOK:      false,
-		},
-		{
-			name:        "no membership and no default refuses the login",
-			defaultID:   nil,
-			memberships: []int64{},
-			want:        0,
-			wantOK:      false,
-		},
-		{
-			name:        "a zero default is never trusted",
-			defaultID:   ptr(0),
-			memberships: []int64{5},
-			want:        5,
-			wantOK:      true,
-		},
+		{"default company that is a real membership wins", ptr(7), []int64{3, 7, 9}, ptr(7)},
+		{"nil default falls back to the lowest membership", nil, []int64{9, 3, 7}, ptr(3)},
+		{"default naming a company the employee does not belong to is ignored", ptr(42), []int64{9, 3}, ptr(3)},
+		{"no membership yields no company rather than a failure", ptr(7), nil, nil},
+		{"no membership and no default yields no company", nil, nil, nil},
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, ok := resolveLoginCompany(tt.defaultID, tt.memberships)
-			if ok != tt.wantOK {
-				t.Fatalf("ok = %v, want %v", ok, tt.wantOK)
-			}
-			if got != tt.want {
-				t.Errorf("company = %d, want %d", got, tt.want)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := resolveLoginCompany(tc.defaultID, tc.memberships)
+			switch {
+			case tc.want == nil && got != nil:
+				t.Fatalf("got %d, want no company", *got)
+			case tc.want != nil && got == nil:
+				t.Fatalf("got no company, want %d", *tc.want)
+			case tc.want != nil && *got != *tc.want:
+				t.Fatalf("got %d, want %d", *got, *tc.want)
 			}
 		})
 	}

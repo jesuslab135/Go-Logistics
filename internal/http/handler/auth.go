@@ -25,9 +25,13 @@ var ErrInvalidCredentials = errors.New("invalid credentials")
 var ErrNoCompanyMembership = errors.New("no company membership")
 
 // Identity is the authenticated principal a successful login resolves to.
+// CompanyID and AccountID are pointers: a company-less session (an account
+// owner who has not yet created a company) has neither a tenant to scope to
+// nor, in CompanyID's case, one to omit as a false zero.
 type Identity struct {
 	EmployeeID int64
-	CompanyID  int64
+	CompanyID  *int64
+	AccountID  *int64
 	IsAdmin    bool
 }
 
@@ -83,7 +87,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	pair, err := h.tokens.Issue(id.EmployeeID, id.CompanyID, id.IsAdmin)
+	pair, err := h.tokens.Issue(id.EmployeeID, id.CompanyID, id.AccountID, id.IsAdmin)
 	if err != nil {
 		apierr.Abort(c, err)
 		return
@@ -134,18 +138,22 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 	// Login and switch-company both prove employee_companies membership before
 	// minting a token; refresh re-issues company_id off the old token, so
 	// without this a revoked membership stays live for a whole refresh TTL.
-	companies, err := h.q.ListEmployeeCompanyIDs(c.Request.Context(), claims.EmployeeID())
-	if err != nil {
-		apierr.Abort(c, err)
-		return
-	}
-	if !slices.Contains(companies, claims.CompanyID) {
-		apierr.Abort(c, apierr.New(http.StatusForbidden, "no_company_membership",
-			"this account is no longer a member of the company this token was issued for"))
-		return
+	// A company-less token (claims.CompanyID == nil) has no membership to
+	// re-prove — it is simply re-issued company-less.
+	if claims.CompanyID != nil {
+		companies, err := h.q.ListEmployeeCompanyIDs(c.Request.Context(), claims.EmployeeID())
+		if err != nil {
+			apierr.Abort(c, err)
+			return
+		}
+		if !slices.Contains(companies, *claims.CompanyID) {
+			apierr.Abort(c, apierr.New(http.StatusForbidden, "no_company_membership",
+				"this account is no longer a member of the company this token was issued for"))
+			return
+		}
 	}
 
-	pair, err := h.tokens.Issue(claims.EmployeeID(), claims.CompanyID, claims.IsAdmin)
+	pair, err := h.tokens.Issue(claims.EmployeeID(), claims.CompanyID, claims.AccountID, claims.IsAdmin)
 	if err != nil {
 		apierr.Abort(c, err)
 		return
@@ -183,7 +191,7 @@ func (h *AuthHandler) SwitchCompany(c *gin.Context) {
 	// Membership is re-read from employee_companies rather than trusted from
 	// the presented token, so a stale claim cannot widen access.
 	row, err := h.q.GetEmployeeIdentity(c.Request.Context(), gen.GetEmployeeIdentityParams{
-		CompanyID: req.CompanyID,
+		CompanyID: &req.CompanyID,
 		ID:        claims.EmployeeID(),
 	})
 	if err != nil || !row.IsActive || !row.IsMember {
@@ -192,8 +200,9 @@ func (h *AuthHandler) SwitchCompany(c *gin.Context) {
 	}
 
 	// Both tokens are re-scoped: is_admin is resolved against the target
-	// company's role, not carried over from the previous tenant.
-	pair, err := h.tokens.Issue(claims.EmployeeID(), req.CompanyID, row.IsAdmin)
+	// company's role, not carried over from the previous tenant. account_id is
+	// re-read alongside membership rather than trusted from the old token.
+	pair, err := h.tokens.Issue(claims.EmployeeID(), &req.CompanyID, row.AccountID, row.IsAdmin)
 	if err != nil {
 		apierr.Abort(c, err)
 		return
