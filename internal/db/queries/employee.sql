@@ -160,3 +160,8 @@ WHERE employee_id = sqlc.arg(employee_id)
 -- name: SetEmployeeDefaultCompany :exec
 UPDATE employee SET default_company_id = sqlc.narg(default_company_id), updated_at = sqlc.arg(updated_at)
 WHERE id = sqlc.arg(id);
+
+-- name: SetEmployeeDefaultCompanyIfUnset :exec
+UPDATE employee
+   SET default_company_id = sqlc.narg(default_company_id)
+ WHERE id = sqlc.arg(id) AND default_company_id IS NULL;

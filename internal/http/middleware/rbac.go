@@ -165,6 +165,12 @@ func (i Identity) moduleActions(module string) map[string]bool {
 
 type identityContextKey struct{}
 
+// ContextWithIdentity injects an identity. RequireIdentity uses it in the
+// request path; tests use it to construct a caller without a live database.
+func ContextWithIdentity(ctx context.Context, id Identity) context.Context {
+	return context.WithValue(ctx, identityContextKey{}, id)
+}
+
 // IdentityOf returns the identity resolved by RequireIdentity, if present.
 func IdentityOf(c *gin.Context) (Identity, bool) {
 	id, ok := c.Request.Context().Value(identityContextKey{}).(Identity)
@@ -202,9 +208,7 @@ func RequireIdentity(loader IdentityLoader) gin.HandlerFunc {
 			return
 		}
 
-		c.Request = c.Request.WithContext(
-			context.WithValue(c.Request.Context(), identityContextKey{}, identity),
-		)
+		c.Request = c.Request.WithContext(ContextWithIdentity(c.Request.Context(), identity))
 		c.Next()
 	}
 }

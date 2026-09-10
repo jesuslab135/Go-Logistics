@@ -628,6 +628,22 @@ func (q *Queries) SetEmployeeDefaultCompany(ctx context.Context, arg SetEmployee
 	return err
 }
 
+const setEmployeeDefaultCompanyIfUnset = `-- name: SetEmployeeDefaultCompanyIfUnset :exec
+UPDATE employee
+   SET default_company_id = $1
+ WHERE id = $2 AND default_company_id IS NULL
+`
+
+type SetEmployeeDefaultCompanyIfUnsetParams struct {
+	DefaultCompanyID *int64
+	ID               int64
+}
+
+func (q *Queries) SetEmployeeDefaultCompanyIfUnset(ctx context.Context, arg SetEmployeeDefaultCompanyIfUnsetParams) error {
+	_, err := q.db.Exec(ctx, setEmployeeDefaultCompanyIfUnset, arg.DefaultCompanyID, arg.ID)
+	return err
+}
+
 const updateEmployee = `-- name: UpdateEmployee :one
 UPDATE employee e SET
     user_id = $1, default_company_id = $2,

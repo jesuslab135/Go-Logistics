@@ -11,6 +11,7 @@ import (
 	"fleet/internal/db/gen"
 	"fleet/internal/http/dto"
 	"fleet/internal/http/middleware"
+	"fleet/internal/platform/apierr"
 	"fleet/internal/platform/paginate"
 	"fleet/internal/platform/storage"
 )
@@ -67,6 +68,16 @@ func (s *CompanyStore) Get(ctx context.Context, id int64) (dto.CompanyResponse, 
 // membership are all written in one transaction, so a company is never left in a
 // state where the product cannot be used.
 func (s *CompanyStore) Create(ctx context.Context, in dto.CreateCompanyRequest) (dto.CompanyResponse, error) {
+	// The account comes from the caller, never from the body: honouring a
+	// body-supplied account_id would let an owner plant a company inside
+	// another client. Platform staff belong to no account and so have no
+	// account to create into.
+	accountID := middleware.AccountFromContext(ctx)
+	if accountID == nil {
+		return dto.CompanyResponse{}, apierr.Forbidden(
+			"only a member of a client account can create a company")
+	}
+
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return dto.CompanyResponse{}, err
@@ -90,6 +101,7 @@ func (s *CompanyStore) Create(ctx context.Context, in dto.CreateCompanyRequest) 
 		Timezone:            orDefault(in.Timezone, "America/Mexico_City"),
 		Currency:            orDefault(in.Currency, "MXN"),
 		SystemOfMeasurement: orDefault(in.SystemOfMeasurement, "metric"),
+		AccountID:           *accountID,
 	})
 	if err != nil {
 		return dto.CompanyResponse{}, err
@@ -98,6 +110,19 @@ func (s *CompanyStore) Create(ctx context.Context, in dto.CreateCompanyRequest) 
 	if err := bootstrap.Company(ctx, qtx, row.ID, middleware.EmployeeFromContext(ctx)); err != nil {
 		return dto.CompanyResponse{}, err
 	}
+
+	// A company-less owner has no default tenant, so their next login would
+	// issue another company-less token and onboarding would look broken. Seed it
+	// with the company they just created. Left alone when already set: silently
+	// repointing someone's default tenant is a surprise, not a convenience.
+	employeeID := middleware.EmployeeFromContext(ctx)
+	if err := qtx.SetEmployeeDefaultCompanyIfUnset(ctx, gen.SetEmployeeDefaultCompanyIfUnsetParams{
+		ID:               employeeID,
+		DefaultCompanyID: &row.ID,
+	}); err != nil {
+		return dto.CompanyResponse{}, err
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return dto.CompanyResponse{}, err
 	}
