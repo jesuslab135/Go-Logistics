@@ -34,3 +34,6 @@ Thumbs.db
 
 # Route audit run artifacts
 qa/route-audit/out/
+
+# Node (the route-audit browser walker is the only Node dependency tree here)
+node_modules/
