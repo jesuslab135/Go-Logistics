@@ -104,10 +104,10 @@ export const FIXTURE_PLAN = [
       name: `${tag}-issue`, summary: `${tag}-issue`, asset_id: ids.asset, priority_id: ids.issuePriority,
       reported_by_id: ids.employee, reported_at: '2026-09-09T00:00:00Z',
     }) },
-  { key: 'purchaseOrder', path: '/api/v1/purchase-orders', dependsOn: ['vendor', 'location'],
+  { key: 'purchaseOrder', path: '/api/v1/purchase-orders', dependsOn: ['vendor', 'partLocation'],
     body: (ids, tag) => ({
       number: `${tag}-PO`, description: `${tag} purchase order`,
-      vendor_id: ids.vendor, destination_id: ids.location,
+      vendor_id: ids.vendor, destination_id: ids.partLocation,
     }) },
   { key: 'serviceEntry', path: '/api/v1/service-entries', dependsOn: ['asset', 'vendor'],
     body: (ids, tag) => ({
