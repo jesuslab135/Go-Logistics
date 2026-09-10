@@ -41,11 +41,7 @@ func (v *EmployeeCredentialVerifier) Verify(ctx context.Context, email, password
 	}
 	companyID := resolveLoginCompany(row.DefaultCompanyID, memberships)
 
-	// An employee belonging to no account and holding no membership has nowhere
-	// to be: refuse, as before. An employee with an account but no company yet
-	// gets a company-less session, which can reach only /me/permissions,
-	// POST /companies and /auth/switch-company.
-	if companyID == nil && row.AccountID == nil {
+	if !mayLogIn(companyID, row.AccountID) {
 		return Identity{}, ErrNoCompanyMembership
 	}
 
@@ -75,4 +71,15 @@ func resolveLoginCompany(defaultCompanyID *int64, memberships []int64) *int64 {
 	}
 	lowest := slices.Min(memberships)
 	return &lowest
+}
+
+// mayLogIn reports whether an employee may receive a token at all.
+//
+// A company is not required: an account owner provisioned by a platform admin
+// has none until they create one, and refusing them a token is the deadlock
+// this change exists to break. Belonging to NOTHING is still refused — a nil
+// company and a nil account together mean there is nowhere for the session to
+// be.
+func mayLogIn(companyID *int64, accountID *int64) bool {
+	return companyID != nil || accountID != nil
 }

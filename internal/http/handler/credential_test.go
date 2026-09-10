@@ -35,3 +35,29 @@ func TestResolveLoginCompany(t *testing.T) {
 		})
 	}
 }
+
+// mayLogIn is the line that decides who may log in at all. resolveLoginCompany
+// cannot see account_id, so a company-less employee with an account and one
+// with neither are indistinguishable to it — both resolve to a nil company.
+// This predicate is where that split actually happens, so it is exhaustively
+// tested: two bools, four combinations.
+func TestMayLogIn(t *testing.T) {
+	tests := []struct {
+		name      string
+		companyID *int64
+		accountID *int64
+		want      bool
+	}{
+		{"scoped session with a known account may log in", ptr(7), ptr(1), true},
+		{"scoped session with no account claim may log in", ptr(7), nil, true},
+		{"company-less owner with an account may log in — the whole point of this change", nil, ptr(1), true},
+		{"an employee belonging to nothing must never receive a token", nil, nil, false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := mayLogIn(tc.companyID, tc.accountID); got != tc.want {
+				t.Fatalf("mayLogIn(%v, %v) = %v, want %v", tc.companyID, tc.accountID, got, tc.want)
+			}
+		})
+	}
+}
