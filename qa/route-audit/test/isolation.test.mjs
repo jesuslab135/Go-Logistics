@@ -182,3 +182,43 @@ test('a failed switch-back to home is a high-severity failing result, skips the 
   // The signal a caller (run.mjs) checks before running teardown at all.
   assert.equal(graph.tenantSwitchBackFailed, true)
 })
+
+// Fail-closed regression: switchTo() calls client.request, which is
+// documented elsewhere as "never throws" but CAN in reality — e.g. the
+// switch-back 401s and the subsequent token refresh also fails. That throw
+// happens inside the `finally` block itself, before the line that would
+// normally clear `tenantSwitchBackFailed` on confirmed success ever runs.
+// The flag must already be true by the time control reaches that point (set
+// before the `try`, ahead of anything that can throw), or it would default
+// to `undefined` — falsy — and both of run.mjs's guards would read that as
+// "safe to run teardown" against a client of unknown tenant.
+test('graph.tenantSwitchBackFailed stays true when the switch-back request itself throws, not just when it returns non-2xx', async () => {
+  const client = makeStubClient({
+    'POST /api/v1/companies': { status: 201, body: { id: 555 }, headers: {}, durationMs: 1 },
+    'POST /auth/switch-company': (opts) => {
+      if (opts.body.company_id === 555) {
+        return { status: 200, body: { access_token: 'tok-555' }, headers: {}, durationMs: 1 }
+      }
+      // Simulates the 401-then-refresh-also-fails path: the request layer
+      // throws instead of returning a status at all.
+      throw new Error('switch-back 401d and the token refresh also failed')
+    },
+    'GET /api/v1/vendors': { status: 200, body: { data: [], total: 0 }, headers: {}, durationMs: 1 },
+  })
+  const graph = { tag: 'ZZ-TEST-stub', ids: {} }
+
+  await assert.rejects(
+    () => runIsolationSuite(client, graph, 1),
+    /switch-back 401d/
+  )
+
+  // This is the exact case the fail-closed fix protects: the assignment
+  // that would clear the flag never runs, because switchTo() threw before
+  // reaching it. Without the pre-set `true`, this would read `undefined`.
+  assert.equal(graph.tenantSwitchBackFailed, true)
+
+  // The delete must never be attempted either, for the same reason as the
+  // non-throwing failure case above.
+  const deleteCall = client.calls.find(c => c.method === 'DELETE')
+  assert.equal(deleteCall, undefined, 'must not attempt the company delete when the switch-back threw')
+})

@@ -67,6 +67,18 @@ export async function runIsolationSuite(client, graph, homeCompanyId) {
     return results
   }
 
+  // Fail closed, before anything below can throw: assume we are NOT back in
+  // the home tenant until a switch-back demonstrably succeeds. switchTo()
+  // calls client.request, which CAN throw rather than return — e.g. the
+  // switch-back 401s and the subsequent token refresh also fails — and that
+  // throw would skip right over an assignment placed after the switch-back
+  // attempt, leaving this flag at its default `undefined` (falsy), which
+  // both run.mjs guards read as "safe to run teardown". Setting it true
+  // here, before the try below, means it stays true no matter what throws
+  // between here and the confirmed-success assignment further down —
+  // teardown is refused rather than defaulting open.
+  graph.tenantSwitchBackFailed = true
+
   // Everything from here through the throwaway company's own DELETE runs
   // inside try/finally. Without this, a throw anywhere in the probes below
   // (the original bug: `(vendors.body?.data ?? []).some(...)` blows up if
@@ -148,7 +160,11 @@ export async function runIsolationSuite(client, graph, homeCompanyId) {
     // throw path.
     const switchedHome = await switchTo(client, homeCompanyId)
     const switchedHomeOk = switchedHome.status >= 200 && switchedHome.status < 300
-    graph.tenantSwitchBackFailed = !switchedHomeOk
+    // Only clear the fail-closed flag set above on confirmed success. If
+    // switchTo() itself throws (see the comment above the `try`), execution
+    // never reaches this line at all, and the flag set before the try stays
+    // true.
+    if (switchedHomeOk) graph.tenantSwitchBackFailed = false
     results.push({
       check: 'tenant-isolation',
       opKey: 'POST /auth/switch-company (return to home)',
