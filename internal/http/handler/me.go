@@ -37,16 +37,6 @@ func (h *MeHandler) Permissions(c *gin.Context) {
 	}
 
 	ctx := c.Request.Context()
-	profile, err := h.q.GetMeProfile(ctx, identity.EmployeeID)
-	if err != nil {
-		apierr.Abort(c, err)
-		return
-	}
-	companies, err := h.q.ListMyCompanies(ctx, identity.EmployeeID)
-	if err != nil {
-		apierr.Abort(c, err)
-		return
-	}
 
 	// identity.CompanyID uses 0 as its internal "absent" sentinel (the same
 	// convention CompanyFromContext uses for request-scoped plumbing), but
@@ -57,6 +47,17 @@ func (h *MeHandler) Permissions(c *gin.Context) {
 	if identity.CompanyID != 0 {
 		id := identity.CompanyID
 		companyID = &id
+	}
+
+	profile, err := h.q.GetMeProfile(ctx, gen.GetMeProfileParams{ID: identity.EmployeeID, CompanyID: companyID})
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	companies, err := h.q.ListMyCompanies(ctx, identity.EmployeeID)
+	if err != nil {
+		apierr.Abort(c, err)
+		return
 	}
 
 	out := dto.MePermissionsResponse{

@@ -274,16 +274,22 @@ func (h *AdminEmployeeHandler) ReplaceCompanies(c *gin.Context) {
 		return
 	}
 	for _, cid := range ids {
-		if err := qtx.AddEmployeeCompany(ctx, gen.AddEmployeeCompanyParams{EmployeeID: id, CompanyID: cid}); err != nil {
+		// This route replaces an employee's set of companies; it has no role to
+		// grant for any of them, so the membership is created with none. A
+		// membership with no role is a legitimate state: the employee is
+		// associated with the company but permitted nothing there until someone
+		// assigns a role.
+		if err := qtx.GrantMembership(ctx, gen.GrantMembershipParams{EmployeeID: id, CompanyID: cid, RoleID: nil}); err != nil {
 			apierr.Abort(c, err)
 			return
 		}
 	}
-	// Granting a company confers administrator access there when the employee's
-	// role carries is_admin, because role_id is a single global FK. That makes
-	// this the highest-privilege write in the system, and it used to leave no
-	// trace at all. The audit rows go in the same transaction as the change, so
-	// a recorded grant is one that actually happened.
+	// Granting a company used to confer administrator access there whenever the
+	// employee's role carried is_admin, back when role_id was a single global
+	// FK. That is no longer possible: the role now lives on the membership
+	// itself, and this route grants none. The audit rows still go in the same
+	// transaction as the change, so a recorded grant is one that actually
+	// happened.
 	now := time.Now().UTC()
 	actor := middleware.EmployeeFromContext(ctx)
 	for _, cid := range membershipDelta(before, ids) {

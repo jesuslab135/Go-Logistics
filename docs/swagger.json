@@ -18595,9 +18595,6 @@
                     "type": "string",
                     "maxLength": 50
                 },
-                "role_id": {
-                    "type": "integer"
-                },
                 "start_date": {
                     "type": "string"
                 },
@@ -20509,9 +20506,6 @@
                 "region": {
                     "type": "string",
                     "maxLength": 50
-                },
-                "role_id": {
-                    "type": "integer"
                 },
                 "start_date": {
                     "type": "string"
@@ -24298,9 +24292,6 @@
                 "region": {
                     "type": "string",
                     "maxLength": 50
-                },
-                "role_id": {
-                    "type": "integer"
                 },
                 "start_date": {
                     "type": "string"

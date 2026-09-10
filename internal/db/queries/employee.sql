@@ -63,7 +63,7 @@ WHERE EXISTS (SELECT 1 FROM employee_companies ec WHERE ec.employee_id = e.id AN
 -- EmployeeStore.Create, which sources it from AccountFromContext — the same
 -- rule company creation follows). Without it the employee row is left with a
 -- NULL account_id, and the composite FK fk_ec_employee_account rejects the
--- membership AddEmployeeCompany then tries to create for it.
+-- membership GrantMembership then tries to create for it.
 INSERT INTO employee (
     account_id, user_id, default_company_id, first_name, last_name, employee_id, is_active,
     email, mobile_phone, work_phone, job_title, start_date, leave_date, birth_date,
@@ -99,27 +99,6 @@ INSERT INTO employee (
     '', '', '', '', '', '', '', '', '', '', '', sqlc.arg(password_hash), now()
 )
 RETURNING id;
-
--- name: AddEmployeeCompany :exec
--- account_id is derived from the company row via a scalar subquery rather
--- than taken as a parameter: that way it can never disagree with the
--- company's own account, and it always satisfies the composite FK invariant
--- fk_ec_company_account by construction rather than by trusting the caller.
---
--- A scalar subquery, not INSERT...SELECT...FROM company: the earlier shape
--- silently inserted zero rows for a company_id that names no company, which
--- the caller had no way to distinguish from an already-satisfied ON CONFLICT.
--- Here a nonexistent company_id makes the subquery yield NULL, which the
--- NOT NULL constraint on employee_companies.account_id rejects outright — a
--- real, surfaced error, the same as the foreign key gave before this column
--- existed, instead of a membership the database never actually created.
-INSERT INTO employee_companies (employee_id, company_id, account_id)
-VALUES (
-    sqlc.arg(employee_id),
-    sqlc.arg(company_id),
-    (SELECT account_id FROM company WHERE id = sqlc.arg(company_id))
-)
-ON CONFLICT (employee_id, company_id) DO NOTHING;
 
 -- name: ListEmployeeCompanyIDs :many
 -- The companies an employee actually belongs to. Login resolves its company_id

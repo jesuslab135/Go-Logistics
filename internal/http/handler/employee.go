@@ -87,7 +87,7 @@ func (s *EmployeeStore) Create(ctx context.Context, in dto.CreateEmployeeRequest
 	if err != nil {
 		return dto.EmployeeResponse{}, err
 	}
-	if err := qtx.AddEmployeeCompany(ctx, gen.AddEmployeeCompanyParams{EmployeeID: r.ID, CompanyID: company}); err != nil {
+	if err := qtx.GrantMembership(ctx, gen.GrantMembershipParams{EmployeeID: r.ID, CompanyID: company, RoleID: nil}); err != nil {
 		return dto.EmployeeResponse{}, err
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -119,7 +119,6 @@ func (s *EmployeeStore) Update(ctx context.Context, id int64, in dto.UpdateEmplo
 		FirstName:            in.FirstName,
 		LastName:             in.LastName,
 		EmployeeID:           in.EmployeeID,
-		RoleID:               in.RoleID,
 		IsActive:             in.IsActive,
 		Email:                in.Email,
 		MobilePhone:          in.MobilePhone,
@@ -180,7 +179,6 @@ func createEmployeeParams(in dto.CreateEmployeeRequest, accountID *int64, now ti
 		FirstName:            in.FirstName,
 		LastName:             in.LastName,
 		EmployeeID:           in.EmployeeID,
-		RoleID:               in.RoleID,
 		IsActive:             boolOrDefault(in.IsActive, true),
 		Email:                in.Email,
 		MobilePhone:          in.MobilePhone,
@@ -218,7 +216,6 @@ func toEmployeeResponse(r gen.Employee) dto.EmployeeResponse {
 		FirstName:            r.FirstName,
 		LastName:             r.LastName,
 		EmployeeID:           r.EmployeeID,
-		RoleID:               r.RoleID,
 		IsActive:             r.IsActive,
 		Email:                r.Email,
 		MobilePhone:          r.MobilePhone,

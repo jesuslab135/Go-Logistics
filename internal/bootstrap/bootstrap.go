@@ -130,15 +130,15 @@ func Company(ctx context.Context, q *gen.Queries, companyID, employeeID int64) e
 	if employeeID == 0 {
 		return nil
 	}
-	if err := q.AddEmployeeCompany(ctx, gen.AddEmployeeCompanyParams{
+	if err := q.GrantMembership(ctx, gen.GrantMembershipParams{
 		EmployeeID: employeeID,
 		CompanyID:  companyID,
+		RoleID:     &adminRole.ID,
 	}); err != nil {
 		return err
 	}
-	return q.BootstrapEmployeeCompany(ctx, gen.BootstrapEmployeeCompanyParams{
+	return q.BootstrapEmployeeDefaultCompany(ctx, gen.BootstrapEmployeeDefaultCompanyParams{
 		ID:        employeeID,
-		RoleID:    &adminRole.ID,
 		CompanyID: &companyID,
 		UpdatedAt: time.Now().UTC(),
 	})

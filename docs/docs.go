@@ -18602,9 +18602,6 @@ const docTemplate = `{
                     "type": "string",
                     "maxLength": 50
                 },
-                "role_id": {
-                    "type": "integer"
-                },
                 "start_date": {
                     "type": "string"
                 },
@@ -20516,9 +20513,6 @@ const docTemplate = `{
                 "region": {
                     "type": "string",
                     "maxLength": 50
-                },
-                "role_id": {
-                    "type": "integer"
                 },
                 "start_date": {
                     "type": "string"
@@ -24305,9 +24299,6 @@ const docTemplate = `{
                 "region": {
                     "type": "string",
                     "maxLength": 50
-                },
-                "role_id": {
-                    "type": "integer"
                 },
                 "start_date": {
                     "type": "string"

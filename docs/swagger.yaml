@@ -946,8 +946,6 @@ definitions:
       region:
         maxLength: 50
         type: string
-      role_id:
-        type: integer
       start_date:
         type: string
       street_address:
@@ -2296,8 +2294,6 @@ definitions:
       region:
         maxLength: 50
         type: string
-      role_id:
-        type: integer
       start_date:
         type: string
       street_address:
@@ -4898,8 +4894,6 @@ definitions:
       region:
         maxLength: 50
         type: string
-      role_id:
-        type: integer
       start_date:
         type: string
       street_address:

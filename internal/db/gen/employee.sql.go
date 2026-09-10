@@ -12,38 +12,6 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-const addEmployeeCompany = `-- name: AddEmployeeCompany :exec
-INSERT INTO employee_companies (employee_id, company_id, account_id)
-VALUES (
-    $1,
-    $2,
-    (SELECT account_id FROM company WHERE id = $2)
-)
-ON CONFLICT (employee_id, company_id) DO NOTHING
-`
-
-type AddEmployeeCompanyParams struct {
-	EmployeeID int64
-	CompanyID  int64
-}
-
-// account_id is derived from the company row via a scalar subquery rather
-// than taken as a parameter: that way it can never disagree with the
-// company's own account, and it always satisfies the composite FK invariant
-// fk_ec_company_account by construction rather than by trusting the caller.
-//
-// A scalar subquery, not INSERT...SELECT...FROM company: the earlier shape
-// silently inserted zero rows for a company_id that names no company, which
-// the caller had no way to distinguish from an already-satisfied ON CONFLICT.
-// Here a nonexistent company_id makes the subquery yield NULL, which the
-// NOT NULL constraint on employee_companies.account_id rejects outright — a
-// real, surfaced error, the same as the foreign key gave before this column
-// existed, instead of a membership the database never actually created.
-func (q *Queries) AddEmployeeCompany(ctx context.Context, arg AddEmployeeCompanyParams) error {
-	_, err := q.db.Exec(ctx, addEmployeeCompany, arg.EmployeeID, arg.CompanyID)
-	return err
-}
-
 const countAllEmployees = `-- name: CountAllEmployees :one
 SELECT count(*) FROM employee e
 WHERE (
@@ -174,7 +142,7 @@ type CreateEmployeeParams struct {
 // EmployeeStore.Create, which sources it from AccountFromContext — the same
 // rule company creation follows). Without it the employee row is left with a
 // NULL account_id, and the composite FK fk_ec_employee_account rejects the
-// membership AddEmployeeCompany then tries to create for it.
+// membership GrantMembership then tries to create for it.
 func (q *Queries) CreateEmployee(ctx context.Context, arg CreateEmployeeParams) (Employee, error) {
 	row := q.db.QueryRow(ctx, createEmployee,
 		arg.AccountID,
