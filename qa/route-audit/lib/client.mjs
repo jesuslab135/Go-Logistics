@@ -78,24 +78,34 @@ export class ApiClient {
     }
 
     const started = process.hrtime.bigint()
-    const response = await fetch(url, {
-      method,
-      headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
-    })
-    const durationMs = Number(process.hrtime.bigint() - started) / 1e6
+    try {
+      const response = await fetch(url, {
+        method,
+        headers,
+        body: body === undefined ? undefined : JSON.stringify(body),
+      })
+      const durationMs = Number(process.hrtime.bigint() - started) / 1e6
 
-    const text = await response.text()
-    let parsed = null
-    if (text) {
-      try { parsed = JSON.parse(text) } catch { parsed = text }
-    }
+      const text = await response.text()
+      let parsed = null
+      if (text) {
+        try { parsed = JSON.parse(text) } catch { parsed = text }
+      }
 
-    return {
-      status: response.status,
-      body: parsed,
-      headers: Object.fromEntries(response.headers.entries()),
-      durationMs,
+      return {
+        status: response.status,
+        body: parsed,
+        headers: Object.fromEntries(response.headers.entries()),
+        durationMs,
+      }
+    } catch (err) {
+      const durationMs = Number(process.hrtime.bigint() - started) / 1e6
+      return {
+        status: 0,
+        body: { error: { code: 'network', message: String(err?.message ?? err) } },
+        headers: {},
+        durationMs,
+      }
     }
   }
 
