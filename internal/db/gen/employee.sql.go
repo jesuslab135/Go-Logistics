@@ -58,6 +58,45 @@ func (q *Queries) CountEmployees(ctx context.Context, companyID int64) (int64, e
 	return count, err
 }
 
+const createAccountOwnerEmployee = `-- name: CreateAccountOwnerEmployee :one
+INSERT INTO employee (
+    account_id, first_name, last_name, employee_id, email, mobile_phone,
+    work_phone, job_title, license_class, license_number, license_state,
+    street_address, city, region, postal_code, country, password_hash, updated_at
+) VALUES (
+    $1, $2, $3, '', $4,
+    '', '', '', '', '', '', '', '', '', '', '', $5, now()
+)
+RETURNING id
+`
+
+type CreateAccountOwnerEmployeeParams struct {
+	AccountID    *int64
+	FirstName    string
+	LastName     string
+	Email        string
+	PasswordHash string
+}
+
+// CreateAccountOwnerEmployee provisions the account's owner employee with the
+// minimum the employee table requires (see the NOT NULL columns with no
+// default in 000001_init.up.sql) plus account_id and password_hash. It is
+// separate from CreateEmployee because an owner is provisioned before there is
+// any company, role or profile detail to give it; updated_at has no default
+// either, so it is stamped here rather than threaded through as a param.
+func (q *Queries) CreateAccountOwnerEmployee(ctx context.Context, arg CreateAccountOwnerEmployeeParams) (int64, error) {
+	row := q.db.QueryRow(ctx, createAccountOwnerEmployee,
+		arg.AccountID,
+		arg.FirstName,
+		arg.LastName,
+		arg.Email,
+		arg.PasswordHash,
+	)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
 const createEmployee = `-- name: CreateEmployee :one
 INSERT INTO employee (
     user_id, default_company_id, first_name, last_name, employee_id, role_id, is_active,

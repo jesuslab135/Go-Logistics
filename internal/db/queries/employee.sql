@@ -80,6 +80,23 @@ INSERT INTO employee (
 )
 RETURNING *;
 
+-- CreateAccountOwnerEmployee provisions the account's owner employee with the
+-- minimum the employee table requires (see the NOT NULL columns with no
+-- default in 000001_init.up.sql) plus account_id and password_hash. It is
+-- separate from CreateEmployee because an owner is provisioned before there is
+-- any company, role or profile detail to give it; updated_at has no default
+-- either, so it is stamped here rather than threaded through as a param.
+-- name: CreateAccountOwnerEmployee :one
+INSERT INTO employee (
+    account_id, first_name, last_name, employee_id, email, mobile_phone,
+    work_phone, job_title, license_class, license_number, license_state,
+    street_address, city, region, postal_code, country, password_hash, updated_at
+) VALUES (
+    sqlc.arg(account_id), sqlc.arg(first_name), sqlc.arg(last_name), '', sqlc.arg(email),
+    '', '', '', '', '', '', '', '', '', '', '', sqlc.arg(password_hash), now()
+)
+RETURNING id;
+
 -- name: AddEmployeeCompany :exec
 INSERT INTO employee_companies (employee_id, company_id)
 VALUES (sqlc.arg(employee_id), sqlc.arg(company_id))
