@@ -1,7 +1,7 @@
 // qa/route-audit/test/fixtures.test.mjs
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { topoSort, FIXTURE_PLAN, UNTAGGABLE } from '../lib/fixtures.mjs'
+import { topoSort, FIXTURE_PLAN, UNTAGGABLE, teardownFixtures } from '../lib/fixtures.mjs'
 
 test('topoSort places dependencies before dependents', () => {
   const plan = [
@@ -78,4 +78,55 @@ test('UNTAGGABLE fixtures have no free-text field to tag', () => {
       )
     }
   }
+})
+
+test('teardown fallback chain routes each resource to the correct mechanism', async () => {
+  const calls = []
+  const stubClient = {
+    async request(method, path, opts) {
+      calls.push({ method, path, body: opts?.body })
+      if (method === 'DELETE') {
+        return { status: 405, body: { error: { code: 'route_retired' } } }
+      }
+      if (method === 'POST' && path.endsWith('/reverse')) {
+        return { status: 201, body: { id: 999 } }
+      }
+      if (method === 'POST' && path.endsWith('/archive')) {
+        return { status: 200, body: { id: 998 } }
+      }
+      throw new Error(`stub client received unexpected call: ${method} ${path}`)
+    },
+  }
+
+  const graph = {
+    runId: 'stub',
+    tag: 'ZZ-TEST-99',
+    ids: {},
+    created: [
+      { key: 'journalEntry', path: '/api/v1/inventory-journal-entries', id: 3 },
+      { key: 'vendor', path: '/api/v1/vendors', id: 7 },
+      { key: 'location', path: '/api/v1/locations', id: 11 },
+    ],
+    failed: [],
+  }
+
+  const result = await teardownFixtures(stubClient, graph)
+
+  // journalEntry -> DELETE refused -> POST .../reverse -> reversed
+  assert.deepEqual(result.reversed, ['journalEntry#3'])
+  // vendor -> DELETE refused -> POST .../archive -> archived
+  assert.deepEqual(result.archived, ['vendor#7'])
+  // location is in neither ARCHIVABLE nor REVERSIBLE -> DELETE refused -> failed
+  assert.deepEqual(result.failed.map(f => f.key), ['location#11'])
+  assert.deepEqual(result.deleted, [])
+
+  const reverseCall = calls.find(c => c.path === '/api/v1/inventory-journal-entries/3/reverse')
+  assert.ok(reverseCall, 'expected a POST to the reverse endpoint')
+  assert.deepEqual(reverseCall.body, { notes: 'ZZ-TEST-99 teardown reversal' })
+
+  const archiveCall = calls.find(c => c.path === '/api/v1/vendors/7/archive')
+  assert.ok(archiveCall, 'expected a POST to the archive endpoint')
+
+  // location must not have triggered a reverse or archive call at all.
+  assert.ok(!calls.some(c => c.path.startsWith('/api/v1/locations/11/')))
 })

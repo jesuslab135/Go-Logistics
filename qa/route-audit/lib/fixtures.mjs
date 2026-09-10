@@ -9,6 +9,12 @@ const ARCHIVABLE = new Set(['vendor', 'part', 'asset', 'serviceTask', 'inspectio
 // is a human-recovery aid, not the deletion mechanism.
 export const UNTAGGABLE = new Set(['laborEntry', 'purchaseOrderLineItem'])
 
+// Rows on an append-only ledger cannot be deleted; reversing is the system's
+// own answer, exactly as archiving is for a referenced catalog row. The
+// reversal is itself a new row, so the ledger ends with a balanced pair
+// rather than one unbalanced adjustment.
+export const REVERSIBLE = new Set(['journalEntry'])
+
 export const FIXTURE_PLAN = [
   // Level 0 — depend on nothing but the company.
   { key: 'vendor', path: '/api/v1/vendors', dependsOn: [],
@@ -220,6 +226,7 @@ export async function buildFixtures(client, runId) {
 export async function teardownFixtures(client, graph) {
   const deleted = []
   const archived = []
+  const reversed = []
   const failed = []
 
   for (const row of [...graph.created].reverse()) {
@@ -236,8 +243,18 @@ export async function teardownFixtures(client, graph) {
         continue
       }
     }
+    if (REVERSIBLE.has(row.key)) {
+      const rev = await client.request('POST', `${target}/reverse`, {
+        body: { notes: `${graph.tag} teardown reversal` },
+        opKey: `REVERSE ${row.key} (teardown)`,
+      })
+      if (rev.status >= 200 && rev.status < 300) {
+        reversed.push(`${row.key}#${row.id}`)
+        continue
+      }
+    }
     failed.push({ key: `${row.key}#${row.id}`, status: res.status, body: res.body })
   }
 
-  return { deleted, archived, failed }
+  return { deleted, archived, reversed, failed }
 }
