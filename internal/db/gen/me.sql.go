@@ -22,14 +22,21 @@ SELECT
     e.is_vehicle_operator,
     e.is_account_owner,
     e.default_company_id,
-    e.role_id,
+    ec.role_id,
     r.name                               AS role_name,
     COALESCE(r.is_admin, false)          AS role_is_admin,
     COALESCE(r.permissions, '{}'::jsonb) AS permissions
 FROM employee e
-LEFT JOIN role r ON r.id = e.role_id
-WHERE e.id = $1
+LEFT JOIN employee_companies ec ON ec.employee_id = e.id
+                               AND ec.company_id = $1
+LEFT JOIN role r ON r.id = ec.role_id
+WHERE e.id = $2
 `
+
+type GetMeProfileParams struct {
+	CompanyID *int64
+	ID        int64
+}
 
 type GetMeProfileRow struct {
 	ID                int64
@@ -52,8 +59,12 @@ type GetMeProfileRow struct {
 // resolves the caller (GetEmployeeIdentity in employee.sql); these add the
 // descriptive fields a client needs to render the shell: who am I, what is my
 // role called, and which companies can I switch to.
-func (q *Queries) GetMeProfile(ctx context.Context, id int64) (GetMeProfileRow, error) {
-	row := q.db.QueryRow(ctx, getMeProfile, id)
+// GetMeProfile's role now comes through the membership for the caller's
+// current company, the same join GetEmployeeIdentity uses. company_id is
+// nullable for the same reason: an account owner with no company yet has no
+// membership row to resolve a role from.
+func (q *Queries) GetMeProfile(ctx context.Context, arg GetMeProfileParams) (GetMeProfileRow, error) {
+	row := q.db.QueryRow(ctx, getMeProfile, arg.CompanyID, arg.ID)
 	var i GetMeProfileRow
 	err := row.Scan(
 		&i.ID,

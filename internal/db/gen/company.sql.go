@@ -10,29 +10,23 @@ import (
 	"time"
 )
 
-const bootstrapEmployeeCompany = `-- name: BootstrapEmployeeCompany :exec
+const bootstrapEmployeeDefaultCompany = `-- name: BootstrapEmployeeDefaultCompany :exec
 UPDATE employee SET
-    role_id            = COALESCE(role_id, $1),
-    default_company_id = COALESCE(default_company_id, $2),
-    updated_at         = $3
-WHERE id = $4
+    default_company_id = COALESCE(default_company_id, $1),
+    updated_at         = $2
+WHERE id = $3
 `
 
-type BootstrapEmployeeCompanyParams struct {
-	RoleID    *int64
+type BootstrapEmployeeDefaultCompanyParams struct {
 	CompanyID *int64
 	UpdatedAt time.Time
 	ID        int64
 }
 
-// Mirrors Django: only fills role/default_company when the employee has none.
-func (q *Queries) BootstrapEmployeeCompany(ctx context.Context, arg BootstrapEmployeeCompanyParams) error {
-	_, err := q.db.Exec(ctx, bootstrapEmployeeCompany,
-		arg.RoleID,
-		arg.CompanyID,
-		arg.UpdatedAt,
-		arg.ID,
-	)
+// Mirrors Django: only fills default_company when the employee has none. The
+// role half moved to the membership.
+func (q *Queries) BootstrapEmployeeDefaultCompany(ctx context.Context, arg BootstrapEmployeeDefaultCompanyParams) error {
+	_, err := q.db.Exec(ctx, bootstrapEmployeeDefaultCompany, arg.CompanyID, arg.UpdatedAt, arg.ID)
 	return err
 }
 

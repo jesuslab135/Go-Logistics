@@ -3,6 +3,10 @@
 -- descriptive fields a client needs to render the shell: who am I, what is my
 -- role called, and which companies can I switch to.
 
+-- GetMeProfile's role now comes through the membership for the caller's
+-- current company, the same join GetEmployeeIdentity uses. company_id is
+-- nullable for the same reason: an account owner with no company yet has no
+-- membership row to resolve a role from.
 -- name: GetMeProfile :one
 SELECT
     e.id,
@@ -15,12 +19,14 @@ SELECT
     e.is_vehicle_operator,
     e.is_account_owner,
     e.default_company_id,
-    e.role_id,
+    ec.role_id,
     r.name                               AS role_name,
     COALESCE(r.is_admin, false)          AS role_is_admin,
     COALESCE(r.permissions, '{}'::jsonb) AS permissions
 FROM employee e
-LEFT JOIN role r ON r.id = e.role_id
+LEFT JOIN employee_companies ec ON ec.employee_id = e.id
+                               AND ec.company_id = sqlc.narg(company_id)
+LEFT JOIN role r ON r.id = ec.role_id
 WHERE e.id = sqlc.arg(id);
 
 -- ListMyCompanies returns every company the caller belongs to, unpaginated: a

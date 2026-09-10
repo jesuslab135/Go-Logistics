@@ -62,10 +62,10 @@ INSERT INTO work_order_status (
 )
 ON CONFLICT (company_id, name) DO NOTHING;
 
--- name: BootstrapEmployeeCompany :exec
--- Mirrors Django: only fills role/default_company when the employee has none.
+-- name: BootstrapEmployeeDefaultCompany :exec
+-- Mirrors Django: only fills default_company when the employee has none. The
+-- role half moved to the membership.
 UPDATE employee SET
-    role_id            = COALESCE(role_id, sqlc.arg(role_id)),
     default_company_id = COALESCE(default_company_id, sqlc.arg(company_id)),
     updated_at         = sqlc.arg(updated_at)
 WHERE id = sqlc.arg(id);
