@@ -1,10 +1,12 @@
 package handler
 
 import (
-	"strings"
+	"errors"
+	"net/http"
 	"testing"
 
 	"fleet/internal/http/dto"
+	"fleet/internal/platform/apierr"
 )
 
 // Provisioning is one call because the two-call alternative can leave an account
@@ -42,8 +44,33 @@ func TestValidateCreateAccountRequest(t *testing.T) {
 				}
 				return
 			}
-			if err == nil || !strings.Contains(err.Error(), tc.want) {
-				t.Fatalf("error = %v, want it to name %q", err, tc.want)
+			if err == nil {
+				t.Fatalf("expected an error naming %q, got nil", tc.want)
+			}
+
+			// apierr.Validation always sets Message to the fixed string
+			// "validation failed" -- every other validation error in this API
+			// (admin_company.go, admin_employee.go) relies on that constant
+			// message, with the offending fields living only in Details. This
+			// asserts against the contract a client actually sees: status,
+			// code, and the per-field details map -- not the Go Error()
+			// string, which never carries the field name.
+			var apiErr *apierr.Error
+			if !errors.As(err, &apiErr) {
+				t.Fatalf("expected an *apierr.Error, got %T", err)
+			}
+			if apiErr.Status != http.StatusUnprocessableEntity {
+				t.Fatalf("status = %d, want %d", apiErr.Status, http.StatusUnprocessableEntity)
+			}
+			if apiErr.Code != "validation_failed" {
+				t.Fatalf("code = %q, want %q", apiErr.Code, "validation_failed")
+			}
+			details, ok := apiErr.Details.(map[string]string)
+			if !ok {
+				t.Fatalf("details = %T, want map[string]string", apiErr.Details)
+			}
+			if _, named := details[tc.want]; !named {
+				t.Fatalf("details %v does not name the field %q", details, tc.want)
 			}
 		})
 	}

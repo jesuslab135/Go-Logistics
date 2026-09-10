@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -45,40 +44,30 @@ const minOwnerPasswordLength = 12
 
 // validateCreateAccount reports every offending field, not just the first: an
 // operator provisioning a client should not have to resubmit five times to
-// discover the fifth problem.
-//
-// apierr.Validation's Message is the fixed string "validation failed" — the
-// per-field reasons live only in Details, which Error() does not include. The
-// message is rebuilt here to name the fields, so a caller inspecting the Go
-// error (not just the JSON body) can also tell which ones failed.
+// discover the fifth problem. The per-field reasons live in the returned
+// error's Details, same as every other apierr.Validation call in this API —
+// Message stays the fixed "validation failed" string.
 func validateCreateAccount(in dto.CreateAccountRequest) error {
 	missing := map[string]string{}
-	var names []string
-	add := func(field, reason string) {
-		missing[field] = reason
-		names = append(names, field)
-	}
 	if strings.TrimSpace(in.Name) == "" {
-		add("name", "this field is required")
+		missing["name"] = "this field is required"
 	}
 	if strings.TrimSpace(in.OwnerFirstName) == "" {
-		add("owner_first_name", "this field is required")
+		missing["owner_first_name"] = "this field is required"
 	}
 	if strings.TrimSpace(in.OwnerLastName) == "" {
-		add("owner_last_name", "this field is required")
+		missing["owner_last_name"] = "this field is required"
 	}
 	if strings.TrimSpace(in.OwnerEmail) == "" {
-		add("owner_email", "this field is required")
+		missing["owner_email"] = "this field is required"
 	}
 	if len(in.OwnerPassword) < minOwnerPasswordLength {
-		add("owner_password", "must be at least 12 characters")
+		missing["owner_password"] = "must be at least 12 characters"
 	}
 	if len(missing) == 0 {
 		return nil
 	}
-	err := apierr.Validation(missing)
-	err.Message = fmt.Sprintf("validation failed: %s", strings.Join(names, ", "))
-	return err
+	return apierr.Validation(missing)
 }
 
 // toAccountResponse renders a row from ListAccountsWithCounts. OwnerEmail is
