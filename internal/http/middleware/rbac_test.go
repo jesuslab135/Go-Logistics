@@ -177,6 +177,30 @@ func TestCompanylessIdentityIsNotAMember(t *testing.T) {
 	}
 }
 
+// A membership with no role grants nothing. Forgetting to assign one must fail
+// closed: the person is a member, and every module gate still refuses.
+func TestMemberWithoutRoleIsRefusedEveryModule(t *testing.T) {
+	id := Identity{IsActive: true, IsMember: true, HasRole: false, IsAdmin: false}
+	for _, module := range Modules {
+		if id.Can(module, "GET") {
+			t.Fatalf("module %q allowed a read for a member holding no role", module)
+		}
+		if id.Can(module, "POST") {
+			t.Fatalf("module %q allowed a write for a member holding no role", module)
+		}
+	}
+}
+
+// Ownership is a backstop: with roles on memberships it becomes possible to
+// remove your own admin role from a company you own, and nobody in the account
+// could then repair it.
+func TestAccountOwnerIsAdminWithoutARole(t *testing.T) {
+	id := Identity{IsActive: true, IsMember: true, HasRole: false, IsAdmin: true}
+	if !id.Can("assets", "DELETE") {
+		t.Fatal("an account owner must retain admin without holding a role")
+	}
+}
+
 func i64ptr(v int64) *int64 { return &v }
 
 func TestIdentityCanAction(t *testing.T) {

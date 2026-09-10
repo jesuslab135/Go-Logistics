@@ -45,6 +45,7 @@ func (l *IdentityLoader) LoadIdentity(ctx context.Context, employeeID int64, com
 		HasRole:         row.RoleID != nil,
 		IsAdmin:         row.IsAdmin,
 		IsPlatformAdmin: row.IsPlatformAdmin,
+		RoleID:          row.RoleID,
 		Permissions:     middleware.DecodePermissions(row.Permissions),
 	}, nil
 }

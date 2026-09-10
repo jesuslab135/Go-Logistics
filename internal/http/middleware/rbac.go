@@ -29,7 +29,10 @@ type Identity struct {
 	// IsPlatformAdmin is internal staff acting across tenants, which IsAdmin is
 	// not: that one is a tenant's own administrator.
 	IsPlatformAdmin bool
-	Permissions     map[string]ModulePermissions
+	// RoleID is the role held in the token's company, if any. Nil means the
+	// membership carries no role, which grants nothing.
+	RoleID      *int64
+	Permissions map[string]ModulePermissions
 }
 
 // ModulePermissions is one entry of role.permissions. An empty object grants the
