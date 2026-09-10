@@ -164,51 +164,77 @@ export async function runWorkOrderWorkflow(client, graph) {
   // A second status to move to. Creating one is cheaper than assuming the
   // company already has two. dto.CreateWorkOrderStatusRequest declares
   // `name` — verified against internal/http/dto/work_order_status.go.
+  //
+  // This row is NOT added to the fixture graph (`graph.created`) — it is
+  // created and torn down entirely inside this function, in the `finally`
+  // below, so a suite that stops early on a failed assertion still cannot
+  // leak it. Leaving this to the fixture graph's own teardown would silently
+  // accumulate a row on every run whose earlier check failed before reaching
+  // that far.
   const second = await client.request('POST', '/api/v1/work-order-statuses', {
     body: { name: `${graph.tag}-wo-status-2` },
     opKey: 'POST /api/v1/work-order-statuses (workflow)',
   })
   const secondId = second.body?.id
 
-  if (secondId) {
-    // The PUT round-trips the GET response as the whole body. That is safe:
-    // dto.UpdateWorkOrderRequest's fields are a strict subset of
-    // dto.WorkOrderResponse's field names (verified against
-    // internal/http/dto/work_order.go) — the response-only fields the GET
-    // carries (id, company_id, computed subtotals/totals, created_at,
-    // updated_at, ...) are simply names Gin does not bind and silently
-    // ignores, not names that collide with anything Update declares.
-    const current = await client.request('GET', `/api/v1/work-orders/${woId}`, {
-      opKey: 'GET /api/v1/work-orders/{id} (workflow)',
-    })
-    const updated = await client.request('PUT', `/api/v1/work-orders/${woId}`, {
-      body: { ...current.body, status_id: secondId },
-      opKey: 'PUT /api/v1/work-orders/{id} (status change)',
-    })
-    results.push(wf('workflow', 'PUT /api/v1/work-orders/{id}',
-      updated.status >= 200 && updated.status < 300,
-      '2xx changing the status',
-      String(updated.status), updated.body))
+  try {
+    if (secondId) {
+      // The PUT round-trips the GET response as the whole body. That is safe:
+      // dto.UpdateWorkOrderRequest's fields are a strict subset of
+      // dto.WorkOrderResponse's field names (verified against
+      // internal/http/dto/work_order.go) — the response-only fields the GET
+      // carries (id, company_id, computed subtotals/totals, created_at,
+      // updated_at, ...) are simply names Gin does not bind and silently
+      // ignores, not names that collide with anything Update declares.
+      const current = await client.request('GET', `/api/v1/work-orders/${woId}`, {
+        opKey: 'GET /api/v1/work-orders/{id} (workflow)',
+      })
+      const updated = await client.request('PUT', `/api/v1/work-orders/${woId}`, {
+        body: { ...current.body, status_id: secondId },
+        opKey: 'PUT /api/v1/work-orders/{id} (status change)',
+      })
+      results.push(wf('workflow', 'PUT /api/v1/work-orders/{id}',
+        updated.status >= 200 && updated.status < 300,
+        '2xx changing the status',
+        String(updated.status), updated.body))
 
-    const after = await client.request('GET', `/api/v1/work-orders/${woId}/status-logs`, {
-      opKey: 'GET /api/v1/work-orders/{id}/status-logs (after)',
+      const after = await client.request('GET', `/api/v1/work-orders/${woId}/status-logs`, {
+        opKey: 'GET /api/v1/work-orders/{id}/status-logs (after)',
+      })
+      const afterCount = Array.isArray(after.body?.data) ? after.body.data.length : 0
+      results.push(wf('workflow', 'work-order status log is appended automatically',
+        afterCount > beforeCount,
+        'one more status log row than before the change',
+        `${beforeCount} -> ${afterCount}`, after.body))
+    }
+
+    // The status history is append-only: writing to it directly must be refused.
+    const direct = await client.request('POST', `/api/v1/work-orders/${woId}/status-logs`, {
+      body: { status_id: statusId },
+      opKey: 'POST /api/v1/work-orders/{id}/status-logs (should not exist)',
     })
-    const afterCount = Array.isArray(after.body?.data) ? after.body.data.length : 0
-    results.push(wf('workflow', 'work-order status log is appended automatically',
-      afterCount > beforeCount,
-      'one more status log row than before the change',
-      `${beforeCount} -> ${afterCount}`, after.body))
+    results.push(wf('workflow', 'POST /api/v1/work-orders/{id}/status-logs',
+      direct.status === 404 || direct.status === 405,
+      '404 or 405, because the history is append-only',
+      String(direct.status), direct.body))
+  } finally {
+    // Runs whether the checks above passed, failed, or threw. If the work
+    // order still references this status (its status_id was changed to
+    // secondId above and never changed back), the delete is legitimately
+    // refused by a foreign-key constraint — that is fine and expected, but
+    // it must show up as a reported (failing) CheckResult, not be dropped,
+    // or a leftover row goes unreported exactly the way this fix exists to
+    // prevent.
+    if (secondId) {
+      const cleanup = await client.request('DELETE', `/api/v1/work-order-statuses/${secondId}`, {
+        opKey: 'DELETE /api/v1/work-order-statuses/{id} (workflow cleanup)',
+      })
+      results.push(wf('workflow', 'DELETE /api/v1/work-order-statuses/{id} (workflow cleanup)',
+        cleanup.status >= 200 && cleanup.status < 300,
+        '2xx removing the extra status this suite created',
+        String(cleanup.status), cleanup.body))
+    }
   }
-
-  // The status history is append-only: writing to it directly must be refused.
-  const direct = await client.request('POST', `/api/v1/work-orders/${woId}/status-logs`, {
-    body: { status_id: statusId },
-    opKey: 'POST /api/v1/work-orders/{id}/status-logs (should not exist)',
-  })
-  results.push(wf('workflow', 'POST /api/v1/work-orders/{id}/status-logs',
-    direct.status === 404 || direct.status === 405,
-    '404 or 405, because the history is append-only',
-    String(direct.status), direct.body))
 
   return results
 }

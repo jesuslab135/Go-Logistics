@@ -2,7 +2,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { PO_TRANSITIONS, PO_WALK, runPurchaseOrderWorkflow } from '../lib/workflows.mjs'
+import { PO_TRANSITIONS, PO_WALK, runPurchaseOrderWorkflow, runWorkOrderWorkflow } from '../lib/workflows.mjs'
 
 const src = readFileSync('internal/domain/purchaseorder/workflow.go', 'utf8')
 
@@ -156,4 +156,118 @@ test('the PO walk stops cleanly at the first failed transition rather than casca
     const r = results.find(r => r.opKey === `POST /api/v1/purchase-orders/{id}/${action}`)
     assert.equal(r, undefined, `no result should exist for ${action} once the walk has stopped`)
   }
+})
+
+// ---------------------------------------------------------------------------
+// LEAK 2: runWorkOrderWorkflow creates an untracked /api/v1/work-order-statuses
+// row (dto.CreateWorkOrderStatusRequest) and must always clean it up itself —
+// including when an earlier step in the suite blows up.
+// ---------------------------------------------------------------------------
+
+test('runWorkOrderWorkflow deletes the extra work-order-status it created even when an earlier step throws', async () => {
+  const calls = []
+  const stubClient = {
+    async request(method, path, opts) {
+      calls.push({ method, path, body: opts?.body })
+      if (method === 'GET' && path === '/api/v1/work-orders/5/status-logs') {
+        return { status: 200, body: { data: [] } }
+      }
+      if (method === 'POST' && path === '/api/v1/work-order-statuses') {
+        return { status: 201, body: { id: 77, name: opts.body.name } }
+      }
+      if (method === 'GET' && path === '/api/v1/work-orders/5') {
+        // A hard failure partway through the suite — a transport error, not
+        // an ordinary 4xx/5xx CheckResult. The delete below must still run.
+        throw new Error('simulated transport failure')
+      }
+      if (method === 'DELETE' && path === '/api/v1/work-order-statuses/77') {
+        return { status: 204, body: null }
+      }
+      throw new Error(`stub client received unexpected call: ${method} ${path}`)
+    },
+  }
+
+  const graph = { runId: 'stub', tag: 'ZZ-TEST-stub', ids: { workOrder: 5, workOrderStatus: 9 }, created: [], failed: [] }
+
+  await assert.rejects(() => runWorkOrderWorkflow(stubClient, graph), /simulated transport failure/)
+
+  const deleteCall = calls.find(c => c.method === 'DELETE' && c.path === '/api/v1/work-order-statuses/77')
+  assert.ok(deleteCall, 'the extra work-order-status must be deleted even though an earlier step threw')
+})
+
+test('runWorkOrderWorkflow reports a successful cleanup delete as a CheckResult', async () => {
+  const calls = []
+  let logCalls = 0
+  const stubClient = {
+    async request(method, path, opts) {
+      calls.push({ method, path, body: opts?.body })
+      if (method === 'GET' && path === '/api/v1/work-orders/5/status-logs') {
+        logCalls++
+        return { status: 200, body: { data: Array(logCalls).fill({ id: logCalls }) } }
+      }
+      if (method === 'POST' && path === '/api/v1/work-order-statuses') {
+        return { status: 201, body: { id: 77, name: opts.body.name } }
+      }
+      if (method === 'GET' && path === '/api/v1/work-orders/5') {
+        return { status: 200, body: { id: 5, status_id: 9 } }
+      }
+      if (method === 'PUT' && path === '/api/v1/work-orders/5') {
+        return { status: 200, body: { ...opts.body } }
+      }
+      if (method === 'POST' && path === '/api/v1/work-orders/5/status-logs') {
+        return { status: 405, body: { error: 'append-only' } }
+      }
+      if (method === 'DELETE' && path === '/api/v1/work-order-statuses/77') {
+        return { status: 204, body: null }
+      }
+      throw new Error(`stub client received unexpected call: ${method} ${path}`)
+    },
+  }
+
+  const graph = { runId: 'stub', tag: 'ZZ-TEST-stub', ids: { workOrder: 5, workOrderStatus: 9 }, created: [], failed: [] }
+  const results = await runWorkOrderWorkflow(stubClient, graph)
+
+  const cleanup = results.find(r => r.opKey === 'DELETE /api/v1/work-order-statuses/{id} (workflow cleanup)')
+  assert.ok(cleanup, 'expected a CheckResult recording the cleanup delete')
+  assert.equal(cleanup.ok, true)
+  assert.equal(calls.filter(c => c.method === 'DELETE').length, 1)
+})
+
+test('runWorkOrderWorkflow reports, rather than swallows, a refused cleanup delete', async () => {
+  // The work order's status_id was changed to the extra status above and
+  // never changed back, so a foreign-key refusal on delete is expected —
+  // but it must still show up as a failing CheckResult, not vanish.
+  let logCalls = 0
+  const stubClient = {
+    async request(method, path, opts) {
+      if (method === 'GET' && path === '/api/v1/work-orders/5/status-logs') {
+        logCalls++
+        return { status: 200, body: { data: Array(logCalls).fill({ id: logCalls }) } }
+      }
+      if (method === 'POST' && path === '/api/v1/work-order-statuses') {
+        return { status: 201, body: { id: 77, name: opts.body.name } }
+      }
+      if (method === 'GET' && path === '/api/v1/work-orders/5') {
+        return { status: 200, body: { id: 5, status_id: 9 } }
+      }
+      if (method === 'PUT' && path === '/api/v1/work-orders/5') {
+        return { status: 200, body: { ...opts.body } }
+      }
+      if (method === 'POST' && path === '/api/v1/work-orders/5/status-logs') {
+        return { status: 405, body: { error: 'append-only' } }
+      }
+      if (method === 'DELETE' && path === '/api/v1/work-order-statuses/77') {
+        return { status: 409, body: { error: { code: 'foreign_key_violation' } } }
+      }
+      throw new Error(`stub client received unexpected call: ${method} ${path}`)
+    },
+  }
+
+  const graph = { runId: 'stub', tag: 'ZZ-TEST-stub', ids: { workOrder: 5, workOrderStatus: 9 }, created: [], failed: [] }
+  const results = await runWorkOrderWorkflow(stubClient, graph)
+
+  const cleanup = results.find(r => r.opKey === 'DELETE /api/v1/work-order-statuses/{id} (workflow cleanup)')
+  assert.ok(cleanup, 'a refused cleanup delete must still be reported, not dropped')
+  assert.equal(cleanup.ok, false)
+  assert.match(String(cleanup.actual), /409/)
 })

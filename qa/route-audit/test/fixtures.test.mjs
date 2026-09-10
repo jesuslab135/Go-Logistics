@@ -239,15 +239,14 @@ test('buildFixtures treats a created-but-untagged response as failed, not health
   assert.equal(graph.ids.vendor, undefined)
 })
 
-test('buildFixtures treats singleton PUT steps as healthy without an id and excludes them from created', async () => {
+test('buildFixtures treats singleton PUT steps as healthy without an id, and DOES track them in created for teardown', async () => {
   // A singleton upsert (vehicle/trailer/axle-config) returns a 2xx body with
   // no `id` field at all. buildFixtures must not treat that as a failure,
   // must still publish the step into `ids` for dependents (as `true`, not an
-  // id), and — since these steps are marked skipTeardown — must NOT add them
-  // to `created` (there is no id to DELETE by, and the parent asset's own
-  // deletion removes them). A generic stub that echoes every request body
-  // back (so the run tag always round-trips) lets the real FIXTURE_PLAN run
-  // end to end.
+  // id), and — LEAK 1 fix — must still add a `created` row for it (marked
+  // `singleton: true`, `id: null`) so teardownFixtures can find and delete
+  // it. A generic stub that echoes every request body back (so the run tag
+  // always round-trips) lets the real FIXTURE_PLAN run end to end.
   let nextId = 1
   const stubClient = {
     async request(method, _path, opts) {
@@ -261,13 +260,26 @@ test('buildFixtures treats singleton PUT steps as healthy without an id and excl
 
   for (const key of ['vehicle', 'trailer', 'axleConfig']) {
     assert.equal(graph.ids[key], true, `${key} should be marked built via its singleton marker`)
-    assert.ok(!graph.created.some(c => c.key === key), `${key} must not be in created (skipTeardown)`)
     assert.ok(!graph.failed.some(f => f.key === key), `${key} must not be recorded as failed`)
+    const row = graph.created.find(c => c.key === key)
+    assert.ok(row, `${key} must be tracked in created so teardown can find it`)
+    assert.equal(row.singleton, true)
+    assert.equal(row.id, null)
+  }
+
+  // The three singletons all depend on `asset`, which is created earlier —
+  // topoSort must place them after it in `created` so the reverse teardown
+  // walk removes them BEFORE the asset they're attached to.
+  const assetIndex = graph.created.findIndex(c => c.key === 'asset')
+  for (const key of ['vehicle', 'trailer', 'axleConfig']) {
+    const idx = graph.created.findIndex(c => c.key === key)
+    assert.ok(idx > assetIndex, `${key} must be created after asset`)
   }
 
   const serviceTaskPart = graph.created.find(c => c.key === 'serviceTaskPart')
   assert.ok(serviceTaskPart, 'serviceTaskPart should be a normal created row with an id')
   assert.notEqual(serviceTaskPart.id, null)
+  assert.ok(!serviceTaskPart.singleton)
 })
 
 test('the vehicle/trailer/axle-config/serviceTaskPart steps are wired as expected', () => {
@@ -278,7 +290,6 @@ test('the vehicle/trailer/axle-config/serviceTaskPart steps are wired as expecte
     assert.ok(step, `expected a FIXTURE_PLAN step for ${key}`)
     assert.equal(step.method, 'PUT')
     assert.equal(step.singleton, true)
-    assert.equal(step.skipTeardown, true)
   }
 
   const serviceTaskPart = byKey.get('serviceTaskPart')
@@ -286,6 +297,41 @@ test('the vehicle/trailer/axle-config/serviceTaskPart steps are wired as expecte
   assert.equal(serviceTaskPart.method ?? 'POST', 'POST')
   assert.ok(!serviceTaskPart.singleton)
   assert.ok(UNTAGGABLE.has('serviceTaskPart'))
+})
+
+// LEAK 1 regression: teardownFixtures must delete a singleton row at its own
+// path with NO id appended — DELETE /api/v1/assets/43/vehicle, never
+// .../vehicle/undefined or .../vehicle/null.
+test('teardown deletes a singleton row at its own path, with no id suffix', async () => {
+  const calls = []
+  const stubClient = {
+    async request(method, path) {
+      calls.push({ method, path })
+      if (method === 'DELETE') return { status: 204, body: null }
+      throw new Error(`stub client received unexpected call: ${method} ${path}`)
+    },
+  }
+
+  const graph = {
+    runId: 'stub', tag: 'ZZ-TEST-99', ids: {},
+    created: [
+      { key: 'asset', path: '/api/v1/assets', id: 43 },
+      { key: 'vehicle', path: '/api/v1/assets/43/vehicle', id: null, singleton: true },
+    ],
+    failed: [],
+  }
+
+  const result = await teardownFixtures(stubClient, graph)
+
+  const deleteCalls = calls.filter(c => c.method === 'DELETE')
+  assert.equal(deleteCalls.length, 2)
+  // Reverse walk: the singleton (created after asset) is deleted first.
+  assert.equal(deleteCalls[0].path, '/api/v1/assets/43/vehicle')
+  assert.equal(deleteCalls[1].path, '/api/v1/assets/43')
+  // No id, undefined, or null ever appended to the singleton's own path.
+  assert.ok(!deleteCalls.some(c => /\/vehicle\/(undefined|null|\d)/.test(c.path)))
+
+  assert.deepEqual(result.deleted.sort(), ['asset#43', 'vehicle'])
 })
 
 test('every path placeholder in FIXTURE_PLAN names a declared dependency', () => {

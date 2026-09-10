@@ -183,14 +183,21 @@ export const FIXTURE_PLAN = [
   // has no vehicle_type gate. Putting the trailer fixture on `trailerAsset`
   // would create it under an id the sweep's GET never queries, so the
   // check it exists to fix would still 404.
+  // singleton: true tells both buildFixtures and teardownFixtures that this
+  // row has no id of its own — it is deleted at its own path
+  // (DELETE /assets/{asset}/vehicle), never at `${path}/${id}`. Because
+  // topoSort creates these after `asset` (they depend on it) they land
+  // later in `created`, so the reverse teardown walk removes them BEFORE
+  // asset — required, since a surviving singleton refuses the asset's own
+  // DELETE and pins whatever catalog rows the asset references.
   { key: 'vehicle', path: '/api/v1/assets/{asset}/vehicle', method: 'PUT',
-    singleton: true, skipTeardown: true, dependsOn: ['asset'],
+    singleton: true, dependsOn: ['asset'],
     body: (_, tag) => ({ engine_serial: `${tag}-vehicle` }) },
   { key: 'trailer', path: '/api/v1/assets/{asset}/trailer', method: 'PUT',
-    singleton: true, skipTeardown: true, dependsOn: ['asset'],
+    singleton: true, dependsOn: ['asset'],
     body: (_, tag) => ({ owner_name: `${tag}-trailer` }) },
   { key: 'axleConfig', path: '/api/v1/assets/{asset}/axle-config', method: 'PUT',
-    singleton: true, skipTeardown: true, dependsOn: ['asset', 'axleTemplate'],
+    singleton: true, dependsOn: ['asset', 'axleTemplate'],
     body: (ids, tag) => ({ template_id: ids.axleTemplate, display_name: `${tag}-axle-config` }) },
 
   // service-tasks/{id}/parts/{child_id} needs its own row: 'parts' resolves
@@ -297,13 +304,10 @@ export async function buildFixtures(client, runId) {
       // but it is not treated as a healthy fixture and nothing downstream
       // may build on it.
       const taggedInResponse = UNTAGGABLE.has(step.key) || JSON.stringify(res.body).includes(tag)
-      // Singleton steps marked skipTeardown are never recorded in `created`:
-      // they have no id of their own to DELETE by, and deleting their
-      // parent asset removes them anyway, so there is nothing for teardown
-      // to do and nothing that can show up as a false teardown failure.
-      if (!step.skipTeardown) {
-        created.push({ key: step.key, path, id: step.singleton ? null : res.body.id })
-      }
+      // Singleton rows go into `created` too — they must be torn down, just
+      // not at `${path}/${id}` (there is no id). teardownFixtures reads the
+      // `singleton` flag on the row itself to know to DELETE `path` as-is.
+      created.push({ key: step.key, path, id: step.singleton ? null : res.body.id, singleton: !!step.singleton })
       if (taggedInResponse) {
         ids[step.key] = step.singleton ? true : res.body.id
       } else {
@@ -327,16 +331,20 @@ export async function teardownFixtures(client, graph) {
   const pending = [] // rows every fallback refused; verified before becoming `failed`
 
   for (const row of [...graph.created].reverse()) {
-    const target = `${row.path}/${row.id}`
+    // A singleton (vehicle/trailer/axle-config) has no id of its own — it is
+    // addressed, and deleted, at its own path. Every other row is deleted at
+    // `${path}/${id}` as before.
+    const target = row.singleton ? row.path : `${row.path}/${row.id}`
+    const label = row.singleton ? row.key : `${row.key}#${row.id}`
     const res = await client.request('DELETE', target, { opKey: `DELETE ${row.key} (teardown)` })
     if (res.status >= 200 && res.status < 300) {
-      deleted.push(`${row.key}#${row.id}`)
+      deleted.push(label)
       continue
     }
     if (ARCHIVABLE.has(row.key)) {
       const arc = await client.request('POST', `${target}/archive`, { opKey: `ARCHIVE ${row.key} (teardown)` })
       if (arc.status >= 200 && arc.status < 300) {
-        archived.push(`${row.key}#${row.id}`)
+        archived.push(label)
         continue
       }
     }
@@ -347,11 +355,11 @@ export async function teardownFixtures(client, graph) {
       // exists to catch, so don't pin a false belief that it's accepted.
       const rev = await client.request('POST', `${target}/reverse`, { opKey: `REVERSE ${row.key} (teardown)` })
       if (rev.status >= 200 && rev.status < 300) {
-        reversed.push(`${row.key}#${row.id}`)
+        reversed.push(label)
         continue
       }
     }
-    pending.push({ row, target, status: res.status, body: res.body })
+    pending.push({ row, target, label, status: res.status, body: res.body })
   }
 
   // A row can land here as a false failure: something later in this same
@@ -364,12 +372,12 @@ export async function teardownFixtures(client, graph) {
   // there, or its state is unknown, and it must stay failed rather than be
   // excused.
   const failed = []
-  for (const { row, target, status, body } of pending) {
+  for (const { row, target, label, status, body } of pending) {
     const check = await client.request('GET', target, { opKey: `GET ${row.key} (teardown verify)` })
     if (check.status === 404) {
-      deleted.push(`${row.key}#${row.id}`)
+      deleted.push(label)
     } else {
-      failed.push({ key: `${row.key}#${row.id}`, status, body })
+      failed.push({ key: label, status, body })
     }
   }
 
