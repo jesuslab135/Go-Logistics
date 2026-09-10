@@ -1,8 +1,8 @@
 # Full-stack route audit
 
-**Run:** `0910d`  
+**Run:** `0910e`  
 **Target:** https://go-logistics.jesuslab135.com  
-**Generated:** 2026-09-10T13:16:38.996Z
+**Generated:** 2026-09-10T13:49:42.100Z
 
 > **How to read this file.** The tables below the "Findings" section are generated
 > by `qa/route-audit/run.mjs` from a live run. The Findings section itself, and the
@@ -13,39 +13,30 @@
 
 **The backend passed every security and behavioural check.** All 22 authorization-gate
 probes, all 12 cross-tenant isolation probes, and all 38 stateful workflow checks
-returned the expected result. There are **zero high-severity findings**.
+returned the expected result. There are **zero high-severity backend findings** — but
+this run also completed the live browser walkthrough for the first time, and it
+surfaced one high-severity **frontend** defect: **F11**, the vehicle creation form
+cannot be submitted at all, and it fails completely silently. That is the most severe
+finding in this report.
 
 The 107 failed checks recorded by this run are contract-level disagreements between
 the OpenAPI spec and the implementation, concentrated in three patterns (F1–F3 below)
 that together account for 96 of them.
-
-> **Post-review correction (see MINOR 5 below).** Run `0910c`, the run this report
-> originally documented, recorded 109 failed checks — including two `list-contract`
-> failures against `GET /api/v1/admin/companies/{id}/roles` and `GET
-> /api/v1/admin/companies/{id}/work-order-statuses` that were harness artefacts, not
-> API defects: the checker substituted a nonexistent id into a *parent* `{id}` it had
-> no fixture row for, and the correct `404` that produced was scored as a failure.
-> `qa/route-audit/lib/checks.mjs` was fixed to skip a `list-contract` check it cannot
-> resolve a real parent row for, and this run, `0910d`, is the fixed harness's first
-> live confirmation of that: checks run **1095 → 1093**, checks failed **109 → 107**,
-> medium findings **99 → 97**. The numbers below are `0910d`'s own — this is no longer
-> a projection. The "Failed contract checks" table further down reflects `0910d`
-> directly and never contained those two rows to begin with.
 
 | Metric | Value |
 |---|---|
 | Backend operations in the spec | 374 |
 | Checks run | 1093 |
 | Checks failed | 107 |
-| Findings — high | **0** |
-| Findings — medium | 97 |
+| Findings — high | **1** |
+| Findings — medium | **106** |
 | Findings — low | 10 |
 | Module-gate probes failed | **0 of 22** |
 | Tenant-isolation probes failed | **0 of 12**\* |
 | Workflow checks failed | **0 of 38**\* |
 | Operations exercised by the sweep | 176 |
 | Operations accounted for by exclusion | 198 |
-| Frontend routes walked in a browser | **0 — blocked, see below** |
+| Frontend routes walked in a browser | **58** |
 | Frontend endpoints calling a nonexistent backend path | **0 of 167** |
 | Backend paths with no frontend consumer | 19 of 186 |
 | Fixture rows created / removed | 49 / 49 — **zero residue in the database** (object storage is not: see Teardown) |
@@ -55,28 +46,30 @@ cross-tenant/state-transition *probes* in each suite. The result arrays they com
 are longer — 14 and 40 entries — because both suites also record their own cleanup as
 CheckResults (isolation's create/switch-into-tenant/switch-back-home/delete of the
 throwaway tenant; the workflow suite's extra work-order-status create/restore/delete).
-The isolation array grew by one entry versus the `0910c` run above (13 → 14): the
-IMPORTANT-2 hardening in this fix wave made the switch-back-to-home a checked, recorded
-CheckResult where it was previously fired and discarded. Those cleanup entries are
-real, counted CheckResults, and are included in "Checks run" (1093) above, but are not
-probes and so are excluded from these two denominators.
+Those cleanup entries are real, counted CheckResults, and are included in "Checks run"
+(1093) above, but are not probes and so are excluded from these two denominators.
 
 ### What was NOT tested
 
-**The live browser walkthrough of the 58 frontend routes did not run.** Browser
-automation was unavailable in the session that produced this report. No screen was
-loaded, so nothing here states whether a page renders, whether its console is clean,
-or whether a form submits. Every frontend claim below comes from static analysis of
-the deployed JavaScript bundle, and is labelled as such.
+**The live browser walkthrough of the 58 frontend routes did run in this session** —
+every route in the table below carries a real verdict, request count, and console-error
+count gathered by driving an actual browser. Three narrower gaps remain:
 
-To complete it: enable browser tools, then follow `qa/route-audit/ui/walkthrough.md`
-and re-run `run.mjs report`.
-
-Generic request-body validation was also not probed. Only 13 of 59 create schemas
-declare required fields and the Go binding tags are overwhelmingly `omitempty`, so a
-spec-driven validation sweep would mostly assert the absence of validation the API
-never promised. Where validation matters it is covered by the workflow suites, and
-finding F4 records the consequence of that looseness.
+- **Generic request-body validation was not probed.** Only 13 of 59 create schemas
+  declare required fields and the Go binding tags are overwhelmingly `omitempty`, so a
+  spec-driven validation sweep would mostly assert the absence of validation the API
+  never promised. Where validation matters it is covered by the workflow suites, and
+  finding F4 records the consequence of that looseness.
+- **Render-state classification was by DOM heuristic, not human judgement.** The
+  walkthrough classified each route's render state (`data`/`empty`/`error`/`blank`) by
+  inspecting the DOM once requests settled, not by a person watching the screen. A page
+  stuck on a spinner, or one showing subtly wrong data, could still be classified
+  `data`. Treat a `works` verdict below as "no crash and no obvious error state was
+  detected," not as "a human confirmed this screen looks right."
+- **Form submission was only exercised on one form.** The vehicle creation panel was
+  submitted end-to-end, and its failure is recorded as F11. No other form in the
+  app — edit forms, other creation panels, settings forms — was submitted during this
+  run.
 
 ## Frontend analysis (static — no browser)
 
@@ -118,8 +111,66 @@ writes a status-log row on every purchase-order and work-order transition (verif
 
 ## Frontend route verdicts
 
-Not available — the browser walkthrough did not run. All 58 routes are listed in
-`qa/route-audit/ui/routes.json` and remain **unverified**.
+| Route | Verdict | Requests | Failed | Console errors |
+|---|---|---|---|---|
+| `/app/admin/companies/$id` | works | 7 | 0 | 0 |
+| `/app/admin/companies` | works | 3 | 0 | 0 |
+| `/app/admin/users` | works | 5 | 0 | 0 |
+| `/app/admin` | works | 3 | 0 | 0 |
+| `/app/dashboard` | works | 3 | 0 | 0 |
+| `/app/design-system` | works | 2 | 0 | 0 |
+| `/app/fuel` | works | 6 | 0 | 0 |
+| `/app/inspections/forms` | works | 6 | 0 | 0 |
+| `/app/inspections` | works | 6 | 0 | 0 |
+| `/app/inventory/inventory-adjustment-reasons` | works | 3 | 0 | 0 |
+| `/app/inventory/inventory-journal-entries` | works | 6 | 0 | 0 |
+| `/app/inventory/part-categories` | works | 3 | 0 | 0 |
+| `/app/inventory/part-locations` | works | 4 | 0 | 0 |
+| `/app/inventory/part-manufacturers` | works | 3 | 0 | 0 |
+| `/app/inventory` | works | 5 | 0 | 0 |
+| `/app/issues/board` | works | 6 | 0 | 0 |
+| `/app/issues/faults` | works | 3 | 0 | 0 |
+| `/app/issues/priorities` | works | 3 | 0 | 0 |
+| `/app/issues` | works | 6 | 0 | 0 |
+| `/app/locations` | works | 3 | 0 | 0 |
+| `/app/maintenance/$id` | works | 13 | 0 | 0 |
+| `/app/maintenance` | works | 6 | 0 | 0 |
+| `/app/organization/employees` | works | 5 | 0 | 0 |
+| `/app/organization/groups` | works | 5 | 0 | 0 |
+| `/app/organization/roles` | works | 5 | 0 | 0 |
+| `/app/organization` | works | 5 | 0 | 0 |
+| `/app/purchase-orders/$id` | works | 7 | 0 | 0 |
+| `/app/purchase-orders` | works | 5 | 0 | 0 |
+| `/app/service/entries/$id` | works | 9 | 0 | 0 |
+| `/app/service/entries` | works | 5 | 0 | 0 |
+| `/app/service/reminders` | works | 6 | 0 | 0 |
+| `/app/service` | works | 5 | 0 | 0 |
+| `/app/settings/custom-fields` | works | 3 | 0 | 0 |
+| `/app/settings/fuel-types` | works | 3 | 0 | 0 |
+| `/app/settings/measurement-units` | works | 3 | 0 | 0 |
+| `/app/settings/service-tasks` | works | 3 | 0 | 0 |
+| `/app/settings/weekly-mileage-goals` | works | 3 | 0 | 0 |
+| `/app/settings` | works | 2 | 0 | 0 |
+| `/app/tires/$id` | works | 11 | 0 | 0 |
+| `/app/tires/assignment-requests` | works | 6 | 0 | 0 |
+| `/app/tires/axle-templates` | works | 3 | 0 | 0 |
+| `/app/tires/models` | works | 4 | 0 | 0 |
+| `/app/tires/movements` | works | 8 | 0 | 0 |
+| `/app/tires` | works | 6 | 0 | 0 |
+| `/app/trailers/$id/edit` | broken | 9 | 2 | 2 |
+| `/app/trailers/$id` | broken | 6 | 2 | 2 |
+| `/app/trailers/new` | partial | 8 | 0 | 0 |
+| `/app/trailers` | works | 5 | 0 | 0 |
+| `/app/vehicle-makes` | works | 3 | 0 | 0 |
+| `/app/vehicle-models` | works | 4 | 0 | 0 |
+| `/app/vehicles/$id/edit` | partial | 4 | 0 | 0 |
+| `/app/vehicles/$id` | works | 4 | 0 | 0 |
+| `/app/vehicles/new` | partial | 8 | 0 | 0 |
+| `/app/vehicles` | works | 5 | 0 | 0 |
+| `/app/vendors` | works | 3 | 0 | 0 |
+| `/login` | works | 3 | 0 | 0 |
+| `/onboarding/company` | works | 3 | 0 | 0 |
+| `/signup` | works | 3 | 0 | 0 |
 
 ## Backend operation verdicts
 
@@ -511,6 +562,154 @@ Severity reflects consequence, not effort: nothing here is a security defect, an
 audit found no way for one tenant to read another's data or for an unprivileged role
 to reach a gated module.
 
+The cross-reference findings immediately below (CT-001–CT-004, FE-005–FE-007) are
+machine-generated by matching this run's frontend network capture against the sweep's
+failed checks and error-state routes; **F11–F13** further down are this audit's
+authored, hands-on analysis of that same underlying behaviour. Treat them as one story
+told twice, not as separate defects.
+
+### CT-001 — GET /api/v1/assets/{id}/trailer refused the frontend with 404
+
+**Severity:** medium  
+**Layer:** contract  
+**Route:** `/app/trailers/$id/edit`
+
+**Expected:** 200 for an authorised admin
+
+**Observed:** 404
+
+**Evidence:**
+
+```json
+{
+  "method": "GET",
+  "url": "/api/v1/assets/50/trailer",
+  "status": 404,
+  "requestBody": null,
+  "responseSummary": "error.code not_found"
+}
+```
+
+### CT-002 — GET /api/v1/assets/{id}/trailer refused the frontend with 404
+
+**Severity:** medium  
+**Layer:** contract  
+**Route:** `/app/trailers/$id/edit`
+
+**Expected:** 200 for an authorised admin
+
+**Observed:** 404
+
+**Evidence:**
+
+```json
+{
+  "method": "GET",
+  "url": "/api/v1/assets/50/trailer",
+  "status": 404,
+  "requestBody": null,
+  "responseSummary": "error.code not_found"
+}
+```
+
+### CT-003 — GET /api/v1/assets/{id}/trailer refused the frontend with 404
+
+**Severity:** medium  
+**Layer:** contract  
+**Route:** `/app/trailers/$id`
+
+**Expected:** 200 for an authorised admin
+
+**Observed:** 404
+
+**Evidence:**
+
+```json
+{
+  "method": "GET",
+  "url": "/api/v1/assets/50/trailer",
+  "status": 404,
+  "requestBody": null,
+  "responseSummary": "error.code not_found"
+}
+```
+
+### CT-004 — GET /api/v1/assets/{id}/trailer refused the frontend with 404
+
+**Severity:** medium  
+**Layer:** contract  
+**Route:** `/app/trailers/$id`
+
+**Expected:** 200 for an authorised admin
+
+**Observed:** 404
+
+**Evidence:**
+
+```json
+{
+  "method": "GET",
+  "url": "/api/v1/assets/50/trailer",
+  "status": 404,
+  "requestBody": null,
+  "responseSummary": "error.code not_found"
+}
+```
+
+### FE-005 — The screen showed an error state even though every request succeeded
+
+**Severity:** medium  
+**Layer:** frontend  
+**Route:** `/app/trailers/new`
+
+**Expected:** rendered data or a deliberate empty state
+
+**Observed:** error; console: no errors logged
+
+**Evidence:**
+
+```json
+{
+  "consoleErrors": []
+}
+```
+
+### FE-006 — The screen showed an error state even though every request succeeded
+
+**Severity:** medium  
+**Layer:** frontend  
+**Route:** `/app/vehicles/$id/edit`
+
+**Expected:** rendered data or a deliberate empty state
+
+**Observed:** error; console: no errors logged
+
+**Evidence:**
+
+```json
+{
+  "consoleErrors": []
+}
+```
+
+### FE-007 — The screen showed an error state even though every request succeeded
+
+**Severity:** medium  
+**Layer:** frontend  
+**Route:** `/app/vehicles/new`
+
+**Expected:** rendered data or a deliberate empty state
+
+**Observed:** error; console: no errors logged
+
+**Evidence:**
+
+```json
+{
+  "consoleErrors": []
+}
+```
+
 ---
 
 ### F1 — 56 DELETE endpoints return `204` for a row that does not exist (medium)
@@ -786,20 +985,109 @@ other.
 
 ---
 
-### Failed contract checks
+### F11 — The vehicle creation form cannot be submitted (HIGH)
 
-**MINOR 5 correction.** The `0910c` run this report originally documented recorded
-`list-contract` failures for `GET /api/v1/admin/companies/{id}/roles` and `GET
-/api/v1/admin/companies/{id}/work-order-statuses`, both `404`. Both were harness
-artefacts, not API defects: `checkListContract` substituted the harness's nonexistent-id
-sentinel into `{id}` — a *parent* company id it has no fixture row for — and the API
-correctly `404`s for a company that does not exist. That was a passing check, not a
-failure; substituting a fake parent id was never a fair probe of the list-contract
-shape. `qa/route-audit/lib/checks.mjs` now skips a `list-contract` check it cannot
-resolve a real parent row for, and this report now documents `0910d`, the fixed
-harness's own live run — its `out/sweep.json` never contained those two rows at all
-(see the "Post-review correction" note under the executive summary above for the
-resulting count change). The table below is `0910d`'s actual output, not a projection.
+This is a confirmed, reproducible defect in the deployed frontend, gathered from direct
+evidence, not inference.
+
+**Expected:** clicking "Guardar" with a valid name and VIN submits the create request.
+**Observed:** no network request of any kind is issued, and nothing on screen indicates
+a problem.
+
+**Reproduction:**
+
+1. Reached by clicking **"Registrar Vehículo"** on `/app/vehicles` (the app UI is in
+   Spanish). The URL gains `?new=true`; a panel opens with six tabs: General,
+   Clasificación, Medidores, Propiedad y Compra, Ciclo de Vida, Financiero.
+2. Across **all six tabs there are exactly two required fields**, both on General:
+   `Nombre *` (input id `general.name`) and `VIN / Serie *` (input id
+   `general.vin_sn`).
+3. Fill both, and additionally set the `Estatus` combobox to a valid option.
+4. Click **"Guardar"**.
+
+**Observed on click:**
+
+- **Zero POST/PUT/PATCH requests of any kind** — not merely none to `/api/v1`, none at
+  all.
+- **Zero console errors and zero uncaught page errors.**
+- **No element with `aria-invalid="true"`.**
+- **No `role="alert"` or `role="status"` message.**
+- The URL is unchanged and the panel stays open.
+
+The Guardar button is `type="submit"`, **not disabled**, and there is exactly one
+`<form>` element on the page.
+
+Confirmed against the API afterwards that nothing was created:
+`GET /api/v1/assets?limit=200&include_archived=true`, filtered for the test name,
+returned no match — total assets unchanged at 8.
+
+**Why it matters:** registering a vehicle is a core workflow of a fleet application,
+and it is non-functional in production. Worse, it fails **completely silently** — a
+user gets no error, no validation highlight, and no indication anything went wrong.
+They would reasonably conclude the app is frozen or that they did something wrong.
+
+The backend side of this is fine: `POST /api/v1/assets` was exercised 49 times during
+fixture construction in this same audit and works correctly. The defect is entirely
+client-side — the form never issues the request.
+
+**Fix:** the submit handler on the asset form panel never reaches its network call.
+Likely a validation resolver rejecting on a field that is not surfaced to the user, or
+a submit handler not wired to the form. The relevant deployed chunks are
+`asset-form-panel` and `record-form`. Frontend source was not available to this audit,
+so this is a behavioural report, not a line-level diagnosis.
+
+---
+
+### F12 — Four routes exist in the router but redirect away (medium)
+
+**Expected:** `/app/vehicles/new`, `/app/vehicles/$id/edit`, `/app/trailers/new` and
+`/app/trailers/$id/edit` render the creation/edit UI at that URL. **Observed:** each
+immediately redirects to the corresponding list or detail route. The real creation and
+edit flows are query-parameter panels on the list route (`?new=true`), not these
+routes.
+
+**Reproduction:** navigate directly to each URL and observe the landing URL:
+
+- `/app/vehicles/new` → `/app/vehicles`
+- `/app/vehicles/49/edit` → `/app/vehicles/49`
+- `/app/trailers/new` → `/app/trailers`
+- `/app/trailers/50/edit` → `/app/trailers/50`
+
+**Why it matters:** these URLs are not linkable or bookmarkable, and anything that
+deep-links to them — an email, a saved tab, a docs page — silently lands somewhere
+else.
+
+**Fix:** either implement these routes for real, or remove them from the router.
+
+---
+
+### F13 — A TRAILER-typed asset with no trailer sub-record breaks its detail screen (medium)
+
+**Expected:** `/app/trailers/{id}` and `/app/trailers/{id}/edit` render for any asset
+with `vehicle_type: "TRAILER"`. **Observed:** both issue
+`GET /api/v1/assets/{id}/trailer`, which returns **404** when the asset has no
+`trailer` sub-record, and the screen renders an error state with two console errors.
+
+**Reproduction:** create an asset with `vehicle_type: "TRAILER"` via
+`POST /api/v1/assets` without ever upserting `/assets/{id}/trailer`, then open
+`/app/trailers/{id}`.
+
+This is not a hypothetical: the API permits creating an asset with
+`vehicle_type: "TRAILER"` and no corresponding `trailer` sub-record — this audit's own
+fixture build did exactly that, and the create was accepted. A real user can reach this
+state.
+
+**Why it matters:** an asset that exists and lists normally throws an error the moment
+its detail page is opened, with no recovery path shown to the user.
+
+**Fix:** either the backend should not accept a TRAILER-typed asset without its
+sub-record (or should create one automatically), or the frontend should treat a `404`
+on the sub-record as an empty state rather than an error. Both are defensible; which is
+right is a product decision, not stated here.
+
+---
+
+### Failed contract checks
 
 | Operation | Check | Expected | Observed | Severity |
 |---|---|---|---|---|
@@ -1123,14 +1411,8 @@ These are proven by Layer 1 but unreachable through the UI. That is
 not automatically a defect — it may be unbuilt frontend, or a route
 with no screen behind it.
 
-- `GET /api/v1/admin/companies/{id}/owner`
-- `GET /api/v1/admin/companies/{id}/roles`
 - `POST /api/v1/admin/companies/{id}/set-owner`
-- `GET /api/v1/admin/companies/{id}/work-order-statuses`
-- `GET /api/v1/admin/employees`
-- `GET /api/v1/admin/employees/{id}/companies`
 - `PUT /api/v1/admin/employees/{id}/companies`
-- `GET /api/v1/asset-statuses`
 - `POST /api/v1/asset-statuses`
 - `GET /api/v1/asset-statuses/{id}`
 - `PUT /api/v1/asset-statuses/{id}`
@@ -1141,10 +1423,7 @@ with no screen behind it.
 - `GET /api/v1/asset-types/{id}`
 - `PUT /api/v1/asset-types/{id}`
 - `DELETE /api/v1/asset-types/{id}`
-- `GET /api/v1/assets`
 - `POST /api/v1/assets`
-- `GET /api/v1/assets/facets`
-- `GET /api/v1/assets/{id}`
 - `PUT /api/v1/assets/{id}`
 - `DELETE /api/v1/assets/{id}`
 - `POST /api/v1/assets/{id}/archive`
@@ -1157,7 +1436,6 @@ with no screen behind it.
 - `PUT /api/v1/assets/{id}/fuel-entries/{child_id}`
 - `DELETE /api/v1/assets/{id}/fuel-entries/{child_id}`
 - `POST /api/v1/assets/{id}/restore`
-- `GET /api/v1/assets/{id}/trailer`
 - `PUT /api/v1/assets/{id}/trailer`
 - `DELETE /api/v1/assets/{id}/trailer`
 - `GET /api/v1/assets/{id}/trailer-assignments`
@@ -1165,7 +1443,6 @@ with no screen behind it.
 - `GET /api/v1/assets/{id}/trailer-assignments/{child_id}`
 - `PUT /api/v1/assets/{id}/trailer-assignments/{child_id}`
 - `DELETE /api/v1/assets/{id}/trailer-assignments/{child_id}`
-- `GET /api/v1/assets/{id}/vehicle`
 - `PUT /api/v1/assets/{id}/vehicle`
 - `DELETE /api/v1/assets/{id}/vehicle`
 - `GET /api/v1/axle-definitions/{id}/wheel-positions`
@@ -1173,7 +1450,6 @@ with no screen behind it.
 - `GET /api/v1/axle-definitions/{id}/wheel-positions/{child_id}`
 - `PUT /api/v1/axle-definitions/{id}/wheel-positions/{child_id}`
 - `DELETE /api/v1/axle-definitions/{id}/wheel-positions/{child_id}`
-- `GET /api/v1/axle-templates`
 - `POST /api/v1/axle-templates`
 - `GET /api/v1/axle-templates/{id}`
 - `PUT /api/v1/axle-templates/{id}`
@@ -1183,39 +1459,31 @@ with no screen behind it.
 - `GET /api/v1/axle-templates/{id}/definitions/{child_id}`
 - `PUT /api/v1/axle-templates/{id}/definitions/{child_id}`
 - `DELETE /api/v1/axle-templates/{id}/definitions/{child_id}`
-- `GET /api/v1/catalog-options`
 - `POST /api/v1/catalog-options`
 - `GET /api/v1/catalog-options/{id}`
 - `PUT /api/v1/catalog-options/{id}`
 - `DELETE /api/v1/catalog-options/{id}`
-- `GET /api/v1/comments`
 - `POST /api/v1/comments`
 - `GET /api/v1/comments/{id}`
 - `PUT /api/v1/comments/{id}`
 - `DELETE /api/v1/comments/{id}`
-- `GET /api/v1/companies`
 - `POST /api/v1/companies`
 - `GET /api/v1/companies/{id}`
 - `PUT /api/v1/companies/{id}`
 - `DELETE /api/v1/companies/{id}`
-- `GET /api/v1/custom-field-definitions`
 - `POST /api/v1/custom-field-definitions`
 - `GET /api/v1/custom-field-definitions/{id}`
 - `PUT /api/v1/custom-field-definitions/{id}`
 - `DELETE /api/v1/custom-field-definitions/{id}`
-- `GET /api/v1/dashboard/stats`
-- `GET /api/v1/employees`
 - `POST /api/v1/employees`
 - `GET /api/v1/employees/{id}`
 - `PUT /api/v1/employees/{id}`
 - `DELETE /api/v1/employees/{id}`
 - `POST /api/v1/employees/{id}/set-password`
-- `GET /api/v1/faults`
 - `POST /api/v1/faults`
 - `GET /api/v1/faults/{id}`
 - `PUT /api/v1/faults/{id}`
 - `DELETE /api/v1/faults/{id}`
-- `GET /api/v1/fuel-entries`
 - `GET /api/v1/fuel-entries/{id}/comments`
 - `POST /api/v1/fuel-entries/{id}/comments`
 - `GET /api/v1/fuel-entries/{id}/comments/{child_id}`
@@ -1227,17 +1495,14 @@ with no screen behind it.
 - `PUT /api/v1/fuel-entries/{id}/photos/{child_id}`
 - `DELETE /api/v1/fuel-entries/{id}/photos/{child_id}`
 - `POST /api/v1/fuel-entries/{id}/photos/{child_id}/set-primary`
-- `GET /api/v1/fuel-types`
 - `POST /api/v1/fuel-types`
 - `GET /api/v1/fuel-types/{id}`
 - `PUT /api/v1/fuel-types/{id}`
 - `DELETE /api/v1/fuel-types/{id}`
-- `GET /api/v1/groups`
 - `POST /api/v1/groups`
 - `GET /api/v1/groups/{id}`
 - `PUT /api/v1/groups/{id}`
 - `DELETE /api/v1/groups/{id}`
-- `GET /api/v1/inspection-forms`
 - `POST /api/v1/inspection-forms`
 - `GET /api/v1/inspection-forms/{id}`
 - `PUT /api/v1/inspection-forms/{id}`
@@ -1249,7 +1514,6 @@ with no screen behind it.
 - `PUT /api/v1/inspection-forms/{id}/items/{child_id}`
 - `DELETE /api/v1/inspection-forms/{id}/items/{child_id}`
 - `POST /api/v1/inspection-forms/{id}/restore`
-- `GET /api/v1/inspection-submissions`
 - `POST /api/v1/inspection-submissions`
 - `GET /api/v1/inspection-submissions/{id}`
 - `PUT /api/v1/inspection-submissions/{id}`
@@ -1259,23 +1523,18 @@ with no screen behind it.
 - `GET /api/v1/inspection-submissions/{id}/items/{child_id}`
 - `PUT /api/v1/inspection-submissions/{id}/items/{child_id}`
 - `DELETE /api/v1/inspection-submissions/{id}/items/{child_id}`
-- `GET /api/v1/inventory-adjustment-reasons`
 - `POST /api/v1/inventory-adjustment-reasons`
 - `GET /api/v1/inventory-adjustment-reasons/{id}`
 - `PUT /api/v1/inventory-adjustment-reasons/{id}`
 - `DELETE /api/v1/inventory-adjustment-reasons/{id}`
-- `GET /api/v1/inventory-journal-entries`
 - `POST /api/v1/inventory-journal-entries`
 - `GET /api/v1/inventory-journal-entries/{id}`
 - `POST /api/v1/inventory-journal-entries/{id}/reverse`
-- `GET /api/v1/issue-priorities`
 - `POST /api/v1/issue-priorities`
 - `GET /api/v1/issue-priorities/{id}`
 - `PUT /api/v1/issue-priorities/{id}`
 - `DELETE /api/v1/issue-priorities/{id}`
-- `GET /api/v1/issues`
 - `POST /api/v1/issues`
-- `GET /api/v1/issues/facets`
 - `GET /api/v1/issues/{id}`
 - `PUT /api/v1/issues/{id}`
 - `DELETE /api/v1/issues/{id}`
@@ -1285,13 +1544,10 @@ with no screen behind it.
 - `GET /api/v1/issues/{id}/watchers`
 - `POST /api/v1/issues/{id}/watchers`
 - `DELETE /api/v1/issues/{id}/watchers/{employee_id}`
-- `GET /api/v1/locations`
 - `POST /api/v1/locations`
 - `GET /api/v1/locations/{id}`
 - `PUT /api/v1/locations/{id}`
 - `DELETE /api/v1/locations/{id}`
-- `GET /api/v1/me/permissions`
-- `GET /api/v1/measurement-units`
 - `POST /api/v1/measurement-units`
 - `GET /api/v1/measurement-units/{id}`
 - `PUT /api/v1/measurement-units/{id}`
@@ -1301,25 +1557,20 @@ with no screen behind it.
 - `GET /api/v1/media/{id}`
 - `PUT /api/v1/media/{id}`
 - `DELETE /api/v1/media/{id}`
-- `GET /api/v1/notifications`
 - `POST /api/v1/notifications/{id}/read`
-- `GET /api/v1/part-categories`
 - `POST /api/v1/part-categories`
 - `GET /api/v1/part-categories/{id}`
 - `PUT /api/v1/part-categories/{id}`
 - `DELETE /api/v1/part-categories/{id}`
 - `GET /api/v1/part-inventory`
-- `GET /api/v1/part-locations`
 - `POST /api/v1/part-locations`
 - `GET /api/v1/part-locations/{id}`
 - `PUT /api/v1/part-locations/{id}`
 - `DELETE /api/v1/part-locations/{id}`
-- `GET /api/v1/part-manufacturers`
 - `POST /api/v1/part-manufacturers`
 - `GET /api/v1/part-manufacturers/{id}`
 - `PUT /api/v1/part-manufacturers/{id}`
 - `DELETE /api/v1/part-manufacturers/{id}`
-- `GET /api/v1/parts`
 - `POST /api/v1/parts`
 - `GET /api/v1/parts/{id}`
 - `PUT /api/v1/parts/{id}`
@@ -1332,14 +1583,12 @@ with no screen behind it.
 - `DELETE /api/v1/parts/{id}/inventory/{child_id}`
 - `POST /api/v1/parts/{id}/restore`
 - `GET /api/v1/purchase-order-line-items`
-- `GET /api/v1/purchase-orders`
 - `POST /api/v1/purchase-orders`
 - `GET /api/v1/purchase-orders/{id}`
 - `PUT /api/v1/purchase-orders/{id}`
 - `DELETE /api/v1/purchase-orders/{id}`
 - `POST /api/v1/purchase-orders/{id}/approve`
 - `POST /api/v1/purchase-orders/{id}/close`
-- `GET /api/v1/purchase-orders/{id}/line-items`
 - `POST /api/v1/purchase-orders/{id}/line-items`
 - `GET /api/v1/purchase-orders/{id}/line-items/{child_id}`
 - `PUT /api/v1/purchase-orders/{id}/line-items/{child_id}`
@@ -1353,17 +1602,14 @@ with no screen behind it.
 - `GET /api/v1/purchase-orders/{id}/status-logs`
 - `GET /api/v1/purchase-orders/{id}/status-logs/{child_id}`
 - `POST /api/v1/purchase-orders/{id}/submit`
-- `GET /api/v1/roles`
 - `POST /api/v1/roles`
 - `GET /api/v1/roles/{id}`
 - `PUT /api/v1/roles/{id}`
 - `DELETE /api/v1/roles/{id}`
-- `GET /api/v1/service-entries`
 - `POST /api/v1/service-entries`
 - `GET /api/v1/service-entries/{id}`
 - `PUT /api/v1/service-entries/{id}`
 - `DELETE /api/v1/service-entries/{id}`
-- `GET /api/v1/service-entries/{id}/line-items`
 - `POST /api/v1/service-entries/{id}/line-items`
 - `GET /api/v1/service-entries/{id}/line-items/{child_id}`
 - `PUT /api/v1/service-entries/{id}/line-items/{child_id}`
@@ -1372,12 +1618,10 @@ with no screen behind it.
 - `GET /api/v1/service-entry-line-items/{id}/issues`
 - `POST /api/v1/service-entry-line-items/{id}/issues`
 - `DELETE /api/v1/service-entry-line-items/{id}/issues/{issue_id}`
-- `GET /api/v1/service-reminders`
 - `POST /api/v1/service-reminders`
 - `GET /api/v1/service-reminders/{id}`
 - `PUT /api/v1/service-reminders/{id}`
 - `DELETE /api/v1/service-reminders/{id}`
-- `GET /api/v1/service-tasks`
 - `POST /api/v1/service-tasks`
 - `GET /api/v1/service-tasks/{id}`
 - `PUT /api/v1/service-tasks/{id}`
@@ -1389,34 +1633,27 @@ with no screen behind it.
 - `PUT /api/v1/service-tasks/{id}/parts/{child_id}`
 - `DELETE /api/v1/service-tasks/{id}/parts/{child_id}`
 - `POST /api/v1/service-tasks/{id}/restore`
-- `GET /api/v1/tire-assignment-requests`
 - `POST /api/v1/tire-assignment-requests`
 - `GET /api/v1/tire-assignment-requests/{id}`
 - `PUT /api/v1/tire-assignment-requests/{id}`
 - `DELETE /api/v1/tire-assignment-requests/{id}`
 - `POST /api/v1/tire-assignment-requests/{id}/approve`
-- `GET /api/v1/tire-models`
 - `POST /api/v1/tire-models`
 - `GET /api/v1/tire-models/{id}`
 - `PUT /api/v1/tire-models/{id}`
 - `DELETE /api/v1/tire-models/{id}`
-- `GET /api/v1/tire-mount-logs`
-- `GET /api/v1/tires`
 - `POST /api/v1/tires`
 - `GET /api/v1/tires/{id}`
 - `PUT /api/v1/tires/{id}`
 - `DELETE /api/v1/tires/{id}`
-- `GET /api/v1/tires/{id}/inspections`
 - `POST /api/v1/tires/{id}/inspections`
 - `GET /api/v1/tires/{id}/inspections/{child_id}`
 - `PUT /api/v1/tires/{id}/inspections/{child_id}`
 - `DELETE /api/v1/tires/{id}/inspections/{child_id}`
-- `GET /api/v1/tires/{id}/installations`
 - `POST /api/v1/tires/{id}/installations`
 - `GET /api/v1/tires/{id}/installations/{child_id}`
 - `PUT /api/v1/tires/{id}/installations/{child_id}`
 - `DELETE /api/v1/tires/{id}/installations/{child_id}`
-- `GET /api/v1/tires/{id}/mount-logs`
 - `POST /api/v1/tires/{id}/mount-logs`
 - `GET /api/v1/tires/{id}/mount-logs/{child_id}`
 - `PUT /api/v1/tires/{id}/mount-logs/{child_id}`
@@ -1427,17 +1664,14 @@ with no screen behind it.
 - `PUT /api/v1/trailer-classifications/{id}`
 - `DELETE /api/v1/trailer-classifications/{id}`
 - `POST /api/v1/uploads`
-- `GET /api/v1/vehicle-makes`
 - `POST /api/v1/vehicle-makes`
 - `GET /api/v1/vehicle-makes/{id}`
 - `PUT /api/v1/vehicle-makes/{id}`
 - `DELETE /api/v1/vehicle-makes/{id}`
-- `GET /api/v1/vehicle-models`
 - `POST /api/v1/vehicle-models`
 - `GET /api/v1/vehicle-models/{id}`
 - `PUT /api/v1/vehicle-models/{id}`
 - `DELETE /api/v1/vehicle-models/{id}`
-- `GET /api/v1/vendors`
 - `POST /api/v1/vendors`
 - `GET /api/v1/vendors/{id}`
 - `PUT /api/v1/vendors/{id}`
@@ -1449,7 +1683,6 @@ with no screen behind it.
 - `GET /api/v1/warranties/{id}`
 - `PUT /api/v1/warranties/{id}`
 - `DELETE /api/v1/warranties/{id}`
-- `GET /api/v1/weekly-mileage-goals`
 - `POST /api/v1/weekly-mileage-goals`
 - `GET /api/v1/weekly-mileage-goals/{id}`
 - `PUT /api/v1/weekly-mileage-goals/{id}`
@@ -1462,7 +1695,6 @@ with no screen behind it.
 - `GET /api/v1/work-order-line-items/{id}/sub-line-items/{child_id}`
 - `PUT /api/v1/work-order-line-items/{id}/sub-line-items/{child_id}`
 - `DELETE /api/v1/work-order-line-items/{id}/sub-line-items/{child_id}`
-- `GET /api/v1/work-order-statuses`
 - `POST /api/v1/work-order-statuses`
 - `GET /api/v1/work-order-statuses/{id}`
 - `PUT /api/v1/work-order-statuses/{id}`
@@ -1472,25 +1704,20 @@ with no screen behind it.
 - `GET /api/v1/work-order-sub-line-items/{id}/labor-entries/{child_id}`
 - `PUT /api/v1/work-order-sub-line-items/{id}/labor-entries/{child_id}`
 - `DELETE /api/v1/work-order-sub-line-items/{id}/labor-entries/{child_id}`
-- `GET /api/v1/work-orders`
 - `POST /api/v1/work-orders`
-- `GET /api/v1/work-orders/facets`
 - `GET /api/v1/work-orders/{id}`
 - `PUT /api/v1/work-orders/{id}`
 - `DELETE /api/v1/work-orders/{id}`
 - `GET /api/v1/work-orders/{id}/faults`
 - `POST /api/v1/work-orders/{id}/faults`
 - `DELETE /api/v1/work-orders/{id}/faults/{fault_id}`
-- `GET /api/v1/work-orders/{id}/issues`
 - `POST /api/v1/work-orders/{id}/issues`
 - `DELETE /api/v1/work-orders/{id}/issues/{issue_id}`
-- `GET /api/v1/work-orders/{id}/line-items`
 - `POST /api/v1/work-orders/{id}/line-items`
 - `GET /api/v1/work-orders/{id}/line-items/{child_id}`
 - `PUT /api/v1/work-orders/{id}/line-items/{child_id}`
 - `DELETE /api/v1/work-orders/{id}/line-items/{child_id}`
 - `POST /api/v1/work-orders/{id}/override-total`
-- `GET /api/v1/work-orders/{id}/status-logs`
 - `GET /api/v1/work-orders/{id}/status-logs/{child_id}`
 - `POST /auth/login`
 - `POST /auth/logout`
@@ -1502,25 +1729,7 @@ with no screen behind it.
 
 | Outcome | Count | Rows |
 |---|---|---|
-| Deleted | 49 | laborEntry#19, workOrderSubLineItem#20, wheelPosition#19, serviceEntryLineItem#19, purchaseOrderLineItem#17, workOrderLineItem#20, serviceTaskPart#3, axleConfig, trailer, vehicle, inspectionFormItem#17, trailerAssignment#19, weeklyMileageGoal#19, warranty#18, partInventory#21, fuelEntry#19, serviceEntry#20, purchaseOrder#20, issue#19, workOrder#21, employee#22, axleDefinition#20, tire#17, trailerAsset#48, asset#47, part#20, vehicleModel#24, tireModel#19, inspectionForm#19, fault#19, group#20, role#34, serviceTask#19, axleTemplate#20, vehicleMake#24, workOrderStatus#80, issuePriority#19, trailerClassification#19, fuelType#19, adjustmentReason#19, partLocation#21, measurementUnit#19, partManufacturer#19, partCategory#19, assetStatus#54, assetType#19, location#19, vendor#21, journalEntry#31 |
+| Deleted | 49 | laborEntry#20, workOrderSubLineItem#21, wheelPosition#20, serviceEntryLineItem#20, purchaseOrderLineItem#18, workOrderLineItem#21, serviceTaskPart#4, axleConfig, trailer, vehicle, inspectionFormItem#18, trailerAssignment#20, weeklyMileageGoal#20, warranty#19, partInventory#22, fuelEntry#20, serviceEntry#21, purchaseOrder#21, issue#20, workOrder#22, employee#23, axleDefinition#21, tire#18, trailerAsset#50, asset#49, part#21, vehicleModel#25, tireModel#20, inspectionForm#20, fault#20, group#21, role#37, serviceTask#20, axleTemplate#21, vehicleMake#25, workOrderStatus#90, issuePriority#20, trailerClassification#20, fuelType#20, adjustmentReason#20, partLocation#22, measurementUnit#20, partManufacturer#20, partCategory#20, assetStatus#60, assetType#20, location#20, vendor#22, journalEntry#33 |
 | Archived instead | 0 | — |
 | Reversed (neutralised, not removed) | 0 | — |
 | Failed to remove | 0 | — |
-
-**MINOR 6: the table above is zero residue in the database — it is not zero residue in
-object storage.** The workflow suite's upload check
-(`qa/route-audit/lib/workflows.mjs:390`) uploads a one-pixel PNG to production object
-storage tagged `ZZ-TEST-<runId>.png`. There is no `DELETE /uploads` route to remove it
-with: `internal/http/handler/router.go:221` registers only `member.POST("/uploads",
-...)` for that path. This run's own recorded response
-(`qa/route-audit/out/workflows.json`) shows the object landed at
-`uploads/private/1/f038db66d813f7e3-ZZ-TEST-0910d.png` — a content-hash prefix ahead of
-the tag, not the bare tag alone — and that the upload handler also generated a
-thumbnail alongside it, `uploads/private/1/thumbs/f038db66d813f7e3-ZZ-TEST-0910d.jpg`.
-So each run leaves **two** objects behind, not one. Every run of this harness does the
-same; how many prior runs is not something the harness or this report can state
-precisely — `out/` is not version-controlled, so there is no record of past run ids —
-but this fix wave alone confirms at least two runs' worth of residue (`0910c` and
-`0910d`, four objects total), and the `AUDIT_RUN_ID` naming convention (date plus a
-letter suffix) implies more ran before either. There is no API route to remove them;
-this harness does not attempt to build one, and none is proposed here.
