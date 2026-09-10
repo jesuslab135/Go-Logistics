@@ -13,6 +13,18 @@ export const UNTAGGABLE = new Set(['laborEntry', 'purchaseOrderLineItem'])
 // own answer, exactly as archiving is for a referenced catalog row. The
 // reversal is itself a new row, so the ledger ends with a balanced pair
 // rather than one unbalanced adjustment.
+//
+// Why partInventory (neither ARCHIVABLE nor REVERSIBLE) needs no fallback
+// of its own: journalEntry is reversed, not deleted, so both the original
+// entry and its reversal row are still present — by design — when teardown
+// reaches partInventory later in the reverse walk. partInventory's DELETE
+// still succeeds anyway, because inventory_journal_entry.part_location_detail_id
+// is declared ON DELETE CASCADE against part_inventory(id)
+// (internal/db/migrations/000001_init.up.sql:1281) — deleting the
+// part_inventory row takes both ledger rows with it. The reversal is not
+// made redundant by that cascade: it neutralises the stock movement before
+// the cascade fires, so the ledger reads as balanced at every instant, not
+// only after teardown finishes removing its parent.
 export const REVERSIBLE = new Set(['journalEntry'])
 
 export const FIXTURE_PLAN = [

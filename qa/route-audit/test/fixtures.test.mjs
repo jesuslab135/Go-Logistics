@@ -130,3 +130,16 @@ test('teardown fallback chain routes each resource to the correct mechanism', as
   // location must not have triggered a reverse or archive call at all.
   assert.ok(!calls.some(c => c.path.startsWith('/api/v1/locations/11/')))
 })
+
+test('every path placeholder in FIXTURE_PLAN names a declared dependency', () => {
+  const PLACEHOLDER = /\{(\w+)\}/g
+  for (const step of FIXTURE_PLAN) {
+    for (const match of step.path.matchAll(PLACEHOLDER)) {
+      const placeholder = match[1]
+      assert.ok(
+        step.dependsOn.includes(placeholder),
+        `${step.key} path '${step.path}' references {${placeholder}}, but dependsOn is [${step.dependsOn.join(', ')}]`
+      )
+    }
+  }
+})
