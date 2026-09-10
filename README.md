@@ -265,6 +265,35 @@ client-owner role (for the pre-existing "Go Logistics" account) and the
 platform-admin flag, pending a follow-up that splits the two into separate
 identities.
 
+### Integration tests
+
+`go test ./...` never touches Postgres — every defect the onboarding flow
+above has had came from Go-to-schema drift a mocked test cannot see: a query
+missing a column a migration added, a route wired under the wrong gate. One
+integration test exercises the real chain end to end against a real,
+throwaway database:
+
+```
+POST /admin/accounts -> login as the owner -> POST /companies ->
+POST /employees -> PUT /admin/employees/{id}/companies
+```
+
+It lives at `internal/http/handler/integration_test.go`, behind a
+`//go:build integration` tag, so it is never part of `go test ./...` or CI —
+running it is a deliberate act, not a side effect of a normal test run.
+It creates its own uniquely named database, applies every migration in
+`internal/db/migrations` to it directly, and drops it when the test ends, so
+it never touches a developer's own `fleet` database. Run it with Postgres up
+(`docker compose up -d db`) and:
+
+```sh
+go test -tags=integration -run TestOnboardingChain ./internal/http/handler/...
+```
+
+It looks for Postgres at `postgres://postgres:postgres@localhost:5433/postgres`
+(this project's own `db` service and the default `docker compose` port) by
+default; point it elsewhere with `INTEGRATION_DATABASE_URL`.
+
 ---
 
 ## Object storage (MinIO / S3)
