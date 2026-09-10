@@ -16,7 +16,6 @@ type Employee struct {
 	FirstName            string
 	LastName             string
 	EmployeeID           string
-	RoleID               *int64
 	IsActive             bool
 	Email                string
 	MobilePhone          string

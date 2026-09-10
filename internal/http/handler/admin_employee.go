@@ -273,12 +273,34 @@ func (h *AdminEmployeeHandler) ReplaceCompanies(c *gin.Context) {
 		apierr.Abort(c, err)
 		return
 	}
+	// GrantMembership's ON CONFLICT DO UPDATE SET role_id = EXCLUDED.role_id
+	// means calling it for a company the employee already belongs to would
+	// silently overwrite whatever role they hold there with NULL. So the loop
+	// below must only touch companies genuinely new to this employee, and that
+	// "already retained" set has to be read here, inside the transaction and
+	// after RemoveEmployeeCompaniesNotIn has run — not from the `before`
+	// variable above, which is read prior to tx.Begin(). Using `before` would
+	// swap this bug for a different one: a removal racing in that window could
+	// make a company this request asked to keep look already-present, and the
+	// loop would then skip re-granting it, silently dropping a company the
+	// caller explicitly listed. `before` stays reserved for the audit trail
+	// below, which is best-effort already.
+	retained, err := qtx.ListEmployeeCompanyIDs(ctx, id)
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	retainedSet := normalizeCompanyIDs(retained)
 	for _, cid := range ids {
-		// This route replaces an employee's set of companies; it has no role to
-		// grant for any of them, so the membership is created with none. A
-		// membership with no role is a legitimate state: the employee is
-		// associated with the company but permitted nothing there until someone
-		// assigns a role.
+		if slices.Contains(retainedSet, cid) {
+			// Already a member post-delete, so this is a retained company, not
+			// a new one — leave its role_id exactly as it is.
+			continue
+		}
+		// A company newly added to the set has no role to grant, so the
+		// membership is created with none. A membership with no role is a
+		// legitimate state: the employee is associated with the company but
+		// permitted nothing there until someone assigns a role.
 		if err := qtx.GrantMembership(ctx, gen.GrantMembershipParams{EmployeeID: id, CompanyID: cid, RoleID: nil}); err != nil {
 			apierr.Abort(c, err)
 			return
@@ -287,7 +309,8 @@ func (h *AdminEmployeeHandler) ReplaceCompanies(c *gin.Context) {
 	// Granting a company used to confer administrator access there whenever the
 	// employee's role carried is_admin, back when role_id was a single global
 	// FK. That is no longer possible: the role now lives on the membership
-	// itself, and this route grants none. The audit rows still go in the same
+	// itself, and this route only ever grants a bare one, to a company the
+	// employee did not already belong to. The audit rows still go in the same
 	// transaction as the change, so a recorded grant is one that actually
 	// happened.
 	now := time.Now().UTC()

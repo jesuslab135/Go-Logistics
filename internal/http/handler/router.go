@@ -400,11 +400,11 @@ func registerCompanyRoutes(api, member *gin.RouterGroup, d Deps) {
 // answer "who belongs to company X" or "did company X get seeded".
 //
 // It is gated on RequirePlatformAdmin, not RequireAdminRole. A tenant's own
-// administrator is not a platform operator, and because employee.role_id is a
-// single global FK, an admin of one company is an admin of every company they
-// belong to — so the previous gate let any company admin read and rewrite
-// another tenant's employees. Granting the flag is a CLI act (cmd/cli
-// platform-admin); nothing in the API hands it out.
+// administrator is not a platform operator: an admin role is granted per
+// company membership, so RequireAdminRole only proves the caller administers
+// the one company their token is scoped to, and that grants no standing over
+// another tenant's employees. Granting the platform-admin flag is a CLI act
+// (cmd/cli platform-admin); nothing in the API hands it out.
 //
 // It is registered on api, not member: platform staff belong to no account and
 // hold no company memberships, so gating this namespace on RequireCompanyMember

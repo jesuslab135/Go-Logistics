@@ -231,10 +231,11 @@ func RequireAdminRole() gin.HandlerFunc {
 }
 
 // RequirePlatformAdmin gates the cross-tenant /admin namespace. It is
-// deliberately not RequireAdminRole: employee.role_id is a single global FK, so
-// a tenant administrator is an administrator in every company they belong to,
-// and gating cross-tenant routes on that let any company admin read and rewrite
-// another tenant's employees.
+// deliberately not RequireAdminRole: an admin role is granted per company
+// membership now, so RequireAdminRole only proves the caller administers the
+// one company their token is scoped to — no standing at all over a tenant
+// they hold no membership in. Only a platform administrator, a flag the CLI
+// grants independently of any company role, may cross that boundary.
 func RequirePlatformAdmin() gin.HandlerFunc {
 	return gate(func(i Identity, _ *gin.Context) bool { return i.IsPlatformAdmin },
 		"platform administrator privileges are required for this action")
