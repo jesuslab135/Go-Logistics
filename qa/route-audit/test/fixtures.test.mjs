@@ -101,6 +101,12 @@ test('teardown fallback chain routes each resource to the correct mechanism', as
       if (method === 'POST' && path.endsWith('/archive')) {
         return { status: 200, body: { id: 998 } }
       }
+      if (method === 'GET') {
+        // location has no fallback and genuinely never gets removed by
+        // anything else in this stub's walk, so the verify-before-failing
+        // GET must find it still there.
+        return { status: 200, body: { id: 11 } }
+      }
       throw new Error(`stub client received unexpected call: ${method} ${path}`)
     },
   }
@@ -123,19 +129,85 @@ test('teardown fallback chain routes each resource to the correct mechanism', as
   assert.deepEqual(result.reversed, ['journalEntry#3'])
   // vendor -> DELETE refused -> POST .../archive -> archived
   assert.deepEqual(result.archived, ['vendor#7'])
-  // location is in neither ARCHIVABLE nor REVERSIBLE -> DELETE refused -> failed
+  // location is in neither ARCHIVABLE nor REVERSIBLE -> DELETE refused,
+  // verify GET confirms it still exists (200) -> stays failed
   assert.deepEqual(result.failed.map(f => f.key), ['location#11'])
   assert.deepEqual(result.deleted, [])
 
   const reverseCall = calls.find(c => c.path === '/api/v1/inventory-journal-entries/3/reverse')
   assert.ok(reverseCall, 'expected a POST to the reverse endpoint')
-  assert.deepEqual(reverseCall.body, { notes: 'ZZ-TEST-99 teardown reversal' })
+  // The reverse endpoint binds no JSON body (see
+  // internal/http/handler/inventory_journal_entry.go) — teardown must not
+  // send one, or send it and have it silently ignored while a test claims
+  // otherwise.
+  assert.equal(reverseCall.body, undefined)
 
   const archiveCall = calls.find(c => c.path === '/api/v1/vendors/7/archive')
   assert.ok(archiveCall, 'expected a POST to the archive endpoint')
 
-  // location must not have triggered a reverse or archive call at all.
-  assert.ok(!calls.some(c => c.path.startsWith('/api/v1/locations/11/')))
+  // location must not have triggered a reverse or archive call, only the
+  // DELETE and the final verification GET.
+  assert.ok(!calls.some(c => c.method === 'POST' && c.path.startsWith('/api/v1/locations/11/')))
+  const locationGet = calls.find(c => c.method === 'GET' && c.path === '/api/v1/locations/11')
+  assert.ok(locationGet, 'expected a verification GET for the row that stayed failed')
+})
+
+test('teardown promotes a row to deleted when a post-walk GET proves it is 404 gone', async () => {
+  // journalEntry: DELETE refused, then reverse also refused (409 - already
+  // reversed by something else this run), so it would land in `failed`.
+  // But the verification GET afterwards returns 404 - something later in
+  // the same reverse walk (a cascade from deleting partInventory, in the
+  // real system) removed it anyway. It must be reported as deleted, not
+  // failed, or the audit report states something false.
+  const stubClient = {
+    async request(method, path) {
+      if (method === 'DELETE') return { status: 405, body: { error: { code: 'route_retired' } } }
+      if (method === 'POST' && path.endsWith('/reverse')) {
+        return { status: 409, body: { error: { code: 'already_reversed' } } }
+      }
+      if (method === 'GET') return { status: 404, body: { error: { code: 'not_found' } } }
+      throw new Error(`stub client received unexpected call: ${method} ${path}`)
+    },
+  }
+
+  const graph = {
+    runId: 'stub', tag: 'ZZ-TEST-99', ids: {},
+    created: [{ key: 'journalEntry', path: '/api/v1/inventory-journal-entries', id: 4 }],
+    failed: [],
+  }
+
+  const result = await teardownFixtures(stubClient, graph)
+
+  assert.deepEqual(result.deleted, ['journalEntry#4'])
+  assert.deepEqual(result.failed, [])
+  assert.deepEqual(result.reversed, [])
+})
+
+test('teardown leaves a row failed when the post-walk GET proves it still exists', async () => {
+  // Same shape as above, but the verification GET returns 200: the row
+  // really is still there. It must stay in `failed` - a promotion here
+  // would hide a genuine leftover row from the audit report.
+  const stubClient = {
+    async request(method, path) {
+      if (method === 'DELETE') return { status: 405, body: { error: { code: 'route_retired' } } }
+      if (method === 'POST' && path.endsWith('/reverse')) {
+        return { status: 409, body: { error: { code: 'already_reversed' } } }
+      }
+      if (method === 'GET') return { status: 200, body: { id: 4 } }
+      throw new Error(`stub client received unexpected call: ${method} ${path}`)
+    },
+  }
+
+  const graph = {
+    runId: 'stub', tag: 'ZZ-TEST-99', ids: {},
+    created: [{ key: 'journalEntry', path: '/api/v1/inventory-journal-entries', id: 4 }],
+    failed: [],
+  }
+
+  const result = await teardownFixtures(stubClient, graph)
+
+  assert.deepEqual(result.failed.map(f => f.key), ['journalEntry#4'])
+  assert.deepEqual(result.deleted, [])
 })
 
 test('buildFixtures treats a created-but-untagged response as failed, not healthy', async () => {

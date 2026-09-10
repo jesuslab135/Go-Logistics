@@ -270,7 +270,7 @@ export async function teardownFixtures(client, graph) {
   const deleted = []
   const archived = []
   const reversed = []
-  const failed = []
+  const pending = [] // rows every fallback refused; verified before becoming `failed`
 
   for (const row of [...graph.created].reverse()) {
     const target = `${row.path}/${row.id}`
@@ -287,16 +287,36 @@ export async function teardownFixtures(client, graph) {
       }
     }
     if (REVERSIBLE.has(row.key)) {
-      const rev = await client.request('POST', `${target}/reverse`, {
-        body: { notes: `${graph.tag} teardown reversal` },
-        opKey: `REVERSE ${row.key} (teardown)`,
-      })
+      // No body: the reverse endpoint binds no JSON request (see
+      // internal/http/handler/inventory_journal_entry.go) — sending one
+      // would be dropped silently, the same class of bug this whole task
+      // exists to catch, so don't pin a false belief that it's accepted.
+      const rev = await client.request('POST', `${target}/reverse`, { opKey: `REVERSE ${row.key} (teardown)` })
       if (rev.status >= 200 && rev.status < 300) {
         reversed.push(`${row.key}#${row.id}`)
         continue
       }
     }
-    failed.push({ key: `${row.key}#${row.id}`, status: res.status, body: res.body })
+    pending.push({ row, target, status: res.status, body: res.body })
+  }
+
+  // A row can land here as a false failure: something later in this same
+  // reverse walk (e.g. deleting partInventory, which cascades onto
+  // journalEntry via ON DELETE CASCADE) can remove a row whose own DELETE
+  // and every fallback were refused earlier in the walk. Reporting it as
+  // failed would be a false statement in the audit report, so verify with
+  // a GET before finalising: 404 means it is genuinely gone (promote to
+  // deleted); anything else (including network failure) means it is still
+  // there, or its state is unknown, and it must stay failed rather than be
+  // excused.
+  const failed = []
+  for (const { row, target, status, body } of pending) {
+    const check = await client.request('GET', target, { opKey: `GET ${row.key} (teardown verify)` })
+    if (check.status === 404) {
+      deleted.push(`${row.key}#${row.id}`)
+    } else {
+      failed.push({ key: `${row.key}#${row.id}`, status, body })
+    }
   }
 
   return { deleted, archived, reversed, failed }
