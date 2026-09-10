@@ -45,11 +45,24 @@ func (v *EmployeeCredentialVerifier) Verify(ctx context.Context, email, password
 		return Identity{}, ErrNoCompanyMembership
 	}
 
+	// is_admin is a property of the role held in THIS company, so it cannot be
+	// resolved until the company is. A company-less session has no role, and its
+	// admin status comes from account ownership alone — which GetEmployeeIdentity
+	// already answers, so the token claim and the request-time gate come from one
+	// query rather than two copies of the rule.
+	ident, err := v.q.GetEmployeeIdentity(ctx, gen.GetEmployeeIdentityParams{
+		ID:        row.ID,
+		CompanyID: companyID,
+	})
+	if err != nil {
+		return Identity{}, ErrInvalidCredentials
+	}
+
 	return Identity{
 		EmployeeID: row.ID,
 		CompanyID:  companyID,
 		AccountID:  row.AccountID,
-		IsAdmin:    row.IsAdmin,
+		IsAdmin:    ident.IsAdmin,
 	}, nil
 }
 
