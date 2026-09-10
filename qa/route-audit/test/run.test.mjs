@@ -83,3 +83,49 @@ test('AUDIT_RUN_ID is read from the environment and the process exits when it is
 test('run.mjs does not import anything that generates ids from time or randomness', () => {
   assert.doesNotMatch(source, /Date\.now\(\)|Math\.random\(\)|randomUUID/, 'run id generation is forbidden by design')
 })
+
+// ---------------------------------------------------------------------------
+// IMPORTANT 2 regression: teardown must never run while the client is
+// scoped to the wrong company. isolation.mjs sets
+// `graph.tenantSwitchBackFailed` when it cannot confirm the client switched
+// back to the home company; this pins that BOTH places run.mjs can reach
+// teardownFixtures from — the normal `teardown` phase and the crash-path
+// `finally` block — check that flag before calling it, so a stuck tenant can
+// never produce a false clean-teardown report. lib/isolation.test.mjs proves
+// the flag itself is set correctly from a stub client; this file cannot run
+// the orchestrator against a live API, so it stays a source-text check like
+// the rest of this file, deliberately narrow.
+// ---------------------------------------------------------------------------
+
+test('the normal teardown phase refuses to run when the isolation suite could not switch back to the home company', () => {
+  const teardownPhaseStart = source.indexOf("phases.has('teardown')")
+  assert.notEqual(teardownPhaseStart, -1, 'could not locate the teardown phase block')
+  // Look at the block up to the crash-path finally, which is far enough to
+  // safely contain the whole teardown-phase if/else.
+  const finallyStart = source.indexOf('} finally {')
+  const teardownPhaseBody = source.slice(teardownPhaseStart, finallyStart)
+  assert.match(
+    teardownPhaseBody,
+    /graph\.tenantSwitchBackFailed/,
+    'the teardown phase must check graph.tenantSwitchBackFailed before calling teardownFixtures'
+  )
+  // teardownFixtures must be called strictly after that check is tested,
+  // i.e. gated by it, not merely present somewhere in the same block.
+  const flagIndex = teardownPhaseBody.indexOf('graph.tenantSwitchBackFailed')
+  const teardownCallIndex = teardownPhaseBody.indexOf('teardownFixtures(')
+  assert.ok(teardownCallIndex > flagIndex, 'teardownFixtures must be called after the tenantSwitchBackFailed check, not before it')
+})
+
+test('the crash-path finally also refuses teardown when the isolation suite could not switch back to the home company', () => {
+  const finallyStart = source.indexOf('} finally {')
+  const guardLineIndex = source.indexOf('!teardownRan')
+  assert.ok(guardLineIndex > finallyStart, 'could not locate the crash-path teardown guard inside finally')
+  const crashBlock = source.slice(guardLineIndex)
+  const nextTopLevelClose = crashBlock.indexOf('\n  }\n')
+  const crashBlockBody = crashBlock.slice(0, nextTopLevelClose === -1 ? undefined : nextTopLevelClose)
+  assert.match(
+    crashBlockBody,
+    /graph\.tenantSwitchBackFailed/,
+    'the crash-path finally must check graph.tenantSwitchBackFailed before calling teardownFixtures'
+  )
+})

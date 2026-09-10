@@ -67,67 +67,126 @@ export async function runIsolationSuite(client, graph, homeCompanyId) {
     return results
   }
 
-  const switched = await switchTo(client, companyId)
-  results.push({
-    check: 'tenant-isolation',
-    opKey: 'POST /auth/switch-company',
-    ok: switched.status >= 200 && switched.status < 300,
-    expected: '2xx returning a token scoped to the new company',
-    actual: String(switched.status),
-    severity: switched.status >= 200 && switched.status < 300 ? 'info' : 'high',
-    evidence: { companyId },
-  })
-
-  if (switched.status >= 200 && switched.status < 300) {
-    for (const target of ISOLATION_TARGETS) {
-      const id = graph.ids[target.key]
-      if (!id) continue
-      const res = await client.request('GET', `${target.path}/${id}`, {
-        opKey: `GET ${target.path}/{id} (cross-tenant)`,
-      })
-      const v = verdictFor(res.status)
-      results.push({
-        check: 'tenant-isolation',
-        opKey: `GET ${target.path}/{id}`,
-        ok: v.ok,
-        expected: "403 or 404 reading another company's row",
-        actual: String(res.status),
-        severity: v.severity,
-        evidence: { targetKey: target.key, id, body: res.body },
-      })
-    }
-
-    // A list in the new tenant must be empty of company-1 rows.
-    const vendors = await client.request('GET', '/api/v1/vendors', {
-      query: { limit: 200 }, opKey: 'GET /api/v1/vendors (cross-tenant list)',
-    })
-    const leaked = (vendors.body?.data ?? []).some(r => r.id === graph.ids.vendor)
+  // Everything from here through the throwaway company's own DELETE runs
+  // inside try/finally. Without this, a throw anywhere in the probes below
+  // (the original bug: `(vendors.body?.data ?? []).some(...)` blows up if
+  // `data` comes back as a non-array object) skips the DELETE entirely and
+  // orphans a whole tenant in a live production database — the company is
+  // never added to `graph.created` either, so run.mjs's own crash-path
+  // teardown cannot reach it. This is the same shape as the two teardown
+  // leaks fixed earlier in fixtures.mjs/workflows.mjs: whatever creates a
+  // row owns tearing it down, in a finally, regardless of what throws
+  // in between.
+  try {
+    const switched = await switchTo(client, companyId)
     results.push({
       check: 'tenant-isolation',
-      opKey: 'GET /api/v1/vendors (list)',
-      ok: !leaked,
-      expected: "the other tenant's vendor is absent from this company's list",
-      actual: leaked ? "the other tenant's vendor is listed" : 'absent',
-      severity: leaked ? 'high' : 'info',
-      evidence: { total: vendors.body?.total },
+      opKey: 'POST /auth/switch-company',
+      ok: switched.status >= 200 && switched.status < 300,
+      expected: '2xx returning a token scoped to the new company',
+      actual: String(switched.status),
+      severity: switched.status >= 200 && switched.status < 300 ? 'info' : 'high',
+      evidence: { companyId },
     })
+
+    if (switched.status >= 200 && switched.status < 300) {
+      for (const target of ISOLATION_TARGETS) {
+        const id = graph.ids[target.key]
+        if (!id) continue
+        const res = await client.request('GET', `${target.path}/${id}`, {
+          opKey: `GET ${target.path}/{id} (cross-tenant)`,
+        })
+        const v = verdictFor(res.status)
+        results.push({
+          check: 'tenant-isolation',
+          opKey: `GET ${target.path}/{id}`,
+          ok: v.ok,
+          expected: "403 or 404 reading another company's row",
+          actual: String(res.status),
+          severity: v.severity,
+          evidence: { targetKey: target.key, id, body: res.body },
+        })
+      }
+
+      // A list in the new tenant must be empty of company-1 rows. Guarded
+      // with Array.isArray, same as every other place in this codebase that
+      // reads a list envelope's `data` field: an unexpected response shape
+      // (an object instead of an array, say) must become a reported
+      // finding, not a thrown TypeError that skips the cleanup below.
+      const vendors = await client.request('GET', '/api/v1/vendors', {
+        query: { limit: 200 }, opKey: 'GET /api/v1/vendors (cross-tenant list)',
+      })
+      const vendorData = vendors.body?.data
+      const leaked = Array.isArray(vendorData) && vendorData.some(r => r.id === graph.ids.vendor)
+      results.push({
+        check: 'tenant-isolation',
+        opKey: 'GET /api/v1/vendors (list)',
+        ok: Array.isArray(vendorData) ? !leaked : false,
+        expected: "the other tenant's vendor is absent from this company's list",
+        actual: !Array.isArray(vendorData)
+          ? 'data is not an array'
+          : (leaked ? "the other tenant's vendor is listed" : 'absent'),
+        severity: !Array.isArray(vendorData) ? 'medium' : (leaked ? 'high' : 'info'),
+        evidence: { total: vendors.body?.total },
+      })
+    }
+  } finally {
+    // Return to the home tenant so teardown deletes in the right company.
+    // This result MUST be checked, not discarded: `isolation` runs
+    // immediately before `teardown` on this same client, and
+    // teardownFixtures treats a 404 on its verification GET as "the row is
+    // genuinely gone" — a check that is not tenant-aware. If this
+    // switch-back silently failed, the client stays scoped to the
+    // throwaway tenant, every fixture DELETE in teardown 404s against the
+    // WRONG company, and the report would confidently claim zero residue
+    // while every fixture row is still live in production. That is the
+    // worst failure mode this tool has: a clean bill of health that is
+    // false. `graph.tenantSwitchBackFailed` is the signal run.mjs checks
+    // before running teardown at all, in both the normal phase flow and
+    // the crash-path finally block — it is set here, before any exception
+    // from the probes above finishes propagating, so it survives even the
+    // throw path.
+    const switchedHome = await switchTo(client, homeCompanyId)
+    const switchedHomeOk = switchedHome.status >= 200 && switchedHome.status < 300
+    graph.tenantSwitchBackFailed = !switchedHomeOk
+    results.push({
+      check: 'tenant-isolation',
+      opKey: 'POST /auth/switch-company (return to home)',
+      ok: switchedHomeOk,
+      expected: '2xx returning a token scoped back to the home company before teardown runs',
+      actual: String(switchedHome.status),
+      severity: switchedHomeOk ? 'info' : 'high',
+      evidence: { homeCompanyId },
+    })
+
+    if (switchedHomeOk) {
+      const cleanup = await client.request('DELETE', `/api/v1/companies/${companyId}`, {
+        opKey: 'DELETE /api/v1/companies/{id} (isolation teardown)',
+      })
+      results.push({
+        check: 'tenant-isolation',
+        opKey: 'DELETE /api/v1/companies/{id}',
+        ok: cleanup.status >= 200 && cleanup.status < 300,
+        expected: '2xx removing the throwaway tenant',
+        actual: String(cleanup.status),
+        severity: cleanup.status >= 200 && cleanup.status < 300 ? 'info' : 'medium',
+        evidence: { companyId, body: cleanup.body },
+      })
+    } else {
+      // Do not attempt the delete: we cannot be sure which company it
+      // would run against. Record the throwaway tenant as still live
+      // rather than silently dropping it.
+      results.push({
+        check: 'tenant-isolation',
+        opKey: 'DELETE /api/v1/companies/{id}',
+        ok: false,
+        expected: 'the throwaway tenant to be removed once the client is confirmed back in the home company',
+        actual: 'skipped: switch-back to the home company did not succeed, so the client identity is unknown',
+        severity: 'high',
+        evidence: { companyId },
+      })
+    }
   }
-
-  // Return to the home tenant so teardown deletes in the right company.
-  await switchTo(client, homeCompanyId)
-
-  const cleanup = await client.request('DELETE', `/api/v1/companies/${companyId}`, {
-    opKey: 'DELETE /api/v1/companies/{id} (isolation teardown)',
-  })
-  results.push({
-    check: 'tenant-isolation',
-    opKey: 'DELETE /api/v1/companies/{id}',
-    ok: cleanup.status >= 200 && cleanup.status < 300,
-    expected: '2xx removing the throwaway tenant',
-    actual: String(cleanup.status),
-    severity: cleanup.status >= 200 && cleanup.status < 300 ? 'info' : 'medium',
-    evidence: { companyId, body: cleanup.body },
-  })
 
   return results
 }

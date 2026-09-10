@@ -125,10 +125,30 @@ try {
 
   if (phases.has('teardown')) {
     if (!graph) throw new Error('teardown needs fixtures')
-    teardown = await teardownFixtures(client, graph)
-    save('teardown.json', teardown)
-    teardownRan = true
-    console.log(`teardown: ${teardown.deleted.length} deleted, ${teardown.archived.length} archived, ${teardown.reversed.length} reversed, ${teardown.failed.length} failed`)
+    // The isolation suite runs immediately before this on the same client.
+    // If it could not switch the client back to the home company,
+    // teardown must not run: every fixture DELETE below would 404 against
+    // the WRONG company, and teardownFixtures' own "404 means genuinely
+    // gone" verification (lib/fixtures.mjs) is not tenant-aware — it would
+    // read every one of those 404s as a successful delete and report a
+    // clean database while all 49 rows are still live in production. That
+    // is the worst failure mode this tool has, so this refusal is loud and
+    // unconditional rather than a warning buried in the log.
+    if (graph.tenantSwitchBackFailed) {
+      console.error('')
+      console.error('TEARDOWN REFUSED: the isolation suite could not switch the client back to the home company.')
+      console.error('The client may still be scoped to the throwaway isolation tenant. Running teardown now would')
+      console.error('404 every fixture DELETE against the WRONG company and falsely report a clean database while')
+      console.error('every fixture row is still live in production.')
+      console.error(`Re-run teardown by itself in a FRESH process once you have confirmed the client is back in the`)
+      console.error(`home company: AUDIT_RUN_ID=${runId} node run.mjs teardown`)
+      console.error('')
+    } else {
+      teardown = await teardownFixtures(client, graph)
+      save('teardown.json', teardown)
+      teardownRan = true
+      console.log(`teardown: ${teardown.deleted.length} deleted, ${teardown.archived.length} archived, ${teardown.reversed.length} reversed, ${teardown.failed.length} failed`)
+    }
   }
 
   if (phases.has('report')) {
@@ -178,14 +198,30 @@ try {
   // Guard this: if teardown itself throws, that must not replace or hide
   // the original failure.
   if (failure && graph && !teardownRan) {
-    console.error('run failed; tearing down fixtures created by this run')
-    try {
-      teardown = await teardownFixtures(client, graph)
-      save('teardown.json', teardown)
-      console.error(`teardown after failure: ${teardown.deleted.length} deleted, ${teardown.archived.length} archived, ${teardown.reversed.length} reversed, ${teardown.failed.length} failed`)
-    } catch (teardownErr) {
-      console.error('teardown also failed while handling the original error:')
-      console.error(teardownErr)
+    // Same refusal as the normal teardown phase above, and just as
+    // unconditional: a crash is exactly the situation in which the
+    // isolation suite is most likely to have thrown mid-probe, and
+    // `graph.tenantSwitchBackFailed` was set (in isolation.mjs's own
+    // finally block) before that throw finished propagating, so it is
+    // still readable here.
+    if (graph.tenantSwitchBackFailed) {
+      console.error('')
+      console.error('TEARDOWN REFUSED after failure: the isolation suite could not switch the client back to the')
+      console.error('home company, so the crash-path teardown that normally runs here is being skipped rather than')
+      console.error('run against a client that may still be scoped to the throwaway isolation tenant.')
+      console.error(`Re-run teardown by itself in a FRESH process once you have confirmed the client is back in the`)
+      console.error(`home company: AUDIT_RUN_ID=${runId} node run.mjs teardown`)
+      console.error('')
+    } else {
+      console.error('run failed; tearing down fixtures created by this run')
+      try {
+        teardown = await teardownFixtures(client, graph)
+        save('teardown.json', teardown)
+        console.error(`teardown after failure: ${teardown.deleted.length} deleted, ${teardown.archived.length} archived, ${teardown.reversed.length} reversed, ${teardown.failed.length} failed`)
+      } catch (teardownErr) {
+        console.error('teardown also failed while handling the original error:')
+        console.error(teardownErr)
+      }
     }
   }
 }
