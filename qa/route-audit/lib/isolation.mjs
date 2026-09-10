@@ -23,13 +23,17 @@ export function verdictFor(status) {
 
 export async function createSecondTenant(client, tag) {
   const res = await client.request('POST', '/api/v1/companies', {
-    body: { name: `${tag} Isolation Co` },
+    body: { name: `${tag} Isolation Co`, tax_id: `${tag}-TAXID` },
     opKey: 'POST /api/v1/companies',
   })
+  // Never throw: the client was built never to throw, and an exception here
+  // would escape runIsolationSuite, kill the whole run, and skip teardown —
+  // leaving every fixture row orphaned in a live production database. A
+  // failure to create the throwaway tenant is itself a finding, not a crash.
   if (res.status < 200 || res.status >= 300 || res.body?.id == null) {
-    throw new Error(`could not create the second tenant: ${res.status} ${JSON.stringify(res.body)}`)
+    return { companyId: null, response: res }
   }
-  return { companyId: res.body.id }
+  return { companyId: res.body.id, response: res }
 }
 
 async function switchTo(client, companyId) {
@@ -46,7 +50,22 @@ async function switchTo(client, companyId) {
 
 export async function runIsolationSuite(client, graph, homeCompanyId) {
   const results = []
-  const { companyId } = await createSecondTenant(client, graph.tag)
+  const { companyId, response } = await createSecondTenant(client, graph.tag)
+
+  if (companyId == null) {
+    // No tenant was created, so there is nothing to probe from and nothing
+    // to switch back out of or delete. Record the failure and stop here.
+    results.push({
+      check: 'tenant-isolation',
+      opKey: 'POST /api/v1/companies',
+      ok: false,
+      expected: '2xx creating the throwaway tenant',
+      actual: String(response.status),
+      severity: 'high',
+      evidence: response.body,
+    })
+    return results
+  }
 
   const switched = await switchTo(client, companyId)
   results.push({
