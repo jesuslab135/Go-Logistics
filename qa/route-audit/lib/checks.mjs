@@ -2,6 +2,19 @@ import { conforms } from './conform.mjs'
 
 export const MISSING_ID = 999999999
 
+// Routes that are public by design: no bearer token is expected, so the
+// unauthenticated-probe check does not apply to them. POST /auth/login,
+// /auth/logout and /auth/refresh correctly return 400 (invalid empty body)
+// for an anonymous probe, and GET /healthz correctly returns 200 — that is
+// the entire point of a health check. POST /auth/switch-company is
+// deliberately NOT in this set: it requires a valid access token.
+export const PUBLIC_ROUTES = new Set([
+  'POST /auth/login',
+  'POST /auth/logout',
+  'POST /auth/refresh',
+  'GET /healthz',
+])
+
 const SEVERITY = {
   'unauthenticated': 'high',
   'tenant-isolation': 'high',
@@ -29,6 +42,7 @@ function result(check, opKey, ok, expected, actual, evidence) {
 }
 
 export async function checkUnauthenticated(client, op) {
+  if (PUBLIC_ROUTES.has(op.opKey)) return null
   const path = fillPath(op.path, { id: MISSING_ID, child_id: MISSING_ID })
   const res = await client.request(op.method, path, {
     anonymous: true,
@@ -48,7 +62,13 @@ export async function checkNotFound(client, op) {
     // would report a state error as a missing row.
     return null
   }
-  const path = fillPath(op.path, { id: MISSING_ID, child_id: MISSING_ID })
+  // Nested many-to-many link routes use a named target param instead of
+  // {child_id} (e.g. {employee_id}, {issue_id}, {fault_id}). Extract every
+  // placeholder in the path so each one gets a missing-id value, not just
+  // the two conventional names.
+  const placeholders = [...op.path.matchAll(/\{(\w+)\}/g)].map(m => m[1])
+  const missingIds = Object.fromEntries(placeholders.map(name => [name, MISSING_ID]))
+  const path = fillPath(op.path, missingIds)
   const res = await client.request(op.method, path, {
     opKey: op.opKey,
     body: op.requestSchema ? {} : undefined,

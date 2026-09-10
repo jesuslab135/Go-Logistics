@@ -14,7 +14,10 @@ const ARCHIVABLE = new Set(['vendor', 'part', 'asset', 'serviceTask', 'inspectio
 // without truncating (a truncated tag is not a usable tag: it defeats the
 // human recovery sweep exactly as no tag would). code/side instead carry
 // plausible domain values ('L1', 'L') so the row is realistic.
-export const UNTAGGABLE = new Set(['laborEntry', 'purchaseOrderLineItem', 'wheelPosition'])
+// serviceTaskPart (dto/service_task_part.go CreateServiceTaskPartRequest) has
+// only part_id (FK), quantity (decimal) and position (int) — none free
+// text, same reasoning as wheelPosition above.
+export const UNTAGGABLE = new Set(['laborEntry', 'purchaseOrderLineItem', 'wheelPosition', 'serviceTaskPart'])
 
 // Rows on an append-only ledger cannot be deleted; reversing is the system's
 // own answer, exactly as archiving is for a referenced catalog row. The
@@ -160,6 +163,44 @@ export const FIXTURE_PLAN = [
   { key: 'inspectionFormItem', path: '/api/v1/inspection-forms/{inspectionForm}/items', dependsOn: ['inspectionForm'],
     body: (_, tag) => ({ label: `${tag}-form-item`, position: 1, item_type: 'PASS_FAIL' }) },
 
+  // Level 2b — asset singleton sub-types. These are upserts (PUT), not
+  // creates: crud.SingletonHandler.Register wires GET/PUT/DELETE on
+  // /{parent}/:id/{child} with no child id of its own (see
+  // internal/platform/crud/singleton.go). The Upsert response is the full
+  // *Response DTO for the row, which has no "id" field (VehicleResponse,
+  // TrailerResponse and VehicleAxleConfigResponse key off asset_id /
+  // vehicle_id instead) — buildFixtures below special-cases `singleton`
+  // steps so that absence doesn't read as a failed create. Bodies are
+  // built from the real request structs (internal/http/dto/vehicle.go,
+  // trailer.go, vehicle_axle_config.go), not the OpenAPI spec, per the
+  // Gin-silently-drops-unknown-fields hazard.
+  //
+  // All three depend on `asset`, not `trailerAsset`: the sweep's own
+  // idsForOperation resolves the {id} in GET /assets/{id}/vehicle (and
+  // /trailer, /axle-config) via PATH_FIXTURE_MAP['assets'] = 'asset'
+  // unconditionally — it has no awareness of which singleton child
+  // follows, and TrailerStore.Upsert (internal/http/handler/trailer.go)
+  // has no vehicle_type gate. Putting the trailer fixture on `trailerAsset`
+  // would create it under an id the sweep's GET never queries, so the
+  // check it exists to fix would still 404.
+  { key: 'vehicle', path: '/api/v1/assets/{asset}/vehicle', method: 'PUT',
+    singleton: true, skipTeardown: true, dependsOn: ['asset'],
+    body: (_, tag) => ({ engine_serial: `${tag}-vehicle` }) },
+  { key: 'trailer', path: '/api/v1/assets/{asset}/trailer', method: 'PUT',
+    singleton: true, skipTeardown: true, dependsOn: ['asset'],
+    body: (_, tag) => ({ owner_name: `${tag}-trailer` }) },
+  { key: 'axleConfig', path: '/api/v1/assets/{asset}/axle-config', method: 'PUT',
+    singleton: true, skipTeardown: true, dependsOn: ['asset', 'axleTemplate'],
+    body: (ids, tag) => ({ template_id: ids.axleTemplate, display_name: `${tag}-axle-config` }) },
+
+  // service-tasks/{id}/parts/{child_id} needs its own row: 'parts' resolves
+  // flatly to the catalog `part` fixture (PATH_FIXTURE_MAP), which 404s
+  // under a service task. dto/service_task_part.go's CreateServiceTaskPartRequest
+  // has no free-text field, so this is UNTAGGABLE (see above), same as
+  // purchaseOrderLineItem.
+  { key: 'serviceTaskPart', path: '/api/v1/service-tasks/{serviceTask}/parts', dependsOn: ['serviceTask', 'part'],
+    body: (ids, tag) => ({ part_id: ids.part, quantity: '1', position: 1 }) },
+
   // Level 3 — line items and logs.
   { key: 'workOrderLineItem', path: '/api/v1/work-orders/{workOrder}/line-items', dependsOn: ['workOrder'],
     body: (_, tag) => ({ title: `${tag}-wo-line`, description: `${tag} work order line item` }) },
@@ -233,11 +274,18 @@ export async function buildFixtures(client, runId) {
       continue
     }
     const path = resolveFixturePath(step.path, ids)
-    const res = await client.request('POST', path, {
+    const method = step.method ?? 'POST'
+    const res = await client.request(method, path, {
       body: step.body(ids, tag),
-      opKey: `POST ${step.path} (fixture)`,
+      opKey: `${method} ${step.path} (fixture)`,
     })
-    if (res.status >= 200 && res.status < 300 && res.body?.id != null) {
+    // A singleton upsert (PUT .../vehicle, .../trailer, .../axle-config) has
+    // no `id` field in its response at all — it is a 1:1 child addressed by
+    // its parent id, not a row with its own identity — so success there is
+    // just a 2xx, not a 2xx-with-id.
+    const succeeded = res.status >= 200 && res.status < 300
+    const identified = step.singleton ? succeeded : succeeded && res.body?.id != null
+    if (identified) {
       // Gin silently ignores unknown JSON fields: if a fixture body uses a
       // field name the Create DTO does not declare, the server still
       // returns 2xx and a row still exists — it just stores nothing we
@@ -249,9 +297,15 @@ export async function buildFixtures(client, runId) {
       // but it is not treated as a healthy fixture and nothing downstream
       // may build on it.
       const taggedInResponse = UNTAGGABLE.has(step.key) || JSON.stringify(res.body).includes(tag)
-      created.push({ key: step.key, path, id: res.body.id })
+      // Singleton steps marked skipTeardown are never recorded in `created`:
+      // they have no id of their own to DELETE by, and deleting their
+      // parent asset removes them anyway, so there is nothing for teardown
+      // to do and nothing that can show up as a false teardown failure.
+      if (!step.skipTeardown) {
+        created.push({ key: step.key, path, id: step.singleton ? null : res.body.id })
+      }
       if (taggedInResponse) {
-        ids[step.key] = res.body.id
+        ids[step.key] = step.singleton ? true : res.body.id
       } else {
         failed.push({
           key: step.key, status: res.status,

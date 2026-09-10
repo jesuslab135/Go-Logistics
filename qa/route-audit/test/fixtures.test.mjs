@@ -239,6 +239,55 @@ test('buildFixtures treats a created-but-untagged response as failed, not health
   assert.equal(graph.ids.vendor, undefined)
 })
 
+test('buildFixtures treats singleton PUT steps as healthy without an id and excludes them from created', async () => {
+  // A singleton upsert (vehicle/trailer/axle-config) returns a 2xx body with
+  // no `id` field at all. buildFixtures must not treat that as a failure,
+  // must still publish the step into `ids` for dependents (as `true`, not an
+  // id), and — since these steps are marked skipTeardown — must NOT add them
+  // to `created` (there is no id to DELETE by, and the parent asset's own
+  // deletion removes them). A generic stub that echoes every request body
+  // back (so the run tag always round-trips) lets the real FIXTURE_PLAN run
+  // end to end.
+  let nextId = 1
+  const stubClient = {
+    async request(method, _path, opts) {
+      if (method === 'POST') return { status: 201, body: { id: nextId++, ...opts.body } }
+      if (method === 'PUT') return { status: 200, body: { ...opts.body } }
+      throw new Error(`unexpected ${method} call`)
+    },
+  }
+
+  const graph = await buildFixtures(stubClient, 'singleton-stub')
+
+  for (const key of ['vehicle', 'trailer', 'axleConfig']) {
+    assert.equal(graph.ids[key], true, `${key} should be marked built via its singleton marker`)
+    assert.ok(!graph.created.some(c => c.key === key), `${key} must not be in created (skipTeardown)`)
+    assert.ok(!graph.failed.some(f => f.key === key), `${key} must not be recorded as failed`)
+  }
+
+  const serviceTaskPart = graph.created.find(c => c.key === 'serviceTaskPart')
+  assert.ok(serviceTaskPart, 'serviceTaskPart should be a normal created row with an id')
+  assert.notEqual(serviceTaskPart.id, null)
+})
+
+test('the vehicle/trailer/axle-config/serviceTaskPart steps are wired as expected', () => {
+  const byKey = new Map(FIXTURE_PLAN.map(s => [s.key, s]))
+
+  for (const key of ['vehicle', 'trailer', 'axleConfig']) {
+    const step = byKey.get(key)
+    assert.ok(step, `expected a FIXTURE_PLAN step for ${key}`)
+    assert.equal(step.method, 'PUT')
+    assert.equal(step.singleton, true)
+    assert.equal(step.skipTeardown, true)
+  }
+
+  const serviceTaskPart = byKey.get('serviceTaskPart')
+  assert.ok(serviceTaskPart)
+  assert.equal(serviceTaskPart.method ?? 'POST', 'POST')
+  assert.ok(!serviceTaskPart.singleton)
+  assert.ok(UNTAGGABLE.has('serviceTaskPart'))
+})
+
 test('every path placeholder in FIXTURE_PLAN names a declared dependency', () => {
   const PLACEHOLDER = /\{(\w+)\}/g
   for (const step of FIXTURE_PLAN) {

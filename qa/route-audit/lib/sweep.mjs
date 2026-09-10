@@ -1,6 +1,7 @@
 import {
   checkUnauthenticated, checkNotFound, checkHappyPath,
   checkConformance, checkListContract, checkRetiredVerb, fillPath,
+  PUBLIC_ROUTES,
 } from './checks.mjs'
 
 // Collection segment -> fixture key. The sweep resolves {id} from the segment
@@ -54,18 +55,40 @@ export const PATH_FIXTURE_MAP = {
   'items': 'inspectionFormItem',
 }
 
+// PATH_FIXTURE_MAP is parent-blind: a collection segment such as
+// 'line-items' or 'parts' always resolves to the same fixture regardless of
+// which parent it hangs off. That is wrong when more than one parent uses
+// the same child segment name for a DIFFERENT fixture, e.g.
+// /purchase-orders/{id}/line-items/{child_id} needs a purchaseOrderLineItem,
+// not the workOrderLineItem that 'line-items' resolves to flatly.
+// NESTED_FIXTURE_MAP is keyed by "<parentCollection>/<childCollection>" and
+// is consulted first for {child_id}; the flat map remains the fallback for
+// the (majority of) nested routes that have only one possible parent.
+export const NESTED_FIXTURE_MAP = {
+  'work-orders/line-items': 'workOrderLineItem',
+  'purchase-orders/line-items': 'purchaseOrderLineItem',
+  'service-entries/line-items': 'serviceEntryLineItem',
+  'service-tasks/parts': 'serviceTaskPart',
+}
+
 export function idsForOperation(op, graph) {
   const segments = op.path.split('/').filter(Boolean)
   const ids = {}
+  const idIndex = segments.indexOf('{id}')
+  const parentCollection = idIndex > 0 ? segments[idIndex - 1] : null
 
   for (let i = 0; i < segments.length; i++) {
     const seg = segments[i]
     if (seg !== '{id}' && seg !== '{child_id}') continue
 
     // {id} belongs to the collection before it; {child_id} to the collection
-    // that follows {id}.
+    // that follows {id}. For {child_id}, try the parent-aware map first so
+    // e.g. purchase-orders/line-items and work-orders/line-items don't
+    // collide on the same flat 'line-items' fixture.
     const collection = segments[i - 1]
-    const fixtureKey = PATH_FIXTURE_MAP[collection]
+    const fixtureKey = seg === '{child_id}' && parentCollection
+      ? (NESTED_FIXTURE_MAP[`${parentCollection}/${collection}`] ?? PATH_FIXTURE_MAP[collection])
+      : PATH_FIXTURE_MAP[collection]
     if (!fixtureKey) return null
     const value = graph.ids[fixtureKey]
     if (value == null) return null
@@ -90,7 +113,16 @@ export async function sweep(client, spec, ops, graph, { onProgress } = {}) {
   for (const op of ops) {
     onProgress?.(op)
 
-    push(await checkUnauthenticated(client, op))
+    const unauth = await checkUnauthenticated(client, op)
+    if (unauth) {
+      push(unauth)
+    } else if (PUBLIC_ROUTES.has(op.opKey)) {
+      coverage.push({
+        opKey: op.opKey,
+        tested: false,
+        reason: 'public by design; no authentication expectation applies',
+      })
+    }
     push(await checkRetiredVerb(client, op))
     push(await checkNotFound(client, op))
     push(await checkListContract(client, op))

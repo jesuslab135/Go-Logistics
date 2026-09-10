@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { sweep, idsForOperation, PATH_FIXTURE_MAP } from '../lib/sweep.mjs'
+import { sweep, idsForOperation, PATH_FIXTURE_MAP, NESTED_FIXTURE_MAP } from '../lib/sweep.mjs'
 
 const graph = { ids: { workOrder: 10, workOrderLineItem: 20, vendor: 30, asset: 40 } }
 
@@ -27,6 +27,35 @@ test('idsForOperation returns null when no fixture matches the collection', () =
 test('idsForOperation returns null when the mapped fixture failed to build', () => {
   const op = { path: '/api/v1/assets/{id}/fuel-entries/{child_id}' }
   assert.equal(idsForOperation(op, { ids: { asset: 40 } }), null)
+})
+
+// DEFECT 3 regression: PATH_FIXTURE_MAP is parent-blind, so 'line-items'
+// always resolved to workOrderLineItem even under /purchase-orders/{id}.
+// NESTED_FIXTURE_MAP must be consulted first so the parent decides which
+// fixture the child resolves to.
+test('idsForOperation resolves purchase-order line-items to the PO fixture, not the work-order one', () => {
+  const g = { ids: { workOrderLineItem: 20, purchaseOrderLineItem: 55 } }
+  const op = { path: '/api/v1/purchase-orders/{id}/line-items/{child_id}' }
+  const ids = idsForOperation(op, { ids: { ...g.ids, purchaseOrder: 33 } })
+  assert.equal(ids.child_id, 55)
+  assert.notEqual(ids.child_id, 20)
+})
+
+test('idsForOperation falls back to the flat map when there is no parent-specific entry', () => {
+  // work-order-line-items/sub-line-items has no NESTED_FIXTURE_MAP entry —
+  // this must still resolve via the flat PATH_FIXTURE_MAP, unchanged from
+  // before DEFECT 3's fix.
+  const op = { path: '/api/v1/work-order-line-items/{id}/sub-line-items/{child_id}' }
+  const g2 = { ids: { workOrderLineItem: 44, workOrderSubLineItem: 77 } }
+  assert.deepEqual(idsForOperation(op, g2), { id: 44, child_id: 77 })
+})
+
+test('NESTED_FIXTURE_MAP names only fixtures the plan can produce', async () => {
+  const { FIXTURE_PLAN } = await import('../lib/fixtures.mjs')
+  const keys = new Set(FIXTURE_PLAN.map(s => s.key))
+  for (const [pair, fixtureKey] of Object.entries(NESTED_FIXTURE_MAP)) {
+    assert.ok(keys.has(fixtureKey), `${pair} maps to unknown fixture ${fixtureKey}`)
+  }
 })
 
 test('every PATH_FIXTURE_MAP value names a key the fixture plan can produce', async () => {
@@ -176,6 +205,28 @@ test('sweep: PUT operation whose preparatory GET succeeds sends the fetched body
 
   const cov = coverage.find(c => c.opKey === op.opKey)
   assert.deepEqual(cov, { opKey: op.opKey, tested: true, reason: null })
+})
+
+test('sweep: a public route gets a coverage entry recording why auth was not checked', async () => {
+  const op = {
+    opKey: 'POST /auth/login',
+    method: 'POST',
+    path: '/auth/login',
+    tags: [],
+    params: [],
+    successStatus: 200,
+    successSchema: null,
+    requestSchema: { type: 'object' },
+  }
+  const client = makeStubClient({})
+  const g = { ids: {} }
+
+  const { results, coverage } = await sweep(client, emptySpec, [op], g)
+
+  assert.equal(results.some(r => r.opKey === op.opKey && r.check === 'unauthenticated'), false)
+  const publicCov = coverage.find(c => c.opKey === op.opKey && c.reason === 'public by design; no authentication expectation applies')
+  assert.ok(publicCov, 'expected a coverage entry explaining the auth check was skipped')
+  assert.equal(publicCov.tested, false)
 })
 
 test('sweep: PUT operation whose preparatory GET fails produces a coverage exclusion and sends no PUT', async () => {
