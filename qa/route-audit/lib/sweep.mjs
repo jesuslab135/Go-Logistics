@@ -1,7 +1,6 @@
 import {
   checkUnauthenticated, checkNotFound, checkHappyPath,
   checkConformance, checkListContract, checkRetiredVerb, fillPath,
-  PUBLIC_ROUTES,
 } from './checks.mjs'
 
 // Collection segment -> fixture key. The sweep resolves {id} from the segment
@@ -113,16 +112,7 @@ export async function sweep(client, spec, ops, graph, { onProgress } = {}) {
   for (const op of ops) {
     onProgress?.(op)
 
-    const unauth = await checkUnauthenticated(client, op)
-    if (unauth) {
-      push(unauth)
-    } else if (PUBLIC_ROUTES.has(op.opKey)) {
-      coverage.push({
-        opKey: op.opKey,
-        tested: false,
-        reason: 'public by design; no authentication expectation applies',
-      })
-    }
+    push(await checkUnauthenticated(client, op))
     push(await checkRetiredVerb(client, op))
     push(await checkNotFound(client, op))
     push(await checkListContract(client, op))

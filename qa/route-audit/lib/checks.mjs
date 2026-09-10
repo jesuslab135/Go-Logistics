@@ -42,7 +42,6 @@ function result(check, opKey, ok, expected, actual, evidence) {
 }
 
 export async function checkUnauthenticated(client, op) {
-  if (PUBLIC_ROUTES.has(op.opKey)) return null
   const path = fillPath(op.path, { id: MISSING_ID, child_id: MISSING_ID })
   const res = await client.request(op.method, path, {
     anonymous: true,
@@ -50,6 +49,25 @@ export async function checkUnauthenticated(client, op) {
     retryOn401: false,
     body: op.requestSchema ? {} : undefined,
   })
+  // A public-by-design route (POST /auth/login, /auth/logout, /auth/refresh,
+  // GET /healthz) has no 401 expectation at all — the anonymous probe is
+  // still sent, so `actual` carries what the server really answered (useful
+  // evidence: healthz says 200, login says 400 to an empty body, both
+  // correctly ungated), but the check is recorded as a PASSING result
+  // rather than skipped. That keeps this op's single coverage row intact
+  // (it still comes only from the verb dispatch further down) while making
+  // the exemption visible in the report instead of silently absent.
+  if (PUBLIC_ROUTES.has(op.opKey)) {
+    return {
+      check: 'unauthenticated',
+      opKey: op.opKey,
+      ok: true,
+      expected: 'no authentication required — this route is public by design',
+      actual: `${res.status} (not gated)`,
+      severity: 'info',
+      evidence: res.body,
+    }
+  }
   const ok = res.status === 401
   return result('unauthenticated', op.opKey, ok, '401', String(res.status), res.body)
 }

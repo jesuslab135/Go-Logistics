@@ -207,7 +207,12 @@ test('sweep: PUT operation whose preparatory GET succeeds sends the fetched body
   assert.deepEqual(cov, { opKey: op.opKey, tested: true, reason: null })
 })
 
-test('sweep: a public route gets a coverage entry recording why auth was not checked', async () => {
+test('sweep: a public route gets exactly one coverage row, and the auth check is a visible passing result', async () => {
+  // DEFECT 1, corrected: the exemption must not cost this operation a
+  // second coverage row alongside the one the verb dispatch already
+  // produces — that would double-count it in the report's totals. The
+  // public-by-design exemption is instead visible as a passing
+  // 'unauthenticated' result in `results`.
   const op = {
     opKey: 'POST /auth/login',
     method: 'POST',
@@ -218,15 +223,20 @@ test('sweep: a public route gets a coverage entry recording why auth was not che
     successSchema: null,
     requestSchema: { type: 'object' },
   }
-  const client = makeStubClient({})
+  const client = makeStubClient({
+    'POST /auth/login': { status: 400, body: { error: 'invalid request body' }, headers: {}, durationMs: 1 },
+  })
   const g = { ids: {} }
 
   const { results, coverage } = await sweep(client, emptySpec, [op], g)
 
-  assert.equal(results.some(r => r.opKey === op.opKey && r.check === 'unauthenticated'), false)
-  const publicCov = coverage.find(c => c.opKey === op.opKey && c.reason === 'public by design; no authentication expectation applies')
-  assert.ok(publicCov, 'expected a coverage entry explaining the auth check was skipped')
-  assert.equal(publicCov.tested, false)
+  const authResult = results.find(r => r.opKey === op.opKey && r.check === 'unauthenticated')
+  assert.ok(authResult, 'expected a passing unauthenticated result, not a silent skip')
+  assert.equal(authResult.ok, true)
+  assert.equal(authResult.severity, 'info')
+
+  const covRows = coverage.filter(c => c.opKey === op.opKey)
+  assert.equal(covRows.length, 1, 'expected exactly one coverage row for this operation')
 })
 
 test('sweep: PUT operation whose preparatory GET fails produces a coverage exclusion and sends no PUT', async () => {

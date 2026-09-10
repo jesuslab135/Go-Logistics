@@ -60,12 +60,34 @@ test('PUBLIC_ROUTES names the three auth endpoints and healthz, not switch-compa
   assert.ok(!PUBLIC_ROUTES.has('POST /auth/switch-company'))
 })
 
-test('checkUnauthenticated returns null for a public route and sends no probe', async () => {
+test('checkUnauthenticated returns a passing info-severity result for a public route, still sending the probe', async () => {
   const client = makeStubClient({ status: 400, body: { error: 'invalid request body' } })
   const op = { opKey: 'POST /auth/login', method: 'POST', path: '/auth/login', requestSchema: { type: 'object' } }
   const out = await checkUnauthenticated(client, op)
-  assert.equal(out, null)
-  assert.deepEqual(client.calls, [])
+  // The probe is still sent — its response is useful evidence for the
+  // report — but the operation is recorded as a passing check, not skipped,
+  // so it does not produce a second coverage row alongside the verb
+  // dispatch's own entry.
+  assert.equal(client.calls.length, 1)
+  assert.deepEqual(out, {
+    check: 'unauthenticated',
+    opKey: 'POST /auth/login',
+    ok: true,
+    expected: 'no authentication required — this route is public by design',
+    actual: '400 (not gated)',
+    severity: 'info',
+    evidence: { error: 'invalid request body' },
+  })
+})
+
+test('checkUnauthenticated marks every PUBLIC_ROUTES opKey ok:true at info severity', async () => {
+  for (const opKey of PUBLIC_ROUTES) {
+    const [method, path] = opKey.split(' ')
+    const client = makeStubClient({ status: method === 'GET' ? 200 : 400, body: {} })
+    const out = await checkUnauthenticated(client, { opKey, method, path, requestSchema: method === 'GET' ? null : { type: 'object' } })
+    assert.equal(out.ok, true, `${opKey} should pass`)
+    assert.equal(out.severity, 'info', `${opKey} should be info severity`)
+  }
 })
 
 test('checkUnauthenticated still expects 401 for switch-company, a non-public route', async () => {
