@@ -2,7 +2,6 @@ package handler
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 	"slices"
 	"strconv"
@@ -38,16 +37,21 @@ func NewAccountEmployeeHandler(q *gen.Queries, pool *pgxpool.Pool) *AccountEmplo
 // first one requested with no way for the caller to tell which one won. An
 // empty grant list is left alone — it is the legitimate way to revoke every
 // membership.
+//
+// This diverges from admin_employee.go's ReplaceCompanies, which rejects an
+// empty company_ids and points the caller at is_active instead: a platform
+// admin can still reach that employee through the member-scoped CRUD to flip
+// it. An account owner with zero company memberships of their own cannot
+// reach that route at all, so refusing empty here would leave them no way to
+// revoke anyone's access.
 func validateGrants(req dto.ReplaceAccountEmployeeCompaniesRequest) error {
 	seen := make(map[int64]bool, len(req.Grants))
 	for _, g := range req.Grants {
 		if g.CompanyID < 1 {
-			return apierr.Validation(map[string]string{"company_id": "must be positive"}).
-				Wrap(fmt.Errorf("company_id %d must be positive", g.CompanyID))
+			return apierr.Validation(map[string]string{"company_id": "must be positive"})
 		}
 		if seen[g.CompanyID] {
-			return apierr.Validation(map[string]string{"company_id": "named more than once"}).
-				Wrap(fmt.Errorf("company %d is named more than once in grants", g.CompanyID))
+			return apierr.Validation(map[string]string{"company_id": "named more than once"})
 		}
 		seen[g.CompanyID] = true
 	}
