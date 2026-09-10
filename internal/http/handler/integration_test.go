@@ -239,6 +239,11 @@ func putJSON(t *testing.T, url, token string, body any, wantStatus int, out any)
 	return doJSON(t, http.MethodPut, url, token, body, wantStatus, out)
 }
 
+func getJSON(t *testing.T, url, token string, wantStatus int, out any) []byte {
+	t.Helper()
+	return doJSON(t, http.MethodGet, url, token, nil, wantStatus, out)
+}
+
 func doJSON(t *testing.T, method, url, token string, body any, wantStatus int, out any) []byte {
 	t.Helper()
 
@@ -392,5 +397,358 @@ func TestOnboardingChain(t *testing.T) {
 	}
 	if membershipAccountID != account.ID {
 		t.Fatalf("employee_companies.account_id = %d, want %d", membershipAccountID, account.ID)
+	}
+}
+
+// --- Subsystem 2: a role is granted per company, not per person. ---
+//
+// The helpers below provision the shape every test below needs: a client
+// account with a logged-in owner. They reuse seedPlatformAdmin/postJSON/
+// putJSON/getJSON exactly as TestOnboardingChain does, rather than talking to
+// the database directly for anything the API itself is supposed to do.
+
+// provisionAccountOwner runs the same platform-admin provisioning
+// TestOnboardingChain's steps 1-2 exercise (POST /admin/accounts, then log
+// in) and hands back the owner's identity and a company-less token. The
+// caller creates whatever companies the test needs from there.
+func provisionAccountOwner(t *testing.T, baseURL, platformToken string) (accountID, ownerEmployeeID int64, ownerEmail, ownerToken string) {
+	t.Helper()
+
+	ownerEmail = fmt.Sprintf("owner-%d@integration.test", time.Now().UnixNano())
+	var account struct {
+		ID              int64 `json:"id"`
+		OwnerEmployeeID int64 `json:"owner_employee_id"`
+	}
+	postJSON(t, baseURL+"/api/v1/admin/accounts", platformToken, map[string]any{
+		"name":             "Integration Fleet",
+		"owner_first_name": "Ivy",
+		"owner_last_name":  "Owner",
+		"owner_email":      ownerEmail,
+		"owner_password":   "correct-horse-battery",
+	}, http.StatusCreated, &account)
+
+	var login struct {
+		AccessToken string `json:"access_token"`
+	}
+	postJSON(t, baseURL+"/auth/login", "", map[string]any{
+		"email": ownerEmail, "password": "correct-horse-battery",
+	}, http.StatusOK, &login)
+
+	return account.ID, account.OwnerEmployeeID, ownerEmail, login.AccessToken
+}
+
+// createCompany POSTs /api/v1/companies, which requires RequireAccountOwner
+// only (not company membership — see registerCompanyRoutes), so the
+// company-less token provisionAccountOwner returns works directly, for as
+// many companies as the caller creates.
+func createCompany(t *testing.T, baseURL, token, name, taxID string) int64 {
+	t.Helper()
+	var company struct {
+		ID int64 `json:"id"`
+	}
+	postJSON(t, baseURL+"/api/v1/companies", token, map[string]any{
+		"name": name, "tax_id": taxID, "address": "1 Integration Rd",
+	}, http.StatusCreated, &company)
+	return company.ID
+}
+
+// switchCompany re-scopes a token via POST /auth/switch-company, which only
+// requires Auth (see router.go) — no prior company membership on the
+// presented token — so it works on the company-less token login returns
+// before the caller has created or joined anything.
+func switchCompany(t *testing.T, baseURL, token string, companyID int64) string {
+	t.Helper()
+	var pair struct {
+		AccessToken string `json:"access_token"`
+	}
+	postJSON(t, baseURL+"/auth/switch-company", token, map[string]any{"company_id": companyID}, http.StatusOK, &pair)
+	return pair.AccessToken
+}
+
+// roleIDByName finds a role by name among a company's roles (GET
+// /api/v1/roles, RequireAdminRole-gated). bootstrap.Company seeds exactly two
+// roles per company, well inside the default page size, so no pagination is
+// needed to find one by name.
+func roleIDByName(t *testing.T, baseURL, token, name string) int64 {
+	t.Helper()
+	var page struct {
+		Data []struct {
+			ID   int64  `json:"id"`
+			Name string `json:"name"`
+		} `json:"data"`
+	}
+	getJSON(t, baseURL+"/api/v1/roles", token, http.StatusOK, &page)
+	for _, r := range page.Data {
+		if r.Name == name {
+			return r.ID
+		}
+	}
+	t.Fatalf("role %q not found among %d roles", name, len(page.Data))
+	return 0
+}
+
+// createDirectorCandidate POSTs /api/v1/employees with callerToken (which
+// must be scoped to homeCompany): the route grants exactly one membership —
+// the caller's own company — with no role (see employee.go's Create), which
+// is the starting point every test below grants roles on top of.
+func createDirectorCandidate(t *testing.T, baseURL, callerToken, emailLocalPart string) int64 {
+	t.Helper()
+	ts := time.Now().UnixNano()
+	var employee struct {
+		ID int64 `json:"id"`
+	}
+	postJSON(t, baseURL+"/api/v1/employees", callerToken, map[string]any{
+		"first_name": "Dana", "last_name": "Director",
+		"email":         fmt.Sprintf("%s-%d@integration.test", emailLocalPart, ts),
+		"employee_id":   fmt.Sprintf("EMP-%s-%d", emailLocalPart, ts),
+		"mobile_phone":  "555", "work_phone": "555",
+		"job_title": "Director", "license_class": "N/A", "license_number": "N/A",
+		"license_state": "N/A", "street_address": "1 St", "city": "City",
+		"region": "R", "postal_code": "00000", "country": "MX",
+	}, http.StatusCreated, &employee)
+	return employee.ID
+}
+
+// setPasswordAndLogIn provisions credentials via POST
+// /employees/{id}/set-password (adminToken must hold an admin role in the
+// employee's company) and logs in as that employee over HTTP, exactly as a
+// real client would, rather than reading password_hash out of the database.
+func setPasswordAndLogIn(t *testing.T, baseURL, adminToken string, employeeID int64, email string) string {
+	t.Helper()
+	postJSON(t, fmt.Sprintf("%s/api/v1/employees/%d/set-password", baseURL, employeeID), adminToken,
+		map[string]any{"password": "correct-horse-battery"}, http.StatusNoContent, nil)
+
+	var login struct {
+		AccessToken string `json:"access_token"`
+	}
+	postJSON(t, baseURL+"/auth/login", "", map[string]any{
+		"email": email, "password": "correct-horse-battery",
+	}, http.StatusOK, &login)
+	return login.AccessToken
+}
+
+// The whole point of subsystem 2: one person, two companies, different
+// powers. This is the assertion the whole subsystem exists to deliver — if
+// this fails, report it exactly rather than adjusting it.
+func TestDirectorHasDifferentPowersPerCompany(t *testing.T) {
+	ctx := context.Background()
+	pool := setupThrowawayDB(t, ctx)
+	router := newIntegrationRouter(pool)
+	srv := httptest.NewServer(router)
+	defer srv.Close()
+
+	platformToken := seedPlatformAdmin(t, ctx, pool, srv.URL)
+	_, _, _, ownerToken := provisionAccountOwner(t, srv.URL, platformToken)
+
+	ts := time.Now().UnixNano()
+	companyA := createCompany(t, srv.URL, ownerToken, "Company A", fmt.Sprintf("TAX-DIFF-A-%d", ts))
+	companyB := createCompany(t, srv.URL, ownerToken, "Company B", fmt.Sprintf("TAX-DIFF-B-%d", ts))
+
+	// bootstrap.Company grants the creating owner an admin membership in
+	// every company they create, in both A and B, so the owner can list A's
+	// seeded role and create a role scoped to B.
+	ownerTokenA := switchCompany(t, srv.URL, ownerToken, companyA)
+	roleAdminA := roleIDByName(t, srv.URL, ownerTokenA, "Administrador")
+
+	ownerTokenB := switchCompany(t, srv.URL, ownerToken, companyB)
+	var readOnlyRole struct {
+		ID int64 `json:"id"`
+	}
+	postJSON(t, srv.URL+"/api/v1/roles", ownerTokenB, map[string]any{
+		"name": "Asset Reader", "is_admin": false,
+		"permissions": map[string]any{"assets": map[string]any{"read": true}},
+	}, http.StatusCreated, &readOnlyRole)
+
+	employeeID := createDirectorCandidate(t, srv.URL, ownerTokenA, "director")
+
+	// Grant: admin in A, read-only in B, in one call.
+	putJSON(t, fmt.Sprintf("%s/api/v1/account/employees/%d/companies", srv.URL, employeeID), ownerToken,
+		map[string]any{"grants": []map[string]any{
+			{"company_id": companyA, "role_id": roleAdminA},
+			{"company_id": companyB, "role_id": readOnlyRole.ID},
+		}}, http.StatusOK, nil)
+
+	// createDirectorCandidate picked the employee's email internally; fetch it
+	// back from the account listing rather than duplicating that logic here.
+	var people []struct {
+		EmployeeID int64  `json:"employee_id"`
+		Email      string `json:"email"`
+	}
+	getJSON(t, srv.URL+"/api/v1/account/employees", ownerToken, http.StatusOK, &people)
+	var employeeEmail string
+	for _, p := range people {
+		if p.EmployeeID == employeeID {
+			employeeEmail = p.Email
+		}
+	}
+	if employeeEmail == "" {
+		t.Fatalf("director employee %d missing from account listing", employeeID)
+	}
+
+	directorToken := setPasswordAndLogIn(t, srv.URL, ownerTokenA, employeeID, employeeEmail)
+	directorTokenA := switchCompany(t, srv.URL, directorToken, companyA)
+
+	// switch to A: POST /api/v1/assets -> 201.
+	postJSON(t, srv.URL+"/api/v1/assets", directorTokenA,
+		map[string]any{"name": "Truck A", "vin_sn": fmt.Sprintf("VIN-A-%d", ts)}, http.StatusCreated, nil)
+
+	directorTokenB := switchCompany(t, srv.URL, directorTokenA, companyB)
+
+	// switch to B: POST /api/v1/assets -> 403.
+	postJSON(t, srv.URL+"/api/v1/assets", directorTokenB,
+		map[string]any{"name": "Truck B", "vin_sn": fmt.Sprintf("VIN-B-%d", ts)}, http.StatusForbidden, nil)
+
+	// switch to B: GET /api/v1/assets -> 200.
+	getJSON(t, srv.URL+"/api/v1/assets", directorTokenB, http.StatusOK, nil)
+}
+
+// An owner who strips their own role must not lose control of their company.
+func TestOwnerKeepsAdminAfterLosingTheirRole(t *testing.T) {
+	ctx := context.Background()
+	pool := setupThrowawayDB(t, ctx)
+	router := newIntegrationRouter(pool)
+	srv := httptest.NewServer(router)
+	defer srv.Close()
+
+	platformToken := seedPlatformAdmin(t, ctx, pool, srv.URL)
+	_, ownerID, _, ownerToken := provisionAccountOwner(t, srv.URL, platformToken)
+
+	ts := time.Now().UnixNano()
+	companyA := createCompany(t, srv.URL, ownerToken, "Company A", fmt.Sprintf("TAX-OWN-%d", ts))
+	ownerTokenA := switchCompany(t, srv.URL, ownerToken, companyA)
+
+	// PUT /account/employees/{ownID}/companies granting their own company
+	// with role_id: null.
+	putJSON(t, fmt.Sprintf("%s/api/v1/account/employees/%d/companies", srv.URL, ownerID), ownerToken,
+		map[string]any{"grants": []map[string]any{
+			{"company_id": companyA, "role_id": nil},
+		}}, http.StatusOK, nil)
+
+	// Identity is resolved fresh from the database on every request (see
+	// middleware.RequireIdentity), so the still-valid, already-issued token
+	// is enough to prove the backstop: ownership, not the stripped role,
+	// must still back is_admin.
+	postJSON(t, srv.URL+"/api/v1/assets", ownerTokenA,
+		map[string]any{"name": "Truck", "vin_sn": fmt.Sprintf("VIN-%d", ts)}, http.StatusCreated, nil)
+}
+
+// A role from another company must be refused at the API, not just the
+// database.
+func TestGrantingARoleFromAnotherCompanyIsRefused(t *testing.T) {
+	ctx := context.Background()
+	pool := setupThrowawayDB(t, ctx)
+	router := newIntegrationRouter(pool)
+	srv := httptest.NewServer(router)
+	defer srv.Close()
+
+	platformToken := seedPlatformAdmin(t, ctx, pool, srv.URL)
+	_, _, _, ownerToken := provisionAccountOwner(t, srv.URL, platformToken)
+
+	ts := time.Now().UnixNano()
+	companyA := createCompany(t, srv.URL, ownerToken, "Company A", fmt.Sprintf("TAX-XA-%d", ts))
+	companyB := createCompany(t, srv.URL, ownerToken, "Company B", fmt.Sprintf("TAX-XB-%d", ts))
+
+	ownerTokenA := switchCompany(t, srv.URL, ownerToken, companyA)
+	roleAdminA := roleIDByName(t, srv.URL, ownerTokenA, "Administrador")
+
+	employeeID := createDirectorCandidate(t, srv.URL, ownerTokenA, "cross")
+
+	// PUT /account/employees/{id}/companies with company B and a role
+	// belonging to company A -> 422 naming role_id.
+	body := putJSON(t, fmt.Sprintf("%s/api/v1/account/employees/%d/companies", srv.URL, employeeID), ownerToken,
+		map[string]any{"grants": []map[string]any{
+			{"company_id": companyB, "role_id": roleAdminA},
+		}}, http.StatusUnprocessableEntity, nil)
+
+	if !bytes.Contains(body, []byte("role_id")) {
+		t.Fatalf("expected the 422 body to name role_id, got: %s", body)
+	}
+}
+
+// A membership with no role is a real, legitimate state — associated with
+// the company, permitted nothing in it — not an oversight. Every module gate
+// must refuse, including a plain read.
+func TestMembershipWithNoRoleGrantsNothing(t *testing.T) {
+	ctx := context.Background()
+	pool := setupThrowawayDB(t, ctx)
+	router := newIntegrationRouter(pool)
+	srv := httptest.NewServer(router)
+	defer srv.Close()
+
+	platformToken := seedPlatformAdmin(t, ctx, pool, srv.URL)
+	_, _, _, ownerToken := provisionAccountOwner(t, srv.URL, platformToken)
+
+	ts := time.Now().UnixNano()
+	companyA := createCompany(t, srv.URL, ownerToken, "Company A", fmt.Sprintf("TAX-NR-%d", ts))
+	ownerTokenA := switchCompany(t, srv.URL, ownerToken, companyA)
+
+	employeeID := createDirectorCandidate(t, srv.URL, ownerTokenA, "norole")
+
+	var people []struct {
+		EmployeeID int64  `json:"employee_id"`
+		Email      string `json:"email"`
+	}
+	getJSON(t, srv.URL+"/api/v1/account/employees", ownerToken, http.StatusOK, &people)
+	var employeeEmail string
+	for _, p := range people {
+		if p.EmployeeID == employeeID {
+			employeeEmail = p.Email
+		}
+	}
+	if employeeEmail == "" {
+		t.Fatalf("employee %d missing from account listing", employeeID)
+	}
+
+	// No PUT /account/employees/.../companies call: the employee keeps
+	// exactly the no-role membership POST /employees granted it.
+	noRoleToken := setPasswordAndLogIn(t, srv.URL, ownerTokenA, employeeID, employeeEmail)
+
+	postJSON(t, srv.URL+"/api/v1/assets", noRoleToken,
+		map[string]any{"name": "Truck", "vin_sn": fmt.Sprintf("VIN-%d", ts)}, http.StatusForbidden, nil)
+	getJSON(t, srv.URL+"/api/v1/assets", noRoleToken, http.StatusForbidden, nil)
+}
+
+// The empty-grant revoke-all path on PUT /account/employees/{id}/companies.
+// RevokeMembershipsNotIn is NOT (company_id = ANY($2::bigint[])); a nil
+// []int64 encodes as SQL NULL, under which that predicate matches zero rows,
+// so revoke-all would silently revoke nothing. account_employee.go's
+// ReplaceCompanies defends with make([]int64, 0, len(req.Grants)), which
+// stays a non-nil empty array when the grant list is empty — this proves
+// that defence actually revokes every membership.
+func TestEmptyGrantListRevokesAllMemberships(t *testing.T) {
+	ctx := context.Background()
+	pool := setupThrowawayDB(t, ctx)
+	router := newIntegrationRouter(pool)
+	srv := httptest.NewServer(router)
+	defer srv.Close()
+
+	platformToken := seedPlatformAdmin(t, ctx, pool, srv.URL)
+	_, _, _, ownerToken := provisionAccountOwner(t, srv.URL, platformToken)
+
+	ts := time.Now().UnixNano()
+	companyA := createCompany(t, srv.URL, ownerToken, "Company A", fmt.Sprintf("TAX-RV-%d", ts))
+	ownerTokenA := switchCompany(t, srv.URL, ownerToken, companyA)
+
+	employeeID := createDirectorCandidate(t, srv.URL, ownerTokenA, "revoke")
+
+	var before int64
+	if err := pool.QueryRow(ctx, "SELECT count(*) FROM employee_companies WHERE employee_id = $1", employeeID).Scan(&before); err != nil {
+		t.Fatalf("count memberships before revoke: %v", err)
+	}
+	if before == 0 {
+		t.Fatal("employee has no membership to revoke — test setup is broken")
+	}
+
+	putJSON(t, fmt.Sprintf("%s/api/v1/account/employees/%d/companies", srv.URL, employeeID), ownerToken,
+		map[string]any{"grants": []map[string]any{}}, http.StatusOK, nil)
+
+	var after int64
+	if err := pool.QueryRow(ctx, "SELECT count(*) FROM employee_companies WHERE employee_id = $1", employeeID).Scan(&after); err != nil {
+		t.Fatalf("count memberships after revoke: %v", err)
+	}
+	if after != 0 {
+		t.Fatalf("PUT with an empty grants list left %d membership(s) behind, want 0 "+
+			"(a nil []int64 encodes as SQL NULL, under which RevokeMembershipsNotIn's "+
+			"NOT (company_id = ANY(NULL)) matches nothing)", after)
 	}
 }
