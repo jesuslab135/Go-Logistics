@@ -179,8 +179,22 @@ func TestCompanylessIdentityIsNotAMember(t *testing.T) {
 
 // A membership with no role grants nothing. Forgetting to assign one must fail
 // closed: the person is a member, and every module gate still refuses.
+// Permissions are deliberately generous here. The point is that HasRole alone
+// refuses: if the !HasRole check were removed, this document would grant the
+// module and the test would fail. A fixture with empty permissions cannot tell
+// "the role gate worked" apart from "there was nothing to grant".
 func TestMemberWithoutRoleIsRefusedEveryModule(t *testing.T) {
-	id := Identity{IsActive: true, IsMember: true, HasRole: false, IsAdmin: false}
+	grantAll := map[string]ModulePermissions{}
+	for _, module := range Modules {
+		grantAll[module] = ModulePermissions{All: true}
+	}
+	id := Identity{
+		IsActive:    true,
+		IsMember:    true,
+		HasRole:     false,
+		IsAdmin:     false,
+		Permissions: grantAll,
+	}
 	for _, module := range Modules {
 		if id.Can(module, "GET") {
 			t.Fatalf("module %q allowed a read for a member holding no role", module)
@@ -191,13 +205,12 @@ func TestMemberWithoutRoleIsRefusedEveryModule(t *testing.T) {
 	}
 }
 
-// Ownership is a backstop: with roles on memberships it becomes possible to
-// remove your own admin role from a company you own, and nobody in the account
-// could then repair it.
-func TestAccountOwnerIsAdminWithoutARole(t *testing.T) {
+// IsAdmin is the bypass for the role requirement. Ownership computation itself is
+// proven in the integration suite (it lives in SQL).
+func TestIsAdminBypassesTheRoleRequirement(t *testing.T) {
 	id := Identity{IsActive: true, IsMember: true, HasRole: false, IsAdmin: true}
 	if !id.Can("assets", "DELETE") {
-		t.Fatal("an account owner must retain admin without holding a role")
+		t.Fatal("IsAdmin must bypass the role requirement")
 	}
 }
 
