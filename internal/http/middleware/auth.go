@@ -33,9 +33,26 @@ func Auth(tokens *auth.TokenService) gin.HandlerFunc {
 		}
 
 		c.Set(claimsKey, claims)
-		ctx := context.WithValue(c.Request.Context(), companyContextKey{}, claims.CompanyID)
-		ctx = context.WithValue(ctx, employeeContextKey{}, claims.EmployeeID())
-		c.Request = c.Request.WithContext(ctx)
+		c.Request = c.Request.WithContext(authContext(c.Request.Context(), claims))
 		c.Next()
 	}
+}
+
+// authContext builds the request context Auth attaches to every downstream
+// handler. Extracted so a test can drive the exact code Auth uses rather than
+// reimplementing it.
+//
+// The company id is stored only when the session has one. CompanyFromContext's
+// contract is "the company, or 0 if absent" — storing a *int64 there instead of
+// an int64 would make its type assertion fail silently and always return 0,
+// even for a session that does have a company. A company-less session has no
+// tenant to scope to anyway, and every company-scoped route sits behind
+// RequireCompanyMember, which refuses such a session before any handler reads
+// this.
+func authContext(ctx context.Context, claims *auth.Claims) context.Context {
+	if claims.CompanyID != nil {
+		ctx = context.WithValue(ctx, companyContextKey{}, *claims.CompanyID)
+	}
+	ctx = context.WithValue(ctx, employeeContextKey{}, claims.EmployeeID())
+	return ctx
 }
