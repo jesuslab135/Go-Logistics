@@ -1,11 +1,32 @@
 package auth
 
 import (
+	"encoding/base64"
+	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 )
 
 func i64(v int64) *int64 { return &v }
+
+// decodeJWTPayload extracts and decodes the JWT payload (middle segment).
+func decodeJWTPayload(t *testing.T, token string) map[string]any {
+	t.Helper()
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 {
+		t.Fatalf("malformed jwt: expected 3 parts, got %d", len(parts))
+	}
+	decoded, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		t.Fatalf("decode jwt payload: %v", err)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(decoded, &payload); err != nil {
+		t.Fatalf("unmarshal jwt payload: %v", err)
+	}
+	return payload
+}
 
 // NewTokenService takes the secret as a string (it converts internally) —
 // verified against internal/auth/token.go:50.
@@ -63,9 +84,12 @@ func TestIssueAndParseCarriesCompanyAndAccount(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Issue: %v", err)
 	}
-	claims, err := s.Parse(pair.AccessToken, TypeAccess)
+	claims, err := s.Parse(pair.AccessToken)
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
+	}
+	if claims.Type != TypeAccess {
+		t.Fatalf("token type = %s, want %s", claims.Type, TypeAccess)
 	}
 	if claims.EmployeeID() != 42 {
 		t.Fatalf("employee id = %d, want 42", claims.EmployeeID())
@@ -75,6 +99,15 @@ func TestIssueAndParseCarriesCompanyAndAccount(t *testing.T) {
 	}
 	if claims.AccountID == nil || *claims.AccountID != 3 {
 		t.Fatalf("account id = %v, want 3", claims.AccountID)
+	}
+
+	// Verify company_id is present in the wire format.
+	payload := decodeJWTPayload(t, pair.AccessToken)
+	if _, present := payload["company_id"]; !present {
+		t.Fatal("company_id must be present in the token payload")
+	}
+	if companyIDVal, ok := payload["company_id"]; !ok || companyIDVal != float64(7) {
+		t.Fatalf("company_id in payload = %v, want 7", companyIDVal)
 	}
 }
 
@@ -88,14 +121,23 @@ func TestIssueOmitsCompanyWhenThereIsNone(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Issue: %v", err)
 	}
-	claims, err := s.Parse(pair.AccessToken, TypeAccess)
+	claims, err := s.Parse(pair.AccessToken)
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
+	}
+	if claims.Type != TypeAccess {
+		t.Fatalf("token type = %s, want %s", claims.Type, TypeAccess)
 	}
 	if claims.CompanyID != nil {
 		t.Fatalf("company id = %v, want nil", *claims.CompanyID)
 	}
 	if claims.AccountID == nil || *claims.AccountID != 3 {
 		t.Fatalf("account id = %v, want 3", claims.AccountID)
+	}
+
+	// Verify company_id is ABSENT from the wire format (not just nil or zero).
+	payload := decodeJWTPayload(t, pair.AccessToken)
+	if _, present := payload["company_id"]; present {
+		t.Fatal("company_id must be absent from the token payload, not null or zero")
 	}
 }

@@ -116,8 +116,8 @@ func newJTI() (string, error) {
 }
 
 // Parse verifies signature, issuer, expiry, and the HS256 method, returning the
-// claims. It validates that the token's type matches the provided typ.
-func (s *TokenService) Parse(token string, typ string) (*Claims, error) {
+// claims. It does not check the token Type — callers decide access vs refresh.
+func (s *TokenService) Parse(token string) (*Claims, error) {
 	var claims Claims
 	parsed, err := jwt.ParseWithClaims(token, &claims, func(t *jwt.Token) (any, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -128,13 +128,17 @@ func (s *TokenService) Parse(token string, typ string) (*Claims, error) {
 	if err != nil || !parsed.Valid {
 		return nil, ErrInvalidToken
 	}
-	if claims.Type != typ {
-		return nil, ErrInvalidToken
-	}
 	return &claims, nil
 }
 
 // ParseRefresh additionally requires the token to be a refresh token.
 func (s *TokenService) ParseRefresh(token string) (*Claims, error) {
-	return s.Parse(token, TypeRefresh)
+	claims, err := s.Parse(token)
+	if err != nil {
+		return nil, err
+	}
+	if claims.Type != TypeRefresh {
+		return nil, ErrInvalidToken
+	}
+	return claims, nil
 }
