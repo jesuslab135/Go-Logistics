@@ -124,11 +124,28 @@ export function checkConformance(spec, op, response) {
   )
 }
 
-export async function checkListContract(client, op) {
+export async function checkListContract(client, op, ids) {
   const isList = op.method === 'GET'
     && !op.path.endsWith('}')
     && (op.params ?? []).some(p => p.name === 'limit')
   if (!isList) return null
+
+  // A nested list's parent placeholder (e.g. `{id}` in
+  // /admin/companies/{id}/roles) cannot be probed generically by
+  // substituting MISSING_ID: whether the backend validates the parent
+  // exists before answering is a property of that specific handler, not of
+  // the list-contract shape. Most nested list handlers don't validate it
+  // and happily answer 200 with an empty page for a nonexistent parent
+  // (that is F2, tracked separately) — but admin/companies scoped routes
+  // do validate it and correctly 404, which is NOT a list-contract defect.
+  // The caller (sweep.mjs) passes `ids`, the same resolution
+  // idsForOperation uses for every other check against this op: `null`
+  // means it could not resolve this op's placeholders to any real fixture
+  // row at all, in which case there is no way to tell "correctly refused a
+  // missing parent" apart from "list-contract genuinely broken", so skip
+  // rather than guess. sweep.mjs's own coverage entry for this opKey
+  // already records why (`no fixture row satisfies this path`).
+  if (op.path.includes('{') && ids === null) return null
 
   const path = fillPath(op.path, { id: MISSING_ID, child_id: MISSING_ID })
   if (path.includes('{')) return null

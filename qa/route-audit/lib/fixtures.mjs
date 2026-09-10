@@ -316,6 +316,20 @@ export async function buildFixtures(client, runId) {
           body: 'created but the response carries no run tag — a field name is probably absent from the Create DTO and was silently ignored; this row cannot be recovered by tag',
         })
       }
+    } else if (succeeded) {
+      // A 2xx create with no `id` in the response (and not a declared
+      // singleton) is not a validation failure — a row plausibly exists in
+      // the database right now. There is no id to build `${path}/${id}`
+      // from, so it cannot be tracked in `created` and teardown cannot
+      // remove it automatically. Not reachable against today's DTOs (every
+      // non-singleton Create*Response declares `id`), but this must never
+      // be silent the way a generic `res.body` dump here would be: it has
+      // to say in plain words that a row may have leaked and nobody but a
+      // human, searching by this run's tag, can find it.
+      failed.push({
+        key: step.key, status: res.status,
+        body: `created (${res.status}) but the response carries no id — this row cannot be tracked for teardown and may still exist in the database; it must be found and removed by hand, by searching for the tag ${tag}`,
+      })
     } else {
       failed.push({ key: step.key, status: res.status, body: res.body })
     }

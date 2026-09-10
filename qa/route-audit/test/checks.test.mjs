@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   fillPath, MISSING_ID, classify, PUBLIC_ROUTES,
-  checkUnauthenticated, checkNotFound,
+  checkUnauthenticated, checkNotFound, checkListContract,
 } from '../lib/checks.mjs'
 
 function makeStubClient(response) {
@@ -102,6 +102,68 @@ test('checkUnauthenticated still expects 401 for switch-company, a non-public ro
 // DEFECT 2: checkNotFound must probe every named path placeholder, not just
 // {id}/{child_id} — m2m link routes use {employee_id}, {issue_id}, {fault_id}.
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// MINOR 5: checkListContract substituted MISSING_ID into a nested list's
+// parent {id} unconditionally, so /admin/companies/{id}/roles and
+// /admin/companies/{id}/work-order-statuses — whose backend correctly 404s
+// for a nonexistent company — were reported as failing list-contract checks.
+// The fix: skip when the caller (sweep.mjs, via idsForOperation) could not
+// resolve the op's placeholders to any real fixture row at all (`ids ===
+// null`). A route whose parent CAN be resolved (e.g. /assets/{id}/...) must
+// still be checked as before.
+// ---------------------------------------------------------------------------
+
+function makeListClient(response) {
+  const calls = []
+  return {
+    calls,
+    async request(method, path, opts = {}) {
+      calls.push({ method, path, opts })
+      return response
+    },
+  }
+}
+
+test('checkListContract skips a nested list whose parent id could not be resolved to a real fixture row', async () => {
+  const client = makeListClient({ status: 404, body: { error: { code: 'not_found' } } })
+  const op = {
+    opKey: 'GET /api/v1/admin/companies/{id}/roles',
+    method: 'GET',
+    path: '/api/v1/admin/companies/{id}/roles',
+    params: [{ name: 'limit' }],
+  }
+  const out = await checkListContract(client, op, null)
+  assert.equal(out, null, 'a 404 for an unresolvable parent must not be reported as a list-contract failure')
+  assert.equal(client.calls.length, 0, 'must not even send the probe once the parent id is known to be unresolvable')
+})
+
+test('checkListContract still runs a nested list whose parent id resolved to a real fixture row', async () => {
+  const client = makeListClient({ status: 200, body: { data: [], total: 0, limit: 1, offset: 0, has_next: false } })
+  const op = {
+    opKey: 'GET /api/v1/assets/{id}/fuel-entries',
+    method: 'GET',
+    path: '/api/v1/assets/{id}/fuel-entries',
+    params: [{ name: 'limit' }],
+  }
+  const out = await checkListContract(client, op, { id: 42 })
+  assert.ok(out, 'a resolvable parent must still be probed')
+  assert.equal(out.ok, true)
+  assert.equal(client.calls.length, 1)
+})
+
+test('checkListContract still runs a top-level list with no parent placeholder at all', async () => {
+  const client = makeListClient({ status: 200, body: { data: [], total: 0, limit: 1, offset: 0, has_next: false } })
+  const op = {
+    opKey: 'GET /api/v1/vendors',
+    method: 'GET',
+    path: '/api/v1/vendors',
+    params: [{ name: 'limit' }],
+  }
+  const out = await checkListContract(client, op, {})
+  assert.ok(out)
+  assert.equal(out.ok, true)
+})
 
 test('checkNotFound substitutes a named link param, not just id/child_id', async () => {
   const client = makeStubClient({ status: 404, body: { error: 'not found' } })

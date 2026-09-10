@@ -112,12 +112,17 @@ export async function sweep(client, spec, ops, graph, { onProgress } = {}) {
   for (const op of ops) {
     onProgress?.(op)
 
+    // Computed once and reused: checkListContract needs to know whether
+    // this op's path placeholders resolve to a real fixture row (see its
+    // own comment for why), and it is exactly the same resolution the
+    // coverage bookkeeping below already needs.
+    const ids = idsForOperation(op, graph)
+
     push(await checkUnauthenticated(client, op))
     push(await checkRetiredVerb(client, op))
     push(await checkNotFound(client, op))
-    push(await checkListContract(client, op))
+    push(await checkListContract(client, op, ids))
 
-    const ids = idsForOperation(op, graph)
     if (ids === null) {
       coverage.push({
         opKey: op.opKey,

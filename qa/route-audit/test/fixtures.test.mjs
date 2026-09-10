@@ -282,6 +282,35 @@ test('buildFixtures treats singleton PUT steps as healthy without an id, and DOE
   assert.ok(!serviceTaskPart.singleton)
 })
 
+// MINOR 7 regression: a non-singleton 2xx create with no `id` in the
+// response is not a validation failure — a row may exist in the database
+// right now with no way to address it for teardown. It must never be
+// silent: it lands in `failed` (never `created`, since there is no id to
+// delete by) with a message that says in plain words a row may still exist.
+test('buildFixtures records a 2xx create with no id as a loud, explicit failure, not silence', async () => {
+  const stubClient = {
+    async request(method, _path, _opts) {
+      if (method !== 'POST') throw new Error(`unexpected ${method} call`)
+      // 2xx, but the body carries no `id` at all — the shape MINOR 7 covers.
+      return { status: 201, body: { note: 'created but no id echoed back' } }
+    },
+  }
+
+  const graph = await buildFixtures(stubClient, 'no-id-stub')
+
+  const vendorCreated = graph.created.find(c => c.key === 'vendor')
+  assert.equal(vendorCreated, undefined, 'a row with no id cannot be tracked in created — there is nothing to delete by')
+
+  const vendorFailure = graph.failed.find(f => f.key === 'vendor')
+  assert.ok(vendorFailure, 'vendor must still be recorded, in failed')
+  assert.match(String(vendorFailure.body), /created.*201/i)
+  assert.match(String(vendorFailure.body), /may still exist/i)
+  assert.match(String(vendorFailure.body), /no-id-stub/)
+
+  // Nothing downstream may build on this row either.
+  assert.equal(graph.ids.vendor, undefined)
+})
+
 test('the vehicle/trailer/axle-config/serviceTaskPart steps are wired as expected', () => {
   const byKey = new Map(FIXTURE_PLAN.map(s => [s.key, s]))
 
