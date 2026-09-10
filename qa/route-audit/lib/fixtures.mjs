@@ -3,6 +3,12 @@
 // Resources that answer POST .../{id}/archive when a delete is refused.
 const ARCHIVABLE = new Set(['vendor', 'part', 'asset', 'serviceTask', 'inspectionForm'])
 
+// Fixtures whose Create DTO has no free-text field, so there is nowhere to put
+// the run tag. Teardown still tracks them by id in `created`, and both are
+// grandchildren that die with their parent, so cleanup is unaffected — the tag
+// is a human-recovery aid, not the deletion mechanism.
+export const UNTAGGABLE = new Set(['laborEntry', 'purchaseOrderLineItem'])
+
 export const FIXTURE_PLAN = [
   // Level 0 — depend on nothing but the company.
   { key: 'vendor', path: '/api/v1/vendors', dependsOn: [],
@@ -87,26 +93,35 @@ export const FIXTURE_PLAN = [
       asset_id: ids.asset, status_id: ids.workOrderStatus,
       issued_at: '2026-09-09T00:00:00Z',
     }) },
-  { key: 'issue', path: '/api/v1/issues', dependsOn: ['asset', 'issuePriority'],
+  { key: 'issue', path: '/api/v1/issues', dependsOn: ['asset', 'issuePriority', 'employee'],
     body: (ids, tag) => ({
-      summary: `${tag}-issue`, asset_id: ids.asset, priority_id: ids.issuePriority,
+      name: `${tag}-issue`, summary: `${tag}-issue`, asset_id: ids.asset, priority_id: ids.issuePriority,
+      reported_by_id: ids.employee, reported_at: '2026-09-09T00:00:00Z',
     }) },
-  { key: 'purchaseOrder', path: '/api/v1/purchase-orders', dependsOn: ['vendor'],
-    body: (ids, tag) => ({ number: `${tag}-PO`, vendor_id: ids.vendor }) },
+  { key: 'purchaseOrder', path: '/api/v1/purchase-orders', dependsOn: ['vendor', 'location'],
+    body: (ids, tag) => ({
+      number: `${tag}-PO`, description: `${tag} purchase order`,
+      vendor_id: ids.vendor, destination_id: ids.location,
+    }) },
   { key: 'serviceEntry', path: '/api/v1/service-entries', dependsOn: ['asset', 'vendor'],
     body: (ids, tag) => ({
       asset_id: ids.asset, vendor_id: ids.vendor,
       reference: `${tag}-SE`, started_at: '2026-09-09T00:00:00Z',
     }) },
-  { key: 'fuelEntry', path: '/api/v1/assets/{asset}/fuel-entries', dependsOn: ['asset', 'fuelType', 'vendor'],
+  { key: 'fuelEntry', path: '/api/v1/assets/{asset}/fuel-entries', dependsOn: ['asset', 'employee', 'vendor'],
     body: (ids, tag) => ({
-      fuel_type_id: ids.fuelType, vendor_id: ids.vendor, reference: `${tag}-FE`,
-      filled_at: '2026-09-09T00:00:00Z', volume: '10', total_cost: '100',
+      employee_id: ids.employee, vendor_id: ids.vendor, date: '2026-09-09T00:00:00Z',
+      fuel_type: 'DIESEL', quantity: '10', unit_cost: '10', total_cost: '100',
+      odometer: '1000', reference: `${tag}-FE`,
     }) },
   { key: 'partInventory', path: '/api/v1/parts/{part}/inventory', dependsOn: ['part', 'partLocation'],
     body: (ids, tag) => ({ location_id: ids.partLocation, quantity: '10', notes: `${tag}-inv` }) },
-  { key: 'warranty', path: '/api/v1/warranties', dependsOn: ['asset'],
-    body: (ids, tag) => ({ name: `${tag}-warranty`, asset_id: ids.asset }) },
+  { key: 'warranty', path: '/api/v1/warranties', dependsOn: ['vendor', 'asset'],
+    body: (ids, tag) => ({
+      provider_id: ids.vendor, asset_id: ids.asset,
+      start_date: '2026-09-09T00:00:00Z', end_date: '2027-09-09T00:00:00Z',
+      terms: `${tag}-warranty`,
+    }) },
   { key: 'weeklyMileageGoal', path: '/api/v1/weekly-mileage-goals', dependsOn: ['asset'],
     body: (ids, tag) => ({ asset_id: ids.asset, target_miles: '100', notes: `${tag}-goal` }) },
   { key: 'trailerAssignment', path: '/api/v1/assets/{asset}/trailer-assignments', dependsOn: ['asset', 'trailerAsset'],
@@ -118,22 +133,23 @@ export const FIXTURE_PLAN = [
   { key: 'workOrderLineItem', path: '/api/v1/work-orders/{workOrder}/line-items', dependsOn: ['workOrder', 'serviceTask'],
     body: (ids, tag) => ({ service_task_id: ids.serviceTask, description: `${tag}-wo-line` }) },
   { key: 'purchaseOrderLineItem', path: '/api/v1/purchase-orders/{purchaseOrder}/line-items', dependsOn: ['purchaseOrder', 'part'],
-    body: (ids, tag) => ({ part_id: ids.part, quantity: '2', unit_cost: '5', description: `${tag}-po-line` }) },
+    body: (ids, tag) => ({ part_id: ids.part, quantity: '2', unit_cost: '5', position: 1 }) },
   { key: 'serviceEntryLineItem', path: '/api/v1/service-entries/{serviceEntry}/line-items', dependsOn: ['serviceEntry', 'serviceTask'],
     body: (ids, tag) => ({ service_task_id: ids.serviceTask, description: `${tag}-se-line` }) },
   { key: 'wheelPosition', path: '/api/v1/axle-definitions/{axleDefinition}/wheel-positions', dependsOn: ['axleDefinition'],
     body: (_, tag) => ({ label: `${tag}-wheel`, position: 1 }) },
-  { key: 'journalEntry', path: '/api/v1/inventory-journal-entries', dependsOn: ['part', 'partLocation', 'adjustmentReason'],
+  { key: 'journalEntry', path: '/api/v1/inventory-journal-entries', dependsOn: ['part', 'partInventory', 'adjustmentReason'],
     body: (ids, tag) => ({
-      part_id: ids.part, location_id: ids.partLocation,
-      reason_id: ids.adjustmentReason, quantity_delta: '5', notes: `${tag}-journal`,
+      part_id: ids.part, part_location_detail_id: ids.partInventory,
+      adjustment_quantity: '5', unit_cost: '1',
+      reason_id: ids.adjustmentReason, notes: `${tag}-journal`,
     }) },
 
   // Level 4 — grandchildren.
   { key: 'workOrderSubLineItem', path: '/api/v1/work-order-line-items/{workOrderLineItem}/sub-line-items', dependsOn: ['workOrderLineItem', 'part'],
     body: (ids, tag) => ({ part_id: ids.part, quantity: '1', unit_cost: '3', description: `${tag}-sub-line` }) },
   { key: 'laborEntry', path: '/api/v1/work-order-sub-line-items/{workOrderSubLineItem}/labor-entries', dependsOn: ['workOrderSubLineItem', 'employee'],
-    body: (ids, tag) => ({ employee_id: ids.employee, hours: '1', notes: `${tag}-labor` }) },
+    body: (ids, tag) => ({ technician_id: ids.employee, started_at: '2026-09-09T00:00:00Z', duration_seconds: 3600 }) },
 ]
 
 export function topoSort(plan) {
