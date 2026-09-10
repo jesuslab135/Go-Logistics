@@ -27,3 +27,7 @@ go.work.sum
 *.swp
 .DS_Store
 Thumbs.db
+
+# Agent scratch (worktrees, SDD ledger) — never committed
+.claude/worktrees/
+.superpowers/
