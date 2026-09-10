@@ -226,6 +226,45 @@ TOKEN=<access_token>
 curl http://localhost:8080/api/v1/companies -H "Authorization: Bearer $TOKEN"
 ```
 
+### Self-service onboarding
+
+Before this change there was no way into the system without seeding rows by
+hand: creating a company required a token, and logging in required membership
+in a company, so an employee with neither could never reach the one endpoint
+that would fix that. The fix splits provisioning a client from provisioning
+its first company:
+
+1. A platform administrator provisions a client account and its owner in one
+   call:
+
+   ```sh
+   curl -X POST http://localhost:8080/api/v1/admin/accounts \
+     -H "Authorization: Bearer $PLATFORM_TOKEN" -H 'Content-Type: application/json' \
+     -d '{"name":"Acme Fleet","owner_first_name":"Ada","owner_last_name":"Byron",
+          "owner_email":"ada@acme.test","owner_password":"correct-horse-battery"}'
+   ```
+
+2. The owner logs in immediately, before they belong to any company. The
+   session is scoped to their account rather than to a company: the access
+   token's payload carries `account_id` and omits `company_id` entirely (an
+   absent claim, not a zero company). Such a company-less session can reach
+   `/api/v1/me/permissions` but nothing tenant-scoped, such as
+   `/api/v1/assets`, which answers `403`.
+
+3. The owner creates their first company with `POST /api/v1/companies`. The
+   account is taken from their session, never from the request body, so an
+   owner can never plant a company inside another client's account. Creation
+   seeds the company's default admin role and — since the employee had no
+   `default_company_id` yet — points it at the new company, so the owner's
+   next login resolves to it automatically and they are placed into it.
+
+Platform staff hold no company memberships of their own: `employee.account_id`
+is `NULL` for them, and they reach tenant data only through `/api/v1/admin/*`.
+On this codebase's seed data, employee 1 currently holds both the
+client-owner role (for the pre-existing "Go Logistics" account) and the
+platform-admin flag, pending a follow-up that splits the two into separate
+identities.
+
 ---
 
 ## Object storage (MinIO / S3)
