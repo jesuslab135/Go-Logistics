@@ -70,7 +70,7 @@ export const FIXTURE_PLAN = [
   { key: 'inspectionForm', path: '/api/v1/inspection-forms', dependsOn: [],
     body: (_, tag) => ({ name: `${tag}-inspection-form` }) },
   { key: 'tireModel', path: '/api/v1/tire-models', dependsOn: [],
-    body: (_, tag) => ({ name: `${tag}-tire-model` }) },
+    body: (_, tag) => ({ brand: `${tag}-brand`, model_name: `${tag}-tire-model`, size: '295/75R22.5' }) },
 
   // Level 1 — one hop.
   { key: 'vehicleModel', path: '/api/v1/vehicle-models', dependsOn: ['vehicleMake'],
@@ -94,7 +94,7 @@ export const FIXTURE_PLAN = [
       vehicle_type: 'TRAILER', ownership_type: 'OWNED',
     }) },
   { key: 'tire', path: '/api/v1/tires', dependsOn: ['tireModel'],
-    body: (ids, tag) => ({ serial_number: `${tag}-tire`, tire_model_id: ids.tireModel }) },
+    body: (ids, tag) => ({ tire_identification_number: `${tag}-tire`, tire_model_id: ids.tireModel, status: 'IN_STOCK' }) },
   { key: 'axleDefinition', path: '/api/v1/axle-templates/{axleTemplate}/definitions', dependsOn: ['axleTemplate'],
     body: (_, tag) => ({ name: `${tag}-axle-def`, position: 1, wheel_count: 2 }) },
   { key: 'employee', path: '/api/v1/employees', dependsOn: ['role', 'group'],
@@ -140,8 +140,11 @@ export const FIXTURE_PLAN = [
       start_date: '2026-09-09T00:00:00Z', end_date: '2027-09-09T00:00:00Z',
       terms: `${tag}-warranty`,
     }) },
-  { key: 'weeklyMileageGoal', path: '/api/v1/weekly-mileage-goals', dependsOn: ['asset'],
-    body: (ids, tag) => ({ asset_id: ids.asset, target_miles: '100', notes: `${tag}-goal` }) },
+  { key: 'weeklyMileageGoal', path: '/api/v1/weekly-mileage-goals', dependsOn: [],
+    body: (_, tag) => ({
+      service_type: `${tag}-goal`, rate_per_mile: '1.5',
+      weekly_mileage_goal: 100, units_per_service: 1,
+    }) },
   { key: 'trailerAssignment', path: '/api/v1/assets/{asset}/trailer-assignments', dependsOn: ['asset', 'trailerAsset'],
     body: (ids, tag) => ({ trailer_id: ids.trailerAsset, notes: `${tag}-assignment` }) },
   { key: 'inspectionFormItem', path: '/api/v1/inspection-forms/{inspectionForm}/items', dependsOn: ['inspectionForm'],
@@ -225,8 +228,26 @@ export async function buildFixtures(client, runId) {
       opKey: `POST ${step.path} (fixture)`,
     })
     if (res.status >= 200 && res.status < 300 && res.body?.id != null) {
-      ids[step.key] = res.body.id
+      // Gin silently ignores unknown JSON fields: if a fixture body uses a
+      // field name the Create DTO does not declare, the server still
+      // returns 2xx and a row still exists — it just stores nothing we
+      // sent, so no ZZ-TEST tag is anywhere in the response. That row is
+      // real but untaggable, so the tag-based human recovery sweep can
+      // never find it. Checking the RESPONSE (not the request we sent) is
+      // the only way to catch this: it's what actually landed in the DB.
+      // The row still goes into `created` so teardown deletes it this run,
+      // but it is not treated as a healthy fixture and nothing downstream
+      // may build on it.
+      const taggedInResponse = UNTAGGABLE.has(step.key) || JSON.stringify(res.body).includes(tag)
       created.push({ key: step.key, path, id: res.body.id })
+      if (taggedInResponse) {
+        ids[step.key] = res.body.id
+      } else {
+        failed.push({
+          key: step.key, status: res.status,
+          body: 'created but the response carries no run tag — a field name is probably absent from the Create DTO and was silently ignored; this row cannot be recovered by tag',
+        })
+      }
     } else {
       failed.push({ key: step.key, status: res.status, body: res.body })
     }

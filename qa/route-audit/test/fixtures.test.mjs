@@ -1,7 +1,7 @@
 // qa/route-audit/test/fixtures.test.mjs
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { topoSort, FIXTURE_PLAN, UNTAGGABLE, teardownFixtures } from '../lib/fixtures.mjs'
+import { topoSort, FIXTURE_PLAN, UNTAGGABLE, buildFixtures, teardownFixtures } from '../lib/fixtures.mjs'
 
 test('topoSort places dependencies before dependents', () => {
   const plan = [
@@ -129,6 +129,35 @@ test('teardown fallback chain routes each resource to the correct mechanism', as
 
   // location must not have triggered a reverse or archive call at all.
   assert.ok(!calls.some(c => c.path.startsWith('/api/v1/locations/11/')))
+})
+
+test('buildFixtures treats a created-but-untagged response as failed, not healthy', async () => {
+  // Simulates the Gin silent-unknown-field-drop failure mode: the server
+  // accepts the POST (2xx, real id) but the row it actually stored carries
+  // none of the fields we sent, so the run tag never appears in the
+  // response body. Every step gets this same stub response.
+  let nextId = 1
+  const stubClient = {
+    async request(method, _path, _opts) {
+      if (method !== 'POST') throw new Error(`unexpected ${method} call`)
+      return { status: 201, body: { id: nextId++, note: 'server stored nothing we sent' } }
+    },
+  }
+
+  const graph = await buildFixtures(stubClient, 'untagged-stub')
+
+  // vendor has no dependencies, so it is always attempted first.
+  const vendorCreated = graph.created.find(c => c.key === 'vendor')
+  assert.ok(vendorCreated, 'vendor should still be recorded in created so teardown can delete it')
+
+  const vendorFailure = graph.failed.find(f => f.key === 'vendor')
+  assert.ok(vendorFailure, 'vendor should also be recorded in failed')
+  assert.match(String(vendorFailure.body), /cannot be recovered by tag/)
+
+  // Its id must not be usable by dependents — buildFixtures must not have
+  // published it into `ids`, or a downstream step could silently build on
+  // an unrecoverable row.
+  assert.equal(graph.ids.vendor, undefined)
 })
 
 test('every path placeholder in FIXTURE_PLAN names a declared dependency', () => {
