@@ -1,0 +1,31 @@
+{
+  "route": "/app/inventory/part-categories",
+  "loadedAt": "2026-09-10T13:40:46.305Z",
+  "httpStatus": 200,
+  "requests": [
+    {
+      "method": "GET",
+      "url": "/api/v1/notifications",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "object response"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/me/permissions",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "object response"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/part-categories?limit=100&offset=0",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "1 rows, has_next false"
+    }
+  ],
+  "consoleErrors": [],
+  "rendered": "data",
+  "notes": "default: page rendered content with no error or empty-state signal"
+}

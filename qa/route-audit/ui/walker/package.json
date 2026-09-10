@@ -1,0 +1,7 @@
+{
+  "name": "route-audit-walker",
+  "private": true,
+  "type": "module",
+  "description": "Browser walkthrough for the route audit. Isolated here so the audit harness itself stays dependency-free.",
+  "dependencies": { "playwright": "^1.63.0" }
+}

@@ -1,0 +1,76 @@
+{
+  "route": "/app/trailers/$id/edit",
+  "loadedAt": "2026-09-10T13:39:47.085Z",
+  "httpStatus": 200,
+  "requests": [
+    {
+      "method": "GET",
+      "url": "/api/v1/notifications",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "object response"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/me/permissions",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "object response"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/assets/50/trailer",
+      "status": 404,
+      "requestBody": null,
+      "responseSummary": "error.code not_found"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/assets/50",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "id 50"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/asset-statuses?limit=100&offset=0",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "6 rows, has_next false"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/assets/50/trailer",
+      "status": 404,
+      "requestBody": null,
+      "responseSummary": "error.code not_found"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/vehicle-models?limit=100&offset=0",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "3 rows, has_next false"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/catalog-options?limit=100&offset=0&category=group_option",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "1 rows, has_next false"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/vehicle-makes?limit=100&offset=0",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "3 rows, has_next false"
+    }
+  ],
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)"
+  ],
+  "rendered": "error",
+  "notes": "redirected from /app/trailers/50/edit to /app/trailers/50 | could not drive this form: could not locate the Name field by label/placeholder; could not locate a Save/Create/Submit button"
+}

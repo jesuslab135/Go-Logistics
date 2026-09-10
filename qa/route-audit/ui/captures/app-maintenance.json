@@ -1,0 +1,52 @@
+{
+  "route": "/app/maintenance",
+  "loadedAt": "2026-09-10T13:40:13.040Z",
+  "httpStatus": 200,
+  "requests": [
+    {
+      "method": "GET",
+      "url": "/api/v1/notifications",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "object response"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/me/permissions",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "object response"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/work-order-statuses?limit=100&offset=0",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "9 rows, has_next false"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/work-orders/facets",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "object response"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/assets?limit=100&offset=0",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "7 rows, has_next false"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/work-orders?limit=100&offset=0",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "2 rows, has_next false"
+    }
+  ],
+  "consoleErrors": [],
+  "rendered": "data",
+  "notes": "default: page rendered content with no error or empty-state signal"
+}

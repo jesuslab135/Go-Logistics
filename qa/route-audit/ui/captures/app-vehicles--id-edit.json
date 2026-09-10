@@ -1,0 +1,38 @@
+{
+  "route": "/app/vehicles/$id/edit",
+  "loadedAt": "2026-09-10T13:39:32.076Z",
+  "httpStatus": 200,
+  "requests": [
+    {
+      "method": "GET",
+      "url": "/api/v1/me/permissions",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "object response"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/notifications",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "object response"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/assets/49/vehicle",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "object response"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/assets/49",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "id 49"
+    }
+  ],
+  "consoleErrors": [],
+  "rendered": "error",
+  "notes": "redirected from /app/vehicles/49/edit to /app/vehicles/49 | could not drive this form: could not locate the Name field by label/placeholder; could not locate a Save/Create/Submit button"
+}

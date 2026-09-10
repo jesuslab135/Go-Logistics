@@ -1,0 +1,38 @@
+{
+  "route": "/app/vehicles/$id",
+  "loadedAt": "2026-09-10T13:39:28.573Z",
+  "httpStatus": 200,
+  "requests": [
+    {
+      "method": "GET",
+      "url": "/api/v1/me/permissions",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "object response"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/notifications",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "object response"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/assets/49/vehicle",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "object response"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/assets/49",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "id 49"
+    }
+  ],
+  "consoleErrors": [],
+  "rendered": "data",
+  "notes": "default: page rendered content with no error or empty-state signal"
+}

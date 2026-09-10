@@ -1,0 +1,45 @@
+{
+  "route": "/app/trailers",
+  "loadedAt": "2026-09-10T13:39:35.745Z",
+  "httpStatus": 200,
+  "requests": [
+    {
+      "method": "GET",
+      "url": "/api/v1/me/permissions",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "object response"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/notifications",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "object response"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/asset-statuses?limit=100&offset=0",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "6 rows, has_next false"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/assets?limit=100&offset=0",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "7 rows, has_next false"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/assets/facets",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "object response"
+    }
+  ],
+  "consoleErrors": [],
+  "rendered": "data",
+  "notes": "default: page rendered content with no error or empty-state signal"
+}

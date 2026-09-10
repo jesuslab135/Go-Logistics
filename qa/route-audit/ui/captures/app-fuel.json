@@ -1,0 +1,52 @@
+{
+  "route": "/app/fuel",
+  "loadedAt": "2026-09-10T13:41:19.052Z",
+  "httpStatus": 200,
+  "requests": [
+    {
+      "method": "GET",
+      "url": "/api/v1/notifications",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "object response"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/me/permissions",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "object response"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/fuel-entries?limit=100&offset=0&date_from=2026-08-11&date_to=2026-09-10&order=-date",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "1 rows, has_next false"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/employees?limit=100&offset=0",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "4 rows, has_next false"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/vendors?limit=100&offset=0",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "2 rows, has_next false"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/assets?limit=100&offset=0",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "7 rows, has_next false"
+    }
+  ],
+  "consoleErrors": [],
+  "rendered": "data",
+  "notes": "default: page rendered content with no error or empty-state signal"
+}

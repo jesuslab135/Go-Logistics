@@ -1,0 +1,31 @@
+{
+  "route": "/app/admin",
+  "loadedAt": "2026-09-10T13:42:20.649Z",
+  "httpStatus": 200,
+  "requests": [
+    {
+      "method": "GET",
+      "url": "/api/v1/notifications",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "object response"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/me/permissions",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "object response"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/companies?limit=100&offset=0",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "1 rows, has_next false"
+    }
+  ],
+  "consoleErrors": [],
+  "rendered": "data",
+  "notes": "redirected from /app/admin to /app/admin/companies | default: page rendered content with no error or empty-state signal"
+}

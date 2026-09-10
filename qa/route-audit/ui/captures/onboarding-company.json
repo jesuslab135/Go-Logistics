@@ -1,0 +1,31 @@
+{
+  "route": "/onboarding/company",
+  "loadedAt": "2026-09-10T13:39:10.243Z",
+  "httpStatus": 200,
+  "requests": [
+    {
+      "method": "GET",
+      "url": "/api/v1/dashboard/stats",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "object response"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/notifications",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "object response"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/me/permissions",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "object response"
+    }
+  ],
+  "consoleErrors": [],
+  "rendered": "data",
+  "notes": "redirected from /onboarding/company to /app/dashboard | default: page rendered content with no error or empty-state signal"
+}

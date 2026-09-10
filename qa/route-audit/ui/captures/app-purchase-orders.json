@@ -1,0 +1,45 @@
+{
+  "route": "/app/purchase-orders",
+  "loadedAt": "2026-09-10T13:40:35.267Z",
+  "httpStatus": 200,
+  "requests": [
+    {
+      "method": "GET",
+      "url": "/api/v1/me/permissions",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "object response"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/notifications",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "object response"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/vendors?limit=100&offset=0",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "2 rows, has_next false"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/part-locations?limit=100&offset=0",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "3 rows, has_next false"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/purchase-orders?limit=100&offset=0",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "2 rows, has_next false"
+    }
+  ],
+  "consoleErrors": [],
+  "rendered": "data",
+  "notes": "default: page rendered content with no error or empty-state signal"
+}

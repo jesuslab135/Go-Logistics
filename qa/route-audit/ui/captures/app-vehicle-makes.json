@@ -1,0 +1,31 @@
+{
+  "route": "/app/vehicle-makes",
+  "loadedAt": "2026-09-10T13:41:37.308Z",
+  "httpStatus": 200,
+  "requests": [
+    {
+      "method": "GET",
+      "url": "/api/v1/me/permissions",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "object response"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/vehicle-makes?limit=100&offset=0",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "3 rows, has_next false"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/notifications",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "object response"
+    }
+  ],
+  "consoleErrors": [],
+  "rendered": "data",
+  "notes": "default: page rendered content with no error or empty-state signal"
+}

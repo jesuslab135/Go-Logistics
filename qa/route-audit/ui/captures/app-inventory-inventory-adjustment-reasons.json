@@ -1,0 +1,31 @@
+{
+  "route": "/app/inventory/inventory-adjustment-reasons",
+  "loadedAt": "2026-09-10T13:40:57.322Z",
+  "httpStatus": 200,
+  "requests": [
+    {
+      "method": "GET",
+      "url": "/api/v1/notifications",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "object response"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/me/permissions",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "object response"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/inventory-adjustment-reasons?limit=100&offset=0",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "1 rows, has_next false"
+    }
+  ],
+  "consoleErrors": [],
+  "rendered": "data",
+  "notes": "default: page rendered content with no error or empty-state signal"
+}

@@ -1,0 +1,66 @@
+{
+  "route": "/app/vehicles/new",
+  "loadedAt": "2026-09-10T13:39:24.934Z",
+  "httpStatus": 200,
+  "requests": [
+    {
+      "method": "GET",
+      "url": "/api/v1/notifications",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "object response"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/me/permissions",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "object response"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/asset-statuses?limit=100&offset=0",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "6 rows, has_next false"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/assets?limit=100&offset=0",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "7 rows, has_next false"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/assets/facets",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "object response"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/vehicle-makes?limit=100&offset=0",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "3 rows, has_next false"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/vehicle-models?limit=100&offset=0",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "3 rows, has_next false"
+    },
+    {
+      "method": "GET",
+      "url": "/api/v1/catalog-options?limit=100&offset=0&category=group_option",
+      "status": 200,
+      "requestBody": null,
+      "responseSummary": "1 rows, has_next false"
+    }
+  ],
+  "consoleErrors": [],
+  "rendered": "error",
+  "notes": "redirected from /app/vehicles/new to /app/vehicles | could not drive this form: could not locate the Name field by label/placeholder; could not select the Asset Type option (combobox/select not found, or the option was not present); could not locate a Save/Create/Submit button"
+}
