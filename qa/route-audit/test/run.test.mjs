@@ -30,7 +30,27 @@ test('teardownFixtures is called somewhere inside the finally block', () => {
   assert.match(
     finallyBody,
     /teardownFixtures\(/,
-    'teardownFixtures must be reachable from inside finally so a crash still tears fixtures down when teardown was requested'
+    'teardownFixtures must be reachable from inside finally so a crash still tears fixtures down'
+  )
+})
+
+test('the failure-path teardown guard is not gated on the requested phase list', () => {
+  // Regression pin for a real Critical finding: the guard once read
+  // `if (failure && phases.has('teardown') && graph && !teardownRan)`,
+  // which meant a crash during the documented default invocation
+  // (`sweep,gates,workflows,isolation` — no `teardown` in that list) would
+  // skip cleanup entirely, because the caller never asked for teardown and
+  // never got the chance to. A crashed run must tear down unconditionally;
+  // gating it on `phases` is exactly the bug that caused 45 orphaned
+  // fixture rows in production. Find the specific guard line (identified
+  // by `!teardownRan`, its distinguishing condition) and assert it does
+  // not reference `phases` at all.
+  const guardLine = source.split('\n').find(line => line.includes('!teardownRan'))
+  assert.ok(guardLine, 'could not find the failure-path teardown guard (look for !teardownRan)')
+  assert.doesNotMatch(
+    guardLine,
+    /phases/,
+    `failure-path teardown must not be gated on the requested phase list, got: ${guardLine.trim()}`
   )
 })
 

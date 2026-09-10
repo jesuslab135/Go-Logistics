@@ -13,7 +13,7 @@ export AUDIT_EMAIL='...'
 export AUDIT_PASSWORD='...'
 export AUDIT_RUN_ID='0909a'
 
-node --test qa/route-audit/test/              # harness unit tests
+node --test qa/route-audit/test/*.test.mjs     # harness unit tests
 node qa/route-audit/run.mjs sweep,gates,workflows,isolation
 # then follow qa/route-audit/ui/walkthrough.md in the browser
 node qa/route-audit/run.mjs report
@@ -38,12 +38,21 @@ knowing that.
 Every row this harness creates is named `ZZ-TEST-<AUDIT_RUN_ID>-...`. The
 harness writes only to rows it created.
 
-If the process dies partway through — network failure, an unexpected API
-response, anything that throws — the fixture graph built so far is still
-persisted to `qa/route-audit/out/fixtures.json` before the process exits.
-Re-running `node qa/route-audit/run.mjs teardown` with the **same**
-`AUDIT_RUN_ID` reads that file and cleans up the rows the dead run created,
-even though the run itself never got to the teardown phase.
+If any phase throws after fixtures exist — an unexpected API response,
+anything the harness didn't anticipate — the harness tears down
+automatically. This is unconditional: it happens regardless of which
+phases were requested for that invocation, because a crashed run's
+fixtures are not resumable state worth preserving as-is. The console will
+print `run failed; tearing down fixtures created by this run` followed by
+the teardown counts, then the process exits non-zero.
+
+The one case automatic teardown can't cover is the process being killed
+hard enough that it never gets to run at all — `SIGKILL`, a lost
+connection, a power loss. For that, the fixture graph is persisted to
+`qa/route-audit/out/fixtures.json` before any phase that could throw, so
+re-running `node qa/route-audit/run.mjs teardown` with the **same**
+`AUDIT_RUN_ID` reads that file and cleans up the rows the dead run
+created.
 
 Teardown walks the created rows in reverse dependency order and reports into
 four buckets:

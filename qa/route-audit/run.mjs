@@ -98,6 +98,10 @@ try {
 
   if (phases.has('gates')) {
     if (!graph) throw new Error('gates need fixtures; run the sweep phase first')
+    // Deterministic from runId on purpose: this provisions a throwaway,
+    // tagged identity for this run, not a real credential. Do not "fix" it
+    // into something random — a resumed run needs to be able to derive the
+    // same password again.
     const password = `Zz-${runId}-Test-Pass-1`
     const limited = await provisionLimitedIdentity(client, graph, password)
     gates = await runGateSuite(client, graph, limited, password)
@@ -154,18 +158,27 @@ try {
     console.log(`  ${findings.length} cross-reference findings, ${captures.length} routes walked`)
   }
 } catch (err) {
-  // Persist whatever fixture graph exists BEFORE anything else, so a dead
-  // run can still be recovered by `node run.mjs teardown` with the same
-  // AUDIT_RUN_ID even if this process is about to exit non-zero.
+  // Persist whatever fixture graph exists BEFORE anything else. The
+  // `finally` below tears down automatically on failure, but if the
+  // process is killed hard enough that `finally` itself never completes
+  // (SIGKILL, power loss), this file is still the recovery path: rerun
+  // `node run.mjs teardown` with the same AUDIT_RUN_ID.
   failure = err
 } finally {
   if (graph) save('fixtures.json', graph)
 
-  // If the run died before reaching the teardown phase on its own, and the
-  // caller actually asked for teardown in this invocation, run it now so a
-  // crash never leaves fixture rows behind. Guard this: if teardown itself
-  // throws, that must not replace or hide the original failure.
-  if (failure && phases.has('teardown') && graph && !teardownRan) {
+  // A crashed run must always tear down what it created — this is
+  // unconditional, deliberately NOT gated on `phases.has('teardown')`. The
+  // documented default workflow is `sweep,gates,workflows,isolation`, which
+  // never lists `teardown`; gating this on the requested phase list is
+  // exactly the bug that caused the real incident this task exists to
+  // prevent (a suite threw, the run died, teardown never ran, and 45
+  // fixture rows had to be hunted down by tag and deleted by hand). A
+  // crashed run's fixtures are not resumable state worth preserving as-is.
+  // Guard this: if teardown itself throws, that must not replace or hide
+  // the original failure.
+  if (failure && graph && !teardownRan) {
+    console.error('run failed; tearing down fixtures created by this run')
     try {
       teardown = await teardownFixtures(client, graph)
       save('teardown.json', teardown)
