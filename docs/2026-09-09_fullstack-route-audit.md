@@ -15,9 +15,22 @@
 probes, all 12 cross-tenant isolation probes, and all 38 stateful workflow checks
 returned the expected result. There are **zero high-severity findings**.
 
-The 109 failed checks are contract-level disagreements between the OpenAPI spec and
-the implementation, concentrated in three patterns (F1–F3 below) that together account
-for 90 of them.
+The 109 failed checks recorded by that run are contract-level disagreements between
+the OpenAPI spec and the implementation, concentrated in three patterns (F1–F3 below)
+that together account for 96 of them.
+
+> **Post-review correction (see MINOR 5 below).** Two of the 109 — the `list-contract`
+> checks against `GET /api/v1/admin/companies/{id}/roles` and `GET
+> /api/v1/admin/companies/{id}/work-order-statuses` — were harness artefacts, not API
+> defects: the checker substituted a nonexistent id into a *parent* `{id}` it had no
+> fixture row for, and the correct `404` that produced was scored as a failure. The
+> harness (`qa/route-audit/lib/checks.mjs`) now skips a `list-contract` check it cannot
+> resolve a real parent row for, instead of guessing. On the next run these two checks
+> will not appear in `results` at all: **checks run drops from 1095 to 1093, checks
+> failed from 109 to 107, and medium findings from 99 to 97.** The table below still
+> shows the numbers exactly as the run on 2026-09-10 produced them, with this note as
+> the correction; the "Failed contract checks" table further down has had those two
+> rows removed and annotated so it does not restate the error.
 
 | Metric | Value |
 |---|---|
@@ -28,14 +41,22 @@ for 90 of them.
 | Findings — medium | 99 |
 | Findings — low | 10 |
 | Module-gate probes failed | **0 of 22** |
-| Tenant-isolation probes failed | **0 of 12** |
-| Workflow checks failed | **0 of 38** |
+| Tenant-isolation probes failed | **0 of 12**\* |
+| Workflow checks failed | **0 of 38**\* |
 | Operations exercised by the sweep | 176 |
 | Operations accounted for by exclusion | 198 |
 | Frontend routes walked in a browser | **0 — blocked, see below** |
 | Frontend endpoints calling a nonexistent backend path | **0 of 167** |
 | Backend paths with no frontend consumer | 19 of 186 |
-| Fixture rows created / removed | 49 / 49 — **zero residue** |
+| Fixture rows created / removed | 49 / 49 — **zero residue in the database** (object storage is not: see Teardown) |
+
+\* The isolation and workflow denominators above (12, 38) count only the actual
+cross-tenant/state-transition *probes* in each suite. The result arrays they come from
+are longer — 13 and 40 entries — because both suites also record their own cleanup as
+CheckResults (isolation's create/switch/delete of the throwaway tenant; the workflow
+suite's extra work-order-status create/restore/delete). Those cleanup entries are real,
+counted CheckResults, and are included in "Checks run" (1095) above, but are not probes
+and so are excluded from these two denominators.
 
 ### What was NOT tested
 
@@ -489,7 +510,7 @@ to reach a gated module.
 
 ---
 
-### F1 — 50 DELETE endpoints return `204` for a row that does not exist (medium)
+### F1 — 56 DELETE endpoints return `204` for a row that does not exist (medium)
 
 **Expected** `404`, per the OpenAPI spec. **Observed** `204 No Content`.
 
@@ -520,10 +541,11 @@ So this is not a limitation, it is an inconsistency: `GET` checks existence firs
 missing row is a defensible REST choice; if that is the intent, the spec is wrong and
 should document `204`. If `404` is the intent, the generic delete handler needs an
 existence check. The generic path is `internal/platform/crud/` — `Handler.Delete` — and
-the change belongs there rather than in 50 individual stores.
+the change belongs there rather than in 56 individual stores.
 
 Affected: every `DELETE /api/v1/<collection>/{id}` operation. Full list in the
-"Failed contract checks" table below, filtered on `check = not-found`, `actual = 204`.
+"Failed contract checks" table below, filtered on `check = not-found`, `actual = 204`
+(56 rows in `out/sweep.json`).
 
 ---
 
@@ -587,7 +609,7 @@ This is Gin's default binding behaviour, so it applies to every write endpoint.
 
 **Why this is the most consequential finding in the report despite not being a
 security issue:** it makes integration errors invisible. During construction of this
-audit, **9 of 45 fixture payloads** hit it — written from the OpenAPI spec, which does
+audit, **9 of 49 fixture payloads** hit it — written from the OpenAPI spec, which does
 not reflect the Go structs. Two were particularly instructive:
 
 - `part` sent `name`, `category_id` and `manufacturer_id`. The real fields are
@@ -698,12 +720,85 @@ worth having written down. Not a defect.
 
 ---
 
+### F10 — `GET /api/v1/notifications` does not return the standard list envelope (medium)
+
+**Expected** the same page envelope every other list endpoint in this API returns:
+`data` (array), `total` (number), `limit`, `offset`, `has_next` (boolean). **Observed**
+a two-field body with no `total` and no `has_next` at all:
+
+```bash
+curl -s -H "Authorization: Bearer $TOKEN" \
+  'https://go-logistics.jesuslab135.com/api/v1/notifications?limit=1&offset=0'
+# {"data":[],"unread_count":0}
+```
+
+`out/sweep.json`'s `list-contract` result for this operation confirms both fields are
+simply absent, not present-with-the-wrong-type:
+
+```json
+{
+  "check": "list-contract",
+  "opKey": "GET /api/v1/notifications",
+  "ok": false,
+  "actual": "total is not a number; has_next is not a boolean",
+  "evidence": { "returned": 0 }
+}
+```
+
+The handler returns a bespoke shape instead of the shared pagination envelope:
+
+```go
+// internal/http/handler/notification.go:103
+c.JSON(http.StatusOK, dto.NotificationListResponse{Data: out, UnreadCount: unread})
+```
+
+```go
+// internal/http/dto/notification.go:18-21
+type NotificationListResponse struct {
+	Data        []NotificationResponse `json:"data"`
+	UnreadCount int64                  `json:"unread_count"`
+}
+```
+
+Every other list handler in this API is built on the shared paginated envelope (`data`,
+`total`, `limit`, `offset`, `has_next`); `NotificationHandler.List`
+(`internal/http/handler/notification.go:67`, constructed via `NewNotificationHandler`
+at `:50`) computes `unread` separately and never calls into that shared path at all.
+
+This matters for two concrete reasons: a client generated from the OpenAPI spec (which
+documents the standard envelope for this route) will type `total` and `has_next` as
+`number`/`boolean` and break the moment it actually decodes a response, since both keys
+are missing; and any pagination logic that reads `has_next` to decide whether to
+request the next page will misbehave — with it undefined, a naive truthiness check
+reads as "false" (stop paging) even when more notifications exist, silently truncating
+the inbox on the first page for any employee with more than one page of notifications.
+
+**Fix:** either return the shared page envelope from `paginate` (adding `total` from a
+count query, alongside the existing `unread_count`), or — if `total`/`has_next` are
+judged not worth a second query for a bell-icon list — update the OpenAPI spec to
+document `dto.NotificationListResponse`'s real, narrower shape instead of the generic
+list envelope it currently claims. The API and the spec must agree either way; today
+neither the API's behavior nor a client generated from its own spec agree with each
+other.
+
+---
+
 ### Failed contract checks
+
+**MINOR 5 correction.** This run's `out/sweep.json` recorded `list-contract` failures
+for `GET /api/v1/admin/companies/{id}/roles` and `GET
+/api/v1/admin/companies/{id}/work-order-statuses`, both `404`. Both are harness
+artefacts, not API defects: `checkListContract` substituted the harness's nonexistent-id
+sentinel into `{id}` — a *parent* company id it has no fixture row for — and the API
+correctly `404`s for a company that does not exist. That is a passing check, not a
+failure; substituting a fake parent id was never a fair probe of the list-contract
+shape. `qa/route-audit/lib/checks.mjs` now skips a `list-contract` check it cannot
+resolve a real parent row for, so on the next run these two rows will not appear here
+at all (see the "Post-review correction" note under the executive summary above for the
+resulting count change). They are omitted from the table below rather than restated.
 
 | Operation | Check | Expected | Observed | Severity |
 |---|---|---|---|---|
-| `GET /api/v1/admin/companies/{id}/roles` | list-contract | 200 with a page envelope | 404 | medium |
-| `GET /api/v1/admin/companies/{id}/work-order-statuses` | list-contract | 200 with a page envelope | 404 | medium |
 | `GET /api/v1/admin/employees` | conformance | response matches the documented schema | type: data[0].dashboard_preferences expected array got object; data[0].table_preferences expected array got object; data[1].dashboard_preferences expected array | low |
 | `PUT /api/v1/admin/employees/{id}/companies` | not-found | 404 | 422 | medium |
 | `PUT /api/v1/asset-statuses/{id}` | not-found | 404 | 422 | medium |
@@ -1407,3 +1502,17 @@ with no screen behind it.
 | Archived instead | 0 | — |
 | Reversed (neutralised, not removed) | 0 | — |
 | Failed to remove | 0 | — |
+
+**MINOR 6: the table above is zero residue in the database — it is not zero residue in
+object storage.** The workflow suite's upload check
+(`qa/route-audit/lib/workflows.mjs:390`) uploads a one-pixel PNG to production object
+storage as `ZZ-TEST-<runId>.png`. There is no `DELETE /uploads` route to remove it with:
+`internal/http/handler/router.go:221` registers only `member.POST("/uploads", ...)` for
+that path. Every run of this harness therefore leaves one small object permanently in
+the private bucket. This run left `ZZ-TEST-0910c.png`; how many prior runs did the same
+is not something the harness or this report can state precisely — `out/` is not
+version-controlled, so there is no record of past run ids — but the `AUDIT_RUN_ID`
+naming convention (date plus a letter suffix, e.g. this run's `0910c`) implies this was
+at least the third run attempted on 2026-09-10 alone, so more than one such object
+almost certainly already exists. There is no API route to remove them; this harness
+does not attempt to build one, and none is proposed here.
