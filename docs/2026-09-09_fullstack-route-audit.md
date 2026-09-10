@@ -1,8 +1,8 @@
 # Full-stack route audit
 
-**Run:** `0910c`  
+**Run:** `0910d`  
 **Target:** https://go-logistics.jesuslab135.com  
-**Generated:** 2026-09-10T08:21:17.742Z
+**Generated:** 2026-09-10T13:16:38.996Z
 
 > **How to read this file.** The tables below the "Findings" section are generated
 > by `qa/route-audit/run.mjs` from a live run. The Findings section itself, and the
@@ -15,30 +15,30 @@
 probes, all 12 cross-tenant isolation probes, and all 38 stateful workflow checks
 returned the expected result. There are **zero high-severity findings**.
 
-The 109 failed checks recorded by that run are contract-level disagreements between
+The 107 failed checks recorded by this run are contract-level disagreements between
 the OpenAPI spec and the implementation, concentrated in three patterns (F1–F3 below)
 that together account for 96 of them.
 
-> **Post-review correction (see MINOR 5 below).** Two of the 109 — the `list-contract`
-> checks against `GET /api/v1/admin/companies/{id}/roles` and `GET
-> /api/v1/admin/companies/{id}/work-order-statuses` — were harness artefacts, not API
-> defects: the checker substituted a nonexistent id into a *parent* `{id}` it had no
-> fixture row for, and the correct `404` that produced was scored as a failure. The
-> harness (`qa/route-audit/lib/checks.mjs`) now skips a `list-contract` check it cannot
-> resolve a real parent row for, instead of guessing. On the next run these two checks
-> will not appear in `results` at all: **checks run drops from 1095 to 1093, checks
-> failed from 109 to 107, and medium findings from 99 to 97.** The table below still
-> shows the numbers exactly as the run on 2026-09-10 produced them, with this note as
-> the correction; the "Failed contract checks" table further down has had those two
-> rows removed and annotated so it does not restate the error.
+> **Post-review correction (see MINOR 5 below).** Run `0910c`, the run this report
+> originally documented, recorded 109 failed checks — including two `list-contract`
+> failures against `GET /api/v1/admin/companies/{id}/roles` and `GET
+> /api/v1/admin/companies/{id}/work-order-statuses` that were harness artefacts, not
+> API defects: the checker substituted a nonexistent id into a *parent* `{id}` it had
+> no fixture row for, and the correct `404` that produced was scored as a failure.
+> `qa/route-audit/lib/checks.mjs` was fixed to skip a `list-contract` check it cannot
+> resolve a real parent row for, and this run, `0910d`, is the fixed harness's first
+> live confirmation of that: checks run **1095 → 1093**, checks failed **109 → 107**,
+> medium findings **99 → 97**. The numbers below are `0910d`'s own — this is no longer
+> a projection. The "Failed contract checks" table further down reflects `0910d`
+> directly and never contained those two rows to begin with.
 
 | Metric | Value |
 |---|---|
 | Backend operations in the spec | 374 |
-| Checks run | 1095 |
-| Checks failed | 109 |
+| Checks run | 1093 |
+| Checks failed | 107 |
 | Findings — high | **0** |
-| Findings — medium | 99 |
+| Findings — medium | 97 |
 | Findings — low | 10 |
 | Module-gate probes failed | **0 of 22** |
 | Tenant-isolation probes failed | **0 of 12**\* |
@@ -52,11 +52,14 @@ that together account for 96 of them.
 
 \* The isolation and workflow denominators above (12, 38) count only the actual
 cross-tenant/state-transition *probes* in each suite. The result arrays they come from
-are longer — 13 and 40 entries — because both suites also record their own cleanup as
-CheckResults (isolation's create/switch/delete of the throwaway tenant; the workflow
-suite's extra work-order-status create/restore/delete). Those cleanup entries are real,
-counted CheckResults, and are included in "Checks run" (1095) above, but are not probes
-and so are excluded from these two denominators.
+are longer — 14 and 40 entries — because both suites also record their own cleanup as
+CheckResults (isolation's create/switch-into-tenant/switch-back-home/delete of the
+throwaway tenant; the workflow suite's extra work-order-status create/restore/delete).
+The isolation array grew by one entry versus the `0910c` run above (13 → 14): the
+IMPORTANT-2 hardening in this fix wave made the switch-back-to-home a checked, recorded
+CheckResult where it was previously fired and discarded. Those cleanup entries are
+real, counted CheckResults, and are included in "Checks run" (1093) above, but are not
+probes and so are excluded from these two denominators.
 
 ### What was NOT tested
 
@@ -123,9 +126,9 @@ Not available — the browser walkthrough did not run. All 58 routes are listed 
 | Operation | Tested | Failed checks |
 |---|---|---|
 | `GET /api/v1/admin/companies/{id}/owner` | no — no fixture row satisfies this path | — |
-| `GET /api/v1/admin/companies/{id}/roles` | no — no fixture row satisfies this path | list-contract |
+| `GET /api/v1/admin/companies/{id}/roles` | no — no fixture row satisfies this path | — |
 | `POST /api/v1/admin/companies/{id}/set-owner` | no — no fixture row satisfies this path | — |
-| `GET /api/v1/admin/companies/{id}/work-order-statuses` | no — no fixture row satisfies this path | list-contract |
+| `GET /api/v1/admin/companies/{id}/work-order-statuses` | no — no fixture row satisfies this path | — |
 | `GET /api/v1/admin/employees` | yes | conformance |
 | `GET /api/v1/admin/employees/{id}/companies` | yes | — |
 | `PUT /api/v1/admin/employees/{id}/companies` | yes | not-found |
@@ -785,17 +788,18 @@ other.
 
 ### Failed contract checks
 
-**MINOR 5 correction.** This run's `out/sweep.json` recorded `list-contract` failures
-for `GET /api/v1/admin/companies/{id}/roles` and `GET
-/api/v1/admin/companies/{id}/work-order-statuses`, both `404`. Both are harness
+**MINOR 5 correction.** The `0910c` run this report originally documented recorded
+`list-contract` failures for `GET /api/v1/admin/companies/{id}/roles` and `GET
+/api/v1/admin/companies/{id}/work-order-statuses`, both `404`. Both were harness
 artefacts, not API defects: `checkListContract` substituted the harness's nonexistent-id
 sentinel into `{id}` — a *parent* company id it has no fixture row for — and the API
-correctly `404`s for a company that does not exist. That is a passing check, not a
+correctly `404`s for a company that does not exist. That was a passing check, not a
 failure; substituting a fake parent id was never a fair probe of the list-contract
 shape. `qa/route-audit/lib/checks.mjs` now skips a `list-contract` check it cannot
-resolve a real parent row for, so on the next run these two rows will not appear here
-at all (see the "Post-review correction" note under the executive summary above for the
-resulting count change). They are omitted from the table below rather than restated.
+resolve a real parent row for, and this report now documents `0910d`, the fixed
+harness's own live run — its `out/sweep.json` never contained those two rows at all
+(see the "Post-review correction" note under the executive summary above for the
+resulting count change). The table below is `0910d`'s actual output, not a projection.
 
 | Operation | Check | Expected | Observed | Severity |
 |---|---|---|---|---|
@@ -1498,7 +1502,7 @@ with no screen behind it.
 
 | Outcome | Count | Rows |
 |---|---|---|
-| Deleted | 49 | laborEntry#18, workOrderSubLineItem#19, wheelPosition#18, serviceEntryLineItem#18, purchaseOrderLineItem#16, workOrderLineItem#19, serviceTaskPart#2, axleConfig, trailer, vehicle, inspectionFormItem#16, trailerAssignment#18, weeklyMileageGoal#18, warranty#17, partInventory#20, fuelEntry#18, serviceEntry#19, purchaseOrder#19, issue#18, workOrder#20, employee#21, axleDefinition#19, tire#16, trailerAsset#46, asset#45, part#19, vehicleModel#23, tireModel#18, inspectionForm#18, fault#18, group#19, role#31, serviceTask#18, axleTemplate#19, vehicleMake#23, workOrderStatus#70, issuePriority#18, trailerClassification#18, fuelType#18, adjustmentReason#18, partLocation#20, measurementUnit#18, partManufacturer#18, partCategory#18, assetStatus#48, assetType#18, location#18, vendor#19, journalEntry#29 |
+| Deleted | 49 | laborEntry#19, workOrderSubLineItem#20, wheelPosition#19, serviceEntryLineItem#19, purchaseOrderLineItem#17, workOrderLineItem#20, serviceTaskPart#3, axleConfig, trailer, vehicle, inspectionFormItem#17, trailerAssignment#19, weeklyMileageGoal#19, warranty#18, partInventory#21, fuelEntry#19, serviceEntry#20, purchaseOrder#20, issue#19, workOrder#21, employee#22, axleDefinition#20, tire#17, trailerAsset#48, asset#47, part#20, vehicleModel#24, tireModel#19, inspectionForm#19, fault#19, group#20, role#34, serviceTask#19, axleTemplate#20, vehicleMake#24, workOrderStatus#80, issuePriority#19, trailerClassification#19, fuelType#19, adjustmentReason#19, partLocation#21, measurementUnit#19, partManufacturer#19, partCategory#19, assetStatus#54, assetType#19, location#19, vendor#21, journalEntry#31 |
 | Archived instead | 0 | — |
 | Reversed (neutralised, not removed) | 0 | — |
 | Failed to remove | 0 | — |
@@ -1506,13 +1510,17 @@ with no screen behind it.
 **MINOR 6: the table above is zero residue in the database — it is not zero residue in
 object storage.** The workflow suite's upload check
 (`qa/route-audit/lib/workflows.mjs:390`) uploads a one-pixel PNG to production object
-storage as `ZZ-TEST-<runId>.png`. There is no `DELETE /uploads` route to remove it with:
-`internal/http/handler/router.go:221` registers only `member.POST("/uploads", ...)` for
-that path. Every run of this harness therefore leaves one small object permanently in
-the private bucket. This run left `ZZ-TEST-0910c.png`; how many prior runs did the same
-is not something the harness or this report can state precisely — `out/` is not
-version-controlled, so there is no record of past run ids — but the `AUDIT_RUN_ID`
-naming convention (date plus a letter suffix, e.g. this run's `0910c`) implies this was
-at least the third run attempted on 2026-09-10 alone, so more than one such object
-almost certainly already exists. There is no API route to remove them; this harness
-does not attempt to build one, and none is proposed here.
+storage tagged `ZZ-TEST-<runId>.png`. There is no `DELETE /uploads` route to remove it
+with: `internal/http/handler/router.go:221` registers only `member.POST("/uploads",
+...)` for that path. This run's own recorded response
+(`qa/route-audit/out/workflows.json`) shows the object landed at
+`uploads/private/1/f038db66d813f7e3-ZZ-TEST-0910d.png` — a content-hash prefix ahead of
+the tag, not the bare tag alone — and that the upload handler also generated a
+thumbnail alongside it, `uploads/private/1/thumbs/f038db66d813f7e3-ZZ-TEST-0910d.jpg`.
+So each run leaves **two** objects behind, not one. Every run of this harness does the
+same; how many prior runs is not something the harness or this report can state
+precisely — `out/` is not version-controlled, so there is no record of past run ids —
+but this fix wave alone confirms at least two runs' worth of residue (`0910c` and
+`0910d`, four objects total), and the `AUDIT_RUN_ID` naming convention (date plus a
+letter suffix) implies more ran before either. There is no API route to remove them;
+this harness does not attempt to build one, and none is proposed here.
