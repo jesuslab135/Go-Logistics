@@ -17,7 +17,7 @@ func NewIdentityLoader(q *gen.Queries) *IdentityLoader {
 	return &IdentityLoader{q: q}
 }
 
-func (l *IdentityLoader) LoadIdentity(ctx context.Context, employeeID, companyID int64) (middleware.Identity, error) {
+func (l *IdentityLoader) LoadIdentity(ctx context.Context, employeeID int64, companyID *int64) (middleware.Identity, error) {
 	row, err := l.q.GetEmployeeIdentity(ctx, gen.GetEmployeeIdentityParams{
 		ID:        employeeID,
 		CompanyID: companyID,
@@ -26,9 +26,19 @@ func (l *IdentityLoader) LoadIdentity(ctx context.Context, employeeID, companyID
 		return middleware.Identity{}, err
 	}
 
+	// A company-less session (no tenant on the token) reports CompanyID 0, the
+	// same "absent" convention CompanyFromContext already uses; IsMember is
+	// false for it regardless, since the identity query's membership EXISTS
+	// resolves to false when companyID is nil.
+	var company int64
+	if companyID != nil {
+		company = *companyID
+	}
+
 	return middleware.Identity{
 		EmployeeID:      row.ID,
-		CompanyID:       companyID,
+		CompanyID:       company,
+		AccountID:       row.AccountID,
 		IsActive:        row.IsActive,
 		IsAccountOwner:  row.IsAccountOwner,
 		IsMember:        row.IsMember,

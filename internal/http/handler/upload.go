@@ -121,7 +121,17 @@ func (h *UploadHandler) Upload(c *gin.Context) {
 
 	var companyID int64
 	if claims, ok := middleware.ClaimsOf(c); ok {
-		companyID = claims.CompanyID
+		// CompanyID is optional on the claims (a company-less session has no
+		// tenant). Every route in this group already sits behind
+		// RequireCompanyMember, which refuses such a session before this
+		// handler runs, so this should be unreachable in practice — but
+		// refuse explicitly rather than dereference a nil pointer or invent a
+		// fallback company id for tenant data.
+		if claims.CompanyID == nil {
+			apierr.Abort(c, apierr.Forbidden("no active company membership is associated with this session"))
+			return
+		}
+		companyID = *claims.CompanyID
 	}
 
 	key := objectKey(purpose.visibility, companyID, header.Filename)

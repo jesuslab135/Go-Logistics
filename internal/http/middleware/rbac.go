@@ -14,9 +14,14 @@ import (
 // database rather than from the token, so role changes and deactivations apply
 // at once. It ports the inputs of api/permissions.py.
 type Identity struct {
-	EmployeeID     int64
-	CompanyID      int64
-	IsActive       bool
+	EmployeeID int64
+	CompanyID  int64
+	// AccountID is the client organisation this person belongs to. NULL means
+	// platform staff, who belong to no client and hold no company memberships.
+	AccountID *int64
+	IsActive  bool
+	// IsAccountOwner means this employee owns the account (AccountID) they
+	// belong to, not the retired global "may create companies" boolean.
 	IsAccountOwner bool
 	IsMember       bool
 	HasRole        bool
@@ -37,7 +42,7 @@ type ModulePermissions struct {
 // IdentityLoader reads the caller's authorization state. Implemented in the
 // handler package over the sqlc queries, so this package stays transport-only.
 type IdentityLoader interface {
-	LoadIdentity(ctx context.Context, employeeID, companyID int64) (Identity, error)
+	LoadIdentity(ctx context.Context, employeeID int64, companyID *int64) (Identity, error)
 }
 
 // methodAction ports HasModuleAccess.METHOD_ACTION_MAP.
@@ -164,6 +169,17 @@ type identityContextKey struct{}
 func IdentityOf(c *gin.Context) (Identity, bool) {
 	id, ok := c.Request.Context().Value(identityContextKey{}).(Identity)
 	return id, ok
+}
+
+// AccountFromContext returns the client organisation of the caller, or nil for
+// platform staff. Company creation reads it so a new company can never be
+// planted inside another client's account.
+func AccountFromContext(ctx context.Context) *int64 {
+	id, ok := ctx.Value(identityContextKey{}).(Identity)
+	if !ok {
+		return nil
+	}
+	return id.AccountID
 }
 
 // RequireIdentity must run after Auth. It resolves the caller once per request

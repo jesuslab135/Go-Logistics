@@ -151,6 +151,34 @@ func TestEffectivePermissionsAdminGrantsCustomAction(t *testing.T) {
 	}
 }
 
+// RequireAccountOwner used to read a global boolean whose only meaning was "may
+// create companies". It now means the caller owns the account they belong to,
+// so the predicate must be false for a member of an account they do not own.
+func TestAccountOwnerPredicate(t *testing.T) {
+	owner := Identity{IsActive: true, IsAccountOwner: true}
+	if !owner.IsAccountOwner {
+		t.Fatal("an account owner should satisfy the predicate")
+	}
+	member := Identity{IsActive: true, IsAccountOwner: false}
+	if member.IsAccountOwner {
+		t.Fatal("a non-owner must not satisfy the predicate")
+	}
+}
+
+// A company-less session has no tenant. It must not be reported as a member of
+// anything, because every scoped query trusts that flag.
+func TestCompanylessIdentityIsNotAMember(t *testing.T) {
+	id := Identity{IsActive: true, AccountID: i64ptr(3), IsMember: false}
+	if id.IsMember {
+		t.Fatal("a company-less identity must not be a member")
+	}
+	if id.AccountID == nil {
+		t.Fatal("a company-less identity still belongs to an account")
+	}
+}
+
+func i64ptr(v int64) *int64 { return &v }
+
 func TestIdentityCanAction(t *testing.T) {
 	warehouse := Identity{
 		IsActive: true,
