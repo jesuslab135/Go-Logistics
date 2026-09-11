@@ -158,6 +158,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "  fleet-cli setpass   --email <email> --password <password>")
 	fmt.Fprintln(os.Stderr, "  fleet-cli bootstrap --email <email> [--company-id <id>]")
 	fmt.Fprintln(os.Stderr, "  fleet-cli platform-admin --email <email> [--revoke] | --list")
+	fmt.Fprintln(os.Stderr, "  fleet-cli platform-admin --create --email <email> --first-name <name> --last-name <name> --password <password>")
 	fmt.Fprintln(os.Stderr, "  fleet-cli inventory-drift")
 }
 
@@ -171,6 +172,10 @@ func platformAdmin(args []string) error {
 	email := fs.String("email", "", "employee email")
 	revoke := fs.Bool("revoke", false, "revoke instead of grant")
 	list := fs.Bool("list", false, "list current platform administrators")
+	create := fs.Bool("create", false, "create a dedicated platform administrator with no account and no company")
+	firstName := fs.String("first-name", "", "first name (with --create)")
+	lastName := fs.String("last-name", "", "last name (with --create)")
+	password := fs.String("password", "", "password, at least 12 characters (with --create)")
 	_ = fs.Parse(args)
 
 	cfg, err := config.Load()
@@ -206,6 +211,10 @@ func platformAdmin(args []string) error {
 		return fmt.Errorf("--email is required (or --list)")
 	}
 
+	if *create {
+		return createPlatformAdmin(ctx, q, *email, *firstName, *lastName, *password)
+	}
+
 	emp, err := q.FindEmployeeByEmail(ctx, *email)
 	if err != nil {
 		return fmt.Errorf("no employee for email %q: %w", *email, err)
@@ -225,6 +234,40 @@ func platformAdmin(args []string) error {
 		verb = "revoked from"
 	}
 	fmt.Printf("platform administrator %s employee %d (%s)\n", verb, updated.ID, updated.Email)
+	return nil
+}
+
+// minPlatformAdminPasswordLength matches the floor for account owners: this
+// login reaches every client's data, so it gets at least the same.
+const minPlatformAdminPasswordLength = 12
+
+// createPlatformAdmin creates a dedicated platform administrator: an employee
+// with no account and no company, who logs in with a company-less session that
+// reaches /api/v1/admin/* and nothing tenant-scoped. Use it instead of granting
+// the flag to a client's own employee, which mixes the two roles.
+func createPlatformAdmin(ctx context.Context, q *gen.Queries, email, firstName, lastName, password string) error {
+	if firstName == "" || lastName == "" || password == "" {
+		return fmt.Errorf("--create needs --first-name, --last-name and --password")
+	}
+	if len(password) < minPlatformAdminPasswordLength {
+		return fmt.Errorf("password must be at least %d characters", minPlatformAdminPasswordLength)
+	}
+
+	hash, err := auth.HashPassword(password)
+	if err != nil {
+		return err
+	}
+	id, err := q.CreatePlatformStaffEmployee(ctx, gen.CreatePlatformStaffEmployeeParams{
+		FirstName:    firstName,
+		LastName:     lastName,
+		Email:        email,
+		PasswordHash: hash,
+	})
+	if err != nil {
+		return fmt.Errorf("create platform administrator %q (is the email already in use?): %w", email, err)
+	}
+
+	fmt.Printf("platform administrator created: employee %d (%s), no account, no company\n", id, email)
 	return nil
 }
 

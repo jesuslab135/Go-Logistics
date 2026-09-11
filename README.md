@@ -198,7 +198,14 @@ there is deliberately no API route that hands it out:
 go run ./cmd/cli platform-admin --email ops@example.com
 go run ./cmd/cli platform-admin --email ops@example.com --revoke
 go run ./cmd/cli platform-admin --list
+go run ./cmd/cli platform-admin --create --email ops@example.com \
+  --first-name Ops --last-name Team --password '<at least 12 characters>'
 ```
+
+`--create` makes a dedicated platform administrator: an employee with no
+account and no company. They log in with a company-less session that reaches
+`/api/v1/admin/*` and nothing tenant-scoped. Prefer it to granting the flag to
+one of a client's own employees, which mixes an operator with a tenant user.
 
 The flag is read from the database on every request, like every other
 authorization fact, so revoking it takes effect on the caller's next request

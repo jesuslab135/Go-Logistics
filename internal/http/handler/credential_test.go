@@ -43,20 +43,22 @@ func TestResolveLoginCompany(t *testing.T) {
 // tested: two bools, four combinations.
 func TestMayLogIn(t *testing.T) {
 	tests := []struct {
-		name      string
-		companyID *int64
-		accountID *int64
-		want      bool
+		name          string
+		companyID     *int64
+		accountID     *int64
+		platformAdmin bool
+		want          bool
 	}{
-		{"scoped session with a known account may log in", ptr(7), ptr(1), true},
-		{"scoped session with no account claim may log in", ptr(7), nil, true},
-		{"company-less owner with an account may log in — the whole point of this change", nil, ptr(1), true},
-		{"an employee belonging to nothing must never receive a token", nil, nil, false},
+		{"scoped session with a known account may log in", ptr(7), ptr(1), false, true},
+		{"scoped session with no account claim may log in", ptr(7), nil, false, true},
+		{"company-less owner with an account may log in — the whole point of this change", nil, ptr(1), false, true},
+		{"platform staff with no account and no company may log in", nil, nil, true, true},
+		{"an employee belonging to nothing, without the platform flag, must never receive a token", nil, nil, false, false},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := mayLogIn(tc.companyID, tc.accountID); got != tc.want {
-				t.Fatalf("mayLogIn(%v, %v) = %v, want %v", tc.companyID, tc.accountID, got, tc.want)
+			if got := mayLogIn(tc.companyID, tc.accountID, tc.platformAdmin); got != tc.want {
+				t.Fatalf("mayLogIn(%v, %v, %v) = %v, want %v", tc.companyID, tc.accountID, tc.platformAdmin, got, tc.want)
 			}
 		})
 	}

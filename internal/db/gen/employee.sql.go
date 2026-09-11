@@ -263,6 +263,42 @@ func (q *Queries) CreateEmployee(ctx context.Context, arg CreateEmployeeParams) 
 	return i, err
 }
 
+const createPlatformStaffEmployee = `-- name: CreatePlatformStaffEmployee :one
+INSERT INTO employee (
+    account_id, first_name, last_name, employee_id, email, mobile_phone,
+    work_phone, job_title, license_class, license_number, license_state,
+    street_address, city, region, postal_code, country, password_hash,
+    is_platform_admin, updated_at
+) VALUES (
+    NULL, $1, $2, '', $3,
+    '', '', '', '', '', '', '', '', '', '', '', $4, true, now()
+)
+RETURNING id
+`
+
+type CreatePlatformStaffEmployeeParams struct {
+	FirstName    string
+	LastName     string
+	Email        string
+	PasswordHash string
+}
+
+// CreatePlatformStaffEmployee provisions platform staff: an employee with no
+// account and no company, holding the flag that opens /api/v1/admin/*. It is
+// created from the CLI only, like every grant of that flag. The NOT NULL
+// columns with no default get empty values, as for an account owner.
+func (q *Queries) CreatePlatformStaffEmployee(ctx context.Context, arg CreatePlatformStaffEmployeeParams) (int64, error) {
+	row := q.db.QueryRow(ctx, createPlatformStaffEmployee,
+		arg.FirstName,
+		arg.LastName,
+		arg.Email,
+		arg.PasswordHash,
+	)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
 const deleteEmployee = `-- name: DeleteEmployee :exec
 DELETE FROM employee e
 WHERE e.id = $1
@@ -336,7 +372,7 @@ func (q *Queries) GetEmployee(ctx context.Context, arg GetEmployeeParams) (Emplo
 }
 
 const getEmployeeAuthByEmail = `-- name: GetEmployeeAuthByEmail :one
-SELECT e.id, e.default_company_id, e.account_id, e.password_hash
+SELECT e.id, e.default_company_id, e.account_id, e.password_hash, e.is_platform_admin
 FROM employee e
 WHERE e.email = $1 AND e.is_active = true
 LIMIT 1
@@ -347,6 +383,7 @@ type GetEmployeeAuthByEmailRow struct {
 	DefaultCompanyID *int64
 	AccountID        *int64
 	PasswordHash     string
+	IsPlatformAdmin  bool
 }
 
 func (q *Queries) GetEmployeeAuthByEmail(ctx context.Context, email string) (GetEmployeeAuthByEmailRow, error) {
@@ -357,6 +394,7 @@ func (q *Queries) GetEmployeeAuthByEmail(ctx context.Context, email string) (Get
 		&i.DefaultCompanyID,
 		&i.AccountID,
 		&i.PasswordHash,
+		&i.IsPlatformAdmin,
 	)
 	return i, err
 }

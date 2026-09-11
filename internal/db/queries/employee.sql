@@ -1,5 +1,5 @@
 -- name: GetEmployeeAuthByEmail :one
-SELECT e.id, e.default_company_id, e.account_id, e.password_hash
+SELECT e.id, e.default_company_id, e.account_id, e.password_hash, e.is_platform_admin
 FROM employee e
 WHERE e.email = $1 AND e.is_active = true
 LIMIT 1;
@@ -98,6 +98,22 @@ INSERT INTO employee (
 ) VALUES (
     sqlc.arg(account_id), sqlc.arg(first_name), sqlc.arg(last_name), '', sqlc.arg(email),
     '', '', '', '', '', '', '', '', '', '', '', sqlc.arg(password_hash), now()
+)
+RETURNING id;
+
+-- CreatePlatformStaffEmployee provisions platform staff: an employee with no
+-- account and no company, holding the flag that opens /api/v1/admin/*. It is
+-- created from the CLI only, like every grant of that flag. The NOT NULL
+-- columns with no default get empty values, as for an account owner.
+-- name: CreatePlatformStaffEmployee :one
+INSERT INTO employee (
+    account_id, first_name, last_name, employee_id, email, mobile_phone,
+    work_phone, job_title, license_class, license_number, license_state,
+    street_address, city, region, postal_code, country, password_hash,
+    is_platform_admin, updated_at
+) VALUES (
+    NULL, sqlc.arg(first_name), sqlc.arg(last_name), '', sqlc.arg(email),
+    '', '', '', '', '', '', '', '', '', '', '', sqlc.arg(password_hash), true, now()
 )
 RETURNING id;
 
