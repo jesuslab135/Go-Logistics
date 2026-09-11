@@ -35,11 +35,26 @@ func (v *EmployeeCredentialVerifier) Verify(ctx context.Context, email, password
 	// default_company_id is a plain writable field, so it is a hint, not an
 	// authority: the session is scoped to a company only after employee_companies
 	// confirms the membership — the same check /auth/switch-company already makes.
-	memberships, err := v.q.ListEmployeeCompanyIDs(ctx, row.ID)
+	memberships, err := v.q.ListActiveEmployeeCompanyIDs(ctx, row.ID)
 	if err != nil {
 		return Identity{}, ErrInvalidCredentials
 	}
 	companyID := resolveLoginCompany(row.DefaultCompanyID, memberships)
+
+	// No active membership is a company-less session only for someone with no
+	// memberships at all: a new account owner, or someone whose access the
+	// owner revoked. Memberships that exist but are all deactivated mean the
+	// person was deactivated everywhere, and a company-less session would
+	// quietly let them back in.
+	if companyID == nil {
+		total, err := v.q.CountEmployeeMemberships(ctx, row.ID)
+		if err != nil {
+			return Identity{}, ErrInvalidCredentials
+		}
+		if total > 0 {
+			return Identity{}, ErrInactiveEverywhere
+		}
+	}
 
 	if !mayLogIn(companyID, row.AccountID) {
 		return Identity{}, ErrNoCompanyMembership

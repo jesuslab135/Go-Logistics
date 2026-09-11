@@ -24,6 +24,10 @@ var ErrInvalidCredentials = errors.New("invalid credentials")
 // company that does not exist, so the login is refused instead.
 var ErrNoCompanyMembership = errors.New("no company membership")
 
+// ErrInactiveEverywhere is returned when credentials are valid but every
+// company membership the employee holds is deactivated.
+var ErrInactiveEverywhere = errors.New("inactive in every company")
+
 // Identity is the authenticated principal a successful login resolves to.
 // CompanyID and AccountID are pointers: a company-less session (an account
 // owner who has not yet created a company) has neither a tenant to scope to
@@ -78,6 +82,11 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	id, err := h.verifier.Verify(c.Request.Context(), req.Email, req.Password)
 	if err != nil {
+		if errors.Is(err, ErrInactiveEverywhere) {
+			apierr.Abort(c, apierr.New(http.StatusForbidden, "inactive",
+				"this employee is deactivated in every company they belong to"))
+			return
+		}
 		if errors.Is(err, ErrNoCompanyMembership) {
 			apierr.Abort(c, apierr.New(http.StatusForbidden, "no_company_membership",
 				"this account is not a member of any company"))
@@ -141,7 +150,7 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 	// A company-less token (claims.CompanyID == nil) has no membership to
 	// re-prove — it is simply re-issued company-less.
 	if claims.CompanyID != nil {
-		companies, err := h.q.ListEmployeeCompanyIDs(c.Request.Context(), claims.EmployeeID())
+		companies, err := h.q.ListActiveEmployeeCompanyIDs(c.Request.Context(), claims.EmployeeID())
 		if err != nil {
 			apierr.Abort(c, err)
 			return

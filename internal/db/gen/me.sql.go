@@ -28,6 +28,7 @@ SELECT
 FROM employee e
 LEFT JOIN employee_companies ec ON ec.employee_id = e.id
                                AND ec.company_id = $1
+                               AND ec.is_active
 LEFT JOIN role r ON r.id = ec.role_id
 WHERE e.id = $2
 `
@@ -87,6 +88,7 @@ SELECT c.id, c.name, c.logo
 FROM company c
 JOIN employee_companies ec ON ec.company_id = c.id
 WHERE ec.employee_id = $1
+  AND ec.is_active
 ORDER BY c.name, c.id
 `
 

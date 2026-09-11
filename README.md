@@ -298,6 +298,19 @@ account, a read-only user in another, and absent from a third.
 - **A company-less session is administrator of nothing.** An account owner who has
   not created a company yet gets `is_admin: false` and no readable modules from
   `/me/permissions`, matching what the module routes enforce, until they enter one.
+- **Deactivation is per company.** `is_active` on `PUT /api/v1/employees/{id}`
+  suspends the person in the session's company only (`employee_companies.is_active`,
+  migration `000023`); they keep working in their other companies. Login refuses
+  someone suspended in every company (`403 inactive`). Reactivating also lifts a
+  deactivation left by the old account-wide flag. Omitting `is_active` leaves it
+  unchanged.
+- **Delete removes someone from the session's company.** A person who belongs to
+  other companies stays in them; only their last company deletes the person, and
+  that fails with `409` if they have history (labor time, issues, fuel entries,
+  inspections). The account owner and the caller themselves can be neither deleted
+  (`409`) nor deactivated (`422`).
+- Employee responses carry `role_name` beside `role_id`, so people who cannot read
+  `/roles` still see which role applies.
 
 Account ownership lives on `account.owner_employee_id`. The old
 `employee.is_account_owner` column was dropped in migration `000022`. The employee

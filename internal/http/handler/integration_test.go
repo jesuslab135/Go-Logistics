@@ -1221,3 +1221,235 @@ func TestProvisioningWithATakenEmailNamesOwnerEmail(t *testing.T) {
 		t.Fatalf("409 details = %s, want owner_email named", body)
 	}
 }
+
+// logIn posts credentials and returns the access token, asserting the status.
+func logIn(t *testing.T, baseURL, email string, want int) (string, []byte) {
+	t.Helper()
+	var login struct {
+		AccessToken string `json:"access_token"`
+	}
+	body := postJSON(t, baseURL+"/auth/login", "", map[string]any{
+		"email": email, "password": "correct-horse-battery",
+	}, want, &login)
+	return login.AccessToken, body
+}
+
+// accountMemberships maps each person in the owner's account to the companies
+// they belong to, from GET /account/employees.
+func accountMemberships(t *testing.T, baseURL, ownerToken string) map[int64][]int64 {
+	t.Helper()
+	var people []struct {
+		EmployeeID  int64 `json:"employee_id"`
+		Memberships []struct {
+			CompanyID int64 `json:"company_id"`
+		} `json:"memberships"`
+	}
+	getJSON(t, baseURL+"/api/v1/account/employees", ownerToken, http.StatusOK, &people)
+	out := make(map[int64][]int64, len(people))
+	for _, p := range people {
+		ids := []int64{}
+		for _, m := range p.Memberships {
+			ids = append(ids, m.CompanyID)
+		}
+		out[p.EmployeeID] = ids
+	}
+	return out
+}
+
+// Nobody can delete or deactivate the account owner, which would leave the
+// account without one, and nobody can delete or deactivate themselves.
+func TestAccountOwnerAndSelfAreProtected(t *testing.T) {
+	ctx := context.Background()
+	pool := setupThrowawayDB(t, ctx)
+	srv := httptest.NewServer(newIntegrationRouter(pool))
+	defer srv.Close()
+
+	platformToken := seedPlatformAdmin(t, ctx, pool, srv.URL)
+	_, ownerID, _, ownerToken := provisionAccountOwner(t, srv.URL, platformToken)
+
+	ts := time.Now().UnixNano()
+	companyA := createCompany(t, srv.URL, ownerToken, "Company A", fmt.Sprintf("TAX-PR-A-%d", ts))
+	ownerTokenA := switchCompany(t, srv.URL, ownerToken, companyA)
+	roleAdminA := roleIDByName(t, srv.URL, ownerTokenA, "Administrador")
+
+	adminID := createDirectorCandidate(t, srv.URL, ownerTokenA, "protadmin")
+	updateEmployee(t, srv.URL, ownerTokenA, adminID, func(d map[string]any) { d["role_id"] = roleAdminA }, http.StatusOK)
+	adminToken := setPasswordAndLogIn(t, srv.URL, ownerTokenA, adminID, employeeEmail(t, srv.URL, ownerTokenA, adminID))
+
+	ownerURL := fmt.Sprintf("%s/api/v1/employees/%d", srv.URL, ownerID)
+	adminURL := fmt.Sprintf("%s/api/v1/employees/%d", srv.URL, adminID)
+
+	// An administrator can neither delete nor deactivate the owner...
+	body := doJSON(t, http.MethodDelete, ownerURL, adminToken, nil, http.StatusConflict, nil)
+	if !bytes.Contains(body, []byte("account owner")) {
+		t.Fatalf("deleting the owner: expected a 409 naming the account owner, got: %s", body)
+	}
+	body = updateEmployee(t, srv.URL, adminToken, ownerID, func(d map[string]any) { d["is_active"] = false }, http.StatusUnprocessableEntity)
+	if !bytes.Contains(body, []byte("account owner")) {
+		t.Fatalf("deactivating the owner: expected a 422 naming the account owner, got: %s", body)
+	}
+	// ...nor themselves.
+	body = doJSON(t, http.MethodDelete, adminURL, adminToken, nil, http.StatusConflict, nil)
+	if !bytes.Contains(body, []byte("yourself")) {
+		t.Fatalf("deleting yourself: expected a 409, got: %s", body)
+	}
+	body = updateEmployee(t, srv.URL, adminToken, adminID, func(d map[string]any) { d["is_active"] = false }, http.StatusUnprocessableEntity)
+	if !bytes.Contains(body, []byte("yourself")) {
+		t.Fatalf("deactivating yourself: expected a 422, got: %s", body)
+	}
+
+	// The owner is untouched.
+	var me meState
+	getJSON(t, srv.URL+"/api/v1/me/permissions", ownerTokenA, http.StatusOK, &me)
+	if !me.IsAccountOwner || !me.IsAdmin {
+		t.Fatalf("owner after the refused attempts: %+v", me)
+	}
+}
+
+// Deleting someone who also works in another company removes them from this
+// company only; the person is deleted when their last company removes them.
+func TestDeletingRemovesOnlyTheCurrentCompany(t *testing.T) {
+	ctx := context.Background()
+	pool := setupThrowawayDB(t, ctx)
+	srv := httptest.NewServer(newIntegrationRouter(pool))
+	defer srv.Close()
+
+	platformToken := seedPlatformAdmin(t, ctx, pool, srv.URL)
+	_, _, _, ownerToken := provisionAccountOwner(t, srv.URL, platformToken)
+
+	ts := time.Now().UnixNano()
+	companyA := createCompany(t, srv.URL, ownerToken, "Company A", fmt.Sprintf("TAX-DL-A-%d", ts))
+	companyB := createCompany(t, srv.URL, ownerToken, "Company B", fmt.Sprintf("TAX-DL-B-%d", ts))
+	ownerTokenA := switchCompany(t, srv.URL, ownerToken, companyA)
+	ownerTokenB := switchCompany(t, srv.URL, ownerToken, companyB)
+
+	personID := createDirectorCandidate(t, srv.URL, ownerTokenA, "twohomes")
+	putJSON(t, fmt.Sprintf("%s/api/v1/account/employees/%d/companies", srv.URL, personID), ownerToken,
+		map[string]any{"grants": []map[string]any{{"company_id": companyA}, {"company_id": companyB}}},
+		http.StatusOK, nil)
+
+	doJSON(t, http.MethodDelete, fmt.Sprintf("%s/api/v1/employees/%d", srv.URL, personID), ownerTokenA, nil, http.StatusNoContent, nil)
+	companies, stillThere := accountMemberships(t, srv.URL, ownerToken)[personID]
+	if !stillThere {
+		t.Fatal("deleting from A deleted the person, though they still belong to B")
+	}
+	if len(companies) != 1 || companies[0] != companyB {
+		t.Fatalf("after removal from A the person belongs to %v, want only %d", companies, companyB)
+	}
+	getJSON(t, fmt.Sprintf("%s/api/v1/employees/%d", srv.URL, personID), ownerTokenA, http.StatusNotFound, nil)
+
+	// B was their last company: now the person goes.
+	doJSON(t, http.MethodDelete, fmt.Sprintf("%s/api/v1/employees/%d", srv.URL, personID), ownerTokenB, nil, http.StatusNoContent, nil)
+	if _, stillThere := accountMemberships(t, srv.URL, ownerToken)[personID]; stillThere {
+		t.Fatal("removing the person from their last company did not delete them")
+	}
+
+	var revoked int64
+	if err := pool.QueryRow(ctx,
+		"SELECT count(*) FROM membership_audit WHERE subject_employee_id = $1 AND action = 'revoked'",
+		personID).Scan(&revoked); err != nil {
+		t.Fatalf("count audit rows: %v", err)
+	}
+	if revoked < 2 {
+		t.Fatalf("membership_audit has %d revoked rows for the person, want at least 2", revoked)
+	}
+}
+
+// Deactivation is per company: suspended in A, the person keeps working in B,
+// and only once they are suspended everywhere is their login refused.
+func TestDeactivationIsPerCompany(t *testing.T) {
+	ctx := context.Background()
+	pool := setupThrowawayDB(t, ctx)
+	srv := httptest.NewServer(newIntegrationRouter(pool))
+	defer srv.Close()
+
+	platformToken := seedPlatformAdmin(t, ctx, pool, srv.URL)
+	_, _, _, ownerToken := provisionAccountOwner(t, srv.URL, platformToken)
+
+	ts := time.Now().UnixNano()
+	companyA := createCompany(t, srv.URL, ownerToken, "Company A", fmt.Sprintf("TAX-DA-A-%d", ts))
+	companyB := createCompany(t, srv.URL, ownerToken, "Company B", fmt.Sprintf("TAX-DA-B-%d", ts))
+	ownerTokenA := switchCompany(t, srv.URL, ownerToken, companyA)
+	ownerTokenB := switchCompany(t, srv.URL, ownerToken, companyB)
+	roleWarehouseA := roleIDByName(t, srv.URL, ownerTokenA, "Almacén")
+	roleWarehouseB := roleIDByName(t, srv.URL, ownerTokenB, "Almacén")
+
+	personID := createDirectorCandidate(t, srv.URL, ownerTokenA, "suspended")
+	putJSON(t, fmt.Sprintf("%s/api/v1/account/employees/%d/companies", srv.URL, personID), ownerToken,
+		map[string]any{"grants": []map[string]any{
+			{"company_id": companyA, "role_id": roleWarehouseA},
+			{"company_id": companyB, "role_id": roleWarehouseB},
+		}}, http.StatusOK, nil)
+	email := employeeEmail(t, srv.URL, ownerTokenA, personID)
+	setPasswordAndLogIn(t, srv.URL, ownerTokenA, personID, email)
+
+	setActive := func(token string, active bool) {
+		t.Helper()
+		updateEmployee(t, srv.URL, token, personID, func(d map[string]any) { d["is_active"] = active }, http.StatusOK)
+	}
+	stateIn := func(token string) (bool, *string) {
+		t.Helper()
+		var e struct {
+			IsActive bool    `json:"is_active"`
+			RoleName *string `json:"role_name"`
+		}
+		getJSON(t, fmt.Sprintf("%s/api/v1/employees/%d", srv.URL, personID), token, http.StatusOK, &e)
+		return e.IsActive, e.RoleName
+	}
+	companyOf := func(token string) int64 {
+		t.Helper()
+		var me meState
+		getJSON(t, srv.URL+"/api/v1/me/permissions", token, http.StatusOK, &me)
+		if me.CompanyID == nil {
+			t.Fatal("session has no company")
+		}
+		return *me.CompanyID
+	}
+
+	// Suspended in A, still active in B, and the role name comes back.
+	setActive(ownerTokenA, false)
+	if active, _ := stateIn(ownerTokenA); active {
+		t.Fatal("is_active false in A was not applied")
+	}
+	active, roleName := stateIn(ownerTokenB)
+	if !active {
+		t.Fatal("suspending the person in A suspended them in B too")
+	}
+	if roleName == nil || *roleName != "Almacén" {
+		t.Fatalf("role_name in B = %v, want Almacén", roleName)
+	}
+
+	// They log in to B, can work there, and cannot enter A.
+	token, _ := logIn(t, srv.URL, email, http.StatusOK)
+	if got := companyOf(token); got != companyB {
+		t.Fatalf("login landed in company %d, want the active one %d", got, companyB)
+	}
+	getJSON(t, srv.URL+"/api/v1/assets", token, http.StatusOK, nil)
+	postJSON(t, srv.URL+"/auth/switch-company", token, map[string]any{"company_id": companyA}, http.StatusForbidden, nil)
+
+	// Suspended everywhere: login is refused, not turned into a company-less session.
+	setActive(ownerTokenB, false)
+	_, body := logIn(t, srv.URL, email, http.StatusForbidden)
+	if !bytes.Contains(body, []byte("inactive")) {
+		t.Fatalf("login while suspended everywhere: expected 403 inactive, got: %s", body)
+	}
+
+	// Reactivated in A: back in, landing in A.
+	setActive(ownerTokenA, true)
+	token, _ = logIn(t, srv.URL, email, http.StatusOK)
+	if got := companyOf(token); got != companyA {
+		t.Fatalf("login landed in company %d, want %d", got, companyA)
+	}
+
+	// A deactivation left by the old account-wide flag is lifted by
+	// reactivating the membership, so it can be undone from the UI.
+	if _, err := pool.Exec(ctx, "UPDATE employee SET is_active = false WHERE id = $1", personID); err != nil {
+		t.Fatalf("simulate a legacy deactivation: %v", err)
+	}
+	if _, err := pool.Exec(ctx, "UPDATE employee_companies SET is_active = false WHERE employee_id = $1", personID); err != nil {
+		t.Fatalf("simulate a legacy deactivation: %v", err)
+	}
+	logIn(t, srv.URL, email, http.StatusUnauthorized)
+	setActive(ownerTokenA, true)
+	logIn(t, srv.URL, email, http.StatusOK)
+}

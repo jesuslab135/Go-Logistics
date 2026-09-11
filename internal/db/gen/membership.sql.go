@@ -28,23 +28,45 @@ func (q *Queries) CompanyInAccount(ctx context.Context, arg CompanyInAccountPara
 	return exists, err
 }
 
-const getMembershipRole = `-- name: GetMembershipRole :one
-SELECT role_id FROM employee_companies
-WHERE employee_id = $1 AND company_id = $2
+const countOtherMemberships = `-- name: CountOtherMemberships :one
+SELECT count(*) FROM employee_companies
+WHERE employee_id = $1 AND company_id <> $2
 `
 
-type GetMembershipRoleParams struct {
+type CountOtherMembershipsParams struct {
 	EmployeeID int64
 	CompanyID  int64
 }
 
-// The role an employee holds in one company. No row means they are not a
-// member of it; a row with a NULL role_id is a member with no role.
-func (q *Queries) GetMembershipRole(ctx context.Context, arg GetMembershipRoleParams) (*int64, error) {
-	row := q.db.QueryRow(ctx, getMembershipRole, arg.EmployeeID, arg.CompanyID)
-	var role_id *int64
-	err := row.Scan(&role_id)
-	return role_id, err
+func (q *Queries) CountOtherMemberships(ctx context.Context, arg CountOtherMembershipsParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countOtherMemberships, arg.EmployeeID, arg.CompanyID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const getMembership = `-- name: GetMembership :one
+SELECT role_id, is_active FROM employee_companies
+WHERE employee_id = $1 AND company_id = $2
+`
+
+type GetMembershipParams struct {
+	EmployeeID int64
+	CompanyID  int64
+}
+
+type GetMembershipRow struct {
+	RoleID   *int64
+	IsActive bool
+}
+
+// One membership. No row means the employee is not a member of the company;
+// a NULL role_id is a member with no role.
+func (q *Queries) GetMembership(ctx context.Context, arg GetMembershipParams) (GetMembershipRow, error) {
+	row := q.db.QueryRow(ctx, getMembership, arg.EmployeeID, arg.CompanyID)
+	var i GetMembershipRow
+	err := row.Scan(&i.RoleID, &i.IsActive)
+	return i, err
 }
 
 const grantMembership = `-- name: GrantMembership :exec
@@ -73,7 +95,8 @@ func (q *Queries) GrantMembership(ctx context.Context, arg GrantMembershipParams
 const listAccountEmployeeMemberships = `-- name: ListAccountEmployeeMemberships :many
 SELECT e.id AS employee_id, e.first_name, e.last_name, e.email, e.is_active,
        ec.company_id, c.name AS company_name,
-       ec.role_id, r.name AS role_name, COALESCE(r.is_admin, false) AS role_is_admin
+       ec.role_id, r.name AS role_name, COALESCE(r.is_admin, false) AS role_is_admin,
+       ec.is_active AS membership_active
 FROM employee e
 LEFT JOIN employee_companies ec ON ec.employee_id = e.id
 LEFT JOIN company c ON c.id = ec.company_id
@@ -83,16 +106,17 @@ ORDER BY e.id, ec.company_id
 `
 
 type ListAccountEmployeeMembershipsRow struct {
-	EmployeeID  int64
-	FirstName   string
-	LastName    string
-	Email       string
-	IsActive    bool
-	CompanyID   *int64
-	CompanyName *string
-	RoleID      *int64
-	RoleName    *string
-	RoleIsAdmin bool
+	EmployeeID       int64
+	FirstName        string
+	LastName         string
+	Email            string
+	IsActive         bool
+	CompanyID        *int64
+	CompanyName      *string
+	RoleID           *int64
+	RoleName         *string
+	RoleIsAdmin      bool
+	MembershipActive *bool
 }
 
 func (q *Queries) ListAccountEmployeeMemberships(ctx context.Context, accountID int64) ([]ListAccountEmployeeMembershipsRow, error) {
@@ -115,6 +139,7 @@ func (q *Queries) ListAccountEmployeeMemberships(ctx context.Context, accountID 
 			&i.RoleID,
 			&i.RoleName,
 			&i.RoleIsAdmin,
+			&i.MembershipActive,
 		); err != nil {
 			return nil, err
 		}
@@ -126,34 +151,44 @@ func (q *Queries) ListAccountEmployeeMemberships(ctx context.Context, accountID 
 	return items, nil
 }
 
-const listCompanyMemberRoles = `-- name: ListCompanyMemberRoles :many
-SELECT employee_id, role_id FROM employee_companies
-WHERE company_id = $1
-  AND employee_id = ANY($2::bigint[])
+const listCompanyMemberships = `-- name: ListCompanyMemberships :many
+SELECT ec.employee_id, ec.role_id, r.name AS role_name, ec.is_active
+FROM employee_companies ec
+LEFT JOIN role r ON r.id = ec.role_id
+WHERE ec.company_id = $1
+  AND ec.employee_id = ANY($2::bigint[])
 `
 
-type ListCompanyMemberRolesParams struct {
+type ListCompanyMembershipsParams struct {
 	CompanyID   int64
 	EmployeeIds []int64
 }
 
-type ListCompanyMemberRolesRow struct {
+type ListCompanyMembershipsRow struct {
 	EmployeeID int64
 	RoleID     *int64
+	RoleName   *string
+	IsActive   bool
 }
 
-// The roles a page of employees holds in one company, so an employee listing
-// can report each person's role for the session's company in one read.
-func (q *Queries) ListCompanyMemberRoles(ctx context.Context, arg ListCompanyMemberRolesParams) ([]ListCompanyMemberRolesRow, error) {
-	rows, err := q.db.Query(ctx, listCompanyMemberRoles, arg.CompanyID, arg.EmployeeIds)
+// The membership each of a page of employees holds in one company, so an
+// employee listing can report role and status for the session's company in
+// one read.
+func (q *Queries) ListCompanyMemberships(ctx context.Context, arg ListCompanyMembershipsParams) ([]ListCompanyMembershipsRow, error) {
+	rows, err := q.db.Query(ctx, listCompanyMemberships, arg.CompanyID, arg.EmployeeIds)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ListCompanyMemberRolesRow{}
+	items := []ListCompanyMembershipsRow{}
 	for rows.Next() {
-		var i ListCompanyMemberRolesRow
-		if err := rows.Scan(&i.EmployeeID, &i.RoleID); err != nil {
+		var i ListCompanyMembershipsRow
+		if err := rows.Scan(
+			&i.EmployeeID,
+			&i.RoleID,
+			&i.RoleName,
+			&i.IsActive,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -162,6 +197,24 @@ func (q *Queries) ListCompanyMemberRoles(ctx context.Context, arg ListCompanyMem
 		return nil, err
 	}
 	return items, nil
+}
+
+const revokeMembership = `-- name: RevokeMembership :execrows
+DELETE FROM employee_companies
+WHERE employee_id = $1 AND company_id = $2
+`
+
+type RevokeMembershipParams struct {
+	EmployeeID int64
+	CompanyID  int64
+}
+
+func (q *Queries) RevokeMembership(ctx context.Context, arg RevokeMembershipParams) (int64, error) {
+	result, err := q.db.Exec(ctx, revokeMembership, arg.EmployeeID, arg.CompanyID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const revokeMembershipsNotIn = `-- name: RevokeMembershipsNotIn :exec
@@ -200,6 +253,27 @@ func (q *Queries) RoleBelongsToCompany(ctx context.Context, arg RoleBelongsToCom
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
+}
+
+const setMembershipActive = `-- name: SetMembershipActive :execrows
+UPDATE employee_companies SET is_active = $1
+WHERE employee_id = $2 AND company_id = $3
+`
+
+type SetMembershipActiveParams struct {
+	IsActive   bool
+	EmployeeID int64
+	CompanyID  int64
+}
+
+// Deactivation belongs to the membership: suspended in one company, still at
+// work in the others.
+func (q *Queries) SetMembershipActive(ctx context.Context, arg SetMembershipActiveParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setMembershipActive, arg.IsActive, arg.EmployeeID, arg.CompanyID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const setMembershipRole = `-- name: SetMembershipRole :execrows

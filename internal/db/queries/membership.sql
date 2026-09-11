@@ -20,7 +20,8 @@ WHERE employee_id = sqlc.arg(employee_id)
 -- name: ListAccountEmployeeMemberships :many
 SELECT e.id AS employee_id, e.first_name, e.last_name, e.email, e.is_active,
        ec.company_id, c.name AS company_name,
-       ec.role_id, r.name AS role_name, COALESCE(r.is_admin, false) AS role_is_admin
+       ec.role_id, r.name AS role_name, COALESCE(r.is_admin, false) AS role_is_admin,
+       ec.is_active AS membership_active
 FROM employee e
 LEFT JOIN employee_companies ec ON ec.employee_id = e.id
 LEFT JOIN company c ON c.id = ec.company_id
@@ -34,22 +35,39 @@ SELECT EXISTS (
     WHERE r.id = sqlc.arg(role_id) AND r.company_id = sqlc.arg(company_id)
 );
 
--- The role an employee holds in one company. No row means they are not a
--- member of it; a row with a NULL role_id is a member with no role.
--- name: GetMembershipRole :one
-SELECT role_id FROM employee_companies
+-- One membership. No row means the employee is not a member of the company;
+-- a NULL role_id is a member with no role.
+-- name: GetMembership :one
+SELECT role_id, is_active FROM employee_companies
 WHERE employee_id = sqlc.arg(employee_id) AND company_id = sqlc.arg(company_id);
 
 -- name: SetMembershipRole :execrows
 UPDATE employee_companies SET role_id = sqlc.narg(role_id)
 WHERE employee_id = sqlc.arg(employee_id) AND company_id = sqlc.arg(company_id);
 
--- The roles a page of employees holds in one company, so an employee listing
--- can report each person's role for the session's company in one read.
--- name: ListCompanyMemberRoles :many
-SELECT employee_id, role_id FROM employee_companies
-WHERE company_id = sqlc.arg(company_id)
-  AND employee_id = ANY(sqlc.arg(employee_ids)::bigint[]);
+-- Deactivation belongs to the membership: suspended in one company, still at
+-- work in the others.
+-- name: SetMembershipActive :execrows
+UPDATE employee_companies SET is_active = sqlc.arg(is_active)
+WHERE employee_id = sqlc.arg(employee_id) AND company_id = sqlc.arg(company_id);
+
+-- name: RevokeMembership :execrows
+DELETE FROM employee_companies
+WHERE employee_id = sqlc.arg(employee_id) AND company_id = sqlc.arg(company_id);
+
+-- name: CountOtherMemberships :one
+SELECT count(*) FROM employee_companies
+WHERE employee_id = sqlc.arg(employee_id) AND company_id <> sqlc.arg(company_id);
+
+-- The membership each of a page of employees holds in one company, so an
+-- employee listing can report role and status for the session's company in
+-- one read.
+-- name: ListCompanyMemberships :many
+SELECT ec.employee_id, ec.role_id, r.name AS role_name, ec.is_active
+FROM employee_companies ec
+LEFT JOIN role r ON r.id = ec.role_id
+WHERE ec.company_id = sqlc.arg(company_id)
+  AND ec.employee_id = ANY(sqlc.arg(employee_ids)::bigint[]);
 
 -- name: CompanyInAccount :one
 SELECT EXISTS (

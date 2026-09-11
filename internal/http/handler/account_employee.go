@@ -85,6 +85,7 @@ func groupAccountEmployeeMemberships(rows []gen.ListAccountEmployeeMembershipsRo
 			CompanyID:   *r.CompanyID,
 			RoleID:      r.RoleID,
 			RoleIsAdmin: r.RoleIsAdmin,
+			IsActive:    r.MembershipActive != nil && *r.MembershipActive,
 		}
 		if r.CompanyName != nil {
 			m.CompanyName = *r.CompanyName
