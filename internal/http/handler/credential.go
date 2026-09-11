@@ -56,7 +56,7 @@ func (v *EmployeeCredentialVerifier) Verify(ctx context.Context, email, password
 		}
 	}
 
-	if !mayLogIn(companyID, row.AccountID) {
+	if !mayLogIn(companyID, row.AccountID, row.IsPlatformAdmin) {
 		return Identity{}, ErrNoCompanyMembership
 	}
 
@@ -105,9 +105,10 @@ func resolveLoginCompany(defaultCompanyID *int64, memberships []int64) *int64 {
 //
 // A company is not required: an account owner provisioned by a platform admin
 // has none until they create one, and refusing them a token is the deadlock
-// this change exists to break. Belonging to NOTHING is still refused — a nil
-// company and a nil account together mean there is nowhere for the session to
-// be.
-func mayLogIn(companyID *int64, accountID *int64) bool {
-	return companyID != nil || accountID != nil
+// this change exists to break. Platform staff belong to no account and no
+// company by design and work only through /api/v1/admin/*, so they log in
+// company-less too. Belonging to NOTHING without the platform flag is still
+// refused — there is nowhere for such a session to be.
+func mayLogIn(companyID *int64, accountID *int64, isPlatformAdmin bool) bool {
+	return companyID != nil || accountID != nil || isPlatformAdmin
 }

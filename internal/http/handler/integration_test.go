@@ -193,30 +193,20 @@ func seedPlatformAdmin(t *testing.T, ctx context.Context, pool *pgxpool.Pool, ba
 		t.Fatalf("hash platform admin password: %v", err)
 	}
 
+	// Platform staff as the model defines them: no account, no company, only the
+	// flag. They used to need an account of their own purely so login would
+	// issue them a token.
 	const email = "platform-admin@integration.test"
-	var accountID int64
-	if err := pool.QueryRow(ctx,
-		"INSERT INTO account (name, created_at) VALUES ($1, now()) RETURNING id",
-		"Integration Platform Ops",
-	).Scan(&accountID); err != nil {
-		t.Fatalf("seed platform admin account: %v", err)
-	}
-
-	var employeeID int64
-	if err := pool.QueryRow(ctx, `
+	if _, err := pool.Exec(ctx, `
 		INSERT INTO employee (
 			account_id, first_name, last_name, employee_id, email, mobile_phone,
 			work_phone, job_title, license_class, license_number, license_state,
 			street_address, city, region, postal_code, country, password_hash,
 			is_platform_admin, updated_at
-		) VALUES ($1,'Platform','Admin','EMP-IT-ADMIN',$2,'','','','','','','','','','','',$3,true,now())
-		RETURNING id`,
-		accountID, email, hash,
-	).Scan(&employeeID); err != nil {
+		) VALUES (NULL,'Platform','Admin','EMP-IT-ADMIN',$1,'','','','','','','','','','','',$2,true,now())`,
+		email, hash,
+	); err != nil {
 		t.Fatalf("seed platform admin employee: %v", err)
-	}
-	if _, err := pool.Exec(ctx, "UPDATE account SET owner_employee_id = $1 WHERE id = $2", employeeID, accountID); err != nil {
-		t.Fatalf("set platform admin as their own account's owner: %v", err)
 	}
 
 	var login struct {
@@ -1452,4 +1442,59 @@ func TestDeactivationIsPerCompany(t *testing.T) {
 	logIn(t, srv.URL, email, http.StatusUnauthorized)
 	setActive(ownerTokenA, true)
 	logIn(t, srv.URL, email, http.StatusOK)
+}
+
+// Platform staff belong to no account and no company, by design. They still
+// log in, company-less, and reach /api/v1/admin/* but nothing company-scoped.
+// Someone with no account, no company and no platform flag is still refused.
+func TestPlatformAdminWithNoCompanyCanLogIn(t *testing.T) {
+	ctx := context.Background()
+	pool := setupThrowawayDB(t, ctx)
+	srv := httptest.NewServer(newIntegrationRouter(pool))
+	defer srv.Close()
+
+	hash, err := auth.HashPassword("correct-horse-battery")
+	if err != nil {
+		t.Fatalf("hash password: %v", err)
+	}
+	insert := func(email string, platformAdmin bool) {
+		t.Helper()
+		if _, err := pool.Exec(ctx, `
+			INSERT INTO employee (
+				account_id, first_name, last_name, employee_id, email, mobile_phone,
+				work_phone, job_title, license_class, license_number, license_state,
+				street_address, city, region, postal_code, country, password_hash,
+				is_platform_admin, updated_at
+			) VALUES (NULL,'Ops','Staff','',$1,'','','','','','','','','','','',$2,$3,now())`,
+			email, hash, platformAdmin); err != nil {
+			t.Fatalf("insert %s: %v", email, err)
+		}
+	}
+	ts := time.Now().UnixNano()
+	opsEmail := fmt.Sprintf("ops-%d@integration.test", ts)
+	nobodyEmail := fmt.Sprintf("nobody-%d@integration.test", ts)
+	insert(opsEmail, true)
+	insert(nobodyEmail, false)
+
+	token, _ := logIn(t, srv.URL, opsEmail, http.StatusOK)
+	var me struct {
+		CompanyID       *int64 `json:"company_id"`
+		IsAdmin         bool   `json:"is_admin"`
+		IsPlatformAdmin bool   `json:"is_platform_admin"`
+	}
+	getJSON(t, srv.URL+"/api/v1/me/permissions", token, http.StatusOK, &me)
+	if me.CompanyID != nil || !me.IsPlatformAdmin || me.IsAdmin {
+		t.Fatalf("platform staff /me = %+v, want company-less, platform admin, not a tenant admin", me)
+	}
+
+	// The admin namespace is open; tenant data and company creation are not.
+	getJSON(t, srv.URL+"/api/v1/admin/accounts", token, http.StatusOK, nil)
+	getJSON(t, srv.URL+"/api/v1/assets", token, http.StatusForbidden, nil)
+	postJSON(t, srv.URL+"/api/v1/companies", token,
+		map[string]any{"name": "Nope", "tax_id": fmt.Sprintf("NOPE-%d", ts)}, http.StatusForbidden, nil)
+
+	_, body := logIn(t, srv.URL, nobodyEmail, http.StatusForbidden)
+	if !bytes.Contains(body, []byte("no_company_membership")) {
+		t.Fatalf("login for someone belonging to nothing: expected 403 no_company_membership, got: %s", body)
+	}
 }
