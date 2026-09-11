@@ -137,11 +137,11 @@ VALUES ('Acme', 'ACME-001', '', now(), '', '', '', NULL, '', '', '',
 INSERT INTO role (company_id, name, is_admin, permissions)
 VALUES (1, 'Admin', true, '{}');                                  -- id 1
 
-INSERT INTO employee (default_company_id, role_id, first_name, last_name,
+INSERT INTO employee (default_company_id, first_name, last_name,
                       employee_id, email, mobile_phone, work_phone, job_title,
                       license_class, license_number, license_state, street_address,
                       city, region, postal_code, country, updated_at)
-VALUES (1, 1, 'Admin', 'User', 'EMP-001', 'admin@example.com',
+VALUES (1, 'Admin', 'User', 'EMP-001', 'admin@example.com',
         '', '', '', '', '', '', '', '', '', '', 'MX', now());
 ```
 
@@ -155,8 +155,8 @@ go run ./cmd/cli bootstrap --email admin@example.com
 ```
 
 This creates the default roles (if absent), the default work order and asset
-statuses, the membership row, and points the employee's role and default company
-at them. `POST /api/v1/companies` does the same thing transactionally for
+statuses, and the membership row carrying the company's `Administrador` role, and
+points the employee's default company at it. `POST /api/v1/companies` does the same thing transactionally for
 companies created through the API, so this command is only for repairing rows
 inserted by hand.
 
@@ -184,10 +184,12 @@ existed pick it up.
 `/api/v1/admin/*` reads and writes other tenants' data — the cross-company
 employee register, membership replacement, company owners, provisioning
 verification. It requires a *platform* administrator, which is not the same
-thing as a tenant's own `is_admin`: `employee.role_id` is a single global FK, so
-an administrator of one company is an administrator of every company they belong
-to, and gating a cross-tenant namespace on that let any company admin rewrite
-another tenant's employees.
+thing as a tenant's own `is_admin`. When this flag was introduced,
+`employee.role_id` was a single global FK, so an administrator of one company was
+an administrator of every company they belonged to, and gating a cross-tenant
+namespace on that let any company admin rewrite another tenant's employees. Roles
+are now per company (see [Per-company roles and directors](#per-company-roles-and-directors)),
+but a tenant administrator is still not a platform operator, so the flag stays.
 
 Nobody holds the flag after migration `000010`, so grant the first one here —
 there is deliberately no API route that hands it out:
@@ -204,9 +206,11 @@ rather than at their next token refresh.
 
 Every membership addition and removal made through
 `PUT /api/v1/admin/employees/{id}/companies` is recorded in `membership_audit`,
-in the same transaction as the change. Granting a company confers administrator
-access there when the employee's role carries `is_admin`, which makes it the
-highest-privilege write in the system; it previously left no trace.
+in the same transaction as the change. A company newly granted there carries no
+role, and so grants nothing until a role is assigned; a company the employee
+already belonged to keeps its role untouched. Before roles moved onto the
+membership, the same grant conferred administrator access wherever the
+employee's single global role carried `is_admin`, and left no trace.
 
 Set the password with the CLI, then log in:
 
@@ -265,6 +269,54 @@ client-owner role (for the pre-existing "Go Logistics" account) and the
 platform-admin flag, pending a follow-up that splits the two into separate
 identities.
 
+### Per-company roles and directors
+
+A role is granted **per company**, not per person: `role_id` lives on the
+`employee_companies` membership, and `employee.role_id` no longer exists
+(migration `000021`). One person can be an administrator of one company in the
+account, a read-only user in another, and absent from a third.
+
+- **A membership with no role grants nothing.** The person is associated with
+  the company and permitted nothing there — every module gate refuses, reads
+  included. Forgetting to assign a role fails closed.
+- **A role from another company cannot be attached**, by the API (`422` naming
+  `role_id`) or by direct SQL: the composite foreign key `fk_ec_role_company`
+  references `role(id, company_id)`.
+- **The account owner is an administrator throughout their own account** by
+  virtue of ownership, whatever role their own membership carries, so they cannot
+  lock themselves out of a company they own.
+- **An administrator of a company may edit that company's roles** (`/api/v1/roles`
+  is gated on the admin role of the session's company).
+
+The account owner appoints directors with two account-scoped routes — not under
+`/api/v1/admin/*`, which is cross-tenant and platform-only:
+
+```sh
+# Everyone in the account, with the role they hold in each company
+curl http://localhost:8080/api/v1/account/employees -H "Authorization: Bearer $OWNER_TOKEN"
+
+# Replace one person's memberships: admin in company 1, read-only in company 2,
+# revoked everywhere else. Omit role_id (or send null) for a membership with no role.
+curl -X PUT http://localhost:8080/api/v1/account/employees/42/companies \
+  -H "Authorization: Bearer $OWNER_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"grants":[{"company_id":1,"role_id":1},{"company_id":2,"role_id":7}]}'
+```
+
+The PUT is a full overwrite: every company named gets exactly the role paired
+with it, every company not named is revoked, and an empty `grants` list revokes
+every membership. Each grant and revoke is written to `membership_audit` in the
+same transaction. An employee or company outside the caller's account answers
+`404`, never confirming it exists elsewhere.
+
+Login resolves the company first and the role second, so the role in effect is
+always the one on the session's membership; switching company switches role.
+`GET /api/v1/me/permissions` reports it as `role` (`id`, `name`, `is_admin`), so
+a client can show which role applies.
+
+The migration preserved every existing user's effective permissions: each
+membership took the role of the same name in its own company, copying the
+definition where none existed.
+
 ### Integration tests
 
 `go test ./...` never touches Postgres — every defect the onboarding flow
@@ -287,8 +339,14 @@ it never touches a developer's own `fleet` database. Run it with Postgres up
 (`docker compose up -d db`) and:
 
 ```sh
-go test -tags=integration -run TestOnboardingChain ./internal/http/handler/...
+go test -tags=integration ./internal/http/handler/...
 ```
+
+Beside the onboarding chain, the same file proves the per-company role model:
+a director who may write in one company and only read in another
+(`TestDirectorHasDifferentPowersPerCompany`), the owner backstop, a
+wrong-company role refused at the API and by the database, a role-less
+membership granting nothing, and an empty grant list revoking everything.
 
 It looks for Postgres at `postgres://postgres:postgres@localhost:5433/postgres`
 (this project's own `db` service and the default `docker compose` port) by
@@ -366,7 +424,7 @@ then passes three gates:
 |---|---|---|
 | Identity | `request.user.employee` | the employee exists and `is_active` |
 | Membership | `IsCompanyMember` | an `employee_companies` row for the token's company |
-| Module | `HasModuleAccess` | `role.is_admin`, or `role.permissions[module]` grants the method |
+| Module | `HasModuleAccess` | the role on that membership has `is_admin` (or the caller owns the account), or its `permissions[module]` grants the method |
 
 `role.permissions` is a JSON object keyed by module. An **empty object grants the
 whole module**; otherwise the request's method maps to an action

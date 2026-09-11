@@ -8,6 +8,122 @@
     },
     "basePath": "/",
     "paths": {
+        "/api/v1/account/employees": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Every employee in the caller's account, with their membership set: which companies they belong to and, per company, the role they hold there (if any). Requires account owner. An employee who belongs to no company yet still appears, with an empty memberships list — this is the route that appoints their first one.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "account"
+                ],
+                "summary": "List the account's people and the role each holds per company",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/dto.AccountEmployeeResponse"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/account/employees/{id}/companies": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Full overwrite of the target employee's memberships within the caller's own account: every named company gets exactly the role paired with it (including companies the employee already belonged to — this is how a role changes), and every company not named is revoked. RoleID may be omitted for a company, which grants membership with no role: the employee is associated with the company but permitted nothing there until a role is assigned. An empty grants list revokes every membership. Every grant and revoke is recorded in membership_audit in the same transaction as the change. Requires account owner; the target employee and every named company must belong to the caller's own account, or the request 404s rather than confirming they exist elsewhere.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "account"
+                ],
+                "summary": "Replace one person's company memberships and roles",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Employee id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Membership set",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.ReplaceAccountEmployeeCompaniesRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.AccountEmployeeResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/admin/companies/{id}/owner": {
             "get": {
                 "security": [
@@ -17251,6 +17367,52 @@
                 }
             }
         },
+        "dto.AccountEmployeeMembership": {
+            "type": "object",
+            "properties": {
+                "company_id": {
+                    "type": "integer"
+                },
+                "company_name": {
+                    "type": "string"
+                },
+                "role_id": {
+                    "type": "integer"
+                },
+                "role_is_admin": {
+                    "type": "boolean"
+                },
+                "role_name": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.AccountEmployeeResponse": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "employee_id": {
+                    "type": "integer"
+                },
+                "first_name": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "last_name": {
+                    "type": "string"
+                },
+                "memberships": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.AccountEmployeeMembership"
+                    }
+                }
+            }
+        },
         "dto.ApproveTireAssignmentRequestRequest": {
             "type": "object",
             "properties": {
@@ -18003,6 +18165,17 @@
                 },
                 "website": {
                     "type": "string"
+                }
+            }
+        },
+        "dto.CompanyRoleGrant": {
+            "type": "object",
+            "properties": {
+                "company_id": {
+                    "type": "integer"
+                },
+                "role_id": {
+                    "type": "integer"
                 }
             }
         },
@@ -22635,6 +22808,17 @@
             "properties": {
                 "refresh_token": {
                     "type": "string"
+                }
+            }
+        },
+        "dto.ReplaceAccountEmployeeCompaniesRequest": {
+            "type": "object",
+            "properties": {
+                "grants": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.CompanyRoleGrant"
+                    }
                 }
             }
         },

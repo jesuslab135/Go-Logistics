@@ -11,6 +11,36 @@ definitions:
       token_type:
         type: string
     type: object
+  dto.AccountEmployeeMembership:
+    properties:
+      company_id:
+        type: integer
+      company_name:
+        type: string
+      role_id:
+        type: integer
+      role_is_admin:
+        type: boolean
+      role_name:
+        type: string
+    type: object
+  dto.AccountEmployeeResponse:
+    properties:
+      email:
+        type: string
+      employee_id:
+        type: integer
+      first_name:
+        type: string
+      is_active:
+        type: boolean
+      last_name:
+        type: string
+      memberships:
+        items:
+          $ref: '#/definitions/dto.AccountEmployeeMembership'
+        type: array
+    type: object
   dto.ApproveTireAssignmentRequestRequest:
     properties:
       notes:
@@ -521,6 +551,13 @@ definitions:
         type: string
       website:
         type: string
+    type: object
+  dto.CompanyRoleGrant:
+    properties:
+      company_id:
+        type: integer
+      role_id:
+        type: integer
     type: object
   dto.CreateAssetRequest:
     properties:
@@ -3751,6 +3788,13 @@ definitions:
         type: string
     required:
     - refresh_token
+    type: object
+  dto.ReplaceAccountEmployeeCompaniesRequest:
+    properties:
+      grants:
+        items:
+          $ref: '#/definitions/dto.CompanyRoleGrant'
+        type: array
     type: object
   dto.ReplaceEmployeeCompaniesRequest:
     properties:
@@ -7216,6 +7260,93 @@ info:
   title: Fleet API
   version: "1.0"
 paths:
+  /api/v1/account/employees:
+    get:
+      description: 'Every employee in the caller''s account, with their membership
+        set: which companies they belong to and, per company, the role they hold there
+        (if any). Requires account owner. An employee who belongs to no company yet
+        still appears, with an empty memberships list — this is the route that appoints
+        their first one.'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/dto.AccountEmployeeResponse'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List the account's people and the role each holds per company
+      tags:
+      - account
+  /api/v1/account/employees/{id}/companies:
+    put:
+      consumes:
+      - application/json
+      description: 'Full overwrite of the target employee''s memberships within the
+        caller''s own account: every named company gets exactly the role paired with
+        it (including companies the employee already belonged to — this is how a role
+        changes), and every company not named is revoked. RoleID may be omitted for
+        a company, which grants membership with no role: the employee is associated
+        with the company but permitted nothing there until a role is assigned. An
+        empty grants list revokes every membership. Every grant and revoke is recorded
+        in membership_audit in the same transaction as the change. Requires account
+        owner; the target employee and every named company must belong to the caller''s
+        own account, or the request 404s rather than confirming they exist elsewhere.'
+      parameters:
+      - description: Employee id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Membership set
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.ReplaceAccountEmployeeCompaniesRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.AccountEmployeeResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Replace one person's company memberships and roles
+      tags:
+      - account
   /api/v1/admin/companies/{id}/owner:
     get:
       description: 'employee.is_account_owner is a single global boolean, not a per-company
