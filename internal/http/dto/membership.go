@@ -20,6 +20,9 @@ type AccountEmployeeMembership struct {
 	RoleID      *int64 `json:"role_id"`
 	RoleName    string `json:"role_name,omitempty"`
 	RoleIsAdmin bool   `json:"role_is_admin"`
+	// IsActive is false when the person is suspended in this company; they
+	// keep their other memberships.
+	IsActive bool `json:"is_active"`
 }
 
 type AccountEmployeeResponse struct {

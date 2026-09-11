@@ -25,6 +25,7 @@ SELECT
 FROM employee e
 LEFT JOIN employee_companies ec ON ec.employee_id = e.id
                                AND ec.company_id = sqlc.narg(company_id)
+                               AND ec.is_active
 LEFT JOIN role r ON r.id = ec.role_id
 WHERE e.id = sqlc.arg(id);
 
@@ -36,4 +37,5 @@ SELECT c.id, c.name, c.logo
 FROM company c
 JOIN employee_companies ec ON ec.company_id = c.id
 WHERE ec.employee_id = sqlc.arg(employee_id)
+  AND ec.is_active
 ORDER BY c.name, c.id;

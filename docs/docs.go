@@ -4093,6 +4093,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "The members of the session's company. role_id, role_name and is_active describe each person's membership in THIS company; is_account_owner is computed from account ownership.",
                 "produces": [
                     "application/json"
                 ],
@@ -4135,6 +4136,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Creates the employee with one membership, in the session's company. role_id gives that membership a role and requires an administrator of the company (403 otherwise; 422 when the role belongs to another company). is_active false creates the membership suspended.",
                 "consumes": [
                     "application/json"
                 ],
@@ -4165,6 +4167,24 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -4216,6 +4236,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Updates the profile. role_id and is_active apply to the membership in the session's company only, and an omitted field leaves it unchanged. is_active false suspends the employee here while they keep working in their other companies; reactivating also lifts a deactivation left by the old account-wide flag. Changing role_id requires an administrator of the company (403). Refused with 422: a role from another company, an administrator changing their own role (the account owner may), deactivating yourself, and deactivating the account owner. Every change is written to membership_audit.",
                 "consumes": [
                     "application/json"
                 ],
@@ -4251,8 +4272,26 @@ const docTemplate = `{
                             "$ref": "#/definitions/dto.EmployeeResponse"
                         }
                     },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -4265,6 +4304,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Removes the employee from the session's company. Someone who belongs to other companies stays in them; only when this was their last company is the person deleted, which fails with 409 foreign_key_violation when they have history (labor time, reported issues, fuel entries, inspections) — deactivate instead. The account owner and the caller themselves cannot be deleted (409). Written to membership_audit.",
                 "tags": [
                     "employees"
                 ],
@@ -4284,6 +4324,18 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -17501,6 +17553,10 @@ const docTemplate = `{
                 "company_name": {
                     "type": "string"
                 },
+                "is_active": {
+                    "description": "IsActive is false when the person is suspended in this company; they\nkeep their other memberships.",
+                    "type": "boolean"
+                },
                 "role_id": {
                     "type": "integer"
                 },
@@ -18844,6 +18900,7 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "is_active": {
+                    "description": "IsActive is the new membership's status in the session's company.\nOmitted means active.",
                     "type": "boolean"
                 },
                 "is_technician": {
@@ -20761,6 +20818,7 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "is_active": {
+                    "description": "IsActive is the employee's status in the session's company. On the\ncross-company /admin/employees listing it is the account-wide flag.",
                     "type": "boolean"
                 },
                 "is_technician": {
@@ -20810,6 +20868,10 @@ const docTemplate = `{
                 "role_id": {
                     "description": "RoleID is the role this employee holds in the session's company, not a\nproperty of the person: the same employee can hold a different role, or\nnone, in another company. Null means no role there. Always null on the\ncross-company /admin/employees listing, which has no session company.",
                     "type": "integer"
+                },
+                "role_name": {
+                    "description": "RoleName is that role's name, so a client can show it without reading\n/roles, which only administrators may.",
+                    "type": "string"
                 },
                 "start_date": {
                     "type": "string"
@@ -24559,6 +24621,7 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "is_active": {
+                    "description": "IsActive is the employee's status in the session's company only: false\nsuspends them here while they keep working in their other companies.\nOmitted leaves it unchanged. The account owner and the caller themselves\ncannot be deactivated.",
                     "type": "boolean"
                 },
                 "is_technician": {

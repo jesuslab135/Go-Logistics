@@ -29,6 +29,7 @@ FROM employee e
 JOIN employee_companies ec ON ec.employee_id = e.id AND ec.company_id = sqlc.arg(company_id)
 LEFT JOIN role r ON r.id = ec.role_id
 WHERE e.is_active
+  AND ec.is_active
   AND (
     COALESCE(r.is_admin, false)
     OR COALESCE(r.permissions -> 'tire_approvals' ->> 'approve', 'false') = 'true'
@@ -62,4 +63,5 @@ SELECT sqlc.arg(company_id), sqlc.arg(employee_id), sqlc.arg(kind), sqlc.arg(tit
 WHERE EXISTS (
     SELECT 1 FROM employee_companies ec
     WHERE ec.employee_id = sqlc.arg(employee_id) AND ec.company_id = sqlc.arg(company_id)
+      AND ec.is_active
 );

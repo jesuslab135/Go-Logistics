@@ -8,11 +8,13 @@ import (
 )
 
 type CreateEmployeeRequest struct {
-	UserID            *int64           `json:"user_id"`
-	DefaultCompanyID  *int64           `json:"default_company_id"`
-	FirstName         string           `json:"first_name" binding:"omitempty,max=100"`
-	LastName          string           `json:"last_name" binding:"omitempty,max=100"`
-	EmployeeID        string           `json:"employee_id" binding:"omitempty,max=50"`
+	UserID           *int64 `json:"user_id"`
+	DefaultCompanyID *int64 `json:"default_company_id"`
+	FirstName        string `json:"first_name" binding:"omitempty,max=100"`
+	LastName         string `json:"last_name" binding:"omitempty,max=100"`
+	EmployeeID       string `json:"employee_id" binding:"omitempty,max=50"`
+	// IsActive is the new membership's status in the session's company.
+	// Omitted means active.
 	IsActive          *bool            `json:"is_active"`
 	Email             string           `json:"email" binding:"omitempty,max=254"`
 	MobilePhone       string           `json:"mobile_phone" binding:"omitempty,max=20"`
@@ -44,12 +46,16 @@ type CreateEmployeeRequest struct {
 }
 
 type UpdateEmployeeRequest struct {
-	UserID            *int64           `json:"user_id"`
-	DefaultCompanyID  *int64           `json:"default_company_id"`
-	FirstName         string           `json:"first_name" binding:"omitempty,max=100"`
-	LastName          string           `json:"last_name" binding:"omitempty,max=100"`
-	EmployeeID        string           `json:"employee_id" binding:"omitempty,max=50"`
-	IsActive          bool             `json:"is_active"`
+	UserID           *int64 `json:"user_id"`
+	DefaultCompanyID *int64 `json:"default_company_id"`
+	FirstName        string `json:"first_name" binding:"omitempty,max=100"`
+	LastName         string `json:"last_name" binding:"omitempty,max=100"`
+	EmployeeID       string `json:"employee_id" binding:"omitempty,max=50"`
+	// IsActive is the employee's status in the session's company only: false
+	// suspends them here while they keep working in their other companies.
+	// Omitted leaves it unchanged. The account owner and the caller themselves
+	// cannot be deactivated.
+	IsActive          *bool            `json:"is_active"`
 	Email             string           `json:"email" binding:"omitempty,max=254"`
 	MobilePhone       string           `json:"mobile_phone" binding:"omitempty,max=20"`
 	WorkPhone         string           `json:"work_phone" binding:"omitempty,max=20"`
@@ -81,12 +87,14 @@ type UpdateEmployeeRequest struct {
 }
 
 type EmployeeResponse struct {
-	ID                int64            `json:"id"`
-	UserID            *int64           `json:"user_id"`
-	DefaultCompanyID  *int64           `json:"default_company_id"`
-	FirstName         string           `json:"first_name" binding:"omitempty,max=100"`
-	LastName          string           `json:"last_name" binding:"omitempty,max=100"`
-	EmployeeID        string           `json:"employee_id" binding:"omitempty,max=50"`
+	ID               int64  `json:"id"`
+	UserID           *int64 `json:"user_id"`
+	DefaultCompanyID *int64 `json:"default_company_id"`
+	FirstName        string `json:"first_name" binding:"omitempty,max=100"`
+	LastName         string `json:"last_name" binding:"omitempty,max=100"`
+	EmployeeID       string `json:"employee_id" binding:"omitempty,max=50"`
+	// IsActive is the employee's status in the session's company. On the
+	// cross-company /admin/employees listing it is the account-wide flag.
 	IsActive          bool             `json:"is_active"`
 	Email             string           `json:"email" binding:"omitempty,max=254"`
 	MobilePhone       string           `json:"mobile_phone" binding:"omitempty,max=20"`
@@ -103,6 +111,9 @@ type EmployeeResponse struct {
 	// none, in another company. Null means no role there. Always null on the
 	// cross-company /admin/employees listing, which has no session company.
 	RoleID *int64 `json:"role_id"`
+	// RoleName is that role's name, so a client can show it without reading
+	// /roles, which only administrators may.
+	RoleName *string `json:"role_name"`
 	// IsAccountOwner is read-only and computed from account ownership. It is
 	// ignored if sent; ownership is transferred with
 	// POST /api/v1/admin/accounts/{id}/set-owner.

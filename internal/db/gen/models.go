@@ -231,6 +231,7 @@ type EmployeeCompany struct {
 	CompanyID  int64
 	AccountID  int64
 	RoleID     *int64
+	IsActive   bool
 }
 
 type Fault struct {

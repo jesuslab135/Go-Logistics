@@ -15,13 +15,20 @@ import (
 	"fleet/internal/platform/paginate"
 )
 
+// Status changes to a membership are audited alongside grants and revokes.
+const (
+	membershipSuspended = "suspended"
+	membershipRestored  = "restored"
+)
+
 // EmployeeStore scopes employees by company membership (employee_companies m2m),
 // creates the membership row transactionally with the employee, and never
 // exposes or accepts password_hash (that is owned by the auth flow / CLI).
 //
-// role_id on these routes is the employee's role in the SESSION's company: a
-// role belongs to a membership, not to a person, so the same employee can hold
-// a different role, or none, in another company.
+// role_id and is_active on these routes describe the employee's membership in
+// the SESSION's company, not the person: the same employee can hold a
+// different role, or be suspended, in another company. Delete likewise removes
+// them from this company, and deletes the person only when it was their last.
 type EmployeeStore struct {
 	q    *gen.Queries
 	pool *pgxpool.Pool
@@ -45,7 +52,7 @@ func (s *EmployeeStore) List(ctx context.Context, p paginate.Params) ([]dto.Empl
 	for i, r := range rows {
 		out[i] = toEmployeeResponse(r)
 	}
-	if err := applyEmployeeRoles(ctx, s.q, company, out); err != nil {
+	if err := applyMemberships(ctx, s.q, company, out); err != nil {
 		return nil, 0, err
 	}
 	return out, total, nil
@@ -109,8 +116,13 @@ func (s *EmployeeStore) Create(ctx context.Context, in dto.CreateEmployeeRequest
 	if err := qtx.GrantMembership(ctx, gen.GrantMembershipParams{EmployeeID: r.ID, CompanyID: company, RoleID: roleID}); err != nil {
 		return dto.EmployeeResponse{}, err
 	}
+	if !newMembershipActive(in) {
+		if _, err := qtx.SetMembershipActive(ctx, gen.SetMembershipActiveParams{IsActive: false, EmployeeID: r.ID, CompanyID: company}); err != nil {
+			return dto.EmployeeResponse{}, err
+		}
+	}
 	if roleID != nil {
-		if err := recordRoleGrant(ctx, qtx, r.ID, company, now); err != nil {
+		if err := recordMembershipChange(ctx, qtx, r.ID, company, membershipGranted, now); err != nil {
 			return dto.EmployeeResponse{}, err
 		}
 	}
@@ -145,28 +157,49 @@ func (s *EmployeeStore) Update(ctx context.Context, id int64, in dto.UpdateEmplo
 	defer tx.Rollback(ctx)
 	qtx := s.q.WithTx(tx)
 
+	current, err := qtx.GetMembership(ctx, gen.GetMembershipParams{EmployeeID: id, CompanyID: company})
+	if err != nil {
+		return dto.EmployeeResponse{}, err
+	}
+
 	// role_id is only acted on when present in the body and different from the
 	// role already held, so a client that echoes the current value back, or
 	// never sends the field, needs no administrator rights to save a profile.
-	if in.RoleID.Set {
-		current, err := qtx.GetMembershipRole(ctx, gen.GetMembershipRoleParams{EmployeeID: id, CompanyID: company})
+	if in.RoleID.Set && !sameRole(current.RoleID, in.RoleID.Value) {
+		if err := authorizeRoleChange(ctx, qtx, id, company, in.RoleID.Value); err != nil {
+			return dto.EmployeeResponse{}, err
+		}
+		n, err := qtx.SetMembershipRole(ctx, gen.SetMembershipRoleParams{RoleID: in.RoleID.Value, EmployeeID: id, CompanyID: company})
 		if err != nil {
 			return dto.EmployeeResponse{}, err
 		}
-		if !sameRole(current, in.RoleID.Value) {
-			if err := authorizeRoleChange(ctx, qtx, id, company, in.RoleID.Value); err != nil {
+		if n == 0 {
+			return dto.EmployeeResponse{}, apierr.NotFound("employee not found")
+		}
+		if err := recordMembershipChange(ctx, qtx, id, company, membershipGranted, now); err != nil {
+			return dto.EmployeeResponse{}, err
+		}
+	}
+
+	// is_active suspends or restores the membership in this company only.
+	if in.IsActive != nil && *in.IsActive != current.IsActive {
+		if err := authorizeActiveChange(ctx, qtx, id, *in.IsActive); err != nil {
+			return dto.EmployeeResponse{}, err
+		}
+		if _, err := qtx.SetMembershipActive(ctx, gen.SetMembershipActiveParams{IsActive: *in.IsActive, EmployeeID: id, CompanyID: company}); err != nil {
+			return dto.EmployeeResponse{}, err
+		}
+		action := membershipSuspended
+		if *in.IsActive {
+			action = membershipRestored
+			// A deactivation made while is_active was account-wide (before
+			// 000023) would otherwise keep the person locked out everywhere.
+			if err := qtx.ActivateEmployee(ctx, gen.ActivateEmployeeParams{ID: id, UpdatedAt: now}); err != nil {
 				return dto.EmployeeResponse{}, err
 			}
-			n, err := qtx.SetMembershipRole(ctx, gen.SetMembershipRoleParams{RoleID: in.RoleID.Value, EmployeeID: id, CompanyID: company})
-			if err != nil {
-				return dto.EmployeeResponse{}, err
-			}
-			if n == 0 {
-				return dto.EmployeeResponse{}, apierr.NotFound("employee not found")
-			}
-			if err := recordRoleGrant(ctx, qtx, id, company, now); err != nil {
-				return dto.EmployeeResponse{}, err
-			}
+		}
+		if err := recordMembershipChange(ctx, qtx, id, company, action, now); err != nil {
+			return dto.EmployeeResponse{}, err
 		}
 	}
 
@@ -178,7 +211,6 @@ func (s *EmployeeStore) Update(ctx context.Context, id int64, in dto.UpdateEmplo
 		FirstName:            in.FirstName,
 		LastName:             in.LastName,
 		EmployeeID:           in.EmployeeID,
-		IsActive:             in.IsActive,
 		Email:                in.Email,
 		MobilePhone:          in.MobilePhone,
 		WorkPhone:            in.WorkPhone,
@@ -213,15 +245,64 @@ func (s *EmployeeStore) Update(ctx context.Context, id int64, in dto.UpdateEmplo
 	return s.respond(ctx, company, r)
 }
 
+// Delete removes the employee from the session's company. Deleting the person
+// outright would take them out of every company in the account, including
+// ones the caller cannot see, so that only happens when this was their last
+// membership — and then fails with a 409 if they have history (labor time,
+// issues, fuel entries, inspections) that must keep its author.
 func (s *EmployeeStore) Delete(ctx context.Context, id int64) error {
-	return s.q.DeleteEmployee(ctx, gen.DeleteEmployeeParams{ID: id, CompanyID: middleware.CompanyFromContext(ctx)})
+	company := middleware.CompanyFromContext(ctx)
+
+	identity, _ := middleware.IdentityFromContext(ctx)
+	if id == identity.EmployeeID {
+		return apierr.Conflict("you cannot delete yourself")
+	}
+	// Deleting the owner would leave the account with none, and with it nobody
+	// able to create companies or appoint directors.
+	owner, err := isAccountOwner(ctx, s.q, id)
+	if err != nil {
+		return err
+	}
+	if owner {
+		return apierr.Conflict("the account owner cannot be deleted; transfer ownership first")
+	}
+
+	if _, err := s.q.GetMembership(ctx, gen.GetMembershipParams{EmployeeID: id, CompanyID: company}); err != nil {
+		return err
+	}
+	others, err := s.q.CountOtherMemberships(ctx, gen.CountOtherMembershipsParams{EmployeeID: id, CompanyID: company})
+	if err != nil {
+		return err
+	}
+
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	qtx := s.q.WithTx(tx)
+
+	if err := recordMembershipChange(ctx, qtx, id, company, membershipRevoked, time.Now().UTC()); err != nil {
+		return err
+	}
+	if others > 0 {
+		if _, err := qtx.RevokeMembership(ctx, gen.RevokeMembershipParams{EmployeeID: id, CompanyID: company}); err != nil {
+			return err
+		}
+		if err := qtx.ClearDefaultCompanyIf(ctx, gen.ClearDefaultCompanyIfParams{ID: id, CompanyID: company}); err != nil {
+			return err
+		}
+	} else if err := qtx.DeleteEmployee(ctx, gen.DeleteEmployeeParams{ID: id, CompanyID: company}); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
-// respond renders one employee with the role they hold in company and their
+// respond renders one employee with their membership in company and their
 // account ownership filled in.
 func (s *EmployeeStore) respond(ctx context.Context, company int64, r gen.Employee) (dto.EmployeeResponse, error) {
 	out := []dto.EmployeeResponse{toEmployeeResponse(r)}
-	if err := applyEmployeeRoles(ctx, s.q, company, out); err != nil {
+	if err := applyMemberships(ctx, s.q, company, out); err != nil {
 		return dto.EmployeeResponse{}, err
 	}
 	return out[0], nil
@@ -255,16 +336,44 @@ func authorizeRoleChange(ctx context.Context, q *gen.Queries, employeeID, compan
 	return nil
 }
 
-// recordRoleGrant writes the role change to membership_audit, as every other
-// membership write does: giving someone a role is the highest-privilege write
-// a company administrator can make.
-func recordRoleGrant(ctx context.Context, q *gen.Queries, employeeID, company int64, now time.Time) error {
+// authorizeActiveChange refuses the two deactivations that lock the wrong
+// person out: yourself, and the account owner, who would lose the company
+// their account owns. Reactivating is never refused.
+func authorizeActiveChange(ctx context.Context, q *gen.Queries, employeeID int64, activate bool) error {
+	if activate {
+		return nil
+	}
+	identity, _ := middleware.IdentityFromContext(ctx)
+	if employeeID == identity.EmployeeID {
+		return apierr.Validation(map[string]string{"is_active": "you cannot deactivate yourself"})
+	}
+	owner, err := isAccountOwner(ctx, q, employeeID)
+	if err != nil {
+		return err
+	}
+	if owner {
+		return apierr.Validation(map[string]string{"is_active": "the account owner cannot be deactivated"})
+	}
+	return nil
+}
+
+func isAccountOwner(ctx context.Context, q *gen.Queries, employeeID int64) (bool, error) {
+	owners, err := q.ListOwnersAmong(ctx, []int64{employeeID})
+	if err != nil {
+		return false, err
+	}
+	return slices.Contains(owners, employeeID), nil
+}
+
+// recordMembershipChange writes to membership_audit, as every other membership
+// write does: a role, a suspension or a removal changes what someone may do.
+func recordMembershipChange(ctx context.Context, q *gen.Queries, employeeID, company int64, action string, now time.Time) error {
 	actor := middleware.EmployeeFromContext(ctx)
 	return q.RecordMembershipChange(ctx, gen.RecordMembershipChangeParams{
 		ActorEmployeeID:   &actor,
 		SubjectEmployeeID: employeeID,
 		CompanyID:         company,
-		Action:            membershipGranted,
+		Action:            action,
 		OccurredAt:        now,
 	})
 }
@@ -276,9 +385,10 @@ func sameRole(a, b *int64) bool {
 	return *a == *b
 }
 
-// applyEmployeeRoles fills in each employee's role in company and whether they
-// own their account, with one read for each rather than one per employee.
-func applyEmployeeRoles(ctx context.Context, q *gen.Queries, company int64, out []dto.EmployeeResponse) error {
+// applyMemberships fills in each employee's role, role name and status in
+// company, and whether they own their account, with one read for each rather
+// than one per employee.
+func applyMemberships(ctx context.Context, q *gen.Queries, company int64, out []dto.EmployeeResponse) error {
 	if len(out) == 0 {
 		return nil
 	}
@@ -286,16 +396,20 @@ func applyEmployeeRoles(ctx context.Context, q *gen.Queries, company int64, out 
 	for i := range out {
 		ids[i] = out[i].ID
 	}
-	rows, err := q.ListCompanyMemberRoles(ctx, gen.ListCompanyMemberRolesParams{CompanyID: company, EmployeeIds: ids})
+	rows, err := q.ListCompanyMemberships(ctx, gen.ListCompanyMembershipsParams{CompanyID: company, EmployeeIds: ids})
 	if err != nil {
 		return err
 	}
-	roles := make(map[int64]*int64, len(rows))
+	byEmployee := make(map[int64]gen.ListCompanyMembershipsRow, len(rows))
 	for _, r := range rows {
-		roles[r.EmployeeID] = r.RoleID
+		byEmployee[r.EmployeeID] = r
 	}
 	for i := range out {
-		out[i].RoleID = roles[out[i].ID]
+		if m, ok := byEmployee[out[i].ID]; ok {
+			out[i].RoleID = m.RoleID
+			out[i].RoleName = m.RoleName
+			out[i].IsActive = out[i].IsActive && m.IsActive
+		}
 	}
 	return applyAccountOwners(ctx, q, out)
 }
@@ -335,6 +449,15 @@ func validateDefaultCompany(defaultCompanyID *int64, memberships []int64) error 
 	})
 }
 
+// newMembershipActive is the status the new employee's membership starts with.
+// is_active is a pointer so an explicit false wins over the active default.
+func newMembershipActive(in dto.CreateEmployeeRequest) bool {
+	return boolOrDefault(in.IsActive, true)
+}
+
+// createEmployeeParams creates the employee row always active: deactivation
+// belongs to the membership (see newMembershipActive), and the row's own
+// is_active is only the old account-wide switch.
 func createEmployeeParams(in dto.CreateEmployeeRequest, accountID *int64, now time.Time) gen.CreateEmployeeParams {
 	return gen.CreateEmployeeParams{
 		AccountID:            accountID,
@@ -343,7 +466,7 @@ func createEmployeeParams(in dto.CreateEmployeeRequest, accountID *int64, now ti
 		FirstName:            in.FirstName,
 		LastName:             in.LastName,
 		EmployeeID:           in.EmployeeID,
-		IsActive:             boolOrDefault(in.IsActive, true),
+		IsActive:             true,
 		Email:                in.Email,
 		MobilePhone:          in.MobilePhone,
 		WorkPhone:            in.WorkPhone,
@@ -371,8 +494,9 @@ func createEmployeeParams(in dto.CreateEmployeeRequest, accountID *int64, now ti
 	}
 }
 
-// toEmployeeResponse renders the employee row alone. RoleID and IsAccountOwner
-// are not columns of it; applyEmployeeRoles and applyAccountOwners fill them.
+// toEmployeeResponse renders the employee row alone. RoleID, RoleName, the
+// per-company IsActive and IsAccountOwner are not columns of it;
+// applyMemberships and applyAccountOwners fill them.
 func toEmployeeResponse(r gen.Employee) dto.EmployeeResponse {
 	return dto.EmployeeResponse{
 		ID:                   r.ID,

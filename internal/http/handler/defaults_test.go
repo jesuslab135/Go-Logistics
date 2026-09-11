@@ -21,20 +21,27 @@ func TestCreateEmployeeDefaultsToActive(t *testing.T) {
 	if in.IsActive != nil {
 		t.Fatalf("omitted is_active should decode to nil, got %v", *in.IsActive)
 	}
+	if !newMembershipActive(in) {
+		t.Error("employee created without is_active must be active in the company")
+	}
 	if got := createEmployeeParams(in, ptr(1), time.Now()); !got.IsActive {
-		t.Error("employee created without is_active must be active")
+		t.Error("the employee row must be created active")
 	}
 }
 
 // An explicit false must still win, which is the whole reason the field is a
-// pointer rather than a plain bool.
+// pointer rather than a plain bool. It suspends the membership, not the
+// person: the employee row stays active so other companies are unaffected.
 func TestCreateEmployeeHonoursExplicitFalse(t *testing.T) {
 	var in dto.CreateEmployeeRequest
 	if err := json.Unmarshal([]byte(`{"is_active":false}`), &in); err != nil {
 		t.Fatal(err)
 	}
-	if got := createEmployeeParams(in, ptr(1), time.Now()); got.IsActive {
+	if newMembershipActive(in) {
 		t.Error(`"is_active":false was ignored`)
+	}
+	if got := createEmployeeParams(in, ptr(1), time.Now()); !got.IsActive {
+		t.Error(`"is_active":false deactivated the employee row, not the membership`)
 	}
 }
 

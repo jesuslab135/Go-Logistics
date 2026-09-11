@@ -12,6 +12,40 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+const activateEmployee = `-- name: ActivateEmployee :exec
+UPDATE employee SET is_active = true, updated_at = $1
+WHERE id = $2 AND NOT is_active
+`
+
+type ActivateEmployeeParams struct {
+	UpdatedAt time.Time
+	ID        int64
+}
+
+// Lifts the old account-wide deactivation. The API never sets employee.is_active
+// false any more; reactivating a membership calls this so a deactivation made
+// before 000023 does not keep the person locked out.
+func (q *Queries) ActivateEmployee(ctx context.Context, arg ActivateEmployeeParams) error {
+	_, err := q.db.Exec(ctx, activateEmployee, arg.UpdatedAt, arg.ID)
+	return err
+}
+
+const clearDefaultCompanyIf = `-- name: ClearDefaultCompanyIf :exec
+UPDATE employee SET default_company_id = NULL
+WHERE id = $1 AND default_company_id = $2::bigint
+`
+
+type ClearDefaultCompanyIfParams struct {
+	ID        int64
+	CompanyID int64
+}
+
+// Forgets a default company the employee no longer belongs to.
+func (q *Queries) ClearDefaultCompanyIf(ctx context.Context, arg ClearDefaultCompanyIfParams) error {
+	_, err := q.db.Exec(ctx, clearDefaultCompanyIf, arg.ID, arg.CompanyID)
+	return err
+}
+
 const countAllEmployees = `-- name: CountAllEmployees :one
 SELECT count(*) FROM employee e
 WHERE (
@@ -25,6 +59,19 @@ WHERE (
 
 func (q *Queries) CountAllEmployees(ctx context.Context, companyID *int64) (int64, error) {
 	row := q.db.QueryRow(ctx, countAllEmployees, companyID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countEmployeeMemberships = `-- name: CountEmployeeMemberships :one
+SELECT count(*) FROM employee_companies WHERE employee_id = $1
+`
+
+// Every membership, active or not. Tells a person deactivated everywhere apart
+// from one who belongs to no company yet.
+func (q *Queries) CountEmployeeMemberships(ctx context.Context, employeeID int64) (int64, error) {
+	row := q.db.QueryRow(ctx, countEmployeeMemberships, employeeID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -376,6 +423,7 @@ SELECT
 FROM employee e
 LEFT JOIN employee_companies ec ON ec.employee_id = e.id
                                AND ec.company_id = $1
+                               AND ec.is_active
 LEFT JOIN role r    ON r.id = ec.role_id
 LEFT JOIN account a ON a.id = e.account_id
 WHERE e.id = $2
@@ -426,6 +474,34 @@ func (q *Queries) GetEmployeeIdentity(ctx context.Context, arg GetEmployeeIdenti
 		&i.IsAccountOwner,
 	)
 	return i, err
+}
+
+const listActiveEmployeeCompanyIDs = `-- name: ListActiveEmployeeCompanyIDs :many
+SELECT company_id FROM employee_companies
+WHERE employee_id = $1 AND is_active
+ORDER BY company_id
+`
+
+// The companies an employee may actually work in: memberships that are not
+// deactivated. Login and refresh scope a session through this.
+func (q *Queries) ListActiveEmployeeCompanyIDs(ctx context.Context, employeeID int64) ([]int64, error) {
+	rows, err := q.db.Query(ctx, listActiveEmployeeCompanyIDs, employeeID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []int64{}
+	for rows.Next() {
+		var company_id int64
+		if err := rows.Scan(&company_id); err != nil {
+			return nil, err
+		}
+		items = append(items, company_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listAllEmployees = `-- name: ListAllEmployees :many
@@ -660,19 +736,19 @@ const updateEmployee = `-- name: UpdateEmployee :one
 UPDATE employee e SET
     user_id = $1, default_company_id = $2,
     first_name = $3, last_name = $4, employee_id = $5,
-    is_active = $6, email = $7,
-    mobile_phone = $8, work_phone = $9, job_title = $10,
-    start_date = $11, leave_date = $12, birth_date = $13,
-    hourly_labor_rate = $14, is_technician = $15,
-    is_vehicle_operator = $16,
-    license_class = $17, license_number = $18,
-    license_state = $19, license_expiry = $20,
-    street_address = $21, city = $22, region = $23,
-    postal_code = $24, country = $25, group_id = $26,
-    custom_fields = $27, table_preferences = $28,
-    dashboard_preferences = $29, updated_at = $30
-WHERE e.id = $31
-  AND EXISTS (SELECT 1 FROM employee_companies ec WHERE ec.employee_id = e.id AND ec.company_id = $32)
+    email = $6,
+    mobile_phone = $7, work_phone = $8, job_title = $9,
+    start_date = $10, leave_date = $11, birth_date = $12,
+    hourly_labor_rate = $13, is_technician = $14,
+    is_vehicle_operator = $15,
+    license_class = $16, license_number = $17,
+    license_state = $18, license_expiry = $19,
+    street_address = $20, city = $21, region = $22,
+    postal_code = $23, country = $24, group_id = $25,
+    custom_fields = $26, table_preferences = $27,
+    dashboard_preferences = $28, updated_at = $29
+WHERE e.id = $30
+  AND EXISTS (SELECT 1 FROM employee_companies ec WHERE ec.employee_id = e.id AND ec.company_id = $31)
 RETURNING e.id, e.user_id, e.default_company_id, e.first_name, e.last_name, e.employee_id, e.is_active, e.email, e.mobile_phone, e.work_phone, e.job_title, e.start_date, e.leave_date, e.birth_date, e.hourly_labor_rate, e.is_technician, e.is_vehicle_operator, e.license_class, e.license_number, e.license_state, e.license_expiry, e.street_address, e.city, e.region, e.postal_code, e.country, e.group_id, e.custom_fields, e.table_preferences, e.dashboard_preferences, e.updated_at, e.password_hash, e.is_platform_admin, e.account_id
 `
 
@@ -682,7 +758,6 @@ type UpdateEmployeeParams struct {
 	FirstName            string
 	LastName             string
 	EmployeeID           string
-	IsActive             bool
 	Email                string
 	MobilePhone          string
 	WorkPhone            string
@@ -718,7 +793,6 @@ func (q *Queries) UpdateEmployee(ctx context.Context, arg UpdateEmployeeParams) 
 		arg.FirstName,
 		arg.LastName,
 		arg.EmployeeID,
-		arg.IsActive,
 		arg.Email,
 		arg.MobilePhone,
 		arg.WorkPhone,

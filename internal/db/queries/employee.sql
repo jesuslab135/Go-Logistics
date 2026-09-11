@@ -35,6 +35,7 @@ SELECT
 FROM employee e
 LEFT JOIN employee_companies ec ON ec.employee_id = e.id
                                AND ec.company_id = sqlc.narg(company_id)
+                               AND ec.is_active
 LEFT JOIN role r    ON r.id = ec.role_id
 LEFT JOIN account a ON a.id = e.account_id
 WHERE e.id = sqlc.arg(id);
@@ -112,7 +113,7 @@ ORDER BY company_id;
 UPDATE employee e SET
     user_id = sqlc.arg(user_id), default_company_id = sqlc.arg(default_company_id),
     first_name = sqlc.arg(first_name), last_name = sqlc.arg(last_name), employee_id = sqlc.arg(employee_id),
-    is_active = sqlc.arg(is_active), email = sqlc.arg(email),
+    email = sqlc.arg(email),
     mobile_phone = sqlc.arg(mobile_phone), work_phone = sqlc.arg(work_phone), job_title = sqlc.arg(job_title),
     start_date = sqlc.arg(start_date), leave_date = sqlc.arg(leave_date), birth_date = sqlc.arg(birth_date),
     hourly_labor_rate = sqlc.arg(hourly_labor_rate), is_technician = sqlc.arg(is_technician),
@@ -175,6 +176,30 @@ WHERE employee_id = sqlc.arg(employee_id)
 -- name: SetEmployeeDefaultCompany :exec
 UPDATE employee SET default_company_id = sqlc.narg(default_company_id), updated_at = sqlc.arg(updated_at)
 WHERE id = sqlc.arg(id);
+
+-- name: ListActiveEmployeeCompanyIDs :many
+-- The companies an employee may actually work in: memberships that are not
+-- deactivated. Login and refresh scope a session through this.
+SELECT company_id FROM employee_companies
+WHERE employee_id = sqlc.arg(employee_id) AND is_active
+ORDER BY company_id;
+
+-- name: CountEmployeeMemberships :one
+-- Every membership, active or not. Tells a person deactivated everywhere apart
+-- from one who belongs to no company yet.
+SELECT count(*) FROM employee_companies WHERE employee_id = sqlc.arg(employee_id);
+
+-- name: ActivateEmployee :exec
+-- Lifts the old account-wide deactivation. The API never sets employee.is_active
+-- false any more; reactivating a membership calls this so a deactivation made
+-- before 000023 does not keep the person locked out.
+UPDATE employee SET is_active = true, updated_at = sqlc.arg(updated_at)
+WHERE id = sqlc.arg(id) AND NOT is_active;
+
+-- name: ClearDefaultCompanyIf :exec
+-- Forgets a default company the employee no longer belongs to.
+UPDATE employee SET default_company_id = NULL
+WHERE id = sqlc.arg(id) AND default_company_id = sqlc.arg(company_id)::bigint;
 
 -- name: SetEmployeeDefaultCompanyIfUnset :exec
 UPDATE employee
