@@ -25,6 +25,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -38,6 +39,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"fleet/internal/auth"
@@ -499,9 +501,9 @@ func createDirectorCandidate(t *testing.T, baseURL, callerToken, emailLocalPart 
 	}
 	postJSON(t, baseURL+"/api/v1/employees", callerToken, map[string]any{
 		"first_name": "Dana", "last_name": "Director",
-		"email":         fmt.Sprintf("%s-%d@integration.test", emailLocalPart, ts),
-		"employee_id":   fmt.Sprintf("EMP-%s-%d", emailLocalPart, ts),
-		"mobile_phone":  "555", "work_phone": "555",
+		"email":        fmt.Sprintf("%s-%d@integration.test", emailLocalPart, ts),
+		"employee_id":  fmt.Sprintf("EMP-%s-%d", emailLocalPart, ts),
+		"mobile_phone": "555", "work_phone": "555",
 		"job_title": "Director", "license_class": "N/A", "license_number": "N/A",
 		"license_state": "N/A", "street_address": "1 St", "city": "City",
 		"region": "R", "postal_code": "00000", "country": "MX",
@@ -662,6 +664,71 @@ func TestGrantingARoleFromAnotherCompanyIsRefused(t *testing.T) {
 
 	if !bytes.Contains(body, []byte("role_id")) {
 		t.Fatalf("expected the 422 body to name role_id, got: %s", body)
+	}
+}
+
+// The database half of the same guarantee: a role from another company cannot
+// be attached "by any means, including direct SQL" (spec, success criteria).
+// Every assertion names fk_ec_role_company rather than accepting any error,
+// because uq_employee_companies can fire first on an insert and make a
+// wrong-company write fail for the wrong reason.
+func TestWrongCompanyRoleIsRefusedByTheDatabase(t *testing.T) {
+	ctx := context.Background()
+	pool := setupThrowawayDB(t, ctx)
+	router := newIntegrationRouter(pool)
+	srv := httptest.NewServer(router)
+	defer srv.Close()
+
+	platformToken := seedPlatformAdmin(t, ctx, pool, srv.URL)
+	_, _, _, ownerToken := provisionAccountOwner(t, srv.URL, platformToken)
+
+	ts := time.Now().UnixNano()
+	companyA := createCompany(t, srv.URL, ownerToken, "Company A", fmt.Sprintf("TAX-FK-A-%d", ts))
+	companyB := createCompany(t, srv.URL, ownerToken, "Company B", fmt.Sprintf("TAX-FK-B-%d", ts))
+
+	ownerTokenA := switchCompany(t, srv.URL, ownerToken, companyA)
+	roleAdminA := roleIDByName(t, srv.URL, ownerTokenA, "Administrador")
+	ownerTokenB := switchCompany(t, srv.URL, ownerToken, companyB)
+	roleAdminB := roleIDByName(t, srv.URL, ownerTokenB, "Administrador")
+
+	// A member of A only, so an insert into B cannot collide with an existing
+	// membership.
+	employeeID := createDirectorCandidate(t, srv.URL, ownerTokenA, "fk")
+	var accountID int64
+	if err := pool.QueryRow(ctx, "SELECT account_id FROM employee_companies WHERE employee_id = $1 AND company_id = $2",
+		employeeID, companyA).Scan(&accountID); err != nil {
+		t.Fatalf("read the employee's membership in A: %v", err)
+	}
+
+	requireFKViolation := func(what string, err error) {
+		t.Helper()
+		var pgErr *pgconn.PgError
+		if !errors.As(err, &pgErr) {
+			t.Fatalf("%s: want a fk_ec_role_company violation, got %v", what, err)
+		}
+		if pgErr.ConstraintName != "fk_ec_role_company" {
+			t.Fatalf("%s: refused by %q (%s), want fk_ec_role_company", what, pgErr.ConstraintName, pgErr.Message)
+		}
+	}
+
+	// Insert: a new membership in B carrying A's role.
+	_, err := pool.Exec(ctx,
+		"INSERT INTO employee_companies (employee_id, company_id, account_id, role_id) VALUES ($1, $2, $3, $4)",
+		employeeID, companyB, accountID, roleAdminA)
+	requireFKViolation("insert a membership in B with A's role", err)
+
+	// Update: the existing membership in A re-pointed at B's role.
+	_, err = pool.Exec(ctx,
+		"UPDATE employee_companies SET role_id = $1 WHERE employee_id = $2 AND company_id = $3",
+		roleAdminB, employeeID, companyA)
+	requireFKViolation("re-point the membership in A at B's role", err)
+
+	// Control: the identical insert with B's own role succeeds, so the refusal
+	// above came from the role alone and not from anything else in the row.
+	if _, err := pool.Exec(ctx,
+		"INSERT INTO employee_companies (employee_id, company_id, account_id, role_id) VALUES ($1, $2, $3, $4)",
+		employeeID, companyB, accountID, roleAdminB); err != nil {
+		t.Fatalf("control insert with B's own role was refused, so the assertions above prove nothing: %v", err)
 	}
 }
 
