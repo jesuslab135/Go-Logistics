@@ -20,7 +20,6 @@ SELECT
     e.is_active,
     e.is_technician,
     e.is_vehicle_operator,
-    e.is_account_owner,
     e.default_company_id,
     ec.role_id,
     r.name                               AS role_name,
@@ -47,7 +46,6 @@ type GetMeProfileRow struct {
 	IsActive          bool
 	IsTechnician      bool
 	IsVehicleOperator bool
-	IsAccountOwner    bool
 	DefaultCompanyID  *int64
 	RoleID            *int64
 	RoleName          *string
@@ -75,7 +73,6 @@ func (q *Queries) GetMeProfile(ctx context.Context, arg GetMeProfileParams) (Get
 		&i.IsActive,
 		&i.IsTechnician,
 		&i.IsVehicleOperator,
-		&i.IsAccountOwner,
 		&i.DefaultCompanyID,
 		&i.RoleID,
 		&i.RoleName,

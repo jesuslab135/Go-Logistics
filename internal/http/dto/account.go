@@ -33,6 +33,13 @@ type AccountPage struct {
 	HasNext bool              `json:"has_next"`
 }
 
+// AccountCompanyResponse is one company of the caller's account.
+type AccountCompanyResponse struct {
+	ID   int64   `json:"id"`
+	Name string  `json:"name"`
+	Logo *string `json:"logo"`
+}
+
 type SetAccountOwnerRequest struct {
 	EmployeeID int64 `json:"employee_id" binding:"required,min=1"`
 }

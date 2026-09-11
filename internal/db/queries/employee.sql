@@ -67,7 +67,7 @@ WHERE EXISTS (SELECT 1 FROM employee_companies ec WHERE ec.employee_id = e.id AN
 INSERT INTO employee (
     account_id, user_id, default_company_id, first_name, last_name, employee_id, is_active,
     email, mobile_phone, work_phone, job_title, start_date, leave_date, birth_date,
-    hourly_labor_rate, is_technician, is_vehicle_operator, is_account_owner, license_class,
+    hourly_labor_rate, is_technician, is_vehicle_operator, license_class,
     license_number, license_state, license_expiry, street_address, city, region, postal_code,
     country, group_id, custom_fields, table_preferences, dashboard_preferences, updated_at
 ) VALUES (
@@ -75,7 +75,7 @@ INSERT INTO employee (
     sqlc.arg(employee_id), sqlc.arg(is_active), sqlc.arg(email),
     sqlc.arg(mobile_phone), sqlc.arg(work_phone), sqlc.arg(job_title), sqlc.arg(start_date),
     sqlc.arg(leave_date), sqlc.arg(birth_date), sqlc.arg(hourly_labor_rate), sqlc.arg(is_technician),
-    sqlc.arg(is_vehicle_operator), sqlc.arg(is_account_owner), sqlc.arg(license_class),
+    sqlc.arg(is_vehicle_operator), sqlc.arg(license_class),
     sqlc.arg(license_number), sqlc.arg(license_state), sqlc.arg(license_expiry),
     sqlc.arg(street_address), sqlc.arg(city), sqlc.arg(region), sqlc.arg(postal_code),
     sqlc.arg(country), sqlc.arg(group_id), sqlc.arg(custom_fields), sqlc.arg(table_preferences),
@@ -116,7 +116,7 @@ UPDATE employee e SET
     mobile_phone = sqlc.arg(mobile_phone), work_phone = sqlc.arg(work_phone), job_title = sqlc.arg(job_title),
     start_date = sqlc.arg(start_date), leave_date = sqlc.arg(leave_date), birth_date = sqlc.arg(birth_date),
     hourly_labor_rate = sqlc.arg(hourly_labor_rate), is_technician = sqlc.arg(is_technician),
-    is_vehicle_operator = sqlc.arg(is_vehicle_operator), is_account_owner = sqlc.arg(is_account_owner),
+    is_vehicle_operator = sqlc.arg(is_vehicle_operator),
     license_class = sqlc.arg(license_class), license_number = sqlc.arg(license_number),
     license_state = sqlc.arg(license_state), license_expiry = sqlc.arg(license_expiry),
     street_address = sqlc.arg(street_address), city = sqlc.arg(city), region = sqlc.arg(region),

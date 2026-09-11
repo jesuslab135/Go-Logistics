@@ -287,13 +287,35 @@ account, a read-only user in another, and absent from a third.
   lock themselves out of a company they own.
 - **An administrator of a company may edit that company's roles** (`/api/v1/roles`
   is gated on the admin role of the session's company).
+- **An administrator of a company assigns roles in it** through the employee API.
+  `role_id` on `GET/POST/PUT /api/v1/employees` is the employee's role in the
+  session's company. Only an administrator of that company may change it (anyone
+  else gets `403`). An omitted `role_id` leaves the role alone and `null` removes
+  it, so a client that never sends the field cannot strip a role by accident. The
+  role must belong to the company (`422`), and an administrator cannot change
+  their own role unless they own the account. Every change is written to
+  `membership_audit`.
+- **A company-less session is administrator of nothing.** An account owner who has
+  not created a company yet gets `is_admin: false` and no readable modules from
+  `/me/permissions`, matching what the module routes enforce, until they enter one.
 
-The account owner appoints directors with two account-scoped routes — not under
+Account ownership lives on `account.owner_employee_id`. The old
+`employee.is_account_owner` column was dropped in migration `000022`. The employee
+API still reports `is_account_owner`, read-only and computed from the account, and
+both `POST /api/v1/admin/accounts/{id}/set-owner` and
+`POST /api/v1/admin/companies/{id}/set-owner` transfer the account's ownership.
+
+The account owner appoints directors with account-scoped routes — not under
 `/api/v1/admin/*`, which is cross-tenant and platform-only:
 
 ```sh
 # Everyone in the account, with the role they hold in each company
 curl http://localhost:8080/api/v1/account/employees -H "Authorization: Bearer $OWNER_TOKEN"
+
+# Every company in the account, whether or not the owner belongs to it,
+# and the roles of one of them to choose from in the PUT below
+curl http://localhost:8080/api/v1/account/companies -H "Authorization: Bearer $OWNER_TOKEN"
+curl http://localhost:8080/api/v1/account/companies/2/roles -H "Authorization: Bearer $OWNER_TOKEN"
 
 # Replace one person's memberships: admin in company 1, read-only in company 2,
 # revoked everywhere else. Omit role_id (or send null) for a membership with no role.
@@ -346,7 +368,10 @@ Beside the onboarding chain, the same file proves the per-company role model:
 a director who may write in one company and only read in another
 (`TestDirectorHasDifferentPowersPerCompany`), the owner backstop, a
 wrong-company role refused at the API and by the database, a role-less
-membership granting nothing, and an empty grant list revoking everything.
+membership granting nothing, and an empty grant list revoking everything. It
+also covers a company-less owner being admin of nothing, the account-wide
+company and role listings, role assignment through the employee API, ownership
+transfer through the admin company route, and the `409` for a taken owner email.
 
 It looks for Postgres at `postgres://postgres:postgres@localhost:5433/postgres`
 (this project's own `db` service and the default `docker compose` port) by
@@ -449,7 +474,7 @@ Four resources required membership only in Django and still do: `/locations`,
 `/vehicle-makes`, `/vehicle-models`, `/tire-assignment-requests` (plus
 `/uploads`). `/roles` requires an admin role. `/companies` is scoped to the
 caller's memberships — an employee may belong to several — with reads and
-mutations requiring an admin role and `POST` requiring `is_account_owner`.
+mutations requiring an admin role and `POST` requiring ownership of the account.
 
 ---
 

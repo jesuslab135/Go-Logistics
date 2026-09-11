@@ -27,7 +27,6 @@ type Employee struct {
 	HourlyLaborRate      *decimal.Decimal
 	IsTechnician         bool
 	IsVehicleOperator    bool
-	IsAccountOwner       bool
 	LicenseClass         string
 	LicenseNumber        string
 	LicenseState         string

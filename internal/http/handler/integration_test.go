@@ -24,6 +24,7 @@ package handler
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -35,6 +36,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -817,5 +819,405 @@ func TestEmptyGrantListRevokesAllMemberships(t *testing.T) {
 		t.Fatalf("PUT with an empty grants list left %d membership(s) behind, want 0 "+
 			"(a nil []int64 encodes as SQL NULL, under which RevokeMembershipsNotIn's "+
 			"NOT (company_id = ANY(NULL)) matches nothing)", after)
+	}
+}
+
+// meState is the part of /me/permissions these tests assert on.
+type meState struct {
+	CompanyID      *int64   `json:"company_id"`
+	IsAdmin        bool     `json:"is_admin"`
+	IsAccountOwner bool     `json:"is_account_owner"`
+	Modules        []string `json:"modules"`
+}
+
+// employeeEmail reads an employee's email through the company-scoped API.
+func employeeEmail(t *testing.T, baseURL, token string, employeeID int64) string {
+	t.Helper()
+	var e struct {
+		Email string `json:"email"`
+	}
+	getJSON(t, fmt.Sprintf("%s/api/v1/employees/%d", baseURL, employeeID), token, http.StatusOK, &e)
+	if e.Email == "" {
+		t.Fatalf("employee %d has no email", employeeID)
+	}
+	return e.Email
+}
+
+// updateEmployee round-trips an employee through GET and PUT, so a test can
+// change one field without blanking the rest: PUT /employees/{id} is a full
+// overwrite. mutate edits the decoded document before it is sent back.
+func updateEmployee(t *testing.T, baseURL, token string, employeeID int64, mutate func(map[string]any), wantStatus int) []byte {
+	t.Helper()
+	url := fmt.Sprintf("%s/api/v1/employees/%d", baseURL, employeeID)
+	doc := map[string]any{}
+	getJSON(t, url, token, http.StatusOK, &doc)
+	mutate(doc)
+	return putJSON(t, url, token, doc, wantStatus, nil)
+}
+
+// A company-less session is administrator of nothing. An account owner who has
+// not created a company yet used to be reported as admin with every module
+// readable, while every module route refused them for want of a membership.
+func TestCompanyLessOwnerIsAdminOfNothing(t *testing.T) {
+	ctx := context.Background()
+	pool := setupThrowawayDB(t, ctx)
+	srv := httptest.NewServer(newIntegrationRouter(pool))
+	defer srv.Close()
+
+	platformToken := seedPlatformAdmin(t, ctx, pool, srv.URL)
+	_, _, _, ownerToken := provisionAccountOwner(t, srv.URL, platformToken)
+
+	var me meState
+	getJSON(t, srv.URL+"/api/v1/me/permissions", ownerToken, http.StatusOK, &me)
+	if me.CompanyID != nil {
+		t.Fatalf("company-less session reported company_id %d", *me.CompanyID)
+	}
+	if !me.IsAccountOwner {
+		t.Fatal("owner not reported as account owner")
+	}
+	if me.IsAdmin {
+		t.Fatal("company-less owner reported is_admin: true")
+	}
+	if len(me.Modules) != 0 {
+		t.Fatalf("company-less owner reported readable modules %v", me.Modules)
+	}
+
+	// The login token must agree with the request-time answer.
+	parts := strings.Split(ownerToken, ".")
+	if len(parts) != 3 {
+		t.Fatalf("access token has %d parts, want 3", len(parts))
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		t.Fatalf("decode token payload: %v", err)
+	}
+	var claims struct {
+		IsAdmin bool `json:"is_admin"`
+	}
+	if err := json.Unmarshal(payload, &claims); err != nil {
+		t.Fatalf("parse token payload: %v", err)
+	}
+	if claims.IsAdmin {
+		t.Fatal("company-less owner's token carries is_admin: true")
+	}
+}
+
+// The account owner sees every company of their account, whether or not they
+// belong to it, and each one's roles; another client's companies stay invisible.
+func TestAccountCompaniesAndTheirRoles(t *testing.T) {
+	ctx := context.Background()
+	pool := setupThrowawayDB(t, ctx)
+	srv := httptest.NewServer(newIntegrationRouter(pool))
+	defer srv.Close()
+
+	platformToken := seedPlatformAdmin(t, ctx, pool, srv.URL)
+	_, ownerID, _, ownerToken := provisionAccountOwner(t, srv.URL, platformToken)
+
+	ts := time.Now().UnixNano()
+	companyA := createCompany(t, srv.URL, ownerToken, "Company A", fmt.Sprintf("TAX-AC-A-%d", ts))
+	companyB := createCompany(t, srv.URL, ownerToken, "Company B", fmt.Sprintf("TAX-AC-B-%d", ts))
+	ownerTokenA := switchCompany(t, srv.URL, ownerToken, companyA)
+	roleAdminA := roleIDByName(t, srv.URL, ownerTokenA, "Administrador")
+
+	// The owner leaves B. It must still be listed: it is in their account.
+	putJSON(t, fmt.Sprintf("%s/api/v1/account/employees/%d/companies", srv.URL, ownerID), ownerToken,
+		map[string]any{"grants": []map[string]any{{"company_id": companyA, "role_id": roleAdminA}}},
+		http.StatusOK, nil)
+
+	var companies []struct {
+		ID int64 `json:"id"`
+	}
+	getJSON(t, srv.URL+"/api/v1/account/companies", ownerToken, http.StatusOK, &companies)
+	listed := map[int64]bool{}
+	for _, c := range companies {
+		listed[c.ID] = true
+	}
+	if len(companies) != 2 || !listed[companyA] || !listed[companyB] {
+		t.Fatalf("GET /account/companies = %+v, want exactly companies %d and %d", companies, companyA, companyB)
+	}
+
+	var roles struct {
+		Data []struct {
+			Name string `json:"name"`
+		} `json:"data"`
+	}
+	getJSON(t, fmt.Sprintf("%s/api/v1/account/companies/%d/roles", srv.URL, companyB), ownerToken, http.StatusOK, &roles)
+	names := map[string]bool{}
+	for _, r := range roles.Data {
+		names[r.Name] = true
+	}
+	if !names["Administrador"] || !names["Almacén"] {
+		t.Fatalf("roles of company B = %+v, want the seeded Administrador and Almacén", roles.Data)
+	}
+
+	// Another client's company is a 404, as if it did not exist, and that
+	// client sees only its own.
+	_, _, _, otherOwnerToken := provisionAccountOwner(t, srv.URL, platformToken)
+	companyC := createCompany(t, srv.URL, otherOwnerToken, "Company C", fmt.Sprintf("TAX-AC-C-%d", ts))
+	getJSON(t, fmt.Sprintf("%s/api/v1/account/companies/%d/roles", srv.URL, companyC), ownerToken, http.StatusNotFound, nil)
+	var otherCompanies []struct {
+		ID int64 `json:"id"`
+	}
+	getJSON(t, srv.URL+"/api/v1/account/companies", otherOwnerToken, http.StatusOK, &otherCompanies)
+	if len(otherCompanies) != 1 || otherCompanies[0].ID != companyC {
+		t.Fatalf("other owner sees %+v, want only company %d", otherCompanies, companyC)
+	}
+
+	// A member who does not own the account is refused.
+	memberID := createDirectorCandidate(t, srv.URL, ownerTokenA, "acmember")
+	memberToken := setPasswordAndLogIn(t, srv.URL, ownerTokenA, memberID, employeeEmail(t, srv.URL, ownerTokenA, memberID))
+	getJSON(t, srv.URL+"/api/v1/account/companies", memberToken, http.StatusForbidden, nil)
+}
+
+// A company administrator assigns roles through the employee API, scoped to the
+// session's company. Nobody else can, and a profile edit that leaves the role
+// alone needs no administrator rights.
+func TestCompanyAdminAssignsRolesThroughTheEmployeeAPI(t *testing.T) {
+	ctx := context.Background()
+	pool := setupThrowawayDB(t, ctx)
+	srv := httptest.NewServer(newIntegrationRouter(pool))
+	defer srv.Close()
+
+	platformToken := seedPlatformAdmin(t, ctx, pool, srv.URL)
+	_, ownerID, _, ownerToken := provisionAccountOwner(t, srv.URL, platformToken)
+
+	ts := time.Now().UnixNano()
+	companyA := createCompany(t, srv.URL, ownerToken, "Company A", fmt.Sprintf("TAX-RA-A-%d", ts))
+	companyB := createCompany(t, srv.URL, ownerToken, "Company B", fmt.Sprintf("TAX-RA-B-%d", ts))
+	ownerTokenA := switchCompany(t, srv.URL, ownerToken, companyA)
+	ownerTokenB := switchCompany(t, srv.URL, ownerToken, companyB)
+	roleAdminA := roleIDByName(t, srv.URL, ownerTokenA, "Administrador")
+	roleWarehouseA := roleIDByName(t, srv.URL, ownerTokenA, "Almacén")
+	roleAdminB := roleIDByName(t, srv.URL, ownerTokenB, "Administrador")
+
+	// A non-admin role that may nonetheless create and edit employee profiles.
+	var people struct {
+		ID int64 `json:"id"`
+	}
+	postJSON(t, srv.URL+"/api/v1/roles", ownerTokenA, map[string]any{
+		"name": "People", "is_admin": false,
+		"permissions": map[string]any{"employees": map[string]any{}},
+	}, http.StatusCreated, &people)
+
+	hrID := createDirectorCandidate(t, srv.URL, ownerTokenA, "hr")
+	targetID := createDirectorCandidate(t, srv.URL, ownerTokenA, "target")
+
+	setRole := func(roleID any) func(map[string]any) {
+		return func(doc map[string]any) { doc["role_id"] = roleID }
+	}
+	roleOf := func(id int64) *int64 {
+		var e struct {
+			RoleID *int64 `json:"role_id"`
+		}
+		getJSON(t, fmt.Sprintf("%s/api/v1/employees/%d", srv.URL, id), ownerTokenA, http.StatusOK, &e)
+		return e.RoleID
+	}
+
+	// The owner, administrator of A by ownership, gives hr the People role.
+	updateEmployee(t, srv.URL, ownerTokenA, hrID, setRole(people.ID), http.StatusOK)
+	if got := roleOf(hrID); got == nil || *got != people.ID {
+		t.Fatalf("hr's role in A = %v, want %d", got, people.ID)
+	}
+
+	// The listing reports each member's role in A and who owns the account.
+	var page struct {
+		Data []struct {
+			ID             int64  `json:"id"`
+			RoleID         *int64 `json:"role_id"`
+			IsAccountOwner bool   `json:"is_account_owner"`
+		} `json:"data"`
+	}
+	getJSON(t, srv.URL+"/api/v1/employees?limit=100", ownerTokenA, http.StatusOK, &page)
+	seen := 0
+	for _, e := range page.Data {
+		switch e.ID {
+		case ownerID:
+			seen++
+			if !e.IsAccountOwner || e.RoleID == nil || *e.RoleID != roleAdminA {
+				t.Fatalf("owner row = %+v, want is_account_owner and role %d", e, roleAdminA)
+			}
+		case hrID:
+			seen++
+			if e.IsAccountOwner || e.RoleID == nil || *e.RoleID != people.ID {
+				t.Fatalf("hr row = %+v, want role %d and not owner", e, people.ID)
+			}
+		}
+	}
+	if seen != 2 {
+		t.Fatalf("listing showed %d of the owner and hr rows, want both", seen)
+	}
+
+	// hr may edit profiles but not roles: changing one is refused...
+	hrToken := setPasswordAndLogIn(t, srv.URL, ownerTokenA, hrID, employeeEmail(t, srv.URL, ownerTokenA, hrID))
+	updateEmployee(t, srv.URL, hrToken, targetID, setRole(roleAdminA), http.StatusForbidden)
+	// ...while a save that leaves it alone, echoed back or omitted, goes through.
+	updateEmployee(t, srv.URL, hrToken, targetID, func(map[string]any) {}, http.StatusOK)
+	updateEmployee(t, srv.URL, hrToken, targetID, func(doc map[string]any) { delete(doc, "role_id") }, http.StatusOK)
+	if got := roleOf(targetID); got != nil {
+		t.Fatalf("target's role became %d without an administrator", *got)
+	}
+
+	// Creating an employee with a role is an administrator's act too.
+	newHire := func(token, local string, want int) []byte {
+		return postJSON(t, srv.URL+"/api/v1/employees", token, map[string]any{
+			"first_name": "New", "last_name": "Hire",
+			"email":   fmt.Sprintf("%s-%d@integration.test", local, ts),
+			"role_id": roleWarehouseA,
+		}, want, nil)
+	}
+	newHire(hrToken, "hire-by-hr", http.StatusForbidden)
+	var hired struct {
+		RoleID *int64 `json:"role_id"`
+	}
+	if err := json.Unmarshal(newHire(ownerTokenA, "hire-by-owner", http.StatusCreated), &hired); err != nil {
+		t.Fatalf("decode created employee: %v", err)
+	}
+	if hired.RoleID == nil || *hired.RoleID != roleWarehouseA {
+		t.Fatalf("employee created with role %d came back with %v", roleWarehouseA, hired.RoleID)
+	}
+
+	// A role from another company is refused, naming role_id.
+	body := updateEmployee(t, srv.URL, ownerTokenA, targetID, setRole(roleAdminB), http.StatusUnprocessableEntity)
+	if !bytes.Contains(body, []byte("role_id")) {
+		t.Fatalf("expected the 422 to name role_id, got: %s", body)
+	}
+
+	// Set a role, then clear it with an explicit null.
+	updateEmployee(t, srv.URL, ownerTokenA, targetID, setRole(roleWarehouseA), http.StatusOK)
+	if got := roleOf(targetID); got == nil || *got != roleWarehouseA {
+		t.Fatalf("target's role = %v, want %d", got, roleWarehouseA)
+	}
+	updateEmployee(t, srv.URL, ownerTokenA, targetID, setRole(nil), http.StatusOK)
+	if got := roleOf(targetID); got != nil {
+		t.Fatalf("role_id: null left role %d in place", *got)
+	}
+
+	// An administrator who does not own the account cannot change their own
+	// role, which would lock them out of the company.
+	updateEmployee(t, srv.URL, ownerTokenA, targetID, setRole(roleAdminA), http.StatusOK)
+	targetToken := setPasswordAndLogIn(t, srv.URL, ownerTokenA, targetID, employeeEmail(t, srv.URL, ownerTokenA, targetID))
+	body = updateEmployee(t, srv.URL, targetToken, targetID, setRole(roleWarehouseA), http.StatusUnprocessableEntity)
+	if !bytes.Contains(body, []byte("own role")) {
+		t.Fatalf("expected the 422 to say you cannot change your own role, got: %s", body)
+	}
+
+	// Each of the three successful changes to target's role was audited, and
+	// none of the refused ones.
+	var audited int64
+	if err := pool.QueryRow(ctx,
+		"SELECT count(*) FROM membership_audit WHERE subject_employee_id = $1 AND company_id = $2",
+		targetID, companyA).Scan(&audited); err != nil {
+		t.Fatalf("count audit rows: %v", err)
+	}
+	if audited != 3 {
+		t.Fatalf("membership_audit has %d rows for target in A, want 3", audited)
+	}
+}
+
+// Handing a company's ownership over through the admin company route changes
+// who owns the account, which is the ownership every gate reads.
+func TestAdminCompanySetOwnerTransfersAccountOwnership(t *testing.T) {
+	ctx := context.Background()
+	pool := setupThrowawayDB(t, ctx)
+	srv := httptest.NewServer(newIntegrationRouter(pool))
+	defer srv.Close()
+
+	platformToken := seedPlatformAdmin(t, ctx, pool, srv.URL)
+	accountID, _, _, ownerToken := provisionAccountOwner(t, srv.URL, platformToken)
+
+	ts := time.Now().UnixNano()
+	companyA := createCompany(t, srv.URL, ownerToken, "Company A", fmt.Sprintf("TAX-SO-A-%d", ts))
+	ownerTokenA := switchCompany(t, srv.URL, ownerToken, companyA)
+	heirID := createDirectorCandidate(t, srv.URL, ownerTokenA, "heir")
+	heirEmail := employeeEmail(t, srv.URL, ownerTokenA, heirID)
+
+	type ownerEnvelope struct {
+		Owner *struct {
+			EmployeeID int64 `json:"employee_id"`
+		} `json:"owner"`
+	}
+	var set ownerEnvelope
+	postJSON(t, fmt.Sprintf("%s/api/v1/admin/companies/%d/set-owner", srv.URL, companyA), platformToken,
+		map[string]any{"employee_id": heirID}, http.StatusOK, &set)
+	if set.Owner == nil || set.Owner.EmployeeID != heirID {
+		t.Fatalf("set-owner returned %+v, want employee %d", set.Owner, heirID)
+	}
+	var read ownerEnvelope
+	getJSON(t, fmt.Sprintf("%s/api/v1/admin/companies/%d/owner", srv.URL, companyA), platformToken, http.StatusOK, &read)
+	if read.Owner == nil || read.Owner.EmployeeID != heirID {
+		t.Fatalf("owner read back as %+v, want employee %d", read.Owner, heirID)
+	}
+
+	// The account list names the new owner, email included.
+	var accounts struct {
+		Data []struct {
+			ID              int64  `json:"id"`
+			OwnerEmployeeID *int64 `json:"owner_employee_id"`
+			OwnerEmail      string `json:"owner_email"`
+		} `json:"data"`
+	}
+	getJSON(t, srv.URL+"/api/v1/admin/accounts?limit=100", platformToken, http.StatusOK, &accounts)
+	found := false
+	for _, a := range accounts.Data {
+		if a.ID != accountID {
+			continue
+		}
+		found = true
+		if a.OwnerEmployeeID == nil || *a.OwnerEmployeeID != heirID || a.OwnerEmail != heirEmail {
+			t.Fatalf("account row = %+v, want owner %d <%s>", a, heirID, heirEmail)
+		}
+	}
+	if !found {
+		t.Fatalf("account %d missing from GET /admin/accounts", accountID)
+	}
+
+	// Ownership is what the gates read: the heir can reach the owner-only
+	// routes and the previous owner no longer can.
+	heirToken := setPasswordAndLogIn(t, srv.URL, ownerTokenA, heirID, heirEmail)
+	var heirMe meState
+	getJSON(t, srv.URL+"/api/v1/me/permissions", heirToken, http.StatusOK, &heirMe)
+	if !heirMe.IsAccountOwner {
+		t.Fatal("new owner not reported as account owner")
+	}
+	var previousMe meState
+	getJSON(t, srv.URL+"/api/v1/me/permissions", ownerTokenA, http.StatusOK, &previousMe)
+	if previousMe.IsAccountOwner {
+		t.Fatal("previous owner still reported as account owner")
+	}
+	getJSON(t, srv.URL+"/api/v1/account/companies", heirToken, http.StatusOK, nil)
+	getJSON(t, srv.URL+"/api/v1/account/companies", ownerTokenA, http.StatusForbidden, nil)
+
+	// An employee of another client can never be made this one's owner.
+	_, outsiderID, _, _ := provisionAccountOwner(t, srv.URL, platformToken)
+	postJSON(t, fmt.Sprintf("%s/api/v1/admin/companies/%d/set-owner", srv.URL, companyA), platformToken,
+		map[string]any{"employee_id": outsiderID}, http.StatusUnprocessableEntity, nil)
+}
+
+// Provisioning a client with an email that is already taken names the field the
+// request actually carries, owner_email, not the shared mapping's "email".
+func TestProvisioningWithATakenEmailNamesOwnerEmail(t *testing.T) {
+	ctx := context.Background()
+	pool := setupThrowawayDB(t, ctx)
+	srv := httptest.NewServer(newIntegrationRouter(pool))
+	defer srv.Close()
+
+	platformToken := seedPlatformAdmin(t, ctx, pool, srv.URL)
+	_, _, ownerEmail, _ := provisionAccountOwner(t, srv.URL, platformToken)
+
+	body := postJSON(t, srv.URL+"/api/v1/admin/accounts", platformToken, map[string]any{
+		"name": "Second Fleet", "owner_first_name": "Dup", "owner_last_name": "Owner",
+		"owner_email": ownerEmail, "owner_password": "correct-horse-battery",
+	}, http.StatusConflict, nil)
+
+	var e struct {
+		Error struct {
+			Details map[string]string `json:"details"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(body, &e); err != nil {
+		t.Fatalf("decode 409 body: %v (%s)", err, body)
+	}
+	if e.Error.Details["owner_email"] == "" {
+		t.Fatalf("409 details = %s, want owner_email named", body)
 	}
 }

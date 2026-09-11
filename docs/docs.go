@@ -15,6 +15,116 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/api/v1/account/companies": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Every company of the caller's account, whether or not the caller holds a membership in it. Requires account owner. Unpaginated, like /account/employees.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "account"
+                ],
+                "summary": "List every company in the caller's account",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/dto.AccountCompanyResponse"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/account/companies/{id}/roles": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "The roles of any company in the caller's account, to choose the role granted in PUT /api/v1/account/employees/{id}/companies. /api/v1/roles only covers the session's company. Requires account owner. A company outside the caller's account is a 404, never confirming it exists elsewhere.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "account"
+                ],
+                "summary": "List the roles of a company in the caller's account",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Company id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Offset",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.RolePage"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/account/employees": {
             "get": {
                 "security": [
@@ -138,7 +248,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "employee.is_account_owner is a single global boolean, not a per-company column: this reads the member of this company who carries it. A company with no owner is 200 with owner:null, not a 404 — that stays reserved for a company that does not exist.",
+                "description": "The owner of the account this company belongs to. Ownership is a property of the account, so every company in an account reports the same owner. A company whose account has no owner is 200 with owner:null, not a 404 — that stays reserved for a company that does not exist.",
                 "produces": [
                     "application/json"
                 ],
@@ -266,7 +376,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Clears the current owner and flags the named employee in one transaction, so a company never carries two. The employee must already be a member of this company. Note that employee.is_account_owner is a single global boolean rather than a per-company column: the clear half therefore also unsets ownership everywhere else the current owner belongs. Where the current owner belongs to another company this is refused with 409 owner_in_multiple_companies rather than silently leaving that company without an owner; move that owner out of this company, or hand the other company a new owner first.",
+                "description": "Makes the named employee the owner of the account this company belongs to — the same act as POST /api/v1/admin/accounts/{id}/set-owner, addressed by company. Ownership is a property of the account, so this changes the owner of every company in it. The employee must belong to that account.",
                 "consumes": [
                     "application/json"
                 ],
@@ -322,12 +432,6 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
-                        }
-                    },
-                    "409": {
-                        "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -17374,6 +17478,20 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.AccountCompanyResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "logo": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
         "dto.AccountEmployeeMembership": {
             "type": "object",
             "properties": {
@@ -18725,9 +18843,6 @@ const docTemplate = `{
                 "hourly_labor_rate": {
                     "type": "number"
                 },
-                "is_account_owner": {
-                    "type": "boolean"
-                },
                 "is_active": {
                     "type": "boolean"
                 },
@@ -18774,6 +18889,10 @@ const docTemplate = `{
                 "region": {
                     "type": "string",
                     "maxLength": 50
+                },
+                "role_id": {
+                    "description": "RoleID is the role the new employee gets in the session's company. Setting\nit requires an administrator of that company, and the role must belong to\nit. Omitted or null creates a membership with no role, which grants nothing.",
+                    "type": "integer"
                 },
                 "start_date": {
                     "type": "string"
@@ -20638,6 +20757,7 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "is_account_owner": {
+                    "description": "IsAccountOwner is read-only and computed from account ownership. It is\nignored if sent; ownership is transferred with\nPOST /api/v1/admin/accounts/{id}/set-owner.",
                     "type": "boolean"
                 },
                 "is_active": {
@@ -20686,6 +20806,10 @@ const docTemplate = `{
                 "region": {
                     "type": "string",
                     "maxLength": 50
+                },
+                "role_id": {
+                    "description": "RoleID is the role this employee holds in the session's company, not a\nproperty of the person: the same employee can hold a different role, or\nnone, in another company. Null means no role there. Always null on the\ncross-company /admin/employees listing, which has no session company.",
+                    "type": "integer"
                 },
                 "start_date": {
                     "type": "string"
@@ -24434,9 +24558,6 @@ const docTemplate = `{
                 "hourly_labor_rate": {
                     "type": "number"
                 },
-                "is_account_owner": {
-                    "type": "boolean"
-                },
                 "is_active": {
                     "type": "boolean"
                 },
@@ -24483,6 +24604,10 @@ const docTemplate = `{
                 "region": {
                     "type": "string",
                     "maxLength": 50
+                },
+                "role_id": {
+                    "description": "RoleID changes the employee's role in the session's company. Omitted\nleaves it unchanged; null removes it. Changing it requires an\nadministrator of that company, the role must belong to it, and an\nadministrator cannot change their own role (the account owner can).",
+                    "type": "integer"
                 },
                 "start_date": {
                     "type": "string"

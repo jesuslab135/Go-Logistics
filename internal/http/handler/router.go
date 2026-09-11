@@ -448,4 +448,8 @@ func registerAccountEmployeeRoutes(api *gin.RouterGroup, d Deps) {
 	accountEmployees := NewAccountEmployeeHandler(d.Queries, d.Pool)
 	accountOwner.GET("/account/employees", accountEmployees.List)
 	accountOwner.PUT("/account/employees/:id/companies", accountEmployees.ReplaceCompanies)
+
+	accountCompanies := NewAccountCompanyHandler(d.Queries)
+	accountOwner.GET("/account/companies", accountCompanies.List)
+	accountOwner.GET("/account/companies/:id/roles", accountCompanies.Roles)
 }

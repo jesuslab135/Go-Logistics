@@ -80,12 +80,50 @@ func (q *Queries) IsEmployeeInAccount(ctx context.Context, arg IsEmployeeInAccou
 	return exists, err
 }
 
+const listAccountCompanies = `-- name: ListAccountCompanies :many
+SELECT c.id, c.name, c.logo
+FROM company c
+WHERE c.account_id = $1
+ORDER BY c.name, c.id
+`
+
+type ListAccountCompaniesRow struct {
+	ID   int64
+	Name string
+	Logo *string
+}
+
+// ListAccountCompanies is every company of one account, whether or not the
+// caller holds a membership in it. The account owner needs the whole set to
+// appoint directors; /me/permissions only lists companies they belong to.
+func (q *Queries) ListAccountCompanies(ctx context.Context, accountID int64) ([]ListAccountCompaniesRow, error) {
+	rows, err := q.db.Query(ctx, listAccountCompanies, accountID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAccountCompaniesRow{}
+	for rows.Next() {
+		var i ListAccountCompaniesRow
+		if err := rows.Scan(&i.ID, &i.Name, &i.Logo); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listAccountsWithCounts = `-- name: ListAccountsWithCounts :many
 SELECT
     a.id, a.name, a.owner_employee_id, a.is_active, a.created_at,
+    oe.email AS owner_email,
     (SELECT count(*) FROM company  c WHERE c.account_id = a.id) AS company_count,
     (SELECT count(*) FROM employee e WHERE e.account_id = a.id) AS employee_count
 FROM account a
+LEFT JOIN employee oe ON oe.id = a.owner_employee_id
 ORDER BY a.id
 LIMIT $2 OFFSET $1
 `
@@ -101,6 +139,7 @@ type ListAccountsWithCountsRow struct {
 	OwnerEmployeeID *int64
 	IsActive        bool
 	CreatedAt       time.Time
+	OwnerEmail      *string
 	CompanyCount    int64
 	EmployeeCount   int64
 }
@@ -120,12 +159,41 @@ func (q *Queries) ListAccountsWithCounts(ctx context.Context, arg ListAccountsWi
 			&i.OwnerEmployeeID,
 			&i.IsActive,
 			&i.CreatedAt,
+			&i.OwnerEmail,
 			&i.CompanyCount,
 			&i.EmployeeCount,
 		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listOwnersAmong = `-- name: ListOwnersAmong :many
+SELECT a.owner_employee_id::bigint AS employee_id
+FROM account a
+WHERE a.owner_employee_id = ANY($1::bigint[])
+`
+
+// ListOwnersAmong reports which of the given employees own an account, so an
+// employee listing can say who the owner is without a column on employee.
+func (q *Queries) ListOwnersAmong(ctx context.Context, employeeIds []int64) ([]int64, error) {
+	rows, err := q.db.Query(ctx, listOwnersAmong, employeeIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []int64{}
+	for rows.Next() {
+		var employee_id int64
+		if err := rows.Scan(&employee_id); err != nil {
+			return nil, err
+		}
+		items = append(items, employee_id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

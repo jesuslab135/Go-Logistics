@@ -17,7 +17,6 @@ SELECT
     e.is_active,
     e.is_technician,
     e.is_vehicle_operator,
-    e.is_account_owner,
     e.default_company_id,
     ec.role_id,
     r.name                               AS role_name,

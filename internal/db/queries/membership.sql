@@ -34,6 +34,23 @@ SELECT EXISTS (
     WHERE r.id = sqlc.arg(role_id) AND r.company_id = sqlc.arg(company_id)
 );
 
+-- The role an employee holds in one company. No row means they are not a
+-- member of it; a row with a NULL role_id is a member with no role.
+-- name: GetMembershipRole :one
+SELECT role_id FROM employee_companies
+WHERE employee_id = sqlc.arg(employee_id) AND company_id = sqlc.arg(company_id);
+
+-- name: SetMembershipRole :execrows
+UPDATE employee_companies SET role_id = sqlc.narg(role_id)
+WHERE employee_id = sqlc.arg(employee_id) AND company_id = sqlc.arg(company_id);
+
+-- The roles a page of employees holds in one company, so an employee listing
+-- can report each person's role for the session's company in one read.
+-- name: ListCompanyMemberRoles :many
+SELECT employee_id, role_id FROM employee_companies
+WHERE company_id = sqlc.arg(company_id)
+  AND employee_id = ANY(sqlc.arg(employee_ids)::bigint[]);
+
 -- name: CompanyInAccount :one
 SELECT EXISTS (
     SELECT 1 FROM company c

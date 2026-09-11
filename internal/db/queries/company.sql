@@ -81,52 +81,12 @@ SELECT count(*) FROM company WHERE id = ANY(sqlc.arg(ids)::bigint[]);
 SELECT * FROM company WHERE id = sqlc.arg(id);
 
 -- name: GetCompanyOwner :one
--- employee.is_account_owner is a single global boolean, so a company's owner is
--- the member of that company carrying the flag. LIMIT 1 keeps the read total
--- even where historical data has more than one — SetCompanyAccountOwner is what
--- makes that impossible going forward.
+-- A company's owner is the owner of the account it belongs to. Ownership lives
+-- on account.owner_employee_id, not on the employee row, so an account has
+-- exactly one owner and it is the same for every company in it. No row when
+-- the account has no owner.
 SELECT e.id, e.first_name, e.last_name, e.email, e.job_title
-FROM employee e
-JOIN employee_companies ec ON ec.employee_id = e.id AND ec.company_id = sqlc.arg(company_id)
-WHERE e.is_account_owner = true
-ORDER BY e.id
-LIMIT 1;
-
--- name: ClearCompanyAccountOwner :exec
--- The clear half of set-owner. Runs in the same transaction as the set so a
--- company never has two owners, which plain CRUD on is_account_owner allows.
-UPDATE employee e SET is_account_owner = false, updated_at = sqlc.arg(updated_at)
-FROM employee_companies ec
-WHERE ec.employee_id = e.id
-  AND ec.company_id = sqlc.arg(company_id)
-  AND e.is_account_owner = true;
-
--- name: SetCompanyAccountOwner :one
--- The membership EXISTS guard makes "not a member of this company" return no
--- row, so the caller cannot make an outsider the owner of a tenant.
-UPDATE employee SET is_account_owner = true, updated_at = sqlc.arg(updated_at)
-WHERE employee.id = sqlc.arg(id)
-  AND EXISTS (
-      SELECT 1 FROM employee_companies ec
-      WHERE ec.employee_id = employee.id AND ec.company_id = sqlc.arg(company_id)
-  )
-RETURNING id, first_name, last_name, email, job_title;
-
--- name: ListOwnersInOtherCompanies :many
--- Pre-flight for set-owner's clear half. is_account_owner is a single global
--- boolean, so clearing "this company's owner" also clears it for every other
--- company that employee belongs to, silently leaving those without an owner and
--- so without POST /api/v1/companies. The incoming owner is excluded: the same
--- transaction sets the flag straight back on them, so nothing is lost there.
-SELECT e.id FROM employee e
-WHERE e.is_account_owner = true
-  AND e.id <> sqlc.arg(new_owner_id)
-  AND EXISTS (
-      SELECT 1 FROM employee_companies ec
-      WHERE ec.employee_id = e.id AND ec.company_id = sqlc.arg(company_id)
-  )
-  AND EXISTS (
-      SELECT 1 FROM employee_companies other
-      WHERE other.employee_id = e.id AND other.company_id <> sqlc.arg(company_id)
-  )
-ORDER BY e.id;
+FROM company c
+JOIN account a  ON a.id = c.account_id
+JOIN employee e ON e.id = a.owner_employee_id
+WHERE c.id = sqlc.arg(company_id);

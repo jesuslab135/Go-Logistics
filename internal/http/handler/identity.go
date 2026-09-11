@@ -36,14 +36,18 @@ func (l *IdentityLoader) LoadIdentity(ctx context.Context, employeeID int64, com
 	}
 
 	return middleware.Identity{
-		EmployeeID:      row.ID,
-		CompanyID:       company,
-		AccountID:       row.AccountID,
-		IsActive:        row.IsActive,
-		IsAccountOwner:  row.IsAccountOwner,
-		IsMember:        row.IsMember,
-		HasRole:         row.RoleID != nil,
-		IsAdmin:         row.IsAdmin,
+		EmployeeID:     row.ID,
+		CompanyID:      company,
+		AccountID:      row.AccountID,
+		IsActive:       row.IsActive,
+		IsAccountOwner: row.IsAccountOwner,
+		IsMember:       row.IsMember,
+		HasRole:        row.RoleID != nil,
+		// Administrator of THIS company, which needs membership in it. The query's
+		// is_admin is also true for an account owner with no company yet (from
+		// ownership alone), and reporting that would make /me/permissions list
+		// every module while every module route refuses a non-member.
+		IsAdmin:         row.IsAdmin && row.IsMember,
 		IsPlatformAdmin: row.IsPlatformAdmin,
 		RoleID:          row.RoleID,
 		Permissions:     middleware.DecodePermissions(row.Permissions),

@@ -1,11 +1,13 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"fleet/internal/auth"
@@ -70,12 +72,10 @@ func validateCreateAccount(in dto.CreateAccountRequest) error {
 	return apierr.Validation(missing)
 }
 
-// toAccountResponse renders a row from ListAccountsWithCounts. OwnerEmail is
-// deliberately left blank here: the list query does not join to the owner
-// employee, so it stays reserved for the moment of creation, where the caller
-// already supplied it.
+// toAccountResponse renders a row from ListAccountsWithCounts, which joins the
+// owner's email so a client list can show who owns each account.
 func toAccountResponse(r gen.ListAccountsWithCountsRow) dto.AccountResponse {
-	return dto.AccountResponse{
+	out := dto.AccountResponse{
 		ID:              r.ID,
 		Name:            r.Name,
 		OwnerEmployeeID: r.OwnerEmployeeID,
@@ -84,6 +84,10 @@ func toAccountResponse(r gen.ListAccountsWithCountsRow) dto.AccountResponse {
 		CompanyCount:    r.CompanyCount,
 		EmployeeCount:   r.EmployeeCount,
 	}
+	if r.OwnerEmail != nil {
+		out.OwnerEmail = *r.OwnerEmail
+	}
+	return out
 }
 
 // Create provisions the account, its owner employee and the owner's password in
@@ -135,6 +139,14 @@ func (h *AdminAccountHandler) Create(c *gin.Context) {
 		PasswordHash: hash,
 	})
 	if err != nil {
+		// The shared mapping names this field "email" (see apierr.Map); in this
+		// request it is owner_email, and a client should not have to translate.
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "uq_employee_email_active" {
+			apierr.Abort(c, apierr.Conflict("email is already in use").
+				WithDetails(map[string]string{"owner_email": "already in use"}).Wrap(err))
+			return
+		}
 		apierr.Abort(c, err)
 		return
 	}

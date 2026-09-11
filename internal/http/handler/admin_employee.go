@@ -141,6 +141,12 @@ func (h *AdminEmployeeHandler) List(c *gin.Context) {
 	for i, r := range rows {
 		out[i] = toEmployeeResponse(r)
 	}
+	// No session company applies across tenants, so role_id stays null here;
+	// account ownership does not depend on one.
+	if err := applyAccountOwners(ctx, h.q, out); err != nil {
+		apierr.Abort(c, err)
+		return
+	}
 	c.JSON(http.StatusOK, paginate.NewPage(out, total, p))
 }
 

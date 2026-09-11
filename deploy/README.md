@@ -138,8 +138,8 @@ cd /opt/fleet
 docker compose exec db psql -U postgres -d fleet -c "
 INSERT INTO company (name,tax_id,address,created_at,phone,email,website,city,region,postal_code,country,timezone,currency,system_of_measurement)
 VALUES ('Go Logistics','','',now(),'','','','','','','MX','America/Mexico_City','MXN','metric');
-INSERT INTO employee (default_company_id,first_name,last_name,employee_id,is_active,email,mobile_phone,work_phone,job_title,is_technician,is_vehicle_operator,is_account_owner,license_class,license_number,license_state,street_address,city,region,postal_code,country,updated_at,password_hash)
-VALUES (1,'Esteban','Olmos','E1',true,'<admin-email>','','','Administrator',false,false,true,'','','','','','','','',now(),'');
+INSERT INTO employee (default_company_id,first_name,last_name,employee_id,is_active,email,mobile_phone,work_phone,job_title,is_technician,is_vehicle_operator,license_class,license_number,license_state,street_address,city,region,postal_code,country,updated_at,password_hash)
+VALUES (1,'Esteban','Olmos','E1',true,'<admin-email>','','','Administrator',false,false,'','','','','','','','',now(),'');
 "
 docker compose run --rm cli bootstrap --email '<admin-email>' --company-id 1
 docker compose run --rm cli setpass  --email '<admin-email>' --password '<password>'

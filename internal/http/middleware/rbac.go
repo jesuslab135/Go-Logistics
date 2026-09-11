@@ -180,6 +180,13 @@ func IdentityOf(c *gin.Context) (Identity, bool) {
 	return id, ok
 }
 
+// IdentityFromContext is IdentityOf for code holding a context rather than a
+// gin.Context, such as the stores behind the CRUD handlers.
+func IdentityFromContext(ctx context.Context) (Identity, bool) {
+	id, ok := ctx.Value(identityContextKey{}).(Identity)
+	return id, ok
+}
+
 // AccountFromContext returns the client organisation of the caller, or nil for
 // platform staff. Company creation reads it so a new company can never be
 // planted inside another client's account.
