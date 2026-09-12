@@ -136,6 +136,10 @@ func (h *BulkHandler) template(imp bulk.Importer) gin.HandlerFunc {
 	}
 }
 
+// exportPageSize is how many rows the exporter asks the list endpoint for at
+// a time.
+const exportPageSize = 100
+
 // Exporter writes a list to a file by calling the section's own list endpoint
 // page by page, so every filter and permission of that list applies unchanged.
 type Exporter struct {
@@ -161,12 +165,14 @@ func (e *Exporter) Handler(listPath string) gin.HandlerFunc {
 
 		var table bulk.Table
 		fetched, truncated := 0, false
-		for {
-			if fetched >= e.maxRows {
-				truncated = true
-				break
+		for fetched < e.maxRows {
+			// Clamped to what is left under the cap, so the cap is exact
+			// rather than being able to overshoot by up to a whole page.
+			limit := e.maxRows - fetched
+			if limit > exportPageSize {
+				limit = exportPageSize
 			}
-			query.Set("limit", "100")
+			query.Set("limit", strconv.Itoa(limit))
 			query.Set("offset", strconv.Itoa(fetched))
 			req, err := http.NewRequestWithContext(c.Request.Context(), http.MethodGet, "/api/v1"+listPath+"?"+query.Encode(), nil)
 			if err != nil {
@@ -196,8 +202,11 @@ func (e *Exporter) Handler(listPath string) gin.HandlerFunc {
 				}
 			}
 			fetched += len(page.Data)
-			if !page.HasNext || len(page.Data) == 0 {
+			if len(page.Data) == 0 || !page.HasNext {
 				break
+			}
+			if fetched >= e.maxRows {
+				truncated = true
 			}
 		}
 

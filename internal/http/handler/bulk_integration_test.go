@@ -598,6 +598,40 @@ func TestExportRespectsPermissions(t *testing.T) {
 	f.download(t, "/vendors/export", http.StatusForbidden)
 }
 
+// A format the exporter does not recognize must be refused outright rather
+// than silently falling back to xlsx, which a regression could do unnoticed.
+func TestExportRejectsAnUnknownFormat(t *testing.T) {
+	f := newImportFixture(t)
+	f.download(t, "/vendors/export?format=xml", http.StatusBadRequest)
+}
+
+// EXPORT_MAX_ROWS is a real, exact bound: it stops the export at precisely
+// that many rows (not a whole page later) and flags the response so a caller
+// knows the file is partial.
+func TestExportCapTruncatesExactlyAndFlagsTheResponse(t *testing.T) {
+	t.Setenv("EXPORT_MAX_ROWS", "150")
+	f := newImportFixture(t)
+	rows := [][]any{{"name"}}
+	for i := 1; i <= 220; i++ {
+		rows = append(rows, []any{fmt.Sprintf("Proveedor %03d", i)})
+	}
+	f.upload(t, "/vendors/import", rows, http.StatusCreated)
+
+	resp, body := f.download(t, "/vendors/export", http.StatusOK)
+	if resp.Header.Get("X-Export-Truncated") != "true" {
+		t.Fatalf("X-Export-Truncated header: %q, want \"true\"", resp.Header.Get("X-Export-Truncated"))
+	}
+	got, err := sheet.Read(bytes.NewReader(body), "vendors.xlsx")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 150 (EXPORT_MAX_ROWS) is not a multiple of the 100-row page size, so
+	// this also proves the cap does not overshoot to the next full page.
+	if len(got) != 151 {
+		t.Fatalf("export has %d rows, want 151 (header + exactly the 150-row cap)", len(got))
+	}
+}
+
 // Exports page each section's list in-process; the list itself reads the
 // company from the request context, so two companies' rows must never mix in
 // one export. This branch has already had one real cross-tenant finding.
@@ -629,11 +663,13 @@ func TestExportOnlyIncludesTheCallersCompany(t *testing.T) {
 	}
 }
 
-// The whole point of exporting is to edit and re-upload: the engine ignores
-// unknown headers, so a file exported from one company's own list is accepted
-// back as an import unchanged. Re-imported into a second, empty company
-// (rather than back into the same one) so the round trip is not confused with
-// vendor.name's own per-company uniqueness constraint rejecting a duplicate.
+// A file exported from one company's own list, unmodified, is accepted as an
+// import: the engine ignores the "id" and other read-only columns it does
+// not recognize rather than rejecting them. Re-uploaded into a second, empty
+// company rather than back into the same one — import only ever inserts, it
+// never updates, so re-uploading into the same company would collide with
+// vendor.name's own per-company uniqueness constraint, not because of
+// anything about the round trip itself.
 func TestExportRoundTripsBackIntoImport(t *testing.T) {
 	ctx := context.Background()
 	pool := setupThrowawayDB(t, ctx)
@@ -671,11 +707,75 @@ func TestExportRoundTripsBackIntoImport(t *testing.T) {
 	dst := importFixture{srv: srv, token: tokenDst, company: companyDst}
 	report := uploadFile(t, dst, "/vendors/import", rebuilt.Bytes(), http.StatusCreated)
 	var parsed struct{ Rows, Created int }
-	if err := json.Unmarshal(report, &parsed); err != nil || parsed.Created != 2 {
+	if err := json.Unmarshal(report, &parsed); err != nil || parsed.Rows != 2 || parsed.Created != 2 {
 		t.Fatalf("round-trip import report: %s (%v)", report, err)
 	}
 	if got := dst.total(t, "/vendors"); got != 2 {
 		t.Fatalf("vendors in destination company after round trip: %d, want 2", got)
+	}
+}
+
+// F1 regression: a list response nests custom fields as "custom_fields":{...},
+// but the import engine keys a custom field's column as "cf.<key>" (not
+// "custom_fields.<key>"), and it silently ignores headers it does not
+// recognize. Without Table remapping that prefix, a file exported from any
+// section with custom fields would lose every custom-field value on
+// re-upload with no error at all. This proves the header comes out as
+// "cf.<key>" and the value itself survives an export/import round trip.
+func TestExportRoundTripPreservesCustomFieldValues(t *testing.T) {
+	ctx := context.Background()
+	pool := setupThrowawayDB(t, ctx)
+	srv := httptest.NewServer(newIntegrationRouter(pool))
+	defer srv.Close()
+
+	platformToken := seedPlatformAdmin(t, ctx, pool, srv.URL)
+	_, _, _, ownerToken := provisionAccountOwner(t, srv.URL, platformToken)
+
+	ts := time.Now().UnixNano()
+	companySrc := createCompany(t, srv.URL, ownerToken, "CF Source", fmt.Sprintf("TAX-CFS-%d", ts))
+	companyDst := createCompany(t, srv.URL, ownerToken, "CF Destination", fmt.Sprintf("TAX-CFD-%d", ts))
+	tokenSrc := switchCompany(t, srv.URL, ownerToken, companySrc)
+	tokenDst := switchCompany(t, srv.URL, ownerToken, companyDst)
+
+	// Both companies define the same custom field, as a customer using the
+	// same field set across two of their own companies would.
+	for _, token := range []string{tokenSrc, tokenDst} {
+		postJSON(t, srv.URL+"/api/v1/custom-field-definitions", token, map[string]any{
+			"resource": "vendors", "key": "zona", "label": "Zona", "field_type": "text",
+		}, http.StatusCreated, nil)
+	}
+
+	src := importFixture{srv: srv, token: tokenSrc, company: companySrc}
+	src.upload(t, "/vendors/import", [][]any{{"name", "cf.zona"}, {"Proveedor Uno", "Norte"}}, http.StatusCreated)
+
+	_, exported := src.download(t, "/vendors/export", http.StatusOK)
+	rows, err := sheet.Read(bytes.NewReader(exported), "vendors.xlsx")
+	if err != nil {
+		t.Fatal(err)
+	}
+	header := strings.Join(rows[0], ",")
+	if !strings.Contains(header, "cf.zona") {
+		t.Fatalf("exported header %q lacks cf.zona", header)
+	}
+	if strings.Contains(header, "custom_fields.zona") {
+		t.Fatalf("exported header %q leaks the raw custom_fields.zona form the importer does not recognize", header)
+	}
+
+	dst := importFixture{srv: srv, token: tokenDst, company: companyDst}
+	uploadFile(t, dst, "/vendors/import", exported, http.StatusCreated)
+
+	var vendors struct {
+		Data []struct {
+			Name         string          `json:"name"`
+			CustomFields json.RawMessage `json:"custom_fields"`
+		} `json:"data"`
+	}
+	getJSON(t, srv.URL+"/api/v1/vendors", tokenDst, http.StatusOK, &vendors)
+	if len(vendors.Data) != 1 {
+		t.Fatalf("destination vendors: %+v", vendors.Data)
+	}
+	if !bytes.Contains(vendors.Data[0].CustomFields, []byte(`"zona":"Norte"`)) {
+		t.Fatalf("custom field value did not survive the export/import round trip: %s", vendors.Data[0].CustomFields)
 	}
 }
 
