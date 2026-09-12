@@ -19,13 +19,13 @@ const inlineLimit = 250
 const catalogSheetName = "Catálogos"
 
 // maxCatalogEntries caps how many names one reference column contributes to
-// the Catálogos sheet. Every reference column otherwise loads the whole list
-// it points at, on a GET any reader may call: /work-orders/import/template
-// alone pulls every asset and every employee in the company. That is unbounded
-// work per request and the cheapest way to make the database do it. Reference
-// drop-downs are AllowOther, so any record the list leaves out is still
-// reachable by typing its id - noteCatalogCapped says so on Instrucciones
-// whenever a list is actually cut.
+// the Catálogos sheet, and - through Lookup.LoadCapped - how many records are
+// read out of Postgres to build it. Every reference column otherwise loaded
+// the whole list it points at, on a GET any reader may call:
+// /work-orders/import/template alone pulled every asset and every employee in
+// the company. Reference drop-downs are AllowOther, so any record the list
+// leaves out is still reachable by typing its id - noteCatalogCapped says so
+// on Instrucciones whenever a list is actually cut.
 const maxCatalogEntries = 1000
 
 // The Notas block at the foot of the Instrucciones sheet.
@@ -34,9 +34,11 @@ const (
 	// is the one convention a user cannot infer: the comma is the decimal
 	// separator in Spanish and the thousands separator in English, and the
 	// same endpoint takes files written both ways.
-	noteDecimals = "Números: el último . o , de la celda es el separador decimal. " +
-		"\"1.234,56\" y \"1,234.56\" son ambos 1234.56; \"1,5\" es 1.5 y \"1,234\" es 1234. " +
-		"Se aceptan $ y espacios. \"1.234\" se rechaza por ambiguo: escriba 1234 o 1.234,00."
+	noteDecimals = "Números: el punto siempre es el separador decimal (\"19.432\" es 19.432). " +
+		"Si la celda trae . y , manda el último: \"1.234,56\" y \"1,234.56\" son ambos 1234.56. " +
+		"Una coma sola también es decimal (\"1,5\" es 1.5), salvo cuando va seguida de exactamente " +
+		"tres dígitos: \"1,234\" se rechaza por ambiguo; escriba 1234 o 1,234.00 si son miles, " +
+		"o 1.234 si es decimal. Se aceptan $ y espacios."
 	noteCatalogCapped = "Algunas listas de la hoja Catálogos muestran solo los primeros 1000 registros. " +
 		"Si el registro que busca no aparece, escriba su id en la celda."
 )
@@ -94,15 +96,17 @@ func Template(ctx context.Context, imp Importer) ([]sheet.Sheet, error) {
 			}
 			source, loaded := sources[id]
 			if !loaded {
-				entries, err := lk.Load(ctx)
+				// One more than the cap is asked for, so that getting it back
+				// is itself the proof the catalogue was cut.
+				entries, err := loadForTemplate(ctx, lk, maxCatalogEntries+1)
 				if err != nil {
 					return nil, err
 				}
-				names := uniqueSortedNames(entries)
-				if len(names) > maxCatalogEntries {
-					names = names[:maxCatalogEntries]
+				if len(entries) > maxCatalogEntries {
+					entries = entries[:maxCatalogEntries]
 					capped = true
 				}
+				names := uniqueSortedNames(entries)
 				if len(names) > 0 {
 					source = addCatalog(col.Key, names)
 				}
@@ -135,6 +139,17 @@ func Template(ctx context.Context, imp Importer) ([]sheet.Sheet, error) {
 		sheets = append(sheets, catalogSheet(catHeader, catValues))
 	}
 	return sheets, nil
+}
+
+// loadForTemplate reads at most limit entries for a catalogue, using the
+// lookup's bounded load when it has one. The unbounded Load is deliberately
+// left alone for the import's reference index, which must see every record or
+// a name past the bound would silently fail to resolve.
+func loadForTemplate(ctx context.Context, lk Lookup, limit int) ([]Entry, error) {
+	if lk.LoadCapped != nil {
+		return lk.LoadCapped(ctx, limit)
+	}
+	return lk.Load(ctx)
 }
 
 func catalogSheet(header []any, values [][]string) sheet.Sheet {
@@ -228,10 +243,10 @@ func hint(col Column) string {
 	case col.Kind == KindList:
 		return "valores separados por comas"
 	case col.Kind == KindDecimal:
-		// The old wording ("se aceptan $ y comas de miles") told Spanish users
-		// their decimal comma was a thousands separator, which is exactly the
-		// misreading the parser used to make. See noteDecimals.
-		return "número; el último . o , es el decimal (1.234,56 = 1,234.56 = 1234.56); ver Notas"
+		// The original wording ("se aceptan $ y comas de miles") told Spanish
+		// users their decimal comma was a thousands separator, which is the
+		// misreading the parser itself used to make. See noteDecimals.
+		return "número; el punto es decimal (19.432); con . y , manda el último (1.234,56 = 1234.56); ver Notas"
 	case col.Kind == KindString && col.Max > 0:
 		return fmt.Sprintf("máximo %d caracteres", col.Max)
 	}

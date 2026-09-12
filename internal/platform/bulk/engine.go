@@ -63,7 +63,14 @@ type Entry struct {
 // referenced thing in messages and the template ("activo").
 type Lookup struct {
 	Label string
-	Load  func(ctx context.Context) ([]Entry, error)
+	// Load returns EVERY record. The import's reference index is built from
+	// it and must stay that way: a bound here would silently fail to resolve
+	// any name past the limit, which is far worse than the load it saves.
+	Load func(ctx context.Context) ([]Entry, error)
+	// LoadCapped returns at most limit records, for the template's catalogues,
+	// which only ever show a bounded sample. Optional: a Lookup without one
+	// falls back to Load.
+	LoadCapped func(ctx context.Context, limit int) ([]Entry, error)
 }
 
 // Entries pages through a store's List and keeps each record's id and name.
@@ -85,6 +92,30 @@ func Entries[T any](list func(context.Context, paginate.Params) ([]T, int64, err
 				return out, nil
 			}
 		}
+	}
+}
+
+// EntriesUpTo is Entries stopped at limit records, for a template catalogue.
+// It is a separate path on purpose rather than a parameter on Entries: the
+// import's reference index resolves names through Entries and has to see every
+// record, so the two uses must not share a bound.
+func EntriesUpTo[T any](list func(context.Context, paginate.Params) ([]T, int64, error), id func(T) int64, name func(T) string) func(context.Context, int) ([]Entry, error) {
+	return func(ctx context.Context, limit int) ([]Entry, error) {
+		var out []Entry
+		for offset := 0; len(out) < limit; {
+			items, total, err := list(ctx, paginate.Params{Limit: min(500, limit-len(out)), Offset: offset})
+			if err != nil {
+				return nil, err
+			}
+			for _, it := range items {
+				out = append(out, Entry{ID: id(it), Name: name(it)})
+			}
+			offset += len(items)
+			if len(items) == 0 || int64(offset) >= total {
+				break
+			}
+		}
+		return out, nil
 	}
 }
 

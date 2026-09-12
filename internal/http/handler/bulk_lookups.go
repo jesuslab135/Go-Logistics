@@ -15,8 +15,16 @@ import (
 // a name or id can only ever resolve to the caller's own record.
 type bulkLookups struct{ d Deps }
 
+// named builds a lookup with both loads over the same list: the unbounded one
+// the import's reference index needs, and the bounded one the template's
+// catalogue uses so a company with 50,000 assets does not page all of them out
+// of Postgres on every template GET.
 func named[T any](label string, list func(context.Context, paginate.Params) ([]T, int64, error), id func(T) int64, name func(T) string) bulk.Lookup {
-	return bulk.Lookup{Label: label, Load: bulk.Entries(list, id, name)}
+	return bulk.Lookup{
+		Label:      label,
+		Load:       bulk.Entries(list, id, name),
+		LoadCapped: bulk.EntriesUpTo(list, id, name),
+	}
 }
 
 func (l bulkLookups) assetTypes() bulk.Lookup {

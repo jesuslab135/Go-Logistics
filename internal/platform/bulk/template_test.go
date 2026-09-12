@@ -304,6 +304,46 @@ func TestTemplateCapsALargeCatalogueAndSaysSo(t *testing.T) {
 	}
 }
 
+// The cap has to bound the QUERY, not just the workbook: a company with 50,000
+// assets would otherwise page all 50,000 out of Postgres on every template GET
+// and then throw 49,000 away. The unbounded Load must not be touched, because
+// the import's reference index resolves names through it.
+func TestTemplateAsksTheLookupForABoundedPage(t *testing.T) {
+	var gotLimit int
+	lk := Lookup{
+		Label: "activo",
+		Load: func(context.Context) ([]Entry, error) {
+			t.Error("Template used the unbounded Load; it must use LoadCapped when the lookup offers one")
+			return nil, nil
+		},
+		LoadCapped: func(_ context.Context, limit int) ([]Entry, error) {
+			gotLimit = limit
+			out := make([]Entry, limit)
+			for i := range out {
+				out[i] = Entry{ID: int64(i + 1), Name: fmt.Sprintf("Activo %05d", i+1)}
+			}
+			return out, nil
+		},
+	}
+	imp := templateFake{
+		cols: []Column{{Key: "asset_id", Kind: KindInt, Ref: "asset_id", Label: "activo"}},
+		refs: map[string]Lookup{"asset_id": lk},
+	}
+	sheets, err := Template(context.Background(), imp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotLimit != maxCatalogEntries+1 {
+		t.Fatalf("lookup was asked for %d entries; want %d (the cap plus the one that proves it was cut)", gotLimit, maxCatalogEntries+1)
+	}
+	if got := len(sheets[2].Rows) - 1; got != maxCatalogEntries {
+		t.Fatalf("Catálogos lists %d names; want the %d cap", got, maxCatalogEntries)
+	}
+	if !instructionsMention(sheets[1], "1000") {
+		t.Fatalf("Instrucciones does not warn the catalogue was capped: %v", sheets[1].Rows)
+	}
+}
+
 // An uncapped template must not carry the capped warning, or it means nothing.
 func TestTemplateOmitsTheCapNoteWhenNothingWasCut(t *testing.T) {
 	imp := templateFake{
