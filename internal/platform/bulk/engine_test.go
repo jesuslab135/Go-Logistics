@@ -248,6 +248,25 @@ func TestRunIsAllOrNothingOnADatabaseRowError(t *testing.T) {
 	if !outer.rolledBack {
 		t.Fatal("outer transaction was never rolled back")
 	}
+	// Each ready row runs in its own savepoint (outer.children): "a" and "b"
+	// must be released (committed) since they succeeded, and "dup" must be
+	// rolled back and never committed - a refactor that dropped sp.Rollback,
+	// poisoning the transaction for every row after the failure, would still
+	// leave the outer transaction rolled back and would slip past the
+	// assertions above alone.
+	if len(outer.children) != 3 {
+		t.Fatalf("outer has %d savepoints; want 3 (one per ready row: a, dup, b)", len(outer.children))
+	}
+	rowA, rowDup, rowB := outer.children[0], outer.children[1], outer.children[2]
+	if !rowA.committed || rowA.rolledBack {
+		t.Fatalf("row \"a\" savepoint: committed=%v rolledBack=%v; want committed only", rowA.committed, rowA.rolledBack)
+	}
+	if rowDup.committed || !rowDup.rolledBack {
+		t.Fatalf("row \"dup\" savepoint: committed=%v rolledBack=%v; want rolled back only", rowDup.committed, rowDup.rolledBack)
+	}
+	if !rowB.committed || rowB.rolledBack {
+		t.Fatalf("row \"b\" savepoint: committed=%v rolledBack=%v; want committed only", rowB.committed, rowB.rolledBack)
+	}
 	if len(created) != 2 {
 		t.Fatalf("store saw %d creates, want 2 (the good rows still run inside the doomed transaction)", len(created))
 	}
@@ -352,5 +371,175 @@ func TestRunSurfacesPerRowPrepareErrorsAsRowErrors(t *testing.T) {
 		if report.Errors[i] != want[i] {
 			t.Fatalf("errors[%d] = %+v; want %+v (sorted by column)", i, report.Errors[i], want[i])
 		}
+	}
+}
+
+// TestRunTreatsInfrastructureFailuresAsRequestLevel covers a create call that
+// fails with a plain error apierr.Map cannot recognise (a dropped connection,
+// a context cancellation, a statement timeout - not a unique violation, not a
+// validation problem). That is not this row's data being wrong; it is the
+// database failing under the import. Run must surface it as a request-level
+// error, once, rather than folding it into a "internal server error" row
+// entry and letting the loop hammer every remaining row with the same
+// useless message under a 200 response.
+func TestRunTreatsInfrastructureFailuresAsRequestLevel(t *testing.T) {
+	root := &fakeTx{}
+	ctx := dbctx.WithTx(context.Background(), root)
+	var attempts int
+	imp := &fakeImporter{
+		name: "activos",
+		cols: []Column{{Key: "name", Kind: KindString, Required: true}},
+		refs: map[string]Lookup{},
+		prepare: func(values map[string]json.RawMessage) (func(context.Context) error, map[string]string) {
+			name := cellString(values, "name")
+			return func(context.Context) error {
+				attempts++
+				if name == "boom" {
+					return errors.New("connection reset by peer")
+				}
+				return nil
+			}, nil
+		},
+	}
+	rows := [][]string{{"name"}, {"a"}, {"boom"}, {"c"}}
+
+	report, err := Run(ctx, nil, imp, rows, false, Limits{})
+	var apiErr *apierr.Error
+	if !errors.As(err, &apiErr) || apiErr.Status < 500 {
+		t.Fatalf("err = %v; want a 5xx apierr.Error", err)
+	}
+	if len(report.Errors) != 0 {
+		t.Fatalf("errors = %+v; want none - this is not a row problem", report.Errors)
+	}
+	if report.Created != 0 {
+		t.Fatalf("Created = %d; want 0", report.Created)
+	}
+	if attempts != 2 {
+		t.Fatalf("create was attempted %d times; want 2 (row \"c\" must not run after the infrastructure failure)", attempts)
+	}
+	if len(root.children) != 1 {
+		t.Fatalf("root has %d children; want exactly 1 (Run's own transaction)", len(root.children))
+	}
+	if root.children[0].committed {
+		t.Fatal("outer transaction was committed; an infrastructure failure must leave the database untouched")
+	}
+	if !root.children[0].rolledBack {
+		t.Fatal("outer transaction was never rolled back")
+	}
+}
+
+// TestRunStillRecordsGenuineDataErrorsAsRowErrors guards against the F1 fix
+// over-firing: a unique violation (409) and other ordinary 4xx problems are
+// this row's data being wrong, not an outage, and must stay row errors with
+// the loop continuing - exactly the behavior already proven by
+// TestRunIsAllOrNothingOnADatabaseRowError, restated here for a plain
+// validation-shaped 4xx rather than a Postgres conflict.
+func TestRunStillRecordsGenuineDataErrorsAsRowErrors(t *testing.T) {
+	root := &fakeTx{}
+	ctx := dbctx.WithTx(context.Background(), root)
+	imp := &fakeImporter{
+		name: "activos",
+		cols: []Column{{Key: "name", Kind: KindString, Required: true}},
+		refs: map[string]Lookup{},
+		prepare: func(values map[string]json.RawMessage) (func(context.Context) error, map[string]string) {
+			name := cellString(values, "name")
+			return func(context.Context) error {
+				if name == "bad" {
+					return apierr.BadRequest("bad value")
+				}
+				return nil
+			}, nil
+		},
+	}
+	rows := [][]string{{"name"}, {"a"}, {"bad"}, {"c"}}
+
+	report, err := Run(ctx, nil, imp, rows, false, Limits{})
+	if err != nil {
+		t.Fatalf("Run returned request-level error %v; a 4xx row problem must stay in the report", err)
+	}
+	if len(report.Errors) != 1 || report.Errors[0].Row != 3 || report.Errors[0].Message != "bad value" {
+		t.Fatalf("errors = %+v; want exactly one error naming row 3", report.Errors)
+	}
+}
+
+func TestRunFlagsDuplicateHeaderColumns(t *testing.T) {
+	imp := &fakeImporter{
+		name: "activos",
+		cols: []Column{{Key: "name", Kind: KindString}, {Key: "code", Kind: KindString}},
+		refs: map[string]Lookup{},
+		prepare: func(map[string]json.RawMessage) (func(context.Context) error, map[string]string) {
+			return func(context.Context) error { return nil }, nil
+		},
+	}
+	rows := [][]string{{"name", "code", "name"}, {"a", "1", "b"}}
+
+	report, err := Run(context.Background(), nil, imp, rows, false, Limits{})
+	if err != nil {
+		t.Fatalf("Run returned request-level error %v; want the problem in the report", err)
+	}
+	want := RowError{Row: 1, Column: "name", Message: "column is duplicated"}
+	if !hasRowError(report.Errors, want) {
+		t.Fatalf("errors = %+v; want to contain %+v", report.Errors, want)
+	}
+	if report.Created != 0 {
+		t.Fatalf("Created = %d; want 0", report.Created)
+	}
+}
+
+func TestRunBlankRowInTheMiddleDoesNotSkewCountOrRowNumbers(t *testing.T) {
+	root := &fakeTx{}
+	ctx := dbctx.WithTx(context.Background(), root)
+	imp := &fakeImporter{
+		name: "activos",
+		cols: []Column{{Key: "name", Kind: KindString}},
+		refs: map[string]Lookup{},
+		prepare: func(values map[string]json.RawMessage) (func(context.Context) error, map[string]string) {
+			name := cellString(values, "name")
+			return func(context.Context) error {
+				if name == "bad" {
+					return apierr.BadRequest("bad value")
+				}
+				return nil
+			}, nil
+		},
+	}
+	// Spreadsheet rows: 1 header, 2 "a" (good), 3 blank, 4 "bad" (fails).
+	// Blank must not be counted and must not shift row 4's own number.
+	rows := [][]string{{"name"}, {"a"}, {""}, {"bad"}}
+
+	report, err := Run(ctx, nil, imp, rows, false, Limits{})
+	if err != nil {
+		t.Fatalf("Run returned request-level error %v; want the problem in the report", err)
+	}
+	if report.Rows != 2 {
+		t.Fatalf("Rows = %d; want 2 (the blank row must not be counted)", report.Rows)
+	}
+	want := RowError{Row: 4, Message: "bad value"}
+	if !hasRowError(report.Errors, want) {
+		t.Fatalf("errors = %+v; want %+v (true spreadsheet row, unaffected by the blank row)", report.Errors, want)
+	}
+}
+
+func TestRunReportsColumnScopedErrorForABadCellConversion(t *testing.T) {
+	imp := &fakeImporter{
+		name: "activos",
+		cols: []Column{{Key: "name", Kind: KindString}, {Key: "age", Kind: KindInt}},
+		refs: map[string]Lookup{},
+		prepare: func(map[string]json.RawMessage) (func(context.Context) error, map[string]string) {
+			return func(context.Context) error { return nil }, nil
+		},
+	}
+	rows := [][]string{{"name", "age"}, {"a", "30"}, {"", ""}, {"bad", "not-a-number"}}
+
+	report, err := Run(context.Background(), nil, imp, rows, false, Limits{})
+	if err != nil {
+		t.Fatalf("Run returned request-level error %v; want the problem in the report", err)
+	}
+	want := RowError{Row: 4, Column: "age", Message: "must be a whole number"}
+	if !hasRowError(report.Errors, want) {
+		t.Fatalf("errors = %+v; want %+v", report.Errors, want)
+	}
+	if report.Rows != 2 {
+		t.Fatalf("Rows = %d; want 2 (the blank row must not be counted)", report.Rows)
 	}
 }

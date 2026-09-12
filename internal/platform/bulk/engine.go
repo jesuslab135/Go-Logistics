@@ -212,11 +212,21 @@ func Run(ctx context.Context, pool *pgxpool.Pool, imp Importer, rows [][]string,
 	}
 	position := map[int]Column{}
 	present := map[string]bool{}
+	duplicate := map[string]bool{}
 	for i, h := range rows[0] {
-		if c, ok := byKey[strings.TrimSpace(h)]; ok {
-			position[i] = c
-			present[c.Key] = true
+		c, ok := byKey[strings.TrimSpace(h)]
+		if !ok {
+			continue
 		}
+		if present[c.Key] {
+			if !duplicate[c.Key] {
+				report.add(RowError{Row: 1, Column: c.Key, Message: "column is duplicated"})
+				duplicate[c.Key] = true
+			}
+			continue
+		}
+		position[i] = c
+		present[c.Key] = true
 	}
 	for _, c := range cols {
 		if c.Required && !present[c.Key] {
@@ -299,7 +309,20 @@ func Run(ctx context.Context, pool *pgxpool.Pool, imp Importer, rows [][]string,
 		}
 		if err := p.create(txCtx); err != nil {
 			_ = sp.Rollback(txCtx)
-			for _, e := range rowErrors(p.row, err) {
+			mapped := apierr.Map(err)
+			// A 5xx here is not a problem with this row's data (those are
+			// already 4xx: a unique violation, a bad foreign key, a failed
+			// validation) - it is the database or connection failing under
+			// us. Recording it as one more row error would flood the report
+			// with up to 500 identical "internal server error" entries,
+			// answer 200, and hide the outage from anything watching Run's
+			// own return value. Treat it as a request-level failure instead;
+			// the deferred rollback still undoes everything already done.
+			if mapped.Status >= 500 {
+				report.Created = 0
+				return report, mapped
+			}
+			for _, e := range mappedRowErrors(p.row, mapped) {
 				report.add(e)
 			}
 			continue
@@ -350,7 +373,13 @@ func sortedErrors(row int, errs map[string]string) []RowError {
 // rowErrors turns a store error into row errors, keeping per-field details
 // when the error carries them.
 func rowErrors(row int, err error) []RowError {
-	e := apierr.Map(err)
+	return mappedRowErrors(row, apierr.Map(err))
+}
+
+// mappedRowErrors is rowErrors' second half, taking an already-mapped error
+// so a caller that must inspect the mapping first (to tell a data problem
+// from an infrastructure one) does not map it twice.
+func mappedRowErrors(row int, e *apierr.Error) []RowError {
 	if details, ok := e.Details.(map[string]string); ok && len(details) > 0 {
 		return sortedErrors(row, details)
 	}
