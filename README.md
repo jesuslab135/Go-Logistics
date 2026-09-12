@@ -431,10 +431,11 @@ curl -OJ "http://localhost:8080/api/v1/work-orders/export?format=csv" -H "Author
   `- revisar frenos` re-imports as `'- revisar frenos`. Prefer `format=xlsx`
   for export → import round trips: the `.xlsx` writer emits inline strings,
   which are never evaluated, so it needs no such quoting.
-- **A large export cannot be re-imported unsplit.** `EXPORT_MAX_ROWS` (20000)
-  is deliberately larger than `IMPORT_MAX_ROWS` (5000), so a full export has to
-  be split into 5000-row files before any of it can be imported back; the
-  import otherwise refuses the whole file with a `400` naming the limit.
+- **A full export can be imported back.** `EXPORT_MAX_ROWS` (5000) matches
+  `IMPORT_MAX_ROWS` (5000), so an export never produces a file the import then
+  refuses. Raise one and raise the other: a file longer than `IMPORT_MAX_ROWS`
+  must be split into smaller files first, and the import otherwise refuses the
+  whole file with a `400` naming the limit.
 - **Importable:** the 33 sections in `bulkImporters`
   (`internal/http/handler/bulk_registry.go`). **Exportable:** every list in
   `exportPaths`.
@@ -677,7 +678,7 @@ environment: `DATABASE_URL`, `JWT_SECRET`. Storage is chosen by `STORAGE_BACKEND
 | `STORAGE_MINIO_PUBLIC_URL_IS_BUCKET_ROOT` | `false` | Skip the bucket-suffix check on `STORAGE_MINIO_PUBLIC_URL` |
 | `IMPORT_MAX_BYTES` | `10485760` | Largest spreadsheet an import accepts |
 | `IMPORT_MAX_ROWS` | `5000` | Most data rows per import |
-| `EXPORT_MAX_ROWS` | `20000` | Most rows per export; `X-Export-Truncated: true` beyond |
+| `EXPORT_MAX_ROWS` | `5000` | Most rows per export; `X-Export-Truncated: true` beyond. Keep it at or below `IMPORT_MAX_ROWS` so an export can be imported back |
 
 `DATABASE_URL` carries `pool_max_conns=20`, which caps the pgx connection pool.
 Keep it set, and keep the value identical in `.env.example`,

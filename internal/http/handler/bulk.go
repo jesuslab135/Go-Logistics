@@ -27,6 +27,13 @@ const xlsxContentType = "application/vnd.openxmlformats-officedocument.spreadshe
 // raising that and every row past 5001 silently loses its drop-downs.
 const importMaxRowsDefault = 5000
 
+// exportMaxRowsDefault is the default for EXPORT_MAX_ROWS. It deliberately
+// equals importMaxRowsDefault: export is documented as the way to seed another
+// company, so a cap larger than the import's would hand the user a file the
+// import then refuses - discovered only after the download. Raise one and
+// raise the other, or exports stop round-tripping.
+const exportMaxRowsDefault = importMaxRowsDefault
+
 // maxConcurrentImports is how many imports may run at once, and
 // maxConcurrentExports how many exports.
 //
@@ -216,7 +223,7 @@ type Exporter struct {
 func NewExporter(engine http.Handler) *Exporter {
 	return &Exporter{
 		engine:  engine,
-		maxRows: int(bulkEnvInt("EXPORT_MAX_ROWS", 20000)),
+		maxRows: int(bulkEnvInt("EXPORT_MAX_ROWS", exportMaxRowsDefault)),
 		slots:   make(chan struct{}, maxConcurrentExports),
 	}
 }

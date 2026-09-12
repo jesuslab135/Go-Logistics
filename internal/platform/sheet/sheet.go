@@ -176,9 +176,9 @@ func WriteXLSX(w io.Writer, sheets []Sheet) error {
 // WriteXLSXStream writes ONE sheet through excelize's StreamWriter, which
 // serialises each row as it is handed over instead of building the whole
 // worksheet as an object graph first. WriteXLSX holds roughly a kilobyte per
-// cell until it serialises, so a 20000-row wide export is on the order of
-// 800k cells and hundreds of megabytes - enough to have the API container
-// killed rather than merely answer slowly.
+// cell until it serialises, so a wide export at a raised EXPORT_MAX_ROWS runs
+// to hundreds of thousands of cells and hundreds of megabytes - enough to have
+// the API container killed rather than merely answer slowly.
 //
 // This is additive, not a replacement: the StreamWriter writes a single sheet
 // and cannot add data validation, which the three-sheet templates and their
