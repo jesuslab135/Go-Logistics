@@ -304,6 +304,12 @@ func NewRouter(d Deps) *gin.Engine {
 	crud.NewLinkHandler[dto.IssueResponse, dto.LinkIssueRequest](NewServiceEntryLineItemIssueStore(d.Queries)).Register(service, "/service-entry-line-items", "/issues", "issue_id")
 	crud.NewLinkHandler[dto.IssueResponse, dto.LinkIssueRequest](NewWorkOrderLineItemIssueStore(d.Queries)).Register(workOrders, "/work-order-line-items", "/issues", "issue_id")
 
+	registerBulkImports(bulkGroups{
+		member: member, assets: assets, tires: tires, parts: parts, inventory: inventory,
+		workOrders: workOrders, issues: issues, service: service, fuel: fuel, vendors: vendors,
+		warranties: warranties, mileageGoals: mileageGoals, employees: employees,
+	}, d)
+
 	return r
 }
 
