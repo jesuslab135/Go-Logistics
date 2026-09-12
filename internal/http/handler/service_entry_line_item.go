@@ -9,6 +9,7 @@ import (
 	"fleet/internal/db/gen"
 	"fleet/internal/http/dto"
 	"fleet/internal/http/middleware"
+	"fleet/internal/platform/apierr"
 	"fleet/internal/platform/paginate"
 )
 
@@ -135,10 +136,17 @@ func (s *ServiceEntryLineItemStore) Update(ctx context.Context, parentID, id int
 func (s *ServiceEntryLineItemStore) Delete(ctx context.Context, parentID, id int64) error {
 	now := time.Now().UTC()
 	return inTx(ctx, s.pool, s.q, func(qtx *gen.Queries) error {
-		if err := qtx.DeleteServiceEntryLineItem(ctx, gen.DeleteServiceEntryLineItemParams{
+		// Zero rows means the line, its entry, or the tenancy between them did
+		// not match. The recompute below must not run for an entry the caller
+		// was never allowed to write.
+		n, err := qtx.DeleteServiceEntryLineItem(ctx, gen.DeleteServiceEntryLineItemParams{
 			ID: id, ParentID: parentID, CompanyID: middleware.CompanyFromContext(ctx),
-		}); err != nil {
+		})
+		if err != nil {
 			return err
+		}
+		if n == 0 {
+			return apierr.NotFound("line item not found")
 		}
 		return recalcServiceEntry(ctx, qtx, parentID, now)
 	})

@@ -9,6 +9,7 @@ import (
 	"fleet/internal/db/gen"
 	"fleet/internal/http/dto"
 	"fleet/internal/http/middleware"
+	"fleet/internal/platform/apierr"
 	"fleet/internal/platform/paginate"
 )
 
@@ -109,10 +110,16 @@ func (s *WorkOrderSubLineItemStore) Update(ctx context.Context, parentID, id int
 func (s *WorkOrderSubLineItemStore) Delete(ctx context.Context, parentID, id int64) error {
 	now := time.Now().UTC()
 	return inTx(ctx, s.pool, s.q, func(qtx *gen.Queries) error {
-		if err := qtx.DeleteWorkOrderSubLineItem(ctx, gen.DeleteWorkOrderSubLineItemParams{
+		// Zero rows means nothing matched under this tenant; recomputing the
+		// parent anyway would touch a line item the caller does not own.
+		n, err := qtx.DeleteWorkOrderSubLineItem(ctx, gen.DeleteWorkOrderSubLineItemParams{
 			ID: id, ParentID: parentID, CompanyID: middleware.CompanyFromContext(ctx),
-		}); err != nil {
+		})
+		if err != nil {
 			return err
+		}
+		if n == 0 {
+			return apierr.NotFound("sub line item not found")
 		}
 		return recalcWorkOrderLineItem(ctx, qtx, parentID, now)
 	})
