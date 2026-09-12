@@ -55,7 +55,9 @@ func CellValue(col Column, cell string) (json.RawMessage, error) {
 		n, err := strconv.ParseInt(cell, 10, 64)
 		if err != nil {
 			f, ferr := strconv.ParseFloat(cell, 64)
-			if ferr != nil || f != math.Trunc(f) {
+			if ferr != nil || math.IsNaN(f) || math.IsInf(f, 0) ||
+				f < float64(math.MinInt64) || f >= float64(math.MaxInt64) ||
+				f != math.Trunc(f) {
 				return nil, errWhole
 			}
 			n = int64(f)
@@ -68,7 +70,8 @@ func CellValue(col Column, cell string) (json.RawMessage, error) {
 		}
 		return json.Marshal(d.String())
 	case KindFloat:
-		if _, err := strconv.ParseFloat(cell, 64); err != nil {
+		f, err := strconv.ParseFloat(cell, 64)
+		if err != nil || math.IsNaN(f) || math.IsInf(f, 0) {
 			return nil, errNumber
 		}
 		return json.RawMessage(cell), nil
@@ -129,24 +132,36 @@ func parseTime(cell string) (time.Time, error) {
 }
 
 // Assemble builds the JSON object for one row: dotted keys become nested
-// objects and cf.<key> becomes custom_fields.<key>.
+// objects and cf.<key> becomes custom_fields.<key>. It returns an error if
+// one key's path collides with another key already placed in the same row
+// (for example both "vehicle" and "vehicle.engine_serial" present at once) -
+// callers must not feed it a value map with such an overlap.
 func Assemble(values map[string]json.RawMessage) ([]byte, error) {
 	root := map[string]any{}
 	for key, v := range values {
+		fullKey := key
 		if strings.HasPrefix(key, "cf.") {
 			key = "custom_fields." + strings.TrimPrefix(key, "cf.")
 		}
 		parts := strings.Split(key, ".")
 		node := root
 		for _, p := range parts[:len(parts)-1] {
-			child, ok := node[p].(map[string]any)
-			if !ok {
-				child = map[string]any{}
+			switch existing := node[p].(type) {
+			case nil:
+				child := map[string]any{}
 				node[p] = child
+				node = child
+			case map[string]any:
+				node = existing
+			default:
+				return nil, fmt.Errorf("bulk: column %q conflicts with another column at %q", fullKey, p)
 			}
-			node = child
 		}
-		node[parts[len(parts)-1]] = v
+		last := parts[len(parts)-1]
+		if _, isMap := node[last].(map[string]any); isMap {
+			return nil, fmt.Errorf("bulk: column %q conflicts with another column at %q", fullKey, last)
+		}
+		node[last] = v
 	}
 	return json.Marshal(root)
 }

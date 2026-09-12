@@ -23,16 +23,34 @@ func TestCellValue(t *testing.T) {
 		{Column{Kind: KindDecimal}, "$1,234.50", `"1234.5"`, ""},
 		{Column{Kind: KindDecimal}, "doce", "", "must be a number"},
 		{Column{Kind: KindBool}, "Sí", "true", ""},
+		{Column{Kind: KindBool}, "si", "true", ""},
+		{Column{Kind: KindBool}, "true", "true", ""},
+		{Column{Kind: KindBool}, "yes", "true", ""},
+		{Column{Kind: KindBool}, "1", "true", ""},
+		{Column{Kind: KindBool}, "x", "true", ""},
+		{Column{Kind: KindBool}, "verdadero", "true", ""},
 		{Column{Kind: KindBool}, "no", "false", ""},
+		{Column{Kind: KindBool}, "false", "false", ""},
+		{Column{Kind: KindBool}, "0", "false", ""},
+		{Column{Kind: KindBool}, "falso", "false", ""},
 		{Column{Kind: KindBool}, "quizá", "", "must be true or false (sí/no)"},
 		{Column{Kind: KindTime}, "2026-09-11", `"2026-09-11T00:00:00Z"`, ""},
+		{Column{Kind: KindTime}, "2026-09-11 08:30", `"2026-09-11T08:30:00Z"`, ""},
 		{Column{Kind: KindTime}, "11/09/2026", `"2026-09-11T00:00:00Z"`, ""},
+		{Column{Kind: KindTime}, "11/09/2026 08:30", `"2026-09-11T08:30:00Z"`, ""},
+		{Column{Kind: KindTime}, "2026-09-11T08:30:00-05:00", `"2026-09-11T13:30:00Z"`, ""},
 		{Column{Kind: KindTime}, "46276", `"2026-09-11T00:00:00Z"`, ""},
 		{Column{Kind: KindTime}, "ayer", "", "must be a date (YYYY-MM-DD or DD/MM/YYYY)"},
 		{Column{Kind: KindJSON}, `{"a":1}`, `{"a":1}`, ""},
 		{Column{Kind: KindJSON}, `{a:1}`, "", "must be valid JSON"},
 		{Column{Kind: KindList}, "frenos, llantas; urgente", `["frenos","llantas","urgente"]`, ""},
+		{Column{Kind: KindFloat}, "abc", "", "must be a number"},
+		{Column{Kind: KindFloat}, "NaN", "", "must be a number"},
+		{Column{Kind: KindFloat}, "Infinity", "", "must be a number"},
+		{Column{Kind: KindInt}, "99999999999999999999999999999", "", "must be a whole number"},
+		{Column{Kind: KindInt}, "Infinity", "", "must be a whole number"},
 		{Column{Kind: KindFloat, CustomType: "number"}, "3.5", "3.5", ""},
+		{Column{Kind: KindFloat, CustomType: "number"}, "no-es-numero", "", "must be a number"},
 		{Column{Kind: KindString, CustomType: "date"}, "11/09/2026", `"2026-09-11"`, ""},
 		{Column{Kind: KindString, CustomType: "select", OneOf: []string{"A12", "B7"}}, "a12", `"A12"`, ""},
 	}
@@ -71,6 +89,21 @@ func TestAssembleNestsDottedKeysAndCustomFields(t *testing.T) {
 		got["vehicle"].(map[string]any)["engine_serial"] != "X1" ||
 		got["custom_fields"].(map[string]any)["cost_centre"] != "A12" {
 		t.Fatalf("assembled %s", doc)
+	}
+}
+
+func TestAssembleRejectsKeyCollision(t *testing.T) {
+	if _, err := Assemble(map[string]json.RawMessage{
+		"vehicle":               json.RawMessage(`"flat"`),
+		"vehicle.engine_serial": json.RawMessage(`"X1"`),
+	}); err == nil {
+		t.Fatal("want an error when a parent key collides with one of its own nested children")
+	}
+	if _, err := Assemble(map[string]json.RawMessage{
+		"vehicle.engine_serial": json.RawMessage(`"X1"`),
+		"vehicle":               json.RawMessage(`"flat"`),
+	}); err == nil {
+		t.Fatal("want an error regardless of which colliding key is assembled first")
 	}
 }
 
