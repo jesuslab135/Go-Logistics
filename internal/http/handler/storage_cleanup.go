@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 
+	"fleet/internal/http/middleware"
 	"fleet/internal/platform/storage"
 )
 
@@ -32,7 +33,10 @@ func reclaimObjects(ctx context.Context, files storage.Storage, log *slog.Logger
 	}
 
 	for _, ref := range refs {
-		key, ok := fileKey(files, ref)
+		// Scoped to the caller's tenant: the reference came off a row whose
+		// file column the client writes freely, so an unscoped resolve would
+		// let one company name another's object and have it deleted here.
+		key, ok := fileKeyForCompany(files, ref, middleware.CompanyFromContext(ctx))
 		if !ok {
 			continue
 		}
