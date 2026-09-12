@@ -83,7 +83,11 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/fleet?sslmode=disable
+      # pool_max_conns caps the pgx pool; keep it in step with .env.example and
+      # docker-compose.yml. Without it pgxpool defaults to max(4, NumCPU) — 4
+      # on this 2-vCPU VPS — and a bulk import holds one connection for the
+      # whole import, so a few at once would starve every other request.
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/fleet?sslmode=disable&pool_max_conns=20
       STORAGE_MINIO_ENDPOINT: minio:9000
       STORAGE_MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
       STORAGE_MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
