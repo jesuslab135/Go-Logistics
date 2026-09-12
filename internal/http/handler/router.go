@@ -199,8 +199,12 @@ func NewRouter(d Deps) *gin.Engine {
 	crud.NewHandler[dto.TireModelResponse, dto.CreateTireModelRequest, dto.UpdateTireModelRequest](NewTireModelStore(d.Queries)).Register(tires, "/tire-models")
 	crud.NewHandler[dto.AxleTemplateResponse, dto.CreateAxleTemplateRequest, dto.UpdateAxleTemplateRequest](NewAxleTemplateStore(d.Queries)).Register(tires, "/axle-templates")
 	// Django's TireAssignmentRequestViewSet required membership only; its
-	// approve/reject actions carried the extra warehouse-role check.
-	registerCrudWithList(member, "/tire-assignment-requests",
+	// approve/reject actions carried the extra warehouse-role check. Gated on
+	// the tires module here rather than left on the bare member group: a
+	// request to move a tire is a tire write, and an ungated CRUD route beside
+	// a permission-gated approve action is an invitation to reach the second
+	// through the first.
+	registerCrudWithList(tires, "/tire-assignment-requests",
 		crud.NewHandler[dto.TireAssignmentRequestResponse, dto.CreateTireAssignmentRequestRequest, dto.UpdateTireAssignmentRequestRequest](NewTireAssignmentRequestStore(d.Queries, d.Pool)), lists.TireAssignmentRequests)
 	// Approving is the warehouse's act, not an ordinary write: Django gated it
 	// on tire_approvals/approve, which admins bypass.

@@ -5768,24 +5768,28 @@ definitions:
     type: object
   dto.UpdateTireAssignmentRequestRequest:
     properties:
-      approved_by_id:
-        type: integer
       notes:
         type: string
       position_code:
         maxLength: 10
         type: string
       rejection_reason:
+        description: |-
+          state, resolved_at and approved_by_id are response-only. They are moved
+          by POST /tire-assignment-requests/{id}/approve, which is gated on
+          tire_approvals/approve and is the only thing that can check the request
+          is still PENDING and stamp who resolved it. Carrying them here would be
+          a way around that gate: a PUT could forge an approval and attribute it
+          to another employee.
+
+          rejection_reason stays editable. No reject action exists yet, so nothing
+          else can write it, and on its own it is a free-text note with no
+          privilege meaning once state is out of reach.
         type: string
       requested_at:
         type: string
       requested_by_id:
         type: integer
-      resolved_at:
-        type: string
-      state:
-        maxLength: 10
-        type: string
       tire_id:
         type: integer
       vehicle_id:

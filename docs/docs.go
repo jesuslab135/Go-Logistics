@@ -25969,9 +25969,6 @@ const docTemplate = `{
         "dto.UpdateTireAssignmentRequestRequest": {
             "type": "object",
             "properties": {
-                "approved_by_id": {
-                    "type": "integer"
-                },
                 "notes": {
                     "type": "string"
                 },
@@ -25980,6 +25977,7 @@ const docTemplate = `{
                     "maxLength": 10
                 },
                 "rejection_reason": {
+                    "description": "state, resolved_at and approved_by_id are response-only. They are moved\nby POST /tire-assignment-requests/{id}/approve, which is gated on\ntire_approvals/approve and is the only thing that can check the request\nis still PENDING and stamp who resolved it. Carrying them here would be\na way around that gate: a PUT could forge an approval and attribute it\nto another employee.\n\nrejection_reason stays editable. No reject action exists yet, so nothing\nelse can write it, and on its own it is a free-text note with no\nprivilege meaning once state is out of reach.",
                     "type": "string"
                 },
                 "requested_at": {
@@ -25987,13 +25985,6 @@ const docTemplate = `{
                 },
                 "requested_by_id": {
                     "type": "integer"
-                },
-                "resolved_at": {
-                    "type": "string"
-                },
-                "state": {
-                    "type": "string",
-                    "maxLength": 10
                 },
                 "tire_id": {
                     "type": "integer"
