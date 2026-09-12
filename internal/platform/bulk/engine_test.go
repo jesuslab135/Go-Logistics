@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -248,27 +249,20 @@ func TestRunIsAllOrNothingOnADatabaseRowError(t *testing.T) {
 	if !outer.rolledBack {
 		t.Fatal("outer transaction was never rolled back")
 	}
-	// Each ready row runs in its own savepoint (outer.children): "a" and "b"
-	// must be released (committed) since they succeeded, and "dup" must be
-	// rolled back and never committed - a refactor that dropped sp.Rollback,
-	// poisoning the transaction for every row after the failure, would still
-	// leave the outer transaction rolled back and would slip past the
-	// assertions above alone.
-	if len(outer.children) != 3 {
-		t.Fatalf("outer has %d savepoints; want 3 (one per ready row: a, dup, b)", len(outer.children))
+	// No per-row savepoints. One savepoint per row spent a subtransaction XID
+	// per row, and a Postgres backend caches only 64 of them before every
+	// other backend's visibility checks start hitting pg_subtrans - certain to
+	// happen at the 5000-row cap. They also bought nothing: the import is
+	// all-or-nothing, so a row that fails in the database ends the run rather
+	// than being stepped over.
+	if len(outer.children) != 0 {
+		t.Fatalf("outer opened %d savepoints; want 0 (the per-row savepoint loop is gone)", len(outer.children))
 	}
-	rowA, rowDup, rowB := outer.children[0], outer.children[1], outer.children[2]
-	if !rowA.committed || rowA.rolledBack {
-		t.Fatalf("row \"a\" savepoint: committed=%v rolledBack=%v; want committed only", rowA.committed, rowA.rolledBack)
-	}
-	if rowDup.committed || !rowDup.rolledBack {
-		t.Fatalf("row \"dup\" savepoint: committed=%v rolledBack=%v; want rolled back only", rowDup.committed, rowDup.rolledBack)
-	}
-	if !rowB.committed || rowB.rolledBack {
-		t.Fatalf("row \"b\" savepoint: committed=%v rolledBack=%v; want committed only", rowB.committed, rowB.rolledBack)
-	}
-	if len(created) != 2 {
-		t.Fatalf("store saw %d creates, want 2 (the good rows still run inside the doomed transaction)", len(created))
+	// The run stops at the first database-level failure, so row 4 ("b") is
+	// never attempted. "a" still ran, inside the transaction about to be
+	// rolled back.
+	if len(created) != 1 || created[0] != "a" {
+		t.Fatalf("store saw creates %v; want exactly [a] - the run must stop at the first failing row", created)
 	}
 }
 
@@ -517,6 +511,94 @@ func TestRunBlankRowInTheMiddleDoesNotSkewCountOrRowNumbers(t *testing.T) {
 	want := RowError{Row: 4, Message: "bad value"}
 	if !hasRowError(report.Errors, want) {
 		t.Fatalf("errors = %+v; want %+v (true spreadsheet row, unaffected by the blank row)", report.Errors, want)
+	}
+}
+
+// Unknown headers stay ignored - that is what lets a file exported from a list
+// be re-uploaded unchanged, id and timestamps and all - but a MISSPELLED
+// optional column is indistinguishable from one of those and used to import as
+// empty under a clean 201, leaving the user sure the data had landed. Report
+// them rather than reject them, so both cases keep working.
+func TestRunReportsIgnoredColumns(t *testing.T) {
+	imp := &fakeImporter{
+		name: "activos",
+		cols: []Column{{Key: "name", Kind: KindString}, {Key: "code", Kind: KindString}},
+		refs: map[string]Lookup{},
+		prepare: func(map[string]json.RawMessage) (func(context.Context) error, map[string]string) {
+			return func(context.Context) error { return nil }, nil
+		},
+	}
+	// "id" is a column an exported file carries; "nmae" is a typo for "name";
+	// the trailing blank header is not a column at all and must not be listed.
+	rows := [][]string{{"name", "id", "nmae", ""}, {"a", "7", "b", ""}}
+
+	// This file has no row errors, so Run reaches the transaction: give it one
+	// to nest in rather than a nil pool.
+	ctx := dbctx.WithTx(context.Background(), &fakeTx{})
+	report, err := Run(ctx, nil, imp, rows, false, Limits{})
+	if err != nil {
+		t.Fatalf("Run returned request-level error %v", err)
+	}
+	if len(report.Errors) != 0 {
+		t.Fatalf("errors = %+v; an unknown column must stay non-fatal", report.Errors)
+	}
+	want := []string{"id", "nmae"}
+	if !reflect.DeepEqual(report.IgnoredColumns, want) {
+		t.Fatalf("IgnoredColumns = %v; want %v", report.IgnoredColumns, want)
+	}
+}
+
+// Errors stops at maxErrors, so the report has to say how many problems there
+// really were: otherwise a user fixes the 500 listed, re-uploads, and is met
+// with 500 more with nothing having warned them there were ever others.
+func TestRunCountsEveryErrorBeyondTheListedCap(t *testing.T) {
+	imp := &fakeImporter{
+		name: "activos",
+		cols: []Column{{Key: "age", Kind: KindInt}},
+		refs: map[string]Lookup{},
+		prepare: func(map[string]json.RawMessage) (func(context.Context) error, map[string]string) {
+			return func(context.Context) error { return nil }, nil
+		},
+	}
+	const extra = 120
+	rows := [][]string{{"age"}}
+	for i := 0; i < maxErrors+extra; i++ {
+		rows = append(rows, []string{"not-a-number"})
+	}
+
+	report, err := Run(context.Background(), nil, imp, rows, false, Limits{})
+	if err != nil {
+		t.Fatalf("Run returned request-level error %v", err)
+	}
+	if len(report.Errors) != maxErrors {
+		t.Fatalf("listed errors = %d; want the %d cap", len(report.Errors), maxErrors)
+	}
+	if report.ErrorCount != maxErrors+extra {
+		t.Fatalf("ErrorCount = %d; want %d (every problem counted, not just the listed ones)", report.ErrorCount, maxErrors+extra)
+	}
+	if !report.Truncated {
+		t.Fatal("Truncated = false; the listed errors are only a prefix of what was found")
+	}
+}
+
+// A clean report must not claim truncation, or the flag means nothing.
+func TestRunLeavesTruncatedUnsetForASmallReport(t *testing.T) {
+	imp := &fakeImporter{
+		name: "activos",
+		cols: []Column{{Key: "age", Kind: KindInt}},
+		refs: map[string]Lookup{},
+		prepare: func(map[string]json.RawMessage) (func(context.Context) error, map[string]string) {
+			return func(context.Context) error { return nil }, nil
+		},
+	}
+	rows := [][]string{{"age"}, {"nope"}}
+
+	report, err := Run(context.Background(), nil, imp, rows, false, Limits{})
+	if err != nil {
+		t.Fatalf("Run returned request-level error %v", err)
+	}
+	if report.ErrorCount != 1 || report.Truncated {
+		t.Fatalf("ErrorCount = %d, Truncated = %v; want 1 and false", report.ErrorCount, report.Truncated)
 	}
 }
 

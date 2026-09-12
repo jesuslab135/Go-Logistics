@@ -36,6 +36,21 @@ type Report struct {
 	Rows     int        `json:"rows"`
 	Created  int        `json:"created"`
 	Errors   []RowError `json:"errors"`
+	// ErrorCount is how many problems were found in total. Errors itself stops
+	// at maxErrors, so without this a file with 4000 bad rows reports 500
+	// problems and says nothing about the rest: the user fixes those 500,
+	// re-uploads, and is met with 500 more with no way to have known.
+	ErrorCount int `json:"error_count"`
+	// Truncated says Errors holds only the first maxErrors of ErrorCount.
+	Truncated bool `json:"truncated"`
+	// IgnoredColumns lists the header cells that matched no column of this
+	// section. Ignoring unknown columns is deliberate - it is what lets a file
+	// exported from a list be re-uploaded unchanged, id and timestamps and all
+	// - but a MISSPELLED optional column is indistinguishable from one of
+	// those, and would otherwise import as empty under a clean 201 leaving the
+	// user certain the data landed. Reported rather than rejected, so the
+	// round trip keeps working.
+	IgnoredColumns []string `json:"ignored_columns"`
 }
 
 // Entry is one record a reference column can point at.
@@ -197,7 +212,7 @@ type prepared struct {
 // only for problems with the request itself; problems with rows are in the
 // report.
 func Run(ctx context.Context, pool *pgxpool.Pool, imp Importer, rows [][]string, dryRun bool, limits Limits) (Report, error) {
-	report := Report{Resource: imp.Resource(), DryRun: dryRun, Errors: []RowError{}}
+	report := Report{Resource: imp.Resource(), DryRun: dryRun, Errors: []RowError{}, IgnoredColumns: []string{}}
 	if len(rows) == 0 {
 		return report, apierr.BadRequest("the file is empty")
 	}
@@ -213,9 +228,15 @@ func Run(ctx context.Context, pool *pgxpool.Pool, imp Importer, rows [][]string,
 	position := map[int]Column{}
 	present := map[string]bool{}
 	duplicate := map[string]bool{}
+	ignored := map[string]bool{}
 	for i, h := range rows[0] {
-		c, ok := byKey[strings.TrimSpace(h)]
+		name := strings.TrimSpace(h)
+		c, ok := byKey[name]
 		if !ok {
+			if name != "" && !ignored[name] {
+				ignored[name] = true
+				report.IgnoredColumns = append(report.IgnoredColumns, name)
+			}
 			continue
 		}
 		if present[c.Key] {
@@ -302,22 +323,26 @@ func Run(ctx context.Context, pool *pgxpool.Pool, imp Importer, rows [][]string,
 	defer tx.Rollback(ctx) //nolint:errcheck // a no-op after Commit
 	txCtx := dbctx.WithTx(ctx, tx)
 
+	// No per-row savepoint. One savepoint per row took one subtransaction XID
+	// per row, and a Postgres backend caches only 64 of those: past that,
+	// every OTHER backend's visibility checks fall back to pg_subtrans SLRU
+	// lookups and the whole cluster degrades - guaranteed at the 5000-row cap,
+	// and RELEASE SAVEPOINT does not retire the XID. Stopping at the first
+	// database-level failure costs nothing: every pure-data error (bad dates,
+	// bad numbers, missing required fields, unresolvable references) is
+	// already collected above, before the transaction opens, so the only
+	// failures left here are constraint violations - and the import is
+	// all-or-nothing regardless, so the file was never going to be written.
 	for _, p := range ready {
-		sp, err := tx.Begin(txCtx)
-		if err != nil {
-			return report, err
-		}
 		if err := p.create(txCtx); err != nil {
-			_ = sp.Rollback(txCtx)
 			mapped := apierr.Map(err)
 			// A 5xx here is not a problem with this row's data (those are
 			// already 4xx: a unique violation, a bad foreign key, a failed
 			// validation) - it is the database or connection failing under
-			// us. Recording it as one more row error would flood the report
-			// with up to 500 identical "internal server error" entries,
-			// answer 200, and hide the outage from anything watching Run's
-			// own return value. Treat it as a request-level failure instead;
-			// the deferred rollback still undoes everything already done.
+			// us. Recording it as a row error would answer 200 and hide the
+			// outage from anything watching Run's own return value. Treat it
+			// as a request-level failure instead; the deferred rollback still
+			// undoes everything already done.
 			if mapped.Status >= 500 {
 				report.Created = 0
 				return report, mapped
@@ -325,18 +350,12 @@ func Run(ctx context.Context, pool *pgxpool.Pool, imp Importer, rows [][]string,
 			for _, e := range mappedRowErrors(p.row, mapped) {
 				report.add(e)
 			}
-			continue
-		}
-		if err := sp.Commit(txCtx); err != nil {
-			return report, err
+			report.Created = 0
+			return report, nil
 		}
 		report.Created++
 	}
 
-	if len(report.Errors) > 0 {
-		report.Created = 0
-		return report, nil
-	}
 	if dryRun {
 		return report, nil
 	}
@@ -347,9 +366,12 @@ func Run(ctx context.Context, pool *pgxpool.Pool, imp Importer, rows [][]string,
 }
 
 func (r *Report) add(e RowError) {
+	r.ErrorCount++
 	if len(r.Errors) < maxErrors {
 		r.Errors = append(r.Errors, e)
+		return
 	}
+	r.Truncated = true
 }
 
 func blank(row []string) bool {

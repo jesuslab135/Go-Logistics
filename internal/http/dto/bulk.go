@@ -10,6 +10,14 @@ type ImportReport struct {
 	Rows     int              `json:"rows"`
 	Created  int              `json:"created"`
 	Errors   []ImportRowError `json:"errors"`
+	// ErrorCount is the total number of problems found; Errors stops at 500,
+	// and Truncated says so.
+	ErrorCount int  `json:"error_count"`
+	Truncated  bool `json:"truncated"`
+	// IgnoredColumns lists header cells matching no column of the section. An
+	// exported file's id and timestamp columns land here, and so does a
+	// misspelled column name - which is why they are reported.
+	IgnoredColumns []string `json:"ignored_columns"`
 }
 
 // ImportRowError is one problem, located by spreadsheet row (the header is row 1).
