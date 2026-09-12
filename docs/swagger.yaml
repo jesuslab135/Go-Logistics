@@ -18629,6 +18629,12 @@ paths:
             additionalProperties:
               type: string
             type: object
+        "503":
+          description: Service Unavailable
+          schema:
+            additionalProperties:
+              type: string
+            type: object
       summary: Liveness check
       tags:
       - system
