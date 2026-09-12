@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/xuri/excelize/v2"
@@ -20,7 +21,11 @@ var ErrUnsupported = errors.New("unsupported file type: upload an .xlsx or .csv 
 // DataSheet is the sheet Read prefers, and the one templates put data in.
 const DataSheet = "Datos"
 
-// maxDataRows bounds the range drop-down lists apply to.
+// maxDataRows bounds the range drop-down lists apply to. It is deliberately
+// one more than IMPORT_MAX_ROWS' default of 5000 data rows (the header is row
+// 1); see bulkEnvInt in internal/http/handler/bulk.go, which names this
+// constant in turn. Raise that environment variable without raising this and
+// every row past 5001 silently loses its drop-downs.
 const maxDataRows = 5001
 
 // Read returns every row of the Datos sheet (or the first sheet) of an .xlsx,
@@ -168,6 +173,61 @@ func WriteXLSX(w io.Writer, sheets []Sheet) error {
 	return f.Write(w)
 }
 
+// WriteXLSXStream writes ONE sheet through excelize's StreamWriter, which
+// serialises each row as it is handed over instead of building the whole
+// worksheet as an object graph first. WriteXLSX holds roughly a kilobyte per
+// cell until it serialises, so a 20000-row wide export is on the order of
+// 800k cells and hundreds of megabytes - enough to have the API container
+// killed rather than merely answer slowly.
+//
+// This is additive, not a replacement: the StreamWriter writes a single sheet
+// and cannot add data validation, which the three-sheet templates and their
+// drop-downs both need. An export is one sheet with no validation, so only the
+// export path uses this and templates keep WriteXLSX unchanged.
+func WriteXLSXStream(w io.Writer, name string, rows [][]any) error {
+	f := excelize.NewFile()
+	defer f.Close()
+
+	if err := f.SetSheetName("Sheet1", name); err != nil {
+		return err
+	}
+	bold, err := f.NewStyle(&excelize.Style{Font: &excelize.Font{Bold: true}})
+	if err != nil {
+		return err
+	}
+	sw, err := f.NewStreamWriter(name)
+	if err != nil {
+		return err
+	}
+	if err := sw.SetPanes(&excelize.Panes{Freeze: true, YSplit: 1, TopLeftCell: "A2", ActivePane: "bottomLeft"}); err != nil {
+		return err
+	}
+
+	for r, row := range rows {
+		cell, err := excelize.CoordinatesToCellName(1, r+1)
+		if err != nil {
+			return err
+		}
+		values := row
+		if r == 0 {
+			// Row 1 is bold, matching WriteXLSX. The StreamWriter takes the
+			// style per cell rather than per row.
+			values = make([]any, len(row))
+			for i, v := range row {
+				values[i] = excelize.Cell{StyleID: bold, Value: v}
+			}
+		}
+		if err := sw.SetRow(cell, values); err != nil {
+			return err
+		}
+	}
+
+	if err := sw.Flush(); err != nil {
+		return err
+	}
+	return f.Write(w)
+}
+
 func addDropList(f *excelize.File, sheetName string, dl DropList) error {
 	dv := excelize.NewDataValidation(true)
 	col := ColumnName(dl.Column)
@@ -184,7 +244,8 @@ func addDropList(f *excelize.File, sheetName string, dl DropList) error {
 }
 
 // WriteCSV writes rows as UTF-8 CSV with a byte-order mark, so Excel shows
-// accents correctly. A nil value is an empty cell.
+// accents correctly. A nil value is an empty cell, and a cell a spreadsheet
+// would otherwise execute is defused - see csvCell.
 func WriteCSV(w io.Writer, rows [][]any) error {
 	if _, err := io.WriteString(w, "\xef\xbb\xbf"); err != nil {
 		return err
@@ -194,7 +255,7 @@ func WriteCSV(w io.Writer, rows [][]any) error {
 		rec := make([]string, len(row))
 		for i, v := range row {
 			if v != nil {
-				rec[i] = fmt.Sprint(v)
+				rec[i] = csvCell(v)
 			}
 		}
 		if err := cw.Write(rec); err != nil {
@@ -203,6 +264,35 @@ func WriteCSV(w io.Writer, rows [][]any) error {
 	}
 	cw.Flush()
 	return cw.Error()
+}
+
+// csvCell renders one value, defusing CSV formula injection. Excel and
+// LibreOffice execute a cell whose text starts with "=", "+", "-", "@", a tab
+// or a carriage return, so an exported vendor name or description beginning
+// with one of those runs as a formula on whatever machine opens the file -
+// reachable by anyone who can type a name into this API. OWASP's guidance is
+// to prefix the cell with a single quote, which those programs strip back off
+// when they display it. The .xlsx path needs none of this: it writes inline
+// strings, which are never evaluated.
+//
+// A value that is simply a number is left alone. "-1234.50" starts with "-"
+// but a spreadsheet reads it as the negative number it is and never as a
+// formula, and quoting it would turn every negative amount in every export
+// into text.
+func csvCell(v any) string {
+	s := fmt.Sprint(v)
+	if s == "" {
+		return s
+	}
+	switch s[0] {
+	case '=', '+', '-', '@', '\t', '\r':
+	default:
+		return s
+	}
+	if _, err := strconv.ParseFloat(s, 64); err == nil {
+		return s
+	}
+	return "'" + s
 }
 
 // ColumnName is the spreadsheet letter of a zero-based column: 0 → "A".

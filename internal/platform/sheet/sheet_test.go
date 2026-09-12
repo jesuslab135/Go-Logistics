@@ -99,6 +99,66 @@ func TestWriteCSVHasBOMAndEmptyNils(t *testing.T) {
 	}
 }
 
+// An exported cell must never execute when the file is opened. Excel and
+// LibreOffice run a cell beginning with "=", "+", "-", "@", a tab or a
+// carriage return as a formula, and every one of those can come straight from
+// a vendor name or a description typed into this API.
+func TestWriteCSVEscapesFormulaCells(t *testing.T) {
+	var buf bytes.Buffer
+	err := WriteCSV(&buf, [][]any{
+		{"name", "notes"},
+		{"=cmd|'/c calc'!A0", "@SUM(1:2)"},
+		{"+1+1", "-2+3+cmd|'/c calc'!A0"},
+		{"\tlead", "\rlead"},
+		{"Taller Norte", "sin fórmula"},
+		{"-1234.50", 12.5},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := strings.TrimPrefix(buf.String(), "\xef\xbb\xbf")
+
+	for _, want := range []string{"'=cmd", "'@SUM(1:2)", "'+1+1", "'-2+3+cmd", "'\tlead", "'\rlead"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("formula cell not escaped: want %q in %q", want, got)
+		}
+	}
+	// Ordinary text, and numbers that merely begin with a sign, stay exactly
+	// as they were: quoting those would turn every negative amount into text.
+	for _, unwanted := range []string{"'Taller Norte", "'sin fórmula", "'-1234.50", "'12.5"} {
+		if strings.Contains(got, unwanted) {
+			t.Errorf("ordinary value was escaped: found %q in %q", unwanted, got)
+		}
+	}
+	for _, want := range []string{"Taller Norte", "sin fórmula", "-1234.50", "12.5"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("ordinary value missing: want %q in %q", want, got)
+		}
+	}
+}
+
+// The streaming export writer must produce a workbook indistinguishable from
+// WriteXLSX's as far as a reader is concerned.
+func TestWriteXLSXStreamRoundTrip(t *testing.T) {
+	var buf bytes.Buffer
+	rows := [][]any{
+		{"name", "unit_cost"},
+		{"  Llantera Sur ", 12.5},
+		{"Taller", nil},
+	}
+	if err := WriteXLSXStream(&buf, DataSheet, rows); err != nil {
+		t.Fatal(err)
+	}
+	got, err := Read(&buf, "vendors.xlsx")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := [][]string{{"name", "unit_cost"}, {"Llantera Sur", "12.5"}, {"Taller"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+}
+
 // The template generator (a later task) builds its drop-downs directly on
 // WriteXLSX + DropList; this proves the validation excelize writes actually
 // lands on the intended column and range, for both an inline value list and
