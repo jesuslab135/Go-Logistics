@@ -230,6 +230,16 @@ func facetQuery(from string, where *filter.Where, groupExpr, labelExpr string) (
 }
 
 // runList executes a spec and returns the page plus the filtered total.
+//
+// This is the one place in the package that queries the pool directly instead
+// of going through dbctx.DB, so it does NOT join a transaction the request
+// context is carrying. That is deliberate and currently safe: lists are
+// read-only, the callers that run during an import (the reference lookups in
+// bulk_lookups.go) run before bulk.Run opens its transaction, and exports run
+// with no transaction at all. It is still the one exception to the dbctx
+// invariant, so TestHandlersUseDbctxRatherThanThePoolDirectly allowlists this
+// file by name - any other file reaching for pool.Query or pool.QueryRow would
+// be a genuine bug and that test will say so.
 func runList[T any](ctx context.Context, pool *pgxpool.Pool, s listSpec[T], p paginate.Params) ([]T, int64, error) {
 	listSQL, listArgs, countSQL, countArgs := s.build(p)
 

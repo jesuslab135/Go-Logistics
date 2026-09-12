@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -20,6 +21,44 @@ import (
 
 const xlsxContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
+// importMaxRowsDefault is the default for IMPORT_MAX_ROWS. sheet.maxDataRows
+// (5001: this many data rows plus the header) bounds how far a template's
+// drop-down lists reach, and the two must move together - raise this without
+// raising that and every row past 5001 silently loses its drop-downs.
+const importMaxRowsDefault = 5000
+
+// maxConcurrentImports is how many imports may run at once, and
+// maxConcurrentExports how many exports.
+//
+// bulk.Run holds one pooled connection for an entire import - up to
+// IMPORT_MAX_ROWS rows in a single transaction - where every other handler in
+// this API holds one for milliseconds. With a pool ceiling of 20
+// (pool_max_conns in the DSN; see the README's environment section) a few
+// simultaneous imports must not be able to starve every other request, and the
+// server sets only ReadHeaderTimeout, so anything that blocks in Acquire
+// blocks indefinitely. Past the limit an import is refused with 429 rather
+// than queued behind a wait nothing will break.
+//
+// Exports are bounded for memory rather than connections: an export buffers
+// the whole result set before writing it, and neither compose file sets a
+// memory limit on the API container.
+const (
+	maxConcurrentImports = 2
+	maxConcurrentExports = 2
+)
+
+// acquire takes one slot without waiting, reporting whether it got one. The
+// caller releases it with the returned func. Refusing beats queueing here: a
+// caller who waits behind a multi-minute import has already timed out.
+func acquire(slots chan struct{}) (func(), bool) {
+	select {
+	case slots <- struct{}{}:
+		return func() { <-slots }, true
+	default:
+		return nil, false
+	}
+}
+
 // BulkHandler serves spreadsheet imports and their templates. Routes are
 // registered on each section's own group, so the module permission that gates
 // creating a record also gates importing it.
@@ -27,21 +66,36 @@ type BulkHandler struct {
 	pool     *pgxpool.Pool
 	maxBytes int64
 	limits   bulk.Limits
+	slots    chan struct{}
 }
 
 func NewBulkHandler(pool *pgxpool.Pool) *BulkHandler {
 	return &BulkHandler{
 		pool:     pool,
 		maxBytes: bulkEnvInt("IMPORT_MAX_BYTES", 10<<20),
-		limits:   bulk.Limits{MaxRows: int(bulkEnvInt("IMPORT_MAX_ROWS", 5000))},
+		limits:   bulk.Limits{MaxRows: int(bulkEnvInt("IMPORT_MAX_ROWS", importMaxRowsDefault))},
+		slots:    make(chan struct{}, maxConcurrentImports),
 	}
 }
 
+// bulkEnvInt reads a positive integer from the environment, falling back to
+// the default when the variable is absent or empty. A variable that is present
+// but unusable - a typo, a negative, or the 0 an operator may well write
+// meaning "no limit" - also falls back, but says so first: silently applying
+// 5000 rows to someone who asked for something else leaves the limit to be
+// discovered by a confusing rejection much later.
 func bulkEnvInt(key string, fallback int64) int64 {
-	if v, err := strconv.ParseInt(os.Getenv(key), 10, 64); err == nil && v > 0 {
-		return v
+	raw, ok := os.LookupEnv(key)
+	if !ok || strings.TrimSpace(raw) == "" {
+		return fallback
 	}
-	return fallback
+	v, err := strconv.ParseInt(strings.TrimSpace(raw), 10, 64)
+	if err != nil || v <= 0 {
+		slog.Warn("bulk: ignoring unusable limit, using the default",
+			"variable", key, "value", raw, "default", fallback)
+		return fallback
+	}
+	return v
 }
 
 // parseDryRun reads ?dry_run= strictly: absent means false, and anything
@@ -103,6 +157,17 @@ func (h *BulkHandler) importRows(imp bulk.Importer) gin.HandlerFunc {
 			return
 		}
 
+		// Taken around the import alone. Reading and parsing the upload holds
+		// no database connection, so a slot spent covering that would turn
+		// callers away for nothing.
+		release, ok := acquire(h.slots)
+		if !ok {
+			apierr.Abort(c, apierr.TooManyRequests(fmt.Sprintf(
+				"%d imports are already running; wait for one to finish and try again", maxConcurrentImports)))
+			return
+		}
+		defer release()
+
 		report, err := bulk.Run(c.Request.Context(), h.pool, imp, rows, dryRun, h.limits)
 		if err != nil {
 			apierr.Abort(c, err)
@@ -110,7 +175,7 @@ func (h *BulkHandler) importRows(imp bulk.Importer) gin.HandlerFunc {
 		}
 		if len(report.Errors) > 0 {
 			apierr.Abort(c, apierr.New(http.StatusUnprocessableEntity, "import_failed",
-				fmt.Sprintf("%d problem(s) found; nothing was imported", len(report.Errors))).WithDetails(report))
+				fmt.Sprintf("%d problem(s) found; nothing was imported", report.ErrorCount)).WithDetails(report))
 			return
 		}
 		status := http.StatusCreated
@@ -145,10 +210,15 @@ const exportPageSize = 100
 type Exporter struct {
 	engine  http.Handler
 	maxRows int
+	slots   chan struct{}
 }
 
 func NewExporter(engine http.Handler) *Exporter {
-	return &Exporter{engine: engine, maxRows: int(bulkEnvInt("EXPORT_MAX_ROWS", 20000))}
+	return &Exporter{
+		engine:  engine,
+		maxRows: int(bulkEnvInt("EXPORT_MAX_ROWS", 20000)),
+		slots:   make(chan struct{}, maxConcurrentExports),
+	}
 }
 
 func (e *Exporter) Handler(listPath string) gin.HandlerFunc {
@@ -158,6 +228,17 @@ func (e *Exporter) Handler(listPath string) gin.HandlerFunc {
 			apierr.Abort(c, apierr.BadRequest(`format must be "xlsx" or "csv"`))
 			return
 		}
+		// Held for the whole export: every page fetched accumulates in the
+		// table below, so it is concurrency, not any single request, that
+		// decides peak memory.
+		release, ok := acquire(e.slots)
+		if !ok {
+			apierr.Abort(c, apierr.TooManyRequests(fmt.Sprintf(
+				"%d exports are already running; wait for one to finish and try again", maxConcurrentExports)))
+			return
+		}
+		defer release()
+
 		query := c.Request.URL.Query()
 		for _, k := range []string{"format", "page", "page_size"} {
 			query.Del(k)
@@ -221,7 +302,11 @@ func (e *Exporter) Handler(listPath string) gin.HandlerFunc {
 			err = sheet.WriteCSV(c.Writer, table.Records())
 		} else {
 			c.Header("Content-Type", xlsxContentType)
-			err = sheet.WriteXLSX(c.Writer, []sheet.Sheet{{Name: sheet.DataSheet, Rows: table.Records(), FreezeHeader: true}})
+			// Streamed, not WriteXLSX: an export is a single sheet with no
+			// data validation, so it does not need what WriteXLSX offers, and
+			// building 800k cells as an object graph first is what turns a
+			// large export into an OOM kill of the whole API.
+			err = sheet.WriteXLSXStream(c.Writer, sheet.DataSheet, table.Records())
 		}
 		if err != nil {
 			_ = c.Error(err)

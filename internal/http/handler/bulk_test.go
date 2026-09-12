@@ -4,12 +4,16 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"mime/multipart"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"reflect"
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -36,6 +40,102 @@ func TestHandlersDoNotBeginTransactionsDirectly(t *testing.T) {
 		if bytes.Contains(src, []byte("pool.Begin(")) {
 			t.Errorf("%s calls pool.Begin directly; use dbctx.Begin(ctx, pool)", f)
 		}
+	}
+}
+
+// A handler that reaches for the pool directly bypasses the transaction a bulk
+// import carries on the context: its writes would outlive a failed import and
+// its reads would not see the import's own rows. dbctx.New(pool) routes both
+// through the context's transaction when there is one.
+//
+// Two files are exempt and say so in their own comments: runList
+// (listquery.go) and facetQuery (facets.go) are read-only and never run inside
+// an import's transaction. Anything else is a real bug, which is the half of
+// the dbctx invariant this guard adds on top of the Begin check above.
+func TestHandlersUseDbctxRatherThanThePoolDirectly(t *testing.T) {
+	exempt := map[string]bool{"listquery.go": true, "facets.go": true}
+	files, err := filepath.Glob("*.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range files {
+		if strings.HasSuffix(f, "_test.go") || exempt[f] {
+			continue
+		}
+		src, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, call := range []string{"pool.Query(", "pool.QueryRow(", "pool.Exec("} {
+			if bytes.Contains(src, []byte(call)) {
+				t.Errorf("%s calls %s directly; use dbctx.New(pool) so it joins the request's transaction", f, call)
+			}
+		}
+	}
+}
+
+// stubImporter is an Importer that would succeed if it ever ran. The
+// concurrency test below asserts that a refused import never reaches it.
+type stubImporter struct{ prepared bool }
+
+func (s *stubImporter) Resource() string { return "vendors" }
+func (s *stubImporter) Columns(context.Context) ([]bulk.Column, error) {
+	return []bulk.Column{{Key: "name", Kind: bulk.KindString}}, nil
+}
+func (s *stubImporter) Refs() map[string]bulk.Lookup { return map[string]bulk.Lookup{} }
+func (s *stubImporter) Prepare(map[string]json.RawMessage) (func(context.Context) error, map[string]string) {
+	s.prepared = true
+	return func(context.Context) error { return nil }, nil
+}
+
+// An import that cannot get a slot must be refused straight away, not queued.
+// bulk.Run holds a pooled connection for the entire import, so the point of
+// the limit is to keep the pool from being drained; a caller parked behind a
+// multi-minute import has already given up, and the server sets no write
+// timeout that would ever break the wait.
+func TestImportRefusesWhenAllSlotsAreBusy(t *testing.T) {
+	h := &BulkHandler{maxBytes: 1 << 20, limits: bulk.Limits{}, slots: make(chan struct{}, 1)}
+	h.slots <- struct{}{} // the only slot belongs to an import already running
+
+	imp := &stubImporter{}
+	router := gin.New()
+	router.POST("/vendors/import", h.importRows(imp))
+
+	var body bytes.Buffer
+	mw := multipart.NewWriter(&body)
+	fw, err := mw.CreateFormFile("file", "datos.csv")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fw.Write([]byte("name\nUno\n")); err != nil {
+		t.Fatal(err)
+	}
+	mw.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/vendors/import", &body)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	rec := httptest.NewRecorder()
+
+	done := make(chan struct{})
+	go func() {
+		router.ServeHTTP(rec, req)
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the import blocked waiting for a slot; it must refuse immediately instead")
+	}
+
+	if rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("status = %d, want %d: %s", rec.Code, http.StatusTooManyRequests, rec.Body)
+	}
+	if imp.prepared {
+		t.Fatal("a refused import must not have started importing rows")
+	}
+	// The slot the running import holds is still its own.
+	if len(h.slots) != 1 {
+		t.Fatalf("slots in use = %d; want 1 (a refusal must not take or release one)", len(h.slots))
 	}
 }
 

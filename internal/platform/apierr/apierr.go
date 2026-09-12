@@ -53,6 +53,9 @@ func PayloadTooLarge(message string) *Error {
 func UnsupportedMediaType(message string) *Error {
 	return New(http.StatusUnsupportedMediaType, "unsupported_media_type", message)
 }
+func TooManyRequests(message string) *Error {
+	return New(http.StatusTooManyRequests, "too_many_requests", message)
+}
 
 func Validation(details any) *Error {
 	return New(http.StatusUnprocessableEntity, "validation_failed", "validation failed").WithDetails(details)
