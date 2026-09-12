@@ -81,7 +81,14 @@ func run(logger *slog.Logger) error {
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
+	// Shutdown closes the listeners first, so ListenAndServe returns as soon as
+	// shutdown *starts*. Returning there would fire the deferred pool.Close()
+	// underneath requests that are still running — the 15s budget below would
+	// never elapse, and every deploy would abort in-flight transactions. So run
+	// waits for Shutdown to report that the connections are idle.
+	shutdownDone := make(chan struct{})
 	go func() {
+		defer close(shutdownDone)
 		<-ctx.Done()
 		logger.Info("shutdown signal received")
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -95,5 +102,6 @@ func run(logger *slog.Logger) error {
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
+	<-shutdownDone
 	return nil
 }
