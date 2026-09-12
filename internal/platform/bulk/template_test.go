@@ -121,7 +121,9 @@ func TestTemplateRefColumnWithNoEntriesStaysUsable(t *testing.T) {
 // deliberate choice for a Column whose Label is unset (legitimate per Task
 // 3/5: Label is filled in by an importer implementation, not by SchemaOf):
 // the Descripción cell is simply blank rather than falling back to the key
-// or a placeholder.
+// or a placeholder. This column has no Ref, so it says nothing about the
+// reference-column hint text - see
+// TestTemplateReferenceHintWithNoLabelHasNoDoubleSpace for that.
 func TestTemplateColumnWithEmptyLabelRendersEmptyDescription(t *testing.T) {
 	imp := templateFake{cols: []Column{{Key: "part_number", Kind: KindString}}}
 	sheets, err := Template(context.Background(), imp)
@@ -131,6 +133,50 @@ func TestTemplateColumnWithEmptyLabelRendersEmptyDescription(t *testing.T) {
 	row := sheets[1].Rows[1]
 	if row[4] != "" {
 		t.Fatalf("Descripción for an unlabeled column = %v, want empty", row[4])
+	}
+}
+
+// TestTemplateReferenceHintWithNoLabelHasNoDoubleSpace covers a reference
+// column whose Ref is set but whose Label was never filled in (Ref and Label
+// are independent manual annotations - SchemaOf sets neither - so an
+// importer author can set one without the other). The "Valores o formato"
+// hint must read as one clean sentence, not leave a gap where the missing
+// name would have gone, and must not fall back to the raw (snake_case) key.
+func TestTemplateReferenceHintWithNoLabelHasNoDoubleSpace(t *testing.T) {
+	imp := templateFake{
+		cols: []Column{{Key: "vendor_id", Kind: KindInt, Ref: "vendor_id"}},
+		refs: map[string]Lookup{"vendor_id": {Load: func(context.Context) ([]Entry, error) {
+			return []Entry{{ID: 1, Name: "Acme"}}, nil
+		}}},
+	}
+	sheets, err := Template(context.Background(), imp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := sheets[1].Rows[1][3]
+	want := "Nombre (ver hoja Catálogos) o su id"
+	if got != want {
+		t.Fatalf("hint for a Ref column with no Label = %q, want %q", got, want)
+	}
+}
+
+// TestTemplateReferenceHintWithLabelIsUnchanged pins the populated-Label
+// wording byte-for-byte so the F1 fix cannot regress the common case.
+func TestTemplateReferenceHintWithLabelIsUnchanged(t *testing.T) {
+	imp := templateFake{
+		cols: []Column{{Key: "part_category_id", Kind: KindInt, Ref: "part_category_id", Label: "categoría"}},
+		refs: map[string]Lookup{"part_category_id": {Label: "categoría", Load: func(context.Context) ([]Entry, error) {
+			return []Entry{{ID: 1, Name: "Filtros"}}, nil
+		}}},
+	}
+	sheets, err := Template(context.Background(), imp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := sheets[1].Rows[1][3]
+	want := "Nombre de categoría (ver hoja Catálogos) o su id"
+	if got != want {
+		t.Fatalf("hint for a Ref column with a Label = %q, want %q", got, want)
 	}
 }
 

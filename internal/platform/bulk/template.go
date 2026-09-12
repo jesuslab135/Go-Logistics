@@ -13,6 +13,11 @@ import (
 // drop-down; Excel caps the list at 255.
 const inlineLimit = 250
 
+// catalogSheetName is the sheet listing reference names and over-long
+// permitted-value lists; used both for the sheet itself and for the range
+// formulas the Datos drop-downs point at, so the two can never drift apart.
+const catalogSheetName = "Catálogos"
+
 // Template builds the workbook for one section: Datos to fill in,
 // Instrucciones describing every column, and Catálogos listing the names
 // reference columns accept.
@@ -37,7 +42,7 @@ func Template(ctx context.Context, imp Importer) ([]sheet.Sheet, error) {
 		catHeader = append(catHeader, key)
 		catValues = append(catValues, values)
 		col := sheet.ColumnName(ci)
-		return fmt.Sprintf("'Catálogos'!$%s$2:$%s$%d", col, col, len(values)+1)
+		return fmt.Sprintf("'%s'!$%s$2:$%s$%d", catalogSheetName, col, col, len(values)+1)
 	}
 
 	header := make([]any, len(cols))
@@ -94,7 +99,7 @@ func catalogSheet(header []any, values [][]string) sheet.Sheet {
 	for c := range header {
 		widths[c] = 28
 	}
-	return sheet.Sheet{Name: "Catálogos", Rows: rows, Widths: widths, FreezeHeader: true}
+	return sheet.Sheet{Name: catalogSheetName, Rows: rows, Widths: widths, FreezeHeader: true}
 }
 
 func uniqueSortedNames(entries []Entry) []string {
@@ -147,6 +152,14 @@ func kindLabel(col Column) string {
 
 func hint(col Column) string {
 	switch {
+	case col.Ref != "" && col.Label == "":
+		// Label is a manual annotation an importer author adds alongside Ref
+		// (SchemaOf never sets either), so a Ref without a Label is
+		// reachable. Fall back to a gap-free phrasing rather than "Nombre
+		// de  (ver..." with the missing name leaving a double space, and
+		// rather than interpolating col.Key, whose snake_case API field name
+		// would read badly inside Spanish prose.
+		return "Nombre (ver hoja Catálogos) o su id"
 	case col.Ref != "":
 		return "Nombre de " + col.Label + " (ver hoja Catálogos) o su id"
 	case len(col.OneOf) > 0:
