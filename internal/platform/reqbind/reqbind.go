@@ -54,6 +54,30 @@ func JSON(c *gin.Context, obj any) error {
 	return nil
 }
 
+// Validate runs the same struct validation JSON binding runs, for values that
+// did not arrive as a request body, such as the rows of a bulk import. Keys are
+// dotted JSON paths ("vehicle.engine_serial"), so a nested field names the
+// spreadsheet column it came from. It returns nil when obj is valid.
+func Validate(obj any) map[string]string {
+	err := ginbinding.Validator.ValidateStruct(obj)
+	if err == nil {
+		return nil
+	}
+	var verrs validator.ValidationErrors
+	if !errors.As(err, &verrs) {
+		return map[string]string{"": err.Error()}
+	}
+	details := make(map[string]string, len(verrs))
+	for _, fe := range verrs {
+		path := fe.Namespace()
+		if i := strings.IndexByte(path, '.'); i >= 0 {
+			path = path[i+1:] // drop the struct's own name
+		}
+		details[path] = message(fe)
+	}
+	return details
+}
+
 func message(fe validator.FieldError) string {
 	switch fe.Tag() {
 	case "required":
