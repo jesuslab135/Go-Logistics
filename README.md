@@ -359,6 +359,87 @@ The migration preserved every existing user's effective permissions: each
 membership took the role of the same name in its own company, copying the
 definition where none existed.
 
+### Bulk import and export
+
+Every data-entry section can be loaded from a spreadsheet, and every list
+exported to one.
+
+```sh
+# 1. Download the section's template (Datos, Instrucciones, Catálogos)
+curl -OJ http://localhost:8080/api/v1/vendors/import/template -H "Authorization: Bearer $TOKEN"
+
+# 2. Check a filled-in file without saving anything
+curl -F file=@vendors.xlsx "http://localhost:8080/api/v1/vendors/import?dry_run=true" -H "Authorization: Bearer $TOKEN"
+
+# 3. Import it
+curl -F file=@vendors.xlsx http://localhost:8080/api/v1/vendors/import -H "Authorization: Bearer $TOKEN"
+
+# Export a list, with the same filters the list takes
+curl -OJ "http://localhost:8080/api/v1/work-orders/export?format=csv" -H "Authorization: Bearer $TOKEN"
+```
+
+- **All-or-nothing:** if any row fails, nothing is imported. The `422
+  import_failed` lists every problem by row and column. The whole file runs in
+  one transaction carried on the request context (`internal/platform/dbctx`).
+  Every problem that can be found without the database — bad dates and numbers,
+  missing required fields, unresolvable references — is collected first, so the
+  `422` names them all at once; a row that then fails *in* the database (a
+  unique or foreign-key violation) ends the import there, since nothing was
+  going to be kept either way.
+- **No updates:** import only ever inserts new rows; there is no upsert.
+  Re-importing a file into the company it came from is rejected by that
+  company's own unique constraints (a vendor's name, for example) rather than
+  updating the existing rows. Export is for reading, sharing and seeding a
+  *different* company — not for an edit-and-reupload round trip back into the
+  same one.
+- **Columns** are the API field names (`vehicle.engine_serial` for the vehicle
+  data of an asset, `cf.<key>` for custom fields). Unknown columns — such as
+  the `id` and timestamps an exported file carries — are silently ignored on
+  import, so an exported file needs no cleanup before it is used to seed
+  another company. A duplicate column in the header is a single error on row 1
+  (the header is row 1, so the first data row is row 2); the first occurrence
+  of a repeated column wins.
+- **References** accept the record's name (case and spaces ignored) or its id,
+  only within the caller's company. A name matching more than one record is a
+  row error telling the user to use the id instead. A file cannot reference a
+  record it creates itself: import parents first.
+- **Numbers.** A lone period is *always* the decimal point, so `19.432` is
+  19.432 and `1.234` is 1.234 — an `.xlsx` cell holding a number arrives in
+  exactly that form whatever the writer's display locale, and these columns are
+  every `decimal.Decimal` field (latitude, odometer, meter readings, quantity,
+  rate), not just money. When both separators appear the last one is the
+  decimal point, so `1.234,56` and `1,234.56` are both 1234.56. A lone comma is
+  also the decimal point — `1,5` is 1.5, `0,75` is 0.75 — *except* before
+  exactly three digits, where `1,234` is 1234 to an English writer and 1.234 to
+  a Spanish one: that one shape is refused rather than guessed at, so write
+  `1234` or `1,234.00` for thousands and `1.234` for a decimal. `$` and spaces
+  are ignored. The Instrucciones sheet of every template says the same, and a
+  rejected row is recoverable where a silently wrong value is not.
+- **Ignored columns are reported.** Unknown headers are still accepted, but the
+  report lists them under `ignored_columns`, so a misspelled *optional* column
+  no longer passes as a clean `201` with the data quietly missing. `error_count`
+  is the total number of problems found and `truncated` says whether `errors`
+  lists them all (it stops at 500).
+- **Exports are buffered in memory** while the list is paged, so
+  `EXPORT_MAX_ROWS` bounds the API's memory and not merely the file size. The
+  `.xlsx` writer then streams those rows out rather than building the whole
+  worksheet first.
+- **CSV exports quote formula-shaped cells.** A cell whose text begins with
+  `=`, `+`, `-`, `@`, a tab or a carriage return is written with a leading
+  apostrophe so it cannot execute as a formula when the file is opened. Nothing
+  strips that apostrophe on the way back in, so a note reading
+  `- revisar frenos` re-imports as `'- revisar frenos`. Prefer `format=xlsx`
+  for export → import round trips: the `.xlsx` writer emits inline strings,
+  which are never evaluated, so it needs no such quoting.
+- **A full export can be imported back.** `EXPORT_MAX_ROWS` (5000) matches
+  `IMPORT_MAX_ROWS` (5000), so an export never produces a file the import then
+  refuses. Raise one and raise the other: a file longer than `IMPORT_MAX_ROWS`
+  must be split into smaller files first, and the import otherwise refuses the
+  whole file with a `400` naming the limit.
+- **Importable:** the 33 sections in `bulkImporters`
+  (`internal/http/handler/bulk_registry.go`). **Exportable:** every list in
+  `exportPaths`.
+
 ### Integration tests
 
 `go test ./...` never touches Postgres — every defect the onboarding flow
@@ -595,6 +676,19 @@ environment: `DATABASE_URL`, `JWT_SECRET`. Storage is chosen by `STORAGE_BACKEND
 | `UPLOAD_THUMBNAIL_MAX_DIM` | `320` | Longest side of a generated thumbnail, in pixels |
 | `DASHBOARD_UPCOMING_DAYS` | `30` | How far ahead `/dashboard/stats` counts a service reminder as upcoming |
 | `STORAGE_MINIO_PUBLIC_URL_IS_BUCKET_ROOT` | `false` | Skip the bucket-suffix check on `STORAGE_MINIO_PUBLIC_URL` |
+| `IMPORT_MAX_BYTES` | `10485760` | Largest spreadsheet an import accepts |
+| `IMPORT_MAX_ROWS` | `5000` | Most data rows per import |
+| `EXPORT_MAX_ROWS` | `5000` | Most rows per export; `X-Export-Truncated: true` beyond. Keep it at or below `IMPORT_MAX_ROWS` so an export can be imported back |
+
+`DATABASE_URL` carries `pool_max_conns=20`, which caps the pgx connection pool.
+Keep it set, and keep the value identical in `.env.example`,
+`docker-compose.yml` and `deploy/docker-compose.prod.yml`. Without it pgxpool
+defaults to `max(4, NumCPU)` — 4 connections on a 2-vCPU VPS — and a bulk
+import holds one connection for the whole import rather than the milliseconds
+every other handler needs, so a few concurrent imports would leave every other
+request blocked in `Acquire` with only `ReadHeaderTimeout` to break the wait.
+On top of that the API runs at most 2 imports and 2 exports at a time and
+answers `429` past that, rather than queueing.
 
 ---
 

@@ -46,6 +46,7 @@ import (
 
 	"fleet/internal/auth"
 	"fleet/internal/db/gen"
+	"fleet/internal/platform/dbctx"
 )
 
 // integrationAdminDSN is where to find a Postgres server to create throwaway
@@ -164,7 +165,7 @@ func runMigrations(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 // storage.Storage is an interface, so a nil value is inert until a method is
 // called on it.
 func newIntegrationRouter(pool *pgxpool.Pool) http.Handler {
-	q := gen.New(pool)
+	q := gen.New(dbctx.New(pool))
 	return NewRouter(Deps{
 		Queries:     q,
 		Pool:        pool,

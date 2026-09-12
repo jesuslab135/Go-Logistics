@@ -12,6 +12,7 @@ import (
 	"fleet/internal/domain/money"
 	"fleet/internal/http/dto"
 	"fleet/internal/http/middleware"
+	"fleet/internal/platform/dbctx"
 	"fleet/internal/platform/paginate"
 )
 
@@ -84,7 +85,7 @@ func (s *WorkOrderStore) Create(ctx context.Context, in dto.CreateWorkOrderReque
 	now := time.Now().UTC()
 	company := middleware.CompanyFromContext(ctx)
 
-	tx, err := s.pool.Begin(ctx)
+	tx, err := dbctx.Begin(ctx, s.pool)
 	if err != nil {
 		return dto.WorkOrderResponse{}, err
 	}
@@ -169,7 +170,7 @@ func (s *WorkOrderStore) Update(ctx context.Context, id int64, in dto.UpdateWork
 	now := time.Now().UTC()
 	company := middleware.CompanyFromContext(ctx)
 
-	tx, err := s.pool.Begin(ctx)
+	tx, err := dbctx.Begin(ctx, s.pool)
 	if err != nil {
 		return dto.WorkOrderResponse{}, err
 	}
