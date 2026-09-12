@@ -35,7 +35,7 @@ var (
 	// amount: a refused row can be fixed and re-uploaded, a wrong price that
 	// was committed cannot be found again.
 	errGrouping  = errors.New("must be a number: thousands separators must group digits in threes (1,234.56 or 1.234,56)")
-	errAmbiguous = errors.New("is ambiguous: a single period before exactly three digits could mean thousands or decimals; write it without a thousands separator (1234) or with both separators (1.234,00)")
+	errAmbiguous = errors.New("is ambiguous: a comma before exactly three digits could be a thousands separator or a decimal separator; write 1234 or 1,234.00 if it is thousands, or 1.234 if it is a decimal")
 )
 
 // CellValue turns one cell into the JSON value its column expects. An empty
@@ -168,15 +168,21 @@ var decimalStripper = strings.NewReplacer("$", "", " ", "", " ", "", " ", "")
 //     the other groups thousands, so "1,234.56" and "1.234,56" are both
 //     1234.56.
 //   - With only one separator character present, several occurrences can only
-//     be thousands grouping ("1.234.567"). A single occurrence is a decimal
-//     separator - "1,5" is 1.5 and "0,75" is 0.75 - unless it looks exactly
-//     like one thousands group, which is 1-3 digits before it and exactly 3
-//     after: "1,234" is 1234.
-//   - That last shape is decided for the comma but genuinely undecidable for
-//     the period: "1.234" is 1234 to a Spanish writer and 1.234 to an English
-//     one, and nothing in the cell says which. It is refused (errAmbiguous)
-//     rather than guessed at. A period anywhere else stays a decimal point, so
-//     "1234.56" - the form this API's own exports emit - is untouched.
+//     be thousands grouping: "1.234.567" and "1,234,567" are both 1234567.
+//   - A lone PERIOD is always the decimal point: "1.234" is 1.234 and
+//     "19.432" is 19.432. Excel stores every number in period-decimal form
+//     whatever the user's display locale, and readXLSX reads raw cell values,
+//     so an .xlsx number arrives in exactly this shape with nothing ambiguous
+//     about it. KindDecimal is every decimal.Decimal field (see schema.go),
+//     not just money: latitude, longitude, odometer, meter readings,
+//     quantities and annual_percentage_rate all land here.
+//   - A lone COMMA before exactly three digits is the one genuinely
+//     undecidable shape: "1,234" is 1234 to an English writer and 1.234 to a
+//     Spanish one, and nothing in the cell says which. It is refused
+//     (errAmbiguous) rather than guessed at - silently taking the English
+//     reading would be the same 1000x corruption this function exists to
+//     prevent, just moved from "1,5" to "1,234".
+//   - Any other lone comma is the decimal point: "1,5" is 1.5, "0,75" is 0.75.
 //   - Grouping that is claimed but malformed ("1,23,456") is refused too.
 func normalizeDecimal(cell string) (string, error) {
 	s := decimalStripper.Replace(cell)
@@ -200,13 +206,15 @@ func normalizeDecimal(cell string) (string, error) {
 // oneSeparator resolves a number written with only sep in it.
 func oneSeparator(s string, sep byte) (string, error) {
 	if strings.Count(s, string(sep)) > 1 {
-		// Repeated, it can only ever be thousands grouping.
+		// Repeated, it can only ever be thousands grouping: two decimal
+		// points in one number is not a reading anybody intends.
 		return regroup(s, 0, sep)
 	}
-	if isThousandsGroup(s, sep) {
-		if sep == ',' {
-			return regroup(s, 0, sep)
-		}
+	// The comma is the only separator whose single occurrence can be either
+	// thing. A period is unambiguous by construction - see normalizeDecimal -
+	// and treating it as grouping refused every .xlsx latitude, odometer and
+	// quantity, which arrive as raw period-decimal values.
+	if sep == ',' && isThousandsGroup(s, sep) {
 		return "", errAmbiguous
 	}
 	return strings.Replace(s, string(sep), ".", 1), nil

@@ -403,12 +403,18 @@ curl -OJ "http://localhost:8080/api/v1/work-orders/export?format=csv" -H "Author
   only within the caller's company. A name matching more than one record is a
   row error telling the user to use the id instead. A file cannot reference a
   record it creates itself: import parents first.
-- **Numbers** are read by the last separator in the cell: `1.234,56` and
-  `1,234.56` are both 1234.56, `1,5` is 1.5, `0,75` is 0.75 and `1,234` is
-  1234. `$` and spaces are ignored. `1.234` on its own is *refused* as
-  ambiguous — 1234 to a Spanish writer, 1.234 to an English one — so write
-  `1234` or `1.234,00`. The Instrucciones sheet of every template says the
-  same, and a rejected row is recoverable where a silently wrong price is not.
+- **Numbers.** A lone period is *always* the decimal point, so `19.432` is
+  19.432 and `1.234` is 1.234 — an `.xlsx` cell holding a number arrives in
+  exactly that form whatever the writer's display locale, and these columns are
+  every `decimal.Decimal` field (latitude, odometer, meter readings, quantity,
+  rate), not just money. When both separators appear the last one is the
+  decimal point, so `1.234,56` and `1,234.56` are both 1234.56. A lone comma is
+  also the decimal point — `1,5` is 1.5, `0,75` is 0.75 — *except* before
+  exactly three digits, where `1,234` is 1234 to an English writer and 1.234 to
+  a Spanish one: that one shape is refused rather than guessed at, so write
+  `1234` or `1,234.00` for thousands and `1.234` for a decimal. `$` and spaces
+  are ignored. The Instrucciones sheet of every template says the same, and a
+  rejected row is recoverable where a silently wrong value is not.
 - **Ignored columns are reported.** Unknown headers are still accepted, but the
   report lists them under `ignored_columns`, so a misspelled *optional* column
   no longer passes as a clean `201` with the data quietly missing. `error_count`
@@ -418,6 +424,13 @@ curl -OJ "http://localhost:8080/api/v1/work-orders/export?format=csv" -H "Author
   `EXPORT_MAX_ROWS` bounds the API's memory and not merely the file size. The
   `.xlsx` writer then streams those rows out rather than building the whole
   worksheet first.
+- **CSV exports quote formula-shaped cells.** A cell whose text begins with
+  `=`, `+`, `-`, `@`, a tab or a carriage return is written with a leading
+  apostrophe so it cannot execute as a formula when the file is opened. Nothing
+  strips that apostrophe on the way back in, so a note reading
+  `- revisar frenos` re-imports as `'- revisar frenos`. Prefer `format=xlsx`
+  for export → import round trips: the `.xlsx` writer emits inline strings,
+  which are never evaluated, so it needs no such quoting.
 - **A large export cannot be re-imported unsplit.** `EXPORT_MAX_ROWS` (20000)
   is deliberately larger than `IMPORT_MAX_ROWS` (5000), so a full export has to
   be split into 5000-row files before any of it can be imported back; the

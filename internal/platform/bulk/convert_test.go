@@ -1,9 +1,49 @@
 package bulk
 
 import (
+	"bytes"
 	"encoding/json"
 	"testing"
+
+	"fleet/internal/platform/sheet"
 )
+
+// TestCellValueReadsXLSXDecimalsVerbatim is the regression this rule must
+// never reacquire. readXLSX reads with RawCellValue, and Excel stores numbers
+// in period-decimal form whatever the display locale, so a latitude of 19.432
+// reaches CellValue as the string "19.432" with nothing ambiguous about it.
+// Treating a lone period before three digits as a thousands group refused
+// exactly these cells, breaking every .xlsx round trip of a coordinate, meter
+// reading or quantity.
+func TestCellValueReadsXLSXDecimalsVerbatim(t *testing.T) {
+	var buf bytes.Buffer
+	err := sheet.WriteXLSX(&buf, []sheet.Sheet{{Name: sheet.DataSheet, Rows: [][]any{
+		{"latitude", "longitude", "quantity"},
+		{19.432, -99.133, 5.25},
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, err := sheet.Read(&buf, "datos.xlsx")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := []string{`"19.432"`, `"-99.133"`, `"5.25"`}
+	if len(rows[1]) != len(want) {
+		t.Fatalf("read back %q, want %d cells", rows[1], len(want))
+	}
+	for i, cell := range rows[1] {
+		got, err := CellValue(Column{Kind: KindDecimal}, cell)
+		if err != nil {
+			t.Errorf("raw xlsx cell %q: unexpected error %v", cell, err)
+			continue
+		}
+		if string(got) != want[i] {
+			t.Errorf("raw xlsx cell %q: got %s, want %s", cell, got, want[i])
+		}
+	}
+}
 
 func TestCellValue(t *testing.T) {
 	cases := []struct {
@@ -92,23 +132,35 @@ func TestCellValueDecimalSeparators(t *testing.T) {
 		// The corruption this replaces: comma as a Spanish decimal separator.
 		{"1,5", `"1.5"`, ""},
 		{"0,75", `"0.75"`, ""},
+		{"-1,5", `"-1.5"`, ""},
 		// Both separators present: the last one is the decimal separator.
 		{"1,234.56", `"1234.56"`, ""},
 		{"1.234,56", `"1234.56"`, ""},
 		{"$1,234.50", `"1234.5"`, ""},
 		{"1,234,567.89", `"1234567.89"`, ""},
-		// One comma over an exact three-digit group is thousands.
-		{"1,234", `"1234"`, ""},
 		// Spaces group thousands in Spanish Excel too.
 		{"1 234,56", `"1234.56"`, ""},
 		// Repeated separators can only ever be grouping.
 		{"1.234.567", `"1234567"`, ""},
-		// Plain machine numbers - what this API's own exports emit - untouched.
+		{"1,234,567", `"1234567"`, ""},
+		// A lone period is ALWAYS the decimal point. KindDecimal is every
+		// decimal.Decimal field, not just money, and an .xlsx cell holding a
+		// number arrives in exactly this form whatever the writer's locale:
+		// below are a coordinate pair, a reading and two quantities.
+		{"1.234", `"1.234"`, ""},
+		{"19.432", `"19.432"`, ""},
+		{"-99.133", `"-99.133"`, ""},
+		{"45.678", `"45.678"`, ""},
+		{"5.250", `"5.25"`, ""},
+		{"0.500", `"0.5"`, ""},
 		{"1234.56", `"1234.56"`, ""},
 		{"1234", `"1234"`, ""},
-		{"-1,5", `"-1.5"`, ""},
-		// Refused rather than guessed at.
-		{"1.234", "", errAmbiguous.Error()},
+		// A lone comma before exactly three digits is the one undecidable
+		// shape - 1234 in English, 1.234 in Spanish - so it is refused rather
+		// than silently resolved the English way, which would be the same
+		// 1000x defect this whole rule exists to prevent.
+		{"1,234", "", errAmbiguous.Error()},
+		{"12,345", "", errAmbiguous.Error()},
 		{"1,23,456", "", errGrouping.Error()},
 		{"doce", "", "must be a number"},
 	}
