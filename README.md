@@ -359,6 +359,49 @@ The migration preserved every existing user's effective permissions: each
 membership took the role of the same name in its own company, copying the
 definition where none existed.
 
+### Bulk import and export
+
+Every data-entry section can be loaded from a spreadsheet, and every list
+exported to one.
+
+```sh
+# 1. Download the section's template (Datos, Instrucciones, Catálogos)
+curl -OJ http://localhost:8080/api/v1/vendors/import/template -H "Authorization: Bearer $TOKEN"
+
+# 2. Check a filled-in file without saving anything
+curl -F file=@vendors.xlsx "http://localhost:8080/api/v1/vendors/import?dry_run=true" -H "Authorization: Bearer $TOKEN"
+
+# 3. Import it
+curl -F file=@vendors.xlsx http://localhost:8080/api/v1/vendors/import -H "Authorization: Bearer $TOKEN"
+
+# Export a list, with the same filters the list takes
+curl -OJ "http://localhost:8080/api/v1/work-orders/export?format=csv" -H "Authorization: Bearer $TOKEN"
+```
+
+- **All-or-nothing:** if any row fails, nothing is imported. The `422
+  import_failed` lists every problem by row and column. The whole file runs in
+  one transaction carried on the request context (`internal/platform/dbctx`).
+- **No updates:** import only ever inserts new rows; there is no upsert.
+  Re-importing a file into the company it came from is rejected by that
+  company's own unique constraints (a vendor's name, for example) rather than
+  updating the existing rows. Export is for reading, sharing and seeding a
+  *different* company — not for an edit-and-reupload round trip back into the
+  same one.
+- **Columns** are the API field names (`vehicle.engine_serial` for the vehicle
+  data of an asset, `cf.<key>` for custom fields). Unknown columns — such as
+  the `id` and timestamps an exported file carries — are silently ignored on
+  import, so an exported file needs no cleanup before it is used to seed
+  another company. A duplicate column in the header is a single error on row 1
+  (the header is row 1, so the first data row is row 2); the first occurrence
+  of a repeated column wins.
+- **References** accept the record's name (case and spaces ignored) or its id,
+  only within the caller's company. A name matching more than one record is a
+  row error telling the user to use the id instead. A file cannot reference a
+  record it creates itself: import parents first.
+- **Importable:** the 33 sections in `bulkImporters`
+  (`internal/http/handler/bulk_registry.go`). **Exportable:** every list in
+  `exportPaths`.
+
 ### Integration tests
 
 `go test ./...` never touches Postgres — every defect the onboarding flow
@@ -595,6 +638,9 @@ environment: `DATABASE_URL`, `JWT_SECRET`. Storage is chosen by `STORAGE_BACKEND
 | `UPLOAD_THUMBNAIL_MAX_DIM` | `320` | Longest side of a generated thumbnail, in pixels |
 | `DASHBOARD_UPCOMING_DAYS` | `30` | How far ahead `/dashboard/stats` counts a service reminder as upcoming |
 | `STORAGE_MINIO_PUBLIC_URL_IS_BUCKET_ROOT` | `false` | Skip the bucket-suffix check on `STORAGE_MINIO_PUBLIC_URL` |
+| `IMPORT_MAX_BYTES` | `10485760` | Largest spreadsheet an import accepts |
+| `IMPORT_MAX_ROWS` | `5000` | Most data rows per import |
+| `EXPORT_MAX_ROWS` | `20000` | Most rows per export; `X-Export-Truncated: true` beyond |
 
 ---
 

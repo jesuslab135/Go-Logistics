@@ -3,12 +3,18 @@ package handler
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
+	"sort"
 	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
+
+	"fleet/internal/http/dto"
+	"fleet/internal/platform/bulk"
 )
 
 // A handler that calls pool.Begin opens a second transaction, outside the one a
@@ -168,5 +174,28 @@ func TestExportPathsAreListRoutes(t *testing.T) {
 		if !routes["GET /api/v1"+p+"/export"] {
 			t.Errorf("export route for %s is not registered", p)
 		}
+	}
+}
+
+// The documented report must have exactly the JSON shape the engine returns.
+func TestImportReportDocMatchesEngine(t *testing.T) {
+	keys := func(v any) []string {
+		b, _ := json.Marshal(v)
+		var m map[string]any
+		_ = json.Unmarshal(b, &m)
+		var out []string
+		for k := range m {
+			out = append(out, k)
+		}
+		sort.Strings(out)
+		return out
+	}
+	engine := bulk.Report{Errors: []bulk.RowError{{Row: 2, Column: "name", Message: "x"}}}
+	doc := dto.ImportReport{Errors: []dto.ImportRowError{{Row: 2, Column: "name", Message: "x"}}}
+	if !reflect.DeepEqual(keys(engine), keys(doc)) {
+		t.Fatalf("report keys differ: engine %v, doc %v", keys(engine), keys(doc))
+	}
+	if !reflect.DeepEqual(keys(engine.Errors[0]), keys(doc.Errors[0])) {
+		t.Fatalf("row error keys differ: engine %v, doc %v", keys(engine.Errors[0]), keys(doc.Errors[0]))
 	}
 }

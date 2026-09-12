@@ -2661,6 +2661,30 @@ definitions:
       updated_at:
         type: string
     type: object
+  dto.ImportReport:
+    properties:
+      created:
+        type: integer
+      dry_run:
+        type: boolean
+      errors:
+        items:
+          $ref: '#/definitions/dto.ImportRowError'
+        type: array
+      resource:
+        type: string
+      rows:
+        type: integer
+    type: object
+  dto.ImportRowError:
+    properties:
+      column:
+        type: string
+      message:
+        type: string
+      row:
+        type: integer
+    type: object
   dto.InspectionFormItemPage:
     properties:
       data:
@@ -7310,6 +7334,127 @@ info:
   title: Fleet API
   version: "1.0"
 paths:
+  /api/v1/{section}/export:
+    get:
+      description: Every row of the list, with the list's own filters (pass them as
+        on the list) and permissions. Up to EXPORT_MAX_ROWS rows; X-Export-Truncated
+        is set when the list is longer.
+      parameters:
+      - description: List path, e.g. work-orders
+        in: path
+        name: section
+        required: true
+        type: string
+      - description: xlsx (default) or csv
+        in: query
+        name: format
+        type: string
+      produces:
+      - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+      - text/csv
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Export a list to Excel or CSV
+      tags:
+      - bulk
+  /api/v1/{section}/import:
+    post:
+      consumes:
+      - multipart/form-data
+      description: 'Available on every importable section (vendors, parts, assets,
+        employees, work-orders…; see README "Bulk import and export"). Upload the
+        section''s template, filled in, as .xlsx or .csv. All-or-nothing: if any row
+        fails, nothing is imported and the 422 lists every problem by row and column.
+        dry_run=true runs the whole import and rolls it back. Reference columns accept
+        the referenced record''s name or id. Requires the section''s create permission.'
+      parameters:
+      - description: Section path, e.g. vendors
+        in: path
+        name: section
+        required: true
+        type: string
+      - description: .xlsx or .csv
+        in: formData
+        name: file
+        required: true
+        type: file
+      - description: Validate and roll back
+        in: query
+        name: dry_run
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: dry run
+          schema:
+            $ref: '#/definitions/dto.ImportReport'
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.ImportReport'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "413":
+          description: Request Entity Too Large
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "415":
+          description: Unsupported Media Type
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "422":
+          description: import_failed; details is an ImportReport
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Bulk import from a spreadsheet
+      tags:
+      - bulk
+  /api/v1/{section}/import/template:
+    get:
+      description: 'Sheets: Datos (the header row to fill in), Instrucciones (every
+        column explained) and Catálogos (the names reference columns accept, from
+        the caller''s company). Custom fields appear as cf.<key> columns. Requires
+        the section''s read permission.'
+      parameters:
+      - description: Section path, e.g. vendors
+        in: path
+        name: section
+        required: true
+        type: string
+      produces:
+      - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Download a section's Excel template
+      tags:
+      - bulk
   /api/v1/account/companies:
     get:
       description: Every company of the caller's account, whether or not the caller
