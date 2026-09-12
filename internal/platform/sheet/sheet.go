@@ -1,0 +1,199 @@
+// Package sheet reads uploaded spreadsheets into rows of strings and writes
+// workbooks and CSV files. It knows nothing about what the rows mean.
+package sheet
+
+import (
+	"bytes"
+	"encoding/csv"
+	"errors"
+	"fmt"
+	"io"
+	"path/filepath"
+	"strings"
+
+	"github.com/xuri/excelize/v2"
+)
+
+// ErrUnsupported is returned for a file that is neither .xlsx nor .csv.
+var ErrUnsupported = errors.New("unsupported file type: upload an .xlsx or .csv file")
+
+// DataSheet is the sheet Read prefers, and the one templates put data in.
+const DataSheet = "Datos"
+
+// maxDataRows bounds the range drop-down lists apply to.
+const maxDataRows = 5001
+
+// Read returns every row of the Datos sheet (or the first sheet) of an .xlsx,
+// or of a .csv, with each cell trimmed. XLSX cells are read raw, so a date
+// comes back as its Excel serial number rather than in whatever display format
+// the cell happens to have.
+func Read(r io.Reader, filename string) ([][]string, error) {
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
+	ext := strings.ToLower(filepath.Ext(filename))
+	switch {
+	case ext == ".xlsx" || bytes.HasPrefix(data, []byte("PK\x03\x04")):
+		return readXLSX(data)
+	case ext == ".csv":
+		return readCSV(data)
+	default:
+		return nil, ErrUnsupported
+	}
+}
+
+func readXLSX(data []byte) ([][]string, error) {
+	f, err := excelize.OpenReader(bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("read xlsx: %w", err)
+	}
+	defer f.Close()
+
+	name := f.GetSheetName(0)
+	if idx, err := f.GetSheetIndex(DataSheet); err == nil && idx >= 0 {
+		name = DataSheet
+	}
+	rows, err := f.GetRows(name, excelize.Options{RawCellValue: true})
+	if err != nil {
+		return nil, fmt.Errorf("read sheet %q: %w", name, err)
+	}
+	return trimAll(rows), nil
+}
+
+func readCSV(data []byte) ([][]string, error) {
+	data = bytes.TrimPrefix(data, []byte("\xef\xbb\xbf"))
+	rd := csv.NewReader(bytes.NewReader(data))
+	rd.FieldsPerRecord = -1
+	if header, _, _ := bytes.Cut(data, []byte("\n")); bytes.Count(header, []byte(";")) > bytes.Count(header, []byte(",")) {
+		rd.Comma = ';'
+	}
+	rows, err := rd.ReadAll()
+	if err != nil {
+		return nil, fmt.Errorf("read csv: %w", err)
+	}
+	return trimAll(rows), nil
+}
+
+func trimAll(rows [][]string) [][]string {
+	for _, row := range rows {
+		for i := range row {
+			row[i] = strings.TrimSpace(row[i])
+		}
+	}
+	return rows
+}
+
+// DropList puts an in-cell drop-down on one column of a sheet, from row 2 down.
+type DropList struct {
+	Column int      // zero-based column
+	Values []string // inline values; keep short (Excel caps them at 255 characters)
+	Source string   // or a range on another sheet, e.g. "'Catálogos'!$A$2:$A$40"
+	// AllowOther lets a user type a value outside the list (for example an id
+	// where the list shows names); Excel then only shows a notice.
+	AllowOther bool
+}
+
+// Sheet is one worksheet to write.
+type Sheet struct {
+	Name         string
+	Rows         [][]any
+	DropLists    []DropList
+	Widths       map[int]float64
+	FreezeHeader bool
+}
+
+// WriteXLSX writes the sheets, in order, as one workbook. Row 1 of each sheet is bold.
+func WriteXLSX(w io.Writer, sheets []Sheet) error {
+	f := excelize.NewFile()
+	defer f.Close()
+
+	bold, err := f.NewStyle(&excelize.Style{Font: &excelize.Font{Bold: true}})
+	if err != nil {
+		return err
+	}
+	for i, s := range sheets {
+		if i == 0 {
+			if err := f.SetSheetName("Sheet1", s.Name); err != nil {
+				return err
+			}
+		} else if _, err := f.NewSheet(s.Name); err != nil {
+			return err
+		}
+		for r, row := range s.Rows {
+			cell, err := excelize.CoordinatesToCellName(1, r+1)
+			if err != nil {
+				return err
+			}
+			if err := f.SetSheetRow(s.Name, cell, &row); err != nil {
+				return err
+			}
+		}
+		if len(s.Rows) > 0 {
+			if err := f.SetRowStyle(s.Name, 1, 1, bold); err != nil {
+				return err
+			}
+		}
+		for col, width := range s.Widths {
+			name := ColumnName(col)
+			if err := f.SetColWidth(s.Name, name, name, width); err != nil {
+				return err
+			}
+		}
+		if s.FreezeHeader {
+			if err := f.SetPanes(s.Name, &excelize.Panes{Freeze: true, YSplit: 1, TopLeftCell: "A2", ActivePane: "bottomLeft"}); err != nil {
+				return err
+			}
+		}
+		for _, dl := range s.DropLists {
+			if err := addDropList(f, s.Name, dl); err != nil {
+				return err
+			}
+		}
+	}
+	f.SetActiveSheet(0)
+	return f.Write(w)
+}
+
+func addDropList(f *excelize.File, sheetName string, dl DropList) error {
+	dv := excelize.NewDataValidation(true)
+	col := ColumnName(dl.Column)
+	dv.Sqref = fmt.Sprintf("%s2:%s%d", col, col, maxDataRows)
+	if dl.Source != "" {
+		dv.SetSqrefDropList(dl.Source)
+	} else if err := dv.SetDropList(dl.Values); err != nil {
+		return err
+	}
+	if dl.AllowOther {
+		dv.SetError(excelize.DataValidationErrorStyleInformation, "", "")
+	}
+	return f.AddDataValidation(sheetName, dv)
+}
+
+// WriteCSV writes rows as UTF-8 CSV with a byte-order mark, so Excel shows
+// accents correctly. A nil value is an empty cell.
+func WriteCSV(w io.Writer, rows [][]any) error {
+	if _, err := io.WriteString(w, "\xef\xbb\xbf"); err != nil {
+		return err
+	}
+	cw := csv.NewWriter(w)
+	for _, row := range rows {
+		rec := make([]string, len(row))
+		for i, v := range row {
+			if v != nil {
+				rec[i] = fmt.Sprint(v)
+			}
+		}
+		if err := cw.Write(rec); err != nil {
+			return err
+		}
+	}
+	cw.Flush()
+	return cw.Error()
+}
+
+// ColumnName is the spreadsheet letter of a zero-based column: 0 → "A".
+func ColumnName(i int) string {
+	name, _ := excelize.ColumnNumberToName(i + 1)
+	return name
+}
