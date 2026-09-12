@@ -52,6 +52,13 @@ func TestCellValue(t *testing.T) {
 		{Column{Kind: KindInt}, "Infinity", "", "must be a whole number"},
 		{Column{Kind: KindFloat, CustomType: "number"}, "3.5", "3.5", ""},
 		{Column{Kind: KindFloat, CustomType: "number"}, "no-es-numero", "", "must be a number"},
+		// ParseFloat accepts these, but none is a valid JSON number, so the
+		// raw cell used to reach Assemble and blow up there with no column
+		// named. They are re-serialised instead.
+		{Column{Kind: KindFloat}, ".5", "0.5", ""},
+		{Column{Kind: KindFloat}, "5.", "5", ""},
+		{Column{Kind: KindFloat}, "+5", "5", ""},
+		{Column{Kind: KindFloat, CustomType: "number"}, ".5", "0.5", ""},
 		{Column{Kind: KindString, CustomType: "date"}, "11/09/2026", `"2026-09-11"`, ""},
 		{Column{Kind: KindString, CustomType: "select", OneOf: []string{"A12", "B7"}}, "a12", `"A12"`, ""},
 	}
@@ -69,6 +76,56 @@ func TestCellValue(t *testing.T) {
 		}
 		if string(got) != tc.want {
 			t.Errorf("%+v %q: got %s, want %s", tc.col, tc.cell, got, tc.want)
+		}
+	}
+}
+
+// TestCellValueDecimalSeparators pins how a money cell is read when the person
+// who filled the sheet in used Spanish conventions, English ones, or both at
+// once. The old code stripped commas as thousands marks, so "1,5" became 15
+// and "0,75" became 75 - a price wrong by 10x or 100x, committed with no
+// error. Every case below is a real shape Excel produces.
+func TestCellValueDecimalSeparators(t *testing.T) {
+	cases := []struct {
+		cell, want, wantErr string
+	}{
+		// The corruption this replaces: comma as a Spanish decimal separator.
+		{"1,5", `"1.5"`, ""},
+		{"0,75", `"0.75"`, ""},
+		// Both separators present: the last one is the decimal separator.
+		{"1,234.56", `"1234.56"`, ""},
+		{"1.234,56", `"1234.56"`, ""},
+		{"$1,234.50", `"1234.5"`, ""},
+		{"1,234,567.89", `"1234567.89"`, ""},
+		// One comma over an exact three-digit group is thousands.
+		{"1,234", `"1234"`, ""},
+		// Spaces group thousands in Spanish Excel too.
+		{"1 234,56", `"1234.56"`, ""},
+		// Repeated separators can only ever be grouping.
+		{"1.234.567", `"1234567"`, ""},
+		// Plain machine numbers - what this API's own exports emit - untouched.
+		{"1234.56", `"1234.56"`, ""},
+		{"1234", `"1234"`, ""},
+		{"-1,5", `"-1.5"`, ""},
+		// Refused rather than guessed at.
+		{"1.234", "", errAmbiguous.Error()},
+		{"1,23,456", "", errGrouping.Error()},
+		{"doce", "", "must be a number"},
+	}
+	for _, tc := range cases {
+		got, err := CellValue(Column{Kind: KindDecimal}, tc.cell)
+		if tc.wantErr != "" {
+			if err == nil || err.Error() != tc.wantErr {
+				t.Errorf("%q: err = %v, want %q", tc.cell, err, tc.wantErr)
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("%q: unexpected error %v", tc.cell, err)
+			continue
+		}
+		if string(got) != tc.want {
+			t.Errorf("%q: got %s, want %s", tc.cell, got, tc.want)
 		}
 	}
 }
