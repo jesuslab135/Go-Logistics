@@ -1,8 +1,10 @@
 package handler
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -54,6 +56,27 @@ func NewRouter(d Deps) *gin.Engine {
 	)
 
 	r.GET("/healthz", func(c *gin.Context) {
+		// A pooled connection can be held for the duration of a bulk import
+		// (see the import handler), and the pool has a bounded ceiling, so a
+		// health check that only answers from memory can stay green while the
+		// pool is exhausted or Postgres is unreachable. Actually round-trip
+		// the pool, but bound it: a health check that can hang is worse than
+		// one that lies, since the deploy gate would then hang with it. 2s is
+		// comfortably above a healthy Ping (sub-millisecond) but short enough
+		// that a genuinely wedged database fails the gate quickly.
+		if d.Pool != nil {
+			ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
+			defer cancel()
+			if err := d.Pool.Ping(ctx); err != nil {
+				d.Logger.Error("healthz: database ping failed", "error", err)
+				c.JSON(http.StatusServiceUnavailable, gin.H{"status": "error", "subsystem": "database"})
+				return
+			}
+		}
+		// A nil Pool means "no pool configured" (the unit-test router, and any
+		// pool-less deployment), not "database unreachable" — every real
+		// deployment wires one in cmd/api, so treating nil as healthy here
+		// does not mask a real outage.
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 
