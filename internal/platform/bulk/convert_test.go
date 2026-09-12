@@ -36,6 +36,7 @@ func TestCellValue(t *testing.T) {
 		{Column{Kind: KindBool}, "quizá", "", "must be true or false (sí/no)"},
 		{Column{Kind: KindTime}, "2026-09-11", `"2026-09-11T00:00:00Z"`, ""},
 		{Column{Kind: KindTime}, "2026-09-11 08:30", `"2026-09-11T08:30:00Z"`, ""},
+		{Column{Kind: KindTime}, "2026-09-11 08:30:45", `"2026-09-11T08:30:45Z"`, ""},
 		{Column{Kind: KindTime}, "11/09/2026", `"2026-09-11T00:00:00Z"`, ""},
 		{Column{Kind: KindTime}, "11/09/2026 08:30", `"2026-09-11T08:30:00Z"`, ""},
 		{Column{Kind: KindTime}, "2026-09-11T08:30:00-05:00", `"2026-09-11T13:30:00Z"`, ""},
@@ -92,6 +93,14 @@ func TestAssembleNestsDottedKeysAndCustomFields(t *testing.T) {
 	}
 }
 
+// TestAssembleRejectsKeyCollision asserts the collision between the flat
+// "vehicle" key and the dotted "vehicle.engine_serial" key is rejected
+// regardless of which one Assemble happens to place into the tree first:
+// child-before-parent (the nested object exists when the flat value is
+// written) and parent-before-child (the flat value exists when the nested
+// object is built). Go does not guarantee map iteration order, so the guard
+// itself - not the order keys are listed in either literal below - must
+// cover both directions.
 func TestAssembleRejectsKeyCollision(t *testing.T) {
 	if _, err := Assemble(map[string]json.RawMessage{
 		"vehicle":               json.RawMessage(`"flat"`),
