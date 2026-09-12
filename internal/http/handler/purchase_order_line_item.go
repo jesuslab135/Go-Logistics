@@ -69,7 +69,7 @@ func (s *PurchaseOrderLineItemStore) Create(ctx context.Context, parentID int64,
 		if err != nil {
 			return err
 		}
-		if err := recalcPurchaseOrderLineItem(ctx, qtx, r.ID, now); err != nil {
+		if err := recalcPurchaseOrderLineItem(ctx, qtx, r.ID, company, now); err != nil {
 			return err
 		}
 		// Re-read: the line's subtotal was just derived.
@@ -103,7 +103,7 @@ func (s *PurchaseOrderLineItemStore) Update(ctx context.Context, parentID, id in
 		if err != nil {
 			return err
 		}
-		if err := recalcPurchaseOrderLineItem(ctx, qtx, r.ID, now); err != nil {
+		if err := recalcPurchaseOrderLineItem(ctx, qtx, r.ID, company, now); err != nil {
 			return err
 		}
 		r, err = qtx.GetPurchaseOrderLineItem(ctx, gen.GetPurchaseOrderLineItemParams{ID: id, ParentID: parentID, CompanyID: company})
@@ -131,7 +131,7 @@ func (s *PurchaseOrderLineItemStore) Delete(ctx context.Context, parentID, id in
 		if n == 0 {
 			return apierr.NotFound("line item not found")
 		}
-		return recalcPurchaseOrder(ctx, qtx, parentID, now)
+		return recalcPurchaseOrder(ctx, qtx, parentID, middleware.CompanyFromContext(ctx), now)
 	})
 }
 

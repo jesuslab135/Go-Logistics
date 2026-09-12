@@ -116,6 +116,48 @@ func TestDeletingAnotherCompanysPurchaseOrderLineIs404(t *testing.T) {
 		tokenA, nil, http.StatusNotFound, nil)
 }
 
+// The recompute family reads and writes the document directly. It used to do so
+// without a tenant, on the argument that the triggering write had already
+// established one. This aims a recompute trigger — the audited total override —
+// at another company's work order, and requires that the document is neither
+// read nor rewritten.
+func TestOverridingAnotherCompanysTotalIsRefused(t *testing.T) {
+	ctx := context.Background()
+	pool := setupThrowawayDB(t, ctx)
+	srv := httptest.NewServer(newIntegrationRouter(pool))
+	defer srv.Close()
+
+	platformToken := seedPlatformAdmin(t, ctx, pool, srv.URL)
+	_, _, _, ownerToken := provisionAccountOwner(t, srv.URL, platformToken)
+
+	ts := time.Now().UnixNano()
+	companyA := createCompany(t, srv.URL, ownerToken, "Company A", fmt.Sprintf("TAX-OV-A-%d", ts))
+	companyB := createCompany(t, srv.URL, ownerToken, "Company B", fmt.Sprintf("TAX-OV-B-%d", ts))
+	tokenA := switchCompany(t, srv.URL, ownerToken, companyA)
+	tokenB := switchCompany(t, srv.URL, ownerToken, companyB)
+
+	victim := seedWorkOrder(t, srv.URL, tokenB, ts, "B")
+	postJSON(t, srv.URL+"/api/v1/work-orders/"+itoa(victim)+"/override-total", tokenB, map[string]any{
+		"amount": "999.00",
+		"reason": "B's own agreed figure",
+	}, http.StatusOK, nil)
+
+	before := workOrderOverride(t, srv.URL, tokenB, victim)
+	if before == nil {
+		t.Fatal("precondition failed: company B's override was not recorded")
+	}
+
+	// Company A tries to override company B's work order.
+	doJSON(t, http.MethodPost, srv.URL+"/api/v1/work-orders/"+itoa(victim)+"/override-total",
+		tokenA, map[string]any{"amount": "1.00", "reason": "not mine to set"},
+		http.StatusNotFound, nil)
+
+	after := workOrderOverride(t, srv.URL, tokenB, victim)
+	if after == nil || *after != *before {
+		t.Errorf("company B's override changed from %s to %s", deref(before), deref(after))
+	}
+}
+
 // seedWorkOrder creates an asset and a work order in the company the token is
 // scoped to, and returns the work order id.
 func seedWorkOrder(t *testing.T, baseURL, token string, ts int64, tag string) int64 {

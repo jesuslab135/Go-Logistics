@@ -74,7 +74,7 @@ func (s *WorkOrderSubLineItemStore) Create(ctx context.Context, parentID int64, 
 			return err
 		}
 		out = toWorkOrderSubLineItemResponse(r)
-		return recalcWorkOrderLineItem(ctx, qtx, parentID, now)
+		return recalcWorkOrderLineItem(ctx, qtx, parentID, middleware.CompanyFromContext(ctx), now)
 	})
 	return out, err
 }
@@ -102,7 +102,7 @@ func (s *WorkOrderSubLineItemStore) Update(ctx context.Context, parentID, id int
 			return err
 		}
 		out = toWorkOrderSubLineItemResponse(r)
-		return recalcWorkOrderLineItem(ctx, qtx, parentID, now)
+		return recalcWorkOrderLineItem(ctx, qtx, parentID, middleware.CompanyFromContext(ctx), now)
 	})
 	return out, err
 }
@@ -121,7 +121,7 @@ func (s *WorkOrderSubLineItemStore) Delete(ctx context.Context, parentID, id int
 		if n == 0 {
 			return apierr.NotFound("sub line item not found")
 		}
-		return recalcWorkOrderLineItem(ctx, qtx, parentID, now)
+		return recalcWorkOrderLineItem(ctx, qtx, parentID, middleware.CompanyFromContext(ctx), now)
 	})
 }
 

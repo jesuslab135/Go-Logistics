@@ -85,7 +85,7 @@ func (s *PurchaseOrderStore) Create(ctx context.Context, in dto.CreatePurchaseOr
 		if err != nil {
 			return err
 		}
-		if err := recalcPurchaseOrder(ctx, qtx, r.ID, now); err != nil {
+		if err := recalcPurchaseOrder(ctx, qtx, r.ID, middleware.CompanyFromContext(ctx), now); err != nil {
 			return err
 		}
 		fresh, err := qtx.GetPurchaseOrder(ctx, gen.GetPurchaseOrderParams{ID: r.ID, CompanyID: middleware.CompanyFromContext(ctx)})
@@ -132,7 +132,7 @@ func (s *PurchaseOrderStore) Update(ctx context.Context, id int64, in dto.Update
 		if err != nil {
 			return err
 		}
-		if err := recalcPurchaseOrder(ctx, qtx, id, now); err != nil {
+		if err := recalcPurchaseOrder(ctx, qtx, id, middleware.CompanyFromContext(ctx), now); err != nil {
 			return err
 		}
 		fresh, err := qtx.GetPurchaseOrder(ctx, gen.GetPurchaseOrderParams{ID: id, CompanyID: middleware.CompanyFromContext(ctx)})

@@ -74,7 +74,7 @@ func (h *TotalOverrideHandler) WorkOrder(c *gin.Context) {
 		// Recompute so total_amount reflects the decision immediately: the
 		// override is what the document is charged at, and the components beside
 		// it stay computed.
-		if err := recalcWorkOrder(ctx, qtx, id, now); err != nil {
+		if err := recalcWorkOrder(ctx, qtx, id, middleware.CompanyFromContext(ctx), now); err != nil {
 			return err
 		}
 		r, err := qtx.GetWorkOrder(ctx, gen.GetWorkOrderParams{ID: id, CompanyID: company})
@@ -125,7 +125,7 @@ func (h *TotalOverrideHandler) PurchaseOrder(c *gin.Context) {
 		}); err != nil {
 			return err
 		}
-		if err := recalcPurchaseOrder(ctx, qtx, id, now); err != nil {
+		if err := recalcPurchaseOrder(ctx, qtx, id, middleware.CompanyFromContext(ctx), now); err != nil {
 			return err
 		}
 		r, err := qtx.GetPurchaseOrder(ctx, gen.GetPurchaseOrderParams{ID: id, CompanyID: company})
@@ -176,7 +176,7 @@ func (h *TotalOverrideHandler) ServiceEntry(c *gin.Context) {
 		}); err != nil {
 			return err
 		}
-		if err := recalcServiceEntry(ctx, qtx, id, now); err != nil {
+		if err := recalcServiceEntry(ctx, qtx, id, middleware.CompanyFromContext(ctx), now); err != nil {
 			return err
 		}
 		r, err := qtx.GetServiceEntry(ctx, gen.GetServiceEntryParams{ID: id, CompanyID: company})

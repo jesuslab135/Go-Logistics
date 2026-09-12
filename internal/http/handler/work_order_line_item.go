@@ -73,7 +73,7 @@ func (s *WorkOrderLineItemStore) Create(ctx context.Context, parentID int64, in 
 		// A new line has no sub-line items yet, so its own costs are zero; the
 		// document is still recomputed because an empty line changes nothing but
 		// the caller should see consistent numbers either way.
-		if err := recalcWorkOrderLineItem(ctx, qtx, r.ID, now); err != nil {
+		if err := recalcWorkOrderLineItem(ctx, qtx, r.ID, company, now); err != nil {
 			return err
 		}
 		r, err = qtx.GetWorkOrderLineItem(ctx, gen.GetWorkOrderLineItemParams{ID: r.ID, ParentID: parentID, CompanyID: company})
@@ -106,7 +106,7 @@ func (s *WorkOrderLineItemStore) Update(ctx context.Context, parentID, id int64,
 		if err != nil {
 			return err
 		}
-		if err := recalcWorkOrderLineItem(ctx, qtx, r.ID, now); err != nil {
+		if err := recalcWorkOrderLineItem(ctx, qtx, r.ID, company, now); err != nil {
 			return err
 		}
 		r, err = qtx.GetWorkOrderLineItem(ctx, gen.GetWorkOrderLineItemParams{ID: id, ParentID: parentID, CompanyID: company})
@@ -137,7 +137,7 @@ func (s *WorkOrderLineItemStore) Delete(ctx context.Context, parentID, id int64)
 		}
 		// The line is gone, so only the document is recomputed - and it must be,
 		// or its total still includes work that no longer exists.
-		return recalcWorkOrder(ctx, qtx, parentID, now)
+		return recalcWorkOrder(ctx, qtx, parentID, middleware.CompanyFromContext(ctx), now)
 	})
 }
 
