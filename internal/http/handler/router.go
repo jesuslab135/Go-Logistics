@@ -309,6 +309,7 @@ func NewRouter(d Deps) *gin.Engine {
 		workOrders: workOrders, issues: issues, service: service, fuel: fuel, vendors: vendors,
 		warranties: warranties, mileageGoals: mileageGoals, employees: employees,
 	}, d)
+	registerExports(r, member)
 
 	return r
 }

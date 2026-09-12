@@ -527,3 +527,198 @@ func TestImportRefusesForeignIdsOnColumnsThatUsedToBypassLookup(t *testing.T) {
 }
 
 func body2str(b []byte) string { return string(b) }
+
+func (f importFixture) download(t *testing.T, path string, want int) (*http.Response, []byte) {
+	t.Helper()
+	req, _ := http.NewRequest(http.MethodGet, f.srv.URL+"/api/v1"+path, nil)
+	req.Header.Set("Authorization", "Bearer "+f.token)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != want {
+		t.Fatalf("GET %s: got %d, want %d: %s", path, resp.StatusCode, want, body)
+	}
+	return resp, body
+}
+
+// 120 rows prove export pages past the 100-row list limit.
+func TestExportPagesThroughTheWholeList(t *testing.T) {
+	f := newImportFixture(t)
+	rows := [][]any{{"name"}}
+	for i := 1; i <= 120; i++ {
+		rows = append(rows, []any{fmt.Sprintf("Proveedor %03d", i)})
+	}
+	f.upload(t, "/vendors/import", rows, http.StatusCreated)
+
+	resp, body := f.download(t, "/vendors/export", http.StatusOK)
+	if resp.Header.Get("Content-Type") != xlsxContentType {
+		t.Fatalf("content type %q", resp.Header.Get("Content-Type"))
+	}
+	got, err := sheet.Read(bytes.NewReader(body), "vendors.xlsx")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 121 || !strings.Contains(strings.Join(got[0], ","), "name") {
+		t.Fatalf("export has %d rows (header %v), want 121", len(got), got[0])
+	}
+}
+
+func TestExportCSV(t *testing.T) {
+	f := newImportFixture(t)
+	f.upload(t, "/vendors/import", [][]any{{"name"}, {"Único"}}, http.StatusCreated)
+	_, body := f.download(t, "/vendors/export?format=csv", http.StatusOK)
+	if !bytes.HasPrefix(body, []byte("\xef\xbb\xbf")) || !bytes.Contains(body, []byte("Único")) {
+		t.Fatalf("csv: %q", body)
+	}
+}
+
+// The export runs the list itself, so the list's filters apply.
+func TestExportHonoursListFilters(t *testing.T) {
+	f := newImportFixture(t)
+	for _, def := range []map[string]any{
+		{"resource": "vendors", "key": "zona", "label": "Zona", "field_type": "text"},
+		{"resource": "parts", "key": "marca", "label": "Marca", "field_type": "text"},
+	} {
+		postJSON(t, f.srv.URL+"/api/v1/custom-field-definitions", f.token, def, http.StatusCreated, nil)
+	}
+	_, body := f.download(t, "/custom-field-definitions/export?resource=vendors&format=csv", http.StatusOK)
+	if !bytes.Contains(body, []byte("zona")) || bytes.Contains(body, []byte("marca")) {
+		t.Fatalf("filtered export: %s", body)
+	}
+}
+
+// The list's own permission applies, and its refusal is relayed.
+func TestExportRespectsPermissions(t *testing.T) {
+	f := newImportFixture(t)
+	memberID := createDirectorCandidate(t, f.srv.URL, f.token, "noexport")
+	f.token = setPasswordAndLogIn(t, f.srv.URL, f.token, memberID, employeeEmail(t, f.srv.URL, f.token, memberID))
+	f.download(t, "/vendors/export", http.StatusForbidden)
+}
+
+// Exports page each section's list in-process; the list itself reads the
+// company from the request context, so two companies' rows must never mix in
+// one export. This branch has already had one real cross-tenant finding.
+func TestExportOnlyIncludesTheCallersCompany(t *testing.T) {
+	ctx := context.Background()
+	pool := setupThrowawayDB(t, ctx)
+	srv := httptest.NewServer(newIntegrationRouter(pool))
+	defer srv.Close()
+
+	platformToken := seedPlatformAdmin(t, ctx, pool, srv.URL)
+	_, _, _, ownerToken := provisionAccountOwner(t, srv.URL, platformToken)
+
+	ts := time.Now().UnixNano()
+	companyA := createCompany(t, srv.URL, ownerToken, "Company A", fmt.Sprintf("TAX-EXA-%d", ts))
+	companyB := createCompany(t, srv.URL, ownerToken, "Company B", fmt.Sprintf("TAX-EXB-%d", ts))
+	tokenA := switchCompany(t, srv.URL, ownerToken, companyA)
+	tokenB := switchCompany(t, srv.URL, ownerToken, companyB)
+
+	postJSON(t, srv.URL+"/api/v1/vendors", tokenA, map[string]any{"name": "Solo A"}, http.StatusCreated, nil)
+	postJSON(t, srv.URL+"/api/v1/vendors", tokenB, map[string]any{"name": "Solo B"}, http.StatusCreated, nil)
+
+	fA := importFixture{srv: srv, token: tokenA, company: companyA}
+	_, body := fA.download(t, "/vendors/export?format=csv", http.StatusOK)
+	if !bytes.Contains(body, []byte("Solo A")) {
+		t.Fatalf("company A export is missing its own vendor: %s", body)
+	}
+	if bytes.Contains(body, []byte("Solo B")) {
+		t.Fatalf("company A export leaked company B's vendor: %s", body)
+	}
+}
+
+// The whole point of exporting is to edit and re-upload: the engine ignores
+// unknown headers, so a file exported from one company's own list is accepted
+// back as an import unchanged. Re-imported into a second, empty company
+// (rather than back into the same one) so the round trip is not confused with
+// vendor.name's own per-company uniqueness constraint rejecting a duplicate.
+func TestExportRoundTripsBackIntoImport(t *testing.T) {
+	ctx := context.Background()
+	pool := setupThrowawayDB(t, ctx)
+	srv := httptest.NewServer(newIntegrationRouter(pool))
+	defer srv.Close()
+
+	platformToken := seedPlatformAdmin(t, ctx, pool, srv.URL)
+	_, _, _, ownerToken := provisionAccountOwner(t, srv.URL, platformToken)
+
+	ts := time.Now().UnixNano()
+	companySrc := createCompany(t, srv.URL, ownerToken, "Source", fmt.Sprintf("TAX-RTS-%d", ts))
+	companyDst := createCompany(t, srv.URL, ownerToken, "Destination", fmt.Sprintf("TAX-RTD-%d", ts))
+	tokenSrc := switchCompany(t, srv.URL, ownerToken, companySrc)
+	tokenDst := switchCompany(t, srv.URL, ownerToken, companyDst)
+
+	src := importFixture{srv: srv, token: tokenSrc, company: companySrc}
+	src.upload(t, "/vendors/import", [][]any{{"name", "city"}, {"Uno", "Tijuana"}, {"Dos", "Ensenada"}}, http.StatusCreated)
+
+	_, exported := src.download(t, "/vendors/export", http.StatusOK)
+	rows, err := sheet.Read(bytes.NewReader(exported), "vendors.xlsx")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 3 {
+		t.Fatalf("exported %d rows, want 3 (header + 2 vendors)", len(rows))
+	}
+
+	// Re-upload the exported file as-is: its "id" and other read-only columns
+	// are unknown to the import schema and are ignored, so the round trip
+	// succeeds.
+	var rebuilt bytes.Buffer
+	if err := sheet.WriteXLSX(&rebuilt, []sheet.Sheet{{Name: "Datos", Rows: toAnyRows(rows)}}); err != nil {
+		t.Fatal(err)
+	}
+	dst := importFixture{srv: srv, token: tokenDst, company: companyDst}
+	report := uploadFile(t, dst, "/vendors/import", rebuilt.Bytes(), http.StatusCreated)
+	var parsed struct{ Rows, Created int }
+	if err := json.Unmarshal(report, &parsed); err != nil || parsed.Created != 2 {
+		t.Fatalf("round-trip import report: %s (%v)", report, err)
+	}
+	if got := dst.total(t, "/vendors"); got != 2 {
+		t.Fatalf("vendors in destination company after round trip: %d, want 2", got)
+	}
+}
+
+// toAnyRows converts sheet.Read's [][]string back into the [][]any shape
+// sheet.WriteXLSX takes, so an exported file can be re-uploaded as a fresh
+// workbook in a test without going through the filesystem.
+func toAnyRows(rows [][]string) [][]any {
+	out := make([][]any, len(rows))
+	for i, row := range rows {
+		r := make([]any, len(row))
+		for j, cell := range row {
+			r[j] = cell
+		}
+		out[i] = r
+	}
+	return out
+}
+
+// uploadFile posts a pre-built .xlsx file (as opposed to importFixture.upload,
+// which builds one from rows) to path, and returns the response body.
+func uploadFile(t *testing.T, f importFixture, path string, file []byte, want int) []byte {
+	t.Helper()
+	var body bytes.Buffer
+	mw := multipart.NewWriter(&body)
+	fw, err := mw.CreateFormFile("file", "export.xlsx")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fw.Write(file); err != nil {
+		t.Fatal(err)
+	}
+	mw.Close()
+	req, _ := http.NewRequest(http.MethodPost, f.srv.URL+"/api/v1"+path, &body)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	req.Header.Set("Authorization", "Bearer "+f.token)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	out, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != want {
+		t.Fatalf("POST %s: got %d, want %d: %s", path, resp.StatusCode, want, out)
+	}
+	return out
+}

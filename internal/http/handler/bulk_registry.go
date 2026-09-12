@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 
 	"fleet/internal/http/dto"
@@ -146,5 +148,30 @@ func registerBulkImports(g bulkGroups, d Deps) {
 	h := NewBulkHandler(d.Pool)
 	for _, e := range bulkImporters(d) {
 		h.Register(e.group(g), e.path, e.imp)
+	}
+}
+
+// exportPaths is every top-level list that can be exported.
+var exportPaths = []string{
+	"/assets", "/asset-trailer-assignments", "/asset-types", "/asset-statuses", "/catalog-options",
+	"/trailer-classifications", "/vehicle-makes", "/vehicle-models", "/media",
+	"/part-categories", "/part-manufacturers", "/parts", "/measurement-units", "/part-locations",
+	"/inventory-adjustment-reasons", "/part-inventory", "/inventory-journal-entries",
+	"/purchase-orders", "/purchase-order-line-items",
+	"/vendors", "/locations", "/warranties", "/weekly-mileage-goals",
+	"/work-order-statuses", "/work-orders", "/issues", "/issue-priorities", "/faults", "/comments",
+	"/service-tasks", "/service-reminders", "/service-entries",
+	"/tires", "/tire-models", "/axle-templates", "/tire-assignment-requests", "/tire-mount-logs",
+	"/fuel-types", "/fuel-entries", "/inspection-forms", "/inspection-submissions",
+	"/employees", "/groups", "/roles", "/custom-field-definitions",
+}
+
+// registerExports adds GET <list>/export for every export path. It sits on the
+// member group: the list it calls enforces its own module permission, and its
+// refusal is relayed to the caller.
+func registerExports(engine http.Handler, member gin.IRouter) {
+	ex := NewExporter(engine)
+	for _, p := range exportPaths {
+		member.GET(p+"/export", ex.Handler(p))
 	}
 }

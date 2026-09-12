@@ -1,9 +1,11 @@
 package handler
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"strconv"
 	"strings"
@@ -129,6 +131,90 @@ func (h *BulkHandler) template(imp bulk.Importer) gin.HandlerFunc {
 		c.Header("Content-Type", xlsxContentType)
 		c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s-plantilla.xlsx"`, imp.Resource()))
 		if err := sheet.WriteXLSX(c.Writer, sheets); err != nil {
+			_ = c.Error(err)
+		}
+	}
+}
+
+// Exporter writes a list to a file by calling the section's own list endpoint
+// page by page, so every filter and permission of that list applies unchanged.
+type Exporter struct {
+	engine  http.Handler
+	maxRows int
+}
+
+func NewExporter(engine http.Handler) *Exporter {
+	return &Exporter{engine: engine, maxRows: int(bulkEnvInt("EXPORT_MAX_ROWS", 20000))}
+}
+
+func (e *Exporter) Handler(listPath string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		format := c.DefaultQuery("format", "xlsx")
+		if format != "xlsx" && format != "csv" {
+			apierr.Abort(c, apierr.BadRequest(`format must be "xlsx" or "csv"`))
+			return
+		}
+		query := c.Request.URL.Query()
+		for _, k := range []string{"format", "page", "page_size"} {
+			query.Del(k)
+		}
+
+		var table bulk.Table
+		fetched, truncated := 0, false
+		for {
+			if fetched >= e.maxRows {
+				truncated = true
+				break
+			}
+			query.Set("limit", "100")
+			query.Set("offset", strconv.Itoa(fetched))
+			req, err := http.NewRequestWithContext(c.Request.Context(), http.MethodGet, "/api/v1"+listPath+"?"+query.Encode(), nil)
+			if err != nil {
+				apierr.Abort(c, apierr.Internal(err))
+				return
+			}
+			req.Header.Set("Authorization", c.GetHeader("Authorization"))
+			rec := httptest.NewRecorder()
+			e.engine.ServeHTTP(rec, req)
+			if rec.Code != http.StatusOK {
+				c.Data(rec.Code, "application/json", rec.Body.Bytes())
+				c.Abort()
+				return
+			}
+			var page struct {
+				Data    []json.RawMessage `json:"data"`
+				HasNext bool              `json:"has_next"`
+			}
+			if err := json.Unmarshal(rec.Body.Bytes(), &page); err != nil {
+				apierr.Abort(c, apierr.Internal(err))
+				return
+			}
+			for _, raw := range page.Data {
+				if err := table.Add(raw); err != nil {
+					apierr.Abort(c, apierr.Internal(err))
+					return
+				}
+			}
+			fetched += len(page.Data)
+			if !page.HasNext || len(page.Data) == 0 {
+				break
+			}
+		}
+
+		if truncated {
+			c.Header("X-Export-Truncated", "true")
+		}
+		filename := strings.Trim(strings.ReplaceAll(listPath, "/", "-"), "-") + "." + format
+		c.Header("Content-Disposition", `attachment; filename="`+filename+`"`)
+		var err error
+		if format == "csv" {
+			c.Header("Content-Type", "text/csv; charset=utf-8")
+			err = sheet.WriteCSV(c.Writer, table.Records())
+		} else {
+			c.Header("Content-Type", xlsxContentType)
+			err = sheet.WriteXLSX(c.Writer, []sheet.Sheet{{Name: sheet.DataSheet, Rows: table.Records(), FreezeHeader: true}})
+		}
+		if err != nil {
 			_ = c.Error(err)
 		}
 	}

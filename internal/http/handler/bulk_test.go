@@ -153,3 +153,20 @@ func TestBulkEntriesUseTheirDeclaredGroup(t *testing.T) {
 		}
 	}
 }
+
+// Every export path must be a list route that exists, or the export would
+// relay a 404 for every call.
+func TestExportPathsAreListRoutes(t *testing.T) {
+	routes := map[string]bool{}
+	for _, r := range newTestRouter(t).Routes() {
+		routes[r.Method+" "+r.Path] = true
+	}
+	for _, p := range exportPaths {
+		if !routes["GET /api/v1"+p] {
+			t.Errorf("export path %s has no GET list route", p)
+		}
+		if !routes["GET /api/v1"+p+"/export"] {
+			t.Errorf("export route for %s is not registered", p)
+		}
+	}
+}
