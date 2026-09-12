@@ -27,6 +27,12 @@ const maxDataRows = 5001
 // or of a .csv, with each cell trimmed. XLSX cells are read raw, so a date
 // comes back as its Excel serial number rather than in whatever display format
 // the cell happens to have.
+//
+// A returned row may be shorter than the header row: excelize (and CSV) trim
+// each row to its own last non-empty cell, so trailing blank cells are simply
+// absent rather than empty strings. A fully blank interior row can come back
+// as a nil slice. Callers must range over a row rather than index it by
+// header column position.
 func Read(r io.Reader, filename string) ([][]string, error) {
 	data, err := io.ReadAll(r)
 	if err != nil {
@@ -44,11 +50,18 @@ func Read(r io.Reader, filename string) ([][]string, error) {
 }
 
 func readXLSX(data []byte) ([][]string, error) {
+	// OpenReader can return a non-nil *File alongside a non-nil error (for
+	// example when the zip and shared strings parse but a later part such as
+	// styles or the calc chain fails on a corrupt upload). Register the
+	// close before checking the error so any temp files excelize already
+	// spooled to disk are always cleaned up.
 	f, err := excelize.OpenReader(bytes.NewReader(data))
+	if f != nil {
+		defer f.Close()
+	}
 	if err != nil {
 		return nil, fmt.Errorf("read xlsx: %w", err)
 	}
-	defer f.Close()
 
 	name := f.GetSheetName(0)
 	if idx, err := f.GetSheetIndex(DataSheet); err == nil && idx >= 0 {

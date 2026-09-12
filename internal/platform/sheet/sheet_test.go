@@ -3,11 +3,14 @@ package sheet
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/xuri/excelize/v2"
 )
 
 func TestXLSXRoundTrip(t *testing.T) {
@@ -93,6 +96,77 @@ func TestWriteCSVHasBOMAndEmptyNils(t *testing.T) {
 	}
 	if got, want := buf.String(), "\xef\xbb\xbfname,notes\nTaller,\n"; got != want {
 		t.Fatalf("got %q, want %q", got, want)
+	}
+}
+
+// The template generator (a later task) builds its drop-downs directly on
+// WriteXLSX + DropList; this proves the validation excelize writes actually
+// lands on the intended column and range, for both an inline value list and
+// a range Source, and that AllowOther relaxes the error style rather than
+// being silently ignored.
+func TestWriteXLSXDataValidations(t *testing.T) {
+	var buf bytes.Buffer
+	err := WriteXLSX(&buf, []Sheet{{
+		Name: "Datos",
+		Rows: [][]any{
+			{"name", "category", "vendor_id"},
+			{"Llantera Sur", "Neumáticos", "42"},
+		},
+		DropLists: []DropList{
+			{Column: 1, Values: []string{"Neumáticos", "Frenos", "Aceite"}},
+			{Column: 2, Source: "'Catálogos'!$A$2:$A$40", AllowOther: true},
+		},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	f, err := excelize.OpenReader(&buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+
+	dvs, err := f.GetDataValidations("Datos")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(dvs) != 2 {
+		t.Fatalf("got %d data validations, want 2", len(dvs))
+	}
+
+	inline := dvs[0]
+	if want := fmt.Sprintf("B2:B%d", maxDataRows); inline.Sqref != want {
+		t.Errorf("inline drop list Sqref = %q, want %q", inline.Sqref, want)
+	}
+	if inline.Type != "list" {
+		t.Errorf("inline drop list Type = %q, want %q", inline.Type, "list")
+	}
+	if want := `"Neumáticos,Frenos,Aceite"`; inline.Formula1 != want {
+		t.Errorf("inline drop list Formula1 = %q, want %q", inline.Formula1, want)
+	}
+	if inline.ErrorStyle != nil {
+		t.Errorf("inline drop list ErrorStyle = %q, want unset (no AllowOther)", *inline.ErrorStyle)
+	}
+
+	ranged := dvs[1]
+	if want := fmt.Sprintf("C2:C%d", maxDataRows); ranged.Sqref != want {
+		t.Errorf("range drop list Sqref = %q, want %q", ranged.Sqref, want)
+	}
+	if ranged.Type != "list" {
+		t.Errorf("range drop list Type = %q, want %q", ranged.Type, "list")
+	}
+	if want := "'Catálogos'!$A$2:$A$40"; ranged.Formula1 != want {
+		t.Errorf("range drop list Formula1 = %q, want the source range %q", ranged.Formula1, want)
+	}
+	// AllowOther: a source-range list still gets a drop-down, but the error
+	// alert is downgraded to "information" so an out-of-list value (e.g. an
+	// id the list shows by name) is merely flagged, not rejected.
+	if ranged.ErrorStyle == nil || *ranged.ErrorStyle != "information" {
+		t.Errorf("AllowOther drop list ErrorStyle = %v, want \"information\"", ranged.ErrorStyle)
+	}
+	if !ranged.ShowErrorMessage {
+		t.Error("AllowOther drop list should still show an (informational) error message")
 	}
 }
 
