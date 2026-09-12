@@ -46,7 +46,11 @@ func bulkImporters(d Deps) []bulkEntry {
 			Name: "assets", Store: NewAssetStore(q, d.Pool, d.Storage, d.Logger), CustomFields: customFieldsFor(d, "assets"),
 			Skip: []string{"linked_vehicles", "photo", "owner_company_id"},
 			References: refs{"asset_type_id": l.assetTypes(), "status_id": l.assetStatuses(),
-				"lease_vendor_id": l.vendors(), "loan_vendor_id": l.vendors(), "trailer.classification_id": l.trailerClassifications()}}},
+				"lease_vendor_id": l.vendors(), "loan_vendor_id": l.vendors(),
+				// classification_2_id is trailer.classification_id's sibling
+				// (dto/trailer.go): the same catalog, so the same lookup keeps
+				// it scoped to the caller's company just as strictly.
+				"trailer.classification_id": l.trailerClassifications(), "trailer.classification_2_id": l.trailerClassifications()}}},
 		{vendors, "/vendors", bulk.Flat[dto.VendorResponse, dto.CreateVendorRequest, dto.UpdateVendorRequest]{
 			Name: "vendors", Store: NewVendorStore(q), CustomFields: customFieldsFor(d, "vendors")}},
 		{member, "/locations", bulk.Flat[dto.LocationResponse, dto.CreateLocationRequest, dto.UpdateLocationRequest]{
@@ -89,7 +93,7 @@ func bulkImporters(d Deps) []bulkEntry {
 			References: refs{"asset_id": l.assets(), "service_task_id": l.serviceTasks()}}},
 		{service, "/service-entries", bulk.Flat[dto.ServiceEntryResponse, dto.CreateServiceEntryRequest, dto.UpdateServiceEntryRequest]{
 			Name: "service-entries", Store: NewServiceEntryStore(q, d.Pool), CustomFields: customFieldsFor(d, "service-entries"),
-			References: refs{"asset_id": l.assets(), "vendor_id": l.vendors()}}},
+			References: refs{"asset_id": l.assets(), "vendor_id": l.vendors(), "work_order_id": l.workOrders()}}},
 		{tires, "/tire-models", bulk.Flat[dto.TireModelResponse, dto.CreateTireModelRequest, dto.UpdateTireModelRequest]{
 			Name: "tire-models", Store: NewTireModelStore(q)}},
 		{tires, "/tires", bulk.Flat[dto.TireResponse, dto.CreateTireRequest, dto.UpdateTireRequest]{

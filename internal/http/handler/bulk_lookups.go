@@ -74,6 +74,11 @@ func (l bulkLookups) workOrderStatuses() bulk.Lookup {
 		func(r dto.WorkOrderStatusResponse) int64 { return r.ID }, func(r dto.WorkOrderStatusResponse) string { return r.Name })
 }
 
+func (l bulkLookups) workOrders() bulk.Lookup {
+	return named("orden de trabajo (número)", NewWorkOrderStore(l.d.Queries, l.d.Pool).List,
+		func(r dto.WorkOrderResponse) int64 { return r.ID }, func(r dto.WorkOrderResponse) string { return r.Number })
+}
+
 func (l bulkLookups) employees() bulk.Lookup {
 	return named("empleado (correo)", NewEmployeeStore(l.d.Queries, l.d.Pool).List,
 		func(r dto.EmployeeResponse) int64 { return r.ID }, func(r dto.EmployeeResponse) string { return r.Email })

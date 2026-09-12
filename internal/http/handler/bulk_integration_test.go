@@ -16,7 +16,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/xuri/excelize/v2"
 
 	"fleet/internal/db/gen"
@@ -74,7 +73,6 @@ func TestContextTransactionJoinsQueriesAndBegin(t *testing.T) {
 // importFixture is an owner signed in to a fresh company.
 type importFixture struct {
 	srv     *httptest.Server
-	pool    *pgxpool.Pool
 	token   string
 	company int64
 }
@@ -88,7 +86,7 @@ func newImportFixture(t *testing.T) importFixture {
 	platformToken := seedPlatformAdmin(t, ctx, pool, srv.URL)
 	_, _, _, ownerToken := provisionAccountOwner(t, srv.URL, platformToken)
 	company := createCompany(t, srv.URL, ownerToken, "Importadora", fmt.Sprintf("TAX-IMP-%d", time.Now().UnixNano()))
-	return importFixture{srv: srv, pool: pool, token: switchCompany(t, srv.URL, ownerToken, company), company: company}
+	return importFixture{srv: srv, token: switchCompany(t, srv.URL, ownerToken, company), company: company}
 }
 
 // upload posts rows as an .xlsx to path (e.g. "/vendors/import?dry_run=true").
@@ -188,6 +186,33 @@ func TestImportDryRunWritesNothing(t *testing.T) {
 	}
 	if got := f.total(t, "/vendors"); got != 0 {
 		t.Fatalf("vendors after a dry run: %d, want 0", got)
+	}
+}
+
+// F2 fix: dry_run is parsed strictly now (strconv.ParseBool on a trimmed,
+// lower-cased value), so a spelling ParseBool recognizes but the original
+// literal `== "true" || == "1"` check did not (case, whitespace) is still
+// honored rather than silently falling through to a real import.
+func TestImportDryRunAcceptsAnotherBooleanSpelling(t *testing.T) {
+	f := newImportFixture(t)
+	body := f.upload(t, "/vendors/import?dry_run=TRUE", [][]any{{"name"}, {"Uno"}}, http.StatusOK)
+	if !strings.Contains(body2str(body), `"dry_run":true`) {
+		t.Fatalf("dry-run report %s", body)
+	}
+	if got := f.total(t, "/vendors"); got != 0 {
+		t.Fatalf("vendors after a dry run spelled \"TRUE\": %d, want 0", got)
+	}
+}
+
+// The failure mode this guards against is the worst available for this
+// parameter: a cautious user testing an import first must never have a typo
+// silently turn into a real write. An unrecognized value is a 400, and
+// nothing is written.
+func TestImportDryRunRejectsInvalidValue(t *testing.T) {
+	f := newImportFixture(t)
+	f.upload(t, "/vendors/import?dry_run=yes", [][]any{{"name"}, {"Uno"}}, http.StatusBadRequest)
+	if got := f.total(t, "/vendors"); got != 0 {
+		t.Fatalf("vendors after an invalid dry_run value: %d, want 0 (must never silently commit)", got)
 	}
 }
 
@@ -374,19 +399,30 @@ func TestImportReferencesAreScopedToTheCallersCompany(t *testing.T) {
 	}
 	postJSON(t, srv.URL+"/api/v1/part-categories", tokenB, map[string]any{"name": "SoloB"}, http.StatusCreated, &categoryB)
 
-	f := importFixture{srv: srv, pool: pool, token: tokenA, company: companyA}
+	f := importFixture{srv: srv, token: tokenA, company: companyA}
 
-	// By name: a name that exists only in B is unresolved from A.
+	// By name: a name that exists only in B is unresolved from A. Assert the
+	// engine's actual "no such record" wording, not merely that the name
+	// appears somewhere in the body — an unrelated error that happened to
+	// echo the name back would also satisfy a bare substring check.
+	// The message's own quotes around the name come back JSON-escaped
+	// (\"SoloB\") in the response body, so the expected string is written
+	// with that escaping rather than literal quote characters.
+	wantUnresolvedName := `no categoría de refacción named \"SoloB\"`
 	body := f.upload(t, "/parts/import", [][]any{{"part_number", "part_category_id"}, {"XA-1", "SoloB"}}, http.StatusUnprocessableEntity)
-	if !strings.Contains(body2str(body), "SoloB") {
-		t.Fatalf("expected the cross-company name to be reported as unresolved, got %s", body)
+	if !strings.Contains(body2str(body), wantUnresolvedName) {
+		t.Fatalf("expected %q in the refusal, got %s", wantUnresolvedName, body)
 	}
 
 	// By explicit id: B's numeric category id is refused from A rather than
-	// silently linking the new part to another tenant's row.
+	// silently linking the new part to another tenant's row. Assert the
+	// specific "no such id in this company" message, not just that the
+	// number appears in the body — a coincidental error naming that same
+	// number for an unrelated reason would otherwise also pass.
+	wantUnresolvedID := fmt.Sprintf("no categoría de refacción with id %d in this company", categoryB.ID)
 	body = f.upload(t, "/parts/import", [][]any{{"part_number", "part_category_id"}, {"XA-2", fmt.Sprint(categoryB.ID)}}, http.StatusUnprocessableEntity)
-	if !strings.Contains(body2str(body), fmt.Sprint(categoryB.ID)) {
-		t.Fatalf("expected company B's id %d to be refused from company A, got %s", categoryB.ID, body)
+	if !strings.Contains(body2str(body), wantUnresolvedID) {
+		t.Fatalf("expected %q in the refusal, got %s", wantUnresolvedID, body)
 	}
 	if got := f.total(t, "/parts"); got != 0 {
 		t.Fatalf("company A parts after two refused imports: %d, want 0", got)
@@ -403,6 +439,90 @@ func TestImportReferencesAreScopedToTheCallersCompany(t *testing.T) {
 	getJSON(t, srv.URL+"/api/v1/parts", tokenB, http.StatusOK, &partsB)
 	if partsB.Total != 0 {
 		t.Fatalf("company B parts: %d, want 0 (the import leaked across companies)", partsB.Total)
+	}
+}
+
+// F1 fix: work_order_id (service-entries) and trailer.classification_2_id
+// (assets) previously reached the insert with no reference lookup at all —
+// a pasted id from another company would attach straight to that company's
+// row instead of being resolved (and scope-checked) like every other
+// reference column. This proves both are now refused across companies, by
+// explicit id, the same way TestImportReferencesAreScopedToTheCallersCompany
+// proves it for part_category_id.
+func TestImportRefusesForeignIdsOnColumnsThatUsedToBypassLookup(t *testing.T) {
+	ctx := context.Background()
+	pool := setupThrowawayDB(t, ctx)
+	srv := httptest.NewServer(newIntegrationRouter(pool))
+	defer srv.Close()
+
+	platformToken := seedPlatformAdmin(t, ctx, pool, srv.URL)
+	_, _, _, ownerToken := provisionAccountOwner(t, srv.URL, platformToken)
+
+	ts := time.Now().UnixNano()
+	companyA := createCompany(t, srv.URL, ownerToken, "Company A", fmt.Sprintf("TAX-WO-A-%d", ts))
+	companyB := createCompany(t, srv.URL, ownerToken, "Company B", fmt.Sprintf("TAX-WO-B-%d", ts))
+	tokenA := switchCompany(t, srv.URL, ownerToken, companyA)
+	tokenB := switchCompany(t, srv.URL, ownerToken, companyB)
+
+	// A work order that exists only in company B.
+	var assetB struct {
+		ID int64 `json:"id"`
+	}
+	postJSON(t, srv.URL+"/api/v1/assets", tokenB, map[string]any{"name": "Unidad B", "vin_sn": fmt.Sprintf("VIN-B-%d", ts)}, http.StatusCreated, &assetB)
+	var statusesB struct {
+		Data []struct {
+			ID int64 `json:"id"`
+		} `json:"data"`
+	}
+	getJSON(t, srv.URL+"/api/v1/work-order-statuses", tokenB, http.StatusOK, &statusesB)
+	if len(statusesB.Data) == 0 {
+		t.Fatal("company B has no seeded work order statuses; cannot create a work order to test against")
+	}
+	var workOrderB struct {
+		ID int64 `json:"id"`
+	}
+	postJSON(t, srv.URL+"/api/v1/work-orders", tokenB, map[string]any{
+		"asset_id": assetB.ID, "status_id": statusesB.Data[0].ID,
+	}, http.StatusCreated, &workOrderB)
+
+	// A trailer classification that exists only in company B.
+	var classificationB struct {
+		ID int64 `json:"id"`
+	}
+	postJSON(t, srv.URL+"/api/v1/trailer-classifications", tokenB, map[string]any{"name": "SoloB Clasificación"}, http.StatusCreated, &classificationB)
+
+	f := importFixture{srv: srv, token: tokenA, company: companyA}
+
+	// service-entries.work_order_id: B's work order id is refused from A.
+	var assetA struct {
+		ID int64 `json:"id"`
+	}
+	postJSON(t, srv.URL+"/api/v1/assets", tokenA, map[string]any{"name": "Unidad A", "vin_sn": fmt.Sprintf("VIN-A-%d", ts)}, http.StatusCreated, &assetA)
+	wantWorkOrderRefusal := fmt.Sprintf("no orden de trabajo (número) with id %d in this company", workOrderB.ID)
+	body := f.upload(t, "/service-entries/import", [][]any{
+		{"asset_id", "work_order_id"},
+		{fmt.Sprint(assetA.ID), fmt.Sprint(workOrderB.ID)},
+	}, http.StatusUnprocessableEntity)
+	if !strings.Contains(body2str(body), wantWorkOrderRefusal) {
+		t.Fatalf("expected %q in the refusal, got %s", wantWorkOrderRefusal, body)
+	}
+	if got := f.total(t, "/service-entries"); got != 0 {
+		t.Fatalf("company A service entries after a refused import: %d, want 0", got)
+	}
+
+	// assets.trailer.classification_2_id: B's classification id is refused
+	// from A rather than silently rendering B's catalog name back to A.
+	wantClassificationRefusal := fmt.Sprintf("no clasificación de remolque with id %d in this company", classificationB.ID)
+	body = f.upload(t, "/assets/import", [][]any{
+		{"name", "vin_sn", "trailer.classification_2_id"},
+		{"Remolque A", fmt.Sprintf("VIN-TRL-%d", ts), fmt.Sprint(classificationB.ID)},
+	}, http.StatusUnprocessableEntity)
+	if !strings.Contains(body2str(body), wantClassificationRefusal) {
+		t.Fatalf("expected %q in the refusal, got %s", wantClassificationRefusal, body)
+	}
+	if got := f.total(t, "/assets"); got != 1 {
+		// assetA above already exists; a leaked link must not add a second row.
+		t.Fatalf("company A assets after a refused import: %d, want 1 (only assetA)", got)
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -41,6 +42,23 @@ func bulkEnvInt(key string, fallback int64) int64 {
 	return fallback
 }
 
+// parseDryRun reads ?dry_run= strictly: absent means false, and anything
+// present that strconv.ParseBool does not recognize (a typo like "yes", or
+// unrelated junk) is an error rather than being silently treated as false.
+// A caller testing an import before committing to it is exactly the person
+// who must never have a typo turn their dry run into a real write.
+func parseDryRun(c *gin.Context) (bool, error) {
+	raw := strings.TrimSpace(strings.ToLower(c.Query("dry_run")))
+	if raw == "" {
+		return false, nil
+	}
+	v, err := strconv.ParseBool(raw)
+	if err != nil {
+		return false, fmt.Errorf("dry_run must be a boolean (true/false/1/0), got %q", raw)
+	}
+	return v, nil
+}
+
 // Register wires POST path/import and GET path/import/template.
 func (h *BulkHandler) Register(g gin.IRouter, path string, imp bulk.Importer) {
 	g.POST(path+"/import", h.importRows(imp))
@@ -49,6 +67,12 @@ func (h *BulkHandler) Register(g gin.IRouter, path string, imp bulk.Importer) {
 
 func (h *BulkHandler) importRows(imp bulk.Importer) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		dryRun, err := parseDryRun(c)
+		if err != nil {
+			apierr.Abort(c, apierr.BadRequest(err.Error()))
+			return
+		}
+
 		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, h.maxBytes)
 		fh, err := c.FormFile("file")
 		if err != nil {
@@ -77,7 +101,6 @@ func (h *BulkHandler) importRows(imp bulk.Importer) gin.HandlerFunc {
 			return
 		}
 
-		dryRun := c.Query("dry_run") == "true" || c.Query("dry_run") == "1"
 		report, err := bulk.Run(c.Request.Context(), h.pool, imp, rows, dryRun, h.limits)
 		if err != nil {
 			apierr.Abort(c, err)

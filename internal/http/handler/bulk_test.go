@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/gin-gonic/gin"
 )
 
 // A handler that calls pool.Begin opens a second transaction, outside the one a
@@ -63,6 +65,91 @@ func TestBulkRoutesAreRegistered(t *testing.T) {
 			if !routes[want] {
 				t.Errorf("missing route %s", want)
 			}
+		}
+	}
+}
+
+// gin's route table (what TestBulkRoutesAreRegistered reads) carries no
+// middleware, so a section pointed at the wrong bulkGroups field — the wrong
+// module gate — would still show up there as "registered" with nothing to
+// catch it. This asserts each entry's declared group directly against the
+// module router.go actually assigns that path, by giving every bulkGroups
+// field a distinct, identifiable *gin.RouterGroup and checking e.group(bg)
+// returns the one this table says it should.
+func TestBulkEntriesUseTheirDeclaredGroup(t *testing.T) {
+	engine := gin.New()
+	bg := bulkGroups{
+		member:       engine.Group("/g/member"),
+		assets:       engine.Group("/g/assets"),
+		tires:        engine.Group("/g/tires"),
+		parts:        engine.Group("/g/parts"),
+		inventory:    engine.Group("/g/inventory"),
+		workOrders:   engine.Group("/g/work-orders"),
+		issues:       engine.Group("/g/issues"),
+		service:      engine.Group("/g/service"),
+		fuel:         engine.Group("/g/fuel"),
+		vendors:      engine.Group("/g/vendors"),
+		warranties:   engine.Group("/g/warranties"),
+		mileageGoals: engine.Group("/g/mileage-goals"),
+		employees:    engine.Group("/g/employees"),
+	}
+
+	// Mirrors the group given to each entry in bulk_registry.go.
+	want := map[string]gin.IRouter{
+		"/assets":                       bg.assets,
+		"/vendors":                      bg.vendors,
+		"/locations":                    bg.member,
+		"/part-categories":              bg.parts,
+		"/part-manufacturers":           bg.parts,
+		"/parts":                        bg.parts,
+		"/measurement-units":            bg.inventory,
+		"/part-locations":               bg.inventory,
+		"/inventory-adjustment-reasons": bg.inventory,
+		"/part-inventory":               bg.inventory,
+		"/work-order-statuses":          bg.workOrders,
+		"/work-orders":                  bg.workOrders,
+		"/issues":                       bg.issues,
+		"/issue-priorities":             bg.issues,
+		"/faults":                       bg.issues,
+		"/service-tasks":                bg.service,
+		"/service-reminders":            bg.service,
+		"/service-entries":              bg.service,
+		"/tire-models":                  bg.tires,
+		"/tires":                        bg.tires,
+		"/tire-inspections":             bg.tires,
+		"/fuel-types":                   bg.fuel,
+		"/fuel-entries":                 bg.fuel,
+		"/trailer-classifications":      bg.assets,
+		"/warranties":                   bg.warranties,
+		"/weekly-mileage-goals":         bg.mileageGoals,
+		"/employees":                    bg.employees,
+		"/groups":                       bg.employees,
+		"/asset-types":                  bg.assets,
+		"/asset-statuses":               bg.assets,
+		"/catalog-options":              bg.assets,
+		"/vehicle-makes":                bg.member,
+		"/vehicle-models":               bg.member,
+	}
+
+	entries := bulkImporters(Deps{})
+	if len(entries) != len(want) {
+		t.Fatalf("bulkImporters has %d entries but this test's table has %d; keep them in sync", len(entries), len(want))
+	}
+	seen := map[string]bool{}
+	for _, e := range entries {
+		seen[e.path] = true
+		wantGroup, ok := want[e.path]
+		if !ok {
+			t.Errorf("%s: no expected group declared in this test", e.path)
+			continue
+		}
+		if got := e.group(bg); got != wantGroup {
+			t.Errorf("%s: registered on the wrong module group", e.path)
+		}
+	}
+	for path := range want {
+		if !seen[path] {
+			t.Errorf("%s: declared in this test's table but not in bulkImporters", path)
 		}
 	}
 }
