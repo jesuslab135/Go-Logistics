@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"regexp"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/xuri/excelize/v2"
@@ -222,6 +224,121 @@ func TestTemplateRoundTripsThroughSheetRead(t *testing.T) {
 		if rows[0][i] != want {
 			t.Fatalf("header[%d] = %q, want %q", i, rows[0][i], want)
 		}
+	}
+}
+
+// instructionsMention reports whether any cell of the Instrucciones sheet
+// contains want.
+func instructionsMention(s sheet.Sheet, want string) bool {
+	for _, row := range s.Rows {
+		for _, cell := range row {
+			if text, ok := cell.(string); ok && strings.Contains(text, want) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// The template endpoint is a GET any reader can call, and every reference
+// column used to load its entire referenced list - /work-orders/import/template
+// loading every asset and every employee, employees twice over. A lookup two
+// columns share must be loaded once and share one catalogue column.
+func TestTemplateLoadsALookupSharedByTwoColumnsOnce(t *testing.T) {
+	var loads int
+	employees := Lookup{Label: "empleado (correo)", Load: func(context.Context) ([]Entry, error) {
+		loads++
+		return []Entry{{ID: 1, Name: "a@x.com"}, {ID: 2, Name: "b@x.com"}}, nil
+	}}
+	imp := templateFake{
+		cols: []Column{
+			{Key: "assigned_to_id", Kind: KindInt, Ref: "assigned_to_id", Label: "empleado (correo)"},
+			{Key: "issued_by_id", Kind: KindInt, Ref: "issued_by_id", Label: "empleado (correo)"},
+		},
+		refs: map[string]Lookup{"assigned_to_id": employees, "issued_by_id": employees},
+	}
+	sheets, err := Template(context.Background(), imp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loads != 1 {
+		t.Fatalf("the shared employee lookup was loaded %d times; want 1", loads)
+	}
+	if len(sheets[0].DropLists) != 2 {
+		t.Fatalf("drop lists = %+v; want one on each of the two columns", sheets[0].DropLists)
+	}
+	if a, b := sheets[0].DropLists[0].Source, sheets[0].DropLists[1].Source; a != b {
+		t.Fatalf("the two columns point at different catalogue ranges (%q vs %q); want the one shared list", a, b)
+	}
+	if got := len(sheets[2].Rows[0]); got != 1 {
+		t.Fatalf("Catálogos has %d columns; want 1 for a lookup shared by two columns", got)
+	}
+}
+
+// A catalogue is capped so one template request cannot page an unbounded list
+// into memory. AllowOther keeps every unlisted record reachable by id, but only
+// if the user is actually told the list is partial.
+func TestTemplateCapsALargeCatalogueAndSaysSo(t *testing.T) {
+	entries := make([]Entry, maxCatalogEntries+500)
+	for i := range entries {
+		entries[i] = Entry{ID: int64(i + 1), Name: fmt.Sprintf("Activo %04d", i+1)}
+	}
+	imp := templateFake{
+		cols: []Column{{Key: "asset_id", Kind: KindInt, Ref: "asset_id", Label: "activo"}},
+		refs: map[string]Lookup{"asset_id": {Label: "activo", Load: func(context.Context) ([]Entry, error) {
+			return entries, nil
+		}}},
+	}
+	sheets, err := Template(context.Background(), imp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := len(sheets[2].Rows) - 1; got != maxCatalogEntries {
+		t.Fatalf("Catálogos lists %d names; want the %d cap", got, maxCatalogEntries)
+	}
+	if len(sheets[0].DropLists) != 1 || !sheets[0].DropLists[0].AllowOther {
+		t.Fatalf("a capped reference drop-down must still accept a typed id: %+v", sheets[0].DropLists)
+	}
+	if !instructionsMention(sheets[1], "1000") {
+		t.Fatalf("Instrucciones never warns that the catalogue is capped: %v", sheets[1].Rows)
+	}
+}
+
+// An uncapped template must not carry the capped warning, or it means nothing.
+func TestTemplateOmitsTheCapNoteWhenNothingWasCut(t *testing.T) {
+	imp := templateFake{
+		cols: []Column{{Key: "asset_id", Kind: KindInt, Ref: "asset_id", Label: "activo"}},
+		refs: map[string]Lookup{"asset_id": {Label: "activo", Load: func(context.Context) ([]Entry, error) {
+			return []Entry{{ID: 1, Name: "Unidad 1"}}, nil
+		}}},
+	}
+	sheets, err := Template(context.Background(), imp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if instructionsMention(sheets[1], "primeros 1000") {
+		t.Fatalf("Instrucciones warns of a cap that did not happen: %v", sheets[1].Rows)
+	}
+}
+
+// The decimal rule is on every template: a Spanish writer's comma is a decimal
+// separator and an English writer's is a thousands separator, and the same
+// endpoint takes both. The old hint asserted the English reading outright.
+func TestTemplateStatesTheDecimalRule(t *testing.T) {
+	imp := templateFake{cols: []Column{{Key: "unit_cost", Kind: KindDecimal}}}
+	sheets, err := Template(context.Background(), imp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !instructionsMention(sheets[1], "separador decimal") {
+		t.Fatalf("Instrucciones does not state the decimal rule: %v", sheets[1].Rows)
+	}
+	hint, _ := sheets[1].Rows[1][3].(string)
+	if strings.Contains(hint, "comas de miles") {
+		t.Fatalf("the decimal hint still tells users a comma is a thousands separator: %q", hint)
+	}
+	if !strings.Contains(hint, "decimal") {
+		t.Fatalf("the decimal hint says nothing about the decimal separator: %q", hint)
 	}
 }
 
