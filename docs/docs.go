@@ -17294,7 +17294,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Every row of the list, with the list's own filters (pass them as on the list) and permissions. Up to EXPORT_MAX_ROWS rows; X-Export-Truncated is set when the list is longer.",
+                "description": "Every row of the list, with the list's own filters (pass them as on the list) and permissions. Up to EXPORT_MAX_ROWS rows; X-Export-Truncated is set when the list is longer. A file longer than IMPORT_MAX_ROWS must be split before it can be imported again.",
                 "produces": [
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     "text/csv"
@@ -17325,8 +17325,20 @@ const docTemplate = `{
                             "type": "file"
                         }
                     },
+                    "400": {
+                        "description": "format is neither xlsx nor csv",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
                     "403": {
                         "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "too many exports already running",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -17413,6 +17425,12 @@ const docTemplate = `{
                     },
                     "422": {
                         "description": "import_failed; details is an ImportReport",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "too many imports already running",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -21482,10 +21500,21 @@ const docTemplate = `{
                 "dry_run": {
                     "type": "boolean"
                 },
+                "error_count": {
+                    "description": "ErrorCount is the total number of problems found; Errors stops at 500,\nand Truncated says so.",
+                    "type": "integer"
+                },
                 "errors": {
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/dto.ImportRowError"
+                    }
+                },
+                "ignored_columns": {
+                    "description": "IgnoredColumns lists header cells matching no column of the section. An\nexported file's id and timestamp columns land here, and so does a\nmisspelled column name - which is why they are reported.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
                     }
                 },
                 "resource": {
@@ -21493,6 +21522,9 @@ const docTemplate = `{
                 },
                 "rows": {
                     "type": "integer"
+                },
+                "truncated": {
+                    "type": "boolean"
                 }
             }
         },

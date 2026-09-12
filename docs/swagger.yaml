@@ -2667,14 +2667,29 @@ definitions:
         type: integer
       dry_run:
         type: boolean
+      error_count:
+        description: |-
+          ErrorCount is the total number of problems found; Errors stops at 500,
+          and Truncated says so.
+        type: integer
       errors:
         items:
           $ref: '#/definitions/dto.ImportRowError'
+        type: array
+      ignored_columns:
+        description: |-
+          IgnoredColumns lists header cells matching no column of the section. An
+          exported file's id and timestamp columns land here, and so does a
+          misspelled column name - which is why they are reported.
+        items:
+          type: string
         type: array
       resource:
         type: string
       rows:
         type: integer
+      truncated:
+        type: boolean
     type: object
   dto.ImportRowError:
     properties:
@@ -7338,7 +7353,8 @@ paths:
     get:
       description: Every row of the list, with the list's own filters (pass them as
         on the list) and permissions. Up to EXPORT_MAX_ROWS rows; X-Export-Truncated
-        is set when the list is longer.
+        is set when the list is longer. A file longer than IMPORT_MAX_ROWS must be
+        split before it can be imported again.
       parameters:
       - description: List path, e.g. work-orders
         in: path
@@ -7357,8 +7373,16 @@ paths:
           description: OK
           schema:
             type: file
+        "400":
+          description: format is neither xlsx nor csv
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
         "403":
           description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "429":
+          description: too many exports already running
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
       security:
@@ -7420,6 +7444,10 @@ paths:
             $ref: '#/definitions/dto.ErrorResponse'
         "422":
           description: import_failed; details is an ImportReport
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "429":
+          description: too many imports already running
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
       security:

@@ -381,6 +381,11 @@ curl -OJ "http://localhost:8080/api/v1/work-orders/export?format=csv" -H "Author
 - **All-or-nothing:** if any row fails, nothing is imported. The `422
   import_failed` lists every problem by row and column. The whole file runs in
   one transaction carried on the request context (`internal/platform/dbctx`).
+  Every problem that can be found without the database — bad dates and numbers,
+  missing required fields, unresolvable references — is collected first, so the
+  `422` names them all at once; a row that then fails *in* the database (a
+  unique or foreign-key violation) ends the import there, since nothing was
+  going to be kept either way.
 - **No updates:** import only ever inserts new rows; there is no upsert.
   Re-importing a file into the company it came from is rejected by that
   company's own unique constraints (a vendor's name, for example) rather than
@@ -398,6 +403,25 @@ curl -OJ "http://localhost:8080/api/v1/work-orders/export?format=csv" -H "Author
   only within the caller's company. A name matching more than one record is a
   row error telling the user to use the id instead. A file cannot reference a
   record it creates itself: import parents first.
+- **Numbers** are read by the last separator in the cell: `1.234,56` and
+  `1,234.56` are both 1234.56, `1,5` is 1.5, `0,75` is 0.75 and `1,234` is
+  1234. `$` and spaces are ignored. `1.234` on its own is *refused* as
+  ambiguous — 1234 to a Spanish writer, 1.234 to an English one — so write
+  `1234` or `1.234,00`. The Instrucciones sheet of every template says the
+  same, and a rejected row is recoverable where a silently wrong price is not.
+- **Ignored columns are reported.** Unknown headers are still accepted, but the
+  report lists them under `ignored_columns`, so a misspelled *optional* column
+  no longer passes as a clean `201` with the data quietly missing. `error_count`
+  is the total number of problems found and `truncated` says whether `errors`
+  lists them all (it stops at 500).
+- **Exports are buffered in memory** while the list is paged, so
+  `EXPORT_MAX_ROWS` bounds the API's memory and not merely the file size. The
+  `.xlsx` writer then streams those rows out rather than building the whole
+  worksheet first.
+- **A large export cannot be re-imported unsplit.** `EXPORT_MAX_ROWS` (20000)
+  is deliberately larger than `IMPORT_MAX_ROWS` (5000), so a full export has to
+  be split into 5000-row files before any of it can be imported back; the
+  import otherwise refuses the whole file with a `400` naming the limit.
 - **Importable:** the 33 sections in `bulkImporters`
   (`internal/http/handler/bulk_registry.go`). **Exportable:** every list in
   `exportPaths`.
@@ -641,6 +665,16 @@ environment: `DATABASE_URL`, `JWT_SECRET`. Storage is chosen by `STORAGE_BACKEND
 | `IMPORT_MAX_BYTES` | `10485760` | Largest spreadsheet an import accepts |
 | `IMPORT_MAX_ROWS` | `5000` | Most data rows per import |
 | `EXPORT_MAX_ROWS` | `20000` | Most rows per export; `X-Export-Truncated: true` beyond |
+
+`DATABASE_URL` carries `pool_max_conns=20`, which caps the pgx connection pool.
+Keep it set, and keep the value identical in `.env.example`,
+`docker-compose.yml` and `deploy/docker-compose.prod.yml`. Without it pgxpool
+defaults to `max(4, NumCPU)` — 4 connections on a 2-vCPU VPS — and a bulk
+import holds one connection for the whole import rather than the milliseconds
+every other handler needs, so a few concurrent imports would leave every other
+request blocked in `Acquire` with only `ReadHeaderTimeout` to break the wait.
+On top of that the API runs at most 2 imports and 2 exports at a time and
+answers `429` past that, rather than queueing.
 
 ---
 

@@ -18,6 +18,7 @@ package handler
 //	@Failure		413		{object}	dto.ErrorResponse
 //	@Failure		415		{object}	dto.ErrorResponse
 //	@Failure		422		{object}	dto.ErrorResponse	"import_failed; details is an ImportReport"
+//	@Failure		429		{object}	dto.ErrorResponse	"too many imports already running"
 //	@Router			/api/v1/{section}/import [post]
 func docBulkImport() {}
 
@@ -37,7 +38,7 @@ func docBulkTemplate() {}
 // docBulkExport godoc
 //
 //	@Summary		Export a list to Excel or CSV
-//	@Description	Every row of the list, with the list's own filters (pass them as on the list) and permissions. Up to EXPORT_MAX_ROWS rows; X-Export-Truncated is set when the list is longer.
+//	@Description	Every row of the list, with the list's own filters (pass them as on the list) and permissions. Up to EXPORT_MAX_ROWS rows; X-Export-Truncated is set when the list is longer. A file longer than IMPORT_MAX_ROWS must be split before it can be imported again.
 //	@Tags			bulk
 //	@Security		BearerAuth
 //	@Produce		application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
@@ -45,6 +46,8 @@ func docBulkTemplate() {}
 //	@Param			section	path	string	true	"List path, e.g. work-orders"
 //	@Param			format	query	string	false	"xlsx (default) or csv"
 //	@Success		200		{file}	file
+//	@Failure		400		{object}	dto.ErrorResponse	"format is neither xlsx nor csv"
 //	@Failure		403		{object}	dto.ErrorResponse
+//	@Failure		429		{object}	dto.ErrorResponse	"too many exports already running"
 //	@Router			/api/v1/{section}/export [get]
 func docBulkExport() {}
