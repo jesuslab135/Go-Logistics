@@ -14,6 +14,7 @@ import (
 	"fleet/internal/db/gen"
 	"fleet/internal/http/dto"
 	"fleet/internal/platform/apierr"
+	"fleet/internal/platform/dbctx"
 	"fleet/internal/platform/paginate"
 )
 
@@ -111,7 +112,7 @@ func (h *AdminAccountHandler) Create(c *gin.Context) {
 	}
 
 	ctx := c.Request.Context()
-	tx, err := h.pool.Begin(ctx)
+	tx, err := dbctx.Begin(ctx, h.pool)
 	if err != nil {
 		apierr.Abort(c, err)
 		return

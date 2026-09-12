@@ -12,6 +12,7 @@ import (
 	"fleet/internal/http/dto"
 	"fleet/internal/http/middleware"
 	"fleet/internal/platform/apierr"
+	"fleet/internal/platform/dbctx"
 	"fleet/internal/platform/paginate"
 )
 
@@ -101,7 +102,7 @@ func (s *EmployeeStore) Create(ctx context.Context, in dto.CreateEmployeeRequest
 		roleID = in.RoleID.Value
 	}
 
-	tx, err := s.pool.Begin(ctx)
+	tx, err := dbctx.Begin(ctx, s.pool)
 	if err != nil {
 		return dto.EmployeeResponse{}, err
 	}
@@ -150,7 +151,7 @@ func (s *EmployeeStore) Update(ctx context.Context, id int64, in dto.UpdateEmplo
 	company := middleware.CompanyFromContext(ctx)
 	now := time.Now().UTC()
 
-	tx, err := s.pool.Begin(ctx)
+	tx, err := dbctx.Begin(ctx, s.pool)
 	if err != nil {
 		return dto.EmployeeResponse{}, err
 	}
@@ -275,7 +276,7 @@ func (s *EmployeeStore) Delete(ctx context.Context, id int64) error {
 		return err
 	}
 
-	tx, err := s.pool.Begin(ctx)
+	tx, err := dbctx.Begin(ctx, s.pool)
 	if err != nil {
 		return err
 	}

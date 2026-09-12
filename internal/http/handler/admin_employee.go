@@ -13,6 +13,7 @@ import (
 	"fleet/internal/http/dto"
 	"fleet/internal/http/middleware"
 	"fleet/internal/platform/apierr"
+	"fleet/internal/platform/dbctx"
 	"fleet/internal/platform/paginate"
 )
 
@@ -261,7 +262,7 @@ func (h *AdminEmployeeHandler) ReplaceCompanies(c *gin.Context) {
 	}
 	before := normalizeCompanyIDs(current)
 
-	tx, err := h.pool.Begin(ctx)
+	tx, err := dbctx.Begin(ctx, h.pool)
 	if err != nil {
 		apierr.Abort(c, err)
 		return

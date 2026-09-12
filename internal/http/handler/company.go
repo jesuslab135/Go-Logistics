@@ -12,6 +12,7 @@ import (
 	"fleet/internal/http/dto"
 	"fleet/internal/http/middleware"
 	"fleet/internal/platform/apierr"
+	"fleet/internal/platform/dbctx"
 	"fleet/internal/platform/paginate"
 	"fleet/internal/platform/storage"
 )
@@ -78,7 +79,7 @@ func (s *CompanyStore) Create(ctx context.Context, in dto.CreateCompanyRequest) 
 			"only a member of a client account can create a company")
 	}
 
-	tx, err := s.pool.Begin(ctx)
+	tx, err := dbctx.Begin(ctx, s.pool)
 	if err != nil {
 		return dto.CompanyResponse{}, err
 	}

@@ -14,6 +14,7 @@ import (
 	"fleet/internal/http/dto"
 	"fleet/internal/http/middleware"
 	"fleet/internal/platform/apierr"
+	"fleet/internal/platform/dbctx"
 )
 
 // AccountEmployeeHandler serves the account-scoped routes that let an account
@@ -189,7 +190,7 @@ func (h *AccountEmployeeHandler) ReplaceCompanies(c *gin.Context) {
 	}
 	before := normalizeCompanyIDs(currentIDs)
 
-	tx, err := h.pool.Begin(ctx)
+	tx, err := dbctx.Begin(ctx, h.pool)
 	if err != nil {
 		apierr.Abort(c, err)
 		return
