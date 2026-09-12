@@ -15,6 +15,7 @@ import (
 	"fleet/internal/http/dto"
 	"fleet/internal/http/middleware"
 	"fleet/internal/platform/apierr"
+	"fleet/internal/platform/dbctx"
 )
 
 // PurchaseOrderActionHandler serves the workflow transitions.
@@ -81,7 +82,7 @@ func (h *PurchaseOrderActionHandler) Handle(action string) gin.HandlerFunc {
 func (h *PurchaseOrderActionHandler) apply(ctx context.Context, id int64, t purchaseorder.Transition, reason string) (dto.PurchaseOrderResponse, error) {
 	company := middleware.CompanyFromContext(ctx)
 
-	tx, err := h.pool.Begin(ctx)
+	tx, err := dbctx.Begin(ctx, h.pool)
 	if err != nil {
 		return dto.PurchaseOrderResponse{}, err
 	}

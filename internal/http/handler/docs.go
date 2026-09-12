@@ -78,5 +78,6 @@ func docDeleteCompany() {}
 //	@Tags		system
 //	@Produce	json
 //	@Success	200	{object}	map[string]string
+//	@Failure	503	{object}	map[string]string
 //	@Router		/healthz [get]
 func docHealth() {}

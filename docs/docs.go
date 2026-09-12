@@ -15,6 +15,232 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/api/v1/account/companies": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Every company of the caller's account, whether or not the caller holds a membership in it. Requires account owner. Unpaginated, like /account/employees.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "account"
+                ],
+                "summary": "List every company in the caller's account",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/dto.AccountCompanyResponse"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/account/companies/{id}/roles": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "The roles of any company in the caller's account, to choose the role granted in PUT /api/v1/account/employees/{id}/companies. /api/v1/roles only covers the session's company. Requires account owner. A company outside the caller's account is a 404, never confirming it exists elsewhere.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "account"
+                ],
+                "summary": "List the roles of a company in the caller's account",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Company id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Offset",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.RolePage"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/account/employees": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Every employee in the caller's account, with their membership set: which companies they belong to and, per company, the role they hold there (if any). Requires account owner. An employee who belongs to no company yet still appears, with an empty memberships list — this is the route that appoints their first one.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "account"
+                ],
+                "summary": "List the account's people and the role each holds per company",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/dto.AccountEmployeeResponse"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/account/employees/{id}/companies": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Full overwrite of the target employee's memberships within the caller's own account: every named company gets exactly the role paired with it (including companies the employee already belonged to — this is how a role changes), and every company not named is revoked. RoleID may be omitted for a company, which grants membership with no role: the employee is associated with the company but permitted nothing there until a role is assigned. An empty grants list revokes every membership. Every grant and revoke is recorded in membership_audit in the same transaction as the change. Requires account owner; the target employee and every named company must belong to the caller's own account, or the request 404s rather than confirming they exist elsewhere.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "account"
+                ],
+                "summary": "Replace one person's company memberships and roles",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Employee id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Membership set",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.ReplaceAccountEmployeeCompaniesRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.AccountEmployeeResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/admin/companies/{id}/owner": {
             "get": {
                 "security": [
@@ -22,7 +248,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "employee.is_account_owner is a single global boolean, not a per-company column: this reads the member of this company who carries it. A company with no owner is 200 with owner:null, not a 404 — that stays reserved for a company that does not exist.",
+                "description": "The owner of the account this company belongs to. Ownership is a property of the account, so every company in an account reports the same owner. A company whose account has no owner is 200 with owner:null, not a 404 — that stays reserved for a company that does not exist.",
                 "produces": [
                     "application/json"
                 ],
@@ -150,7 +376,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Clears the current owner and flags the named employee in one transaction, so a company never carries two. The employee must already be a member of this company. Note that employee.is_account_owner is a single global boolean rather than a per-company column: the clear half therefore also unsets ownership everywhere else the current owner belongs. Where the current owner belongs to another company this is refused with 409 owner_in_multiple_companies rather than silently leaving that company without an owner; move that owner out of this company, or hand the other company a new owner first.",
+                "description": "Makes the named employee the owner of the account this company belongs to — the same act as POST /api/v1/admin/accounts/{id}/set-owner, addressed by company. Ownership is a property of the account, so this changes the owner of every company in it. The employee must belong to that account.",
                 "consumes": [
                     "application/json"
                 ],
@@ -206,12 +432,6 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
-                        }
-                    },
-                    "409": {
-                        "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -3873,6 +4093,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "The members of the session's company. role_id, role_name and is_active describe each person's membership in THIS company; is_account_owner is computed from account ownership.",
                 "produces": [
                     "application/json"
                 ],
@@ -3915,6 +4136,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Creates the employee with one membership, in the session's company. role_id gives that membership a role and requires an administrator of the company (403 otherwise; 422 when the role belongs to another company). is_active false creates the membership suspended.",
                 "consumes": [
                     "application/json"
                 ],
@@ -3945,6 +4167,24 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -3996,6 +4236,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Updates the profile. role_id and is_active apply to the membership in the session's company only, and an omitted field leaves it unchanged. is_active false suspends the employee here while they keep working in their other companies; reactivating also lifts a deactivation left by the old account-wide flag. Changing role_id requires an administrator of the company (403). Refused with 422: a role from another company, an administrator changing their own role (the account owner may), deactivating yourself, and deactivating the account owner. Every change is written to membership_audit.",
                 "consumes": [
                     "application/json"
                 ],
@@ -4031,8 +4272,26 @@ const docTemplate = `{
                             "$ref": "#/definitions/dto.EmployeeResponse"
                         }
                     },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -4045,6 +4304,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Removes the employee from the session's company. Someone who belongs to other companies stays in them; only when this was their last company is the person deleted, which fails with 409 foreign_key_violation when they have history (labor time, reported issues, fuel entries, inspections) — deactivate instead. The account owner and the caller themselves cannot be deleted (409). Written to membership_audit.",
                 "tags": [
                     "employees"
                 ],
@@ -4064,6 +4324,18 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -17015,6 +17287,197 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/{section}/export": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Every row of the list, with the list's own filters (pass them as on the list) and permissions. Up to EXPORT_MAX_ROWS rows; X-Export-Truncated is set when the list is longer. A file longer than IMPORT_MAX_ROWS must be split before it can be imported again.",
+                "produces": [
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    "text/csv"
+                ],
+                "tags": [
+                    "bulk"
+                ],
+                "summary": "Export a list to Excel or CSV",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "List path, e.g. work-orders",
+                        "name": "section",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "xlsx (default) or csv",
+                        "name": "format",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "400": {
+                        "description": "format is neither xlsx nor csv",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "too many exports already running",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/{section}/import": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Available on every importable section (vendors, parts, assets, employees, work-orders…; see README \"Bulk import and export\"). Upload the section's template, filled in, as .xlsx or .csv. All-or-nothing: if any row fails, nothing is imported and the 422 lists every problem by row and column. dry_run=true runs the whole import and rolls it back. Reference columns accept the referenced record's name or id. Requires the section's create permission.",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "bulk"
+                ],
+                "summary": "Bulk import from a spreadsheet",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Section path, e.g. vendors",
+                        "name": "section",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": ".xlsx or .csv",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Validate and roll back",
+                        "name": "dry_run",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "dry run",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ImportReport"
+                        }
+                    },
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ImportReport"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "413": {
+                        "description": "Request Entity Too Large",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "415": {
+                        "description": "Unsupported Media Type",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "import_failed; details is an ImportReport",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "too many imports already running",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/{section}/import/template": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Sheets: Datos (the header row to fill in), Instrucciones (every column explained) and Catálogos (the names reference columns accept, from the caller's company). Custom fields appear as cf.\u003ckey\u003e columns. Requires the section's read permission.",
+                "produces": [
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                ],
+                "tags": [
+                    "bulk"
+                ],
+                "summary": "Download a section's Excel template",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Section path, e.g. vendors",
+                        "name": "section",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/auth/login": {
             "post": {
                 "consumes": [
@@ -17235,6 +17698,15 @@ const docTemplate = `{
                                 "type": "string"
                             }
                         }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
                     }
                 }
             }
@@ -17255,6 +17727,70 @@ const docTemplate = `{
                 },
                 "token_type": {
                     "type": "string"
+                }
+            }
+        },
+        "dto.AccountCompanyResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "logo": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.AccountEmployeeMembership": {
+            "type": "object",
+            "properties": {
+                "company_id": {
+                    "type": "integer"
+                },
+                "company_name": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "description": "IsActive is false when the person is suspended in this company; they\nkeep their other memberships.",
+                    "type": "boolean"
+                },
+                "role_id": {
+                    "type": "integer"
+                },
+                "role_is_admin": {
+                    "type": "boolean"
+                },
+                "role_name": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.AccountEmployeeResponse": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "employee_id": {
+                    "type": "integer"
+                },
+                "first_name": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "last_name": {
+                    "type": "string"
+                },
+                "memberships": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.AccountEmployeeMembership"
+                    }
                 }
             }
         },
@@ -18013,6 +18549,17 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.CompanyRoleGrant": {
+            "type": "object",
+            "properties": {
+                "company_id": {
+                    "type": "integer"
+                },
+                "role_id": {
+                    "type": "integer"
+                }
+            }
+        },
         "dto.CreateAssetRequest": {
             "type": "object",
             "properties": {
@@ -18552,10 +19099,8 @@ const docTemplate = `{
                 "hourly_labor_rate": {
                     "type": "number"
                 },
-                "is_account_owner": {
-                    "type": "boolean"
-                },
                 "is_active": {
+                    "description": "IsActive is the new membership's status in the session's company.\nOmitted means active.",
                     "type": "boolean"
                 },
                 "is_technician": {
@@ -18603,6 +19148,7 @@ const docTemplate = `{
                     "maxLength": 50
                 },
                 "role_id": {
+                    "description": "RoleID is the role the new employee gets in the session's company. Setting\nit requires an administrator of that company, and the role must belong to\nit. Omitted or null creates a membership with no role, which grants nothing.",
                     "type": "integer"
                 },
                 "start_date": {
@@ -20468,9 +21014,11 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "is_account_owner": {
+                    "description": "IsAccountOwner is read-only and computed from account ownership. It is\nignored if sent; ownership is transferred with\nPOST /api/v1/admin/accounts/{id}/set-owner.",
                     "type": "boolean"
                 },
                 "is_active": {
+                    "description": "IsActive is the employee's status in the session's company. On the\ncross-company /admin/employees listing it is the account-wide flag.",
                     "type": "boolean"
                 },
                 "is_technician": {
@@ -20518,7 +21066,12 @@ const docTemplate = `{
                     "maxLength": 50
                 },
                 "role_id": {
+                    "description": "RoleID is the role this employee holds in the session's company, not a\nproperty of the person: the same employee can hold a different role, or\nnone, in another company. Null means no role there. Always null on the\ncross-company /admin/employees listing, which has no session company.",
                     "type": "integer"
+                },
+                "role_name": {
+                    "description": "RoleName is that role's name, so a client can show it without reading\n/roles, which only administrators may.",
+                    "type": "string"
                 },
                 "start_date": {
                     "type": "string"
@@ -20944,6 +21497,57 @@ const docTemplate = `{
                 },
                 "updated_at": {
                     "type": "string"
+                }
+            }
+        },
+        "dto.ImportReport": {
+            "type": "object",
+            "properties": {
+                "created": {
+                    "type": "integer"
+                },
+                "dry_run": {
+                    "type": "boolean"
+                },
+                "error_count": {
+                    "description": "ErrorCount is the total number of problems found; Errors stops at 500,\nand Truncated says so.",
+                    "type": "integer"
+                },
+                "errors": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.ImportRowError"
+                    }
+                },
+                "ignored_columns": {
+                    "description": "IgnoredColumns lists header cells matching no column of the section. An\nexported file's id and timestamp columns land here, and so does a\nmisspelled column name - which is why they are reported.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "resource": {
+                    "type": "string"
+                },
+                "rows": {
+                    "type": "integer"
+                },
+                "truncated": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "dto.ImportRowError": {
+            "type": "object",
+            "properties": {
+                "column": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "row": {
+                    "type": "integer"
                 }
             }
         },
@@ -21829,6 +22433,7 @@ const docTemplate = `{
                     }
                 },
                 "company_id": {
+                    "description": "CompanyID is absent, not 0, for a company-less session — the same care\nthe access token itself takes (Claims.CompanyID omits the key entirely)\nso the one response such a client is meant to read to discover its own\nstate does not reintroduce the sentinel the token went to trouble to\nkeep out.",
                     "type": "integer"
                 },
                 "employee": {
@@ -22647,6 +23252,17 @@ const docTemplate = `{
             "properties": {
                 "refresh_token": {
                     "type": "string"
+                }
+            }
+        },
+        "dto.ReplaceAccountEmployeeCompaniesRequest": {
+            "type": "object",
+            "properties": {
+                "grants": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.CompanyRoleGrant"
+                    }
                 }
             }
         },
@@ -24255,10 +24871,8 @@ const docTemplate = `{
                 "hourly_labor_rate": {
                     "type": "number"
                 },
-                "is_account_owner": {
-                    "type": "boolean"
-                },
                 "is_active": {
+                    "description": "IsActive is the employee's status in the session's company only: false\nsuspends them here while they keep working in their other companies.\nOmitted leaves it unchanged. The account owner and the caller themselves\ncannot be deactivated.",
                     "type": "boolean"
                 },
                 "is_technician": {
@@ -24306,6 +24920,7 @@ const docTemplate = `{
                     "maxLength": 50
                 },
                 "role_id": {
+                    "description": "RoleID changes the employee's role in the session's company. Omitted\nleaves it unchanged; null removes it. Changing it requires an\nadministrator of that company, the role must belong to it, and an\nadministrator cannot change their own role (the account owner can).",
                     "type": "integer"
                 },
                 "start_date": {

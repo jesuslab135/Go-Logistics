@@ -18,10 +18,16 @@ const (
 var ErrInvalidToken = errors.New("auth: invalid token")
 
 // Claims are the JWT payload. Subject holds the employee id (string per the JWT
-// spec); EmployeeID decodes it. CompanyID scopes every authenticated request to
-// a tenant.
+// spec); EmployeeID decodes it.
+//
+// CompanyID is a pointer and omitted when absent. A company-less session — an
+// account owner who has not created a company yet — has no tenant to scope to,
+// and encoding 0 would be worse than encoding nothing: it would flow into
+// scoped queries as a real argument and quietly resolve to "not a member",
+// which is the right answer for the wrong reason.
 type Claims struct {
-	CompanyID int64  `json:"company_id"`
+	CompanyID *int64 `json:"company_id,omitempty"`
+	AccountID *int64 `json:"account_id,omitempty"`
 	IsAdmin   bool   `json:"is_admin"`
 	Type      string `json:"typ"`
 	jwt.RegisteredClaims
@@ -57,12 +63,12 @@ func NewTokenService(secret, issuer string, accessTTL, refreshTTL time.Duration)
 	}
 }
 
-func (s *TokenService) Issue(employeeID, companyID int64, isAdmin bool) (TokenPair, error) {
-	access, err := s.sign(employeeID, companyID, isAdmin, TypeAccess, s.accessTTL)
+func (s *TokenService) Issue(employeeID int64, companyID *int64, accountID *int64, isAdmin bool) (TokenPair, error) {
+	access, err := s.sign(employeeID, companyID, accountID, isAdmin, TypeAccess, s.accessTTL)
 	if err != nil {
 		return TokenPair{}, err
 	}
-	refresh, err := s.sign(employeeID, companyID, isAdmin, TypeRefresh, s.refreshTTL)
+	refresh, err := s.sign(employeeID, companyID, accountID, isAdmin, TypeRefresh, s.refreshTTL)
 	if err != nil {
 		return TokenPair{}, err
 	}
@@ -74,7 +80,7 @@ func (s *TokenService) Issue(employeeID, companyID int64, isAdmin bool) (TokenPa
 	}, nil
 }
 
-func (s *TokenService) sign(employeeID, companyID int64, isAdmin bool, typ string, ttl time.Duration) (string, error) {
+func (s *TokenService) sign(employeeID int64, companyID *int64, accountID *int64, isAdmin bool, typ string, ttl time.Duration) (string, error) {
 	now := s.now()
 	registered := jwt.RegisteredClaims{
 		Subject:   strconv.FormatInt(employeeID, 10),
@@ -93,6 +99,7 @@ func (s *TokenService) sign(employeeID, companyID int64, isAdmin bool, typ strin
 	}
 	claims := Claims{
 		CompanyID:        companyID,
+		AccountID:        accountID,
 		IsAdmin:          isAdmin,
 		Type:             typ,
 		RegisteredClaims: registered,

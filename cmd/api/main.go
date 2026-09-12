@@ -17,6 +17,7 @@ import (
 	"fleet/internal/db"
 	"fleet/internal/db/gen"
 	"fleet/internal/http/handler"
+	"fleet/internal/platform/dbctx"
 	"fleet/internal/platform/storage"
 
 	_ "fleet/docs" // generated OpenAPI spec (swag init)
@@ -54,7 +55,7 @@ func run(logger *slog.Logger) error {
 	}
 	defer pool.Close()
 
-	queries := gen.New(pool)
+	queries := gen.New(dbctx.New(pool))
 	tokens := auth.NewTokenService(cfg.JWT.Secret, cfg.JWT.Issuer, cfg.JWT.AccessTTL, cfg.JWT.RefreshTTL)
 
 	blobs, err := storage.FromEnv()

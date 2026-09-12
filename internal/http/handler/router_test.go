@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -8,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"fleet/internal/auth"
 	"fleet/internal/db/gen"
@@ -86,6 +88,58 @@ func TestRouterRegistersRoutes(t *testing.T) {
 		if !routes[want] {
 			t.Errorf("route %q not registered", want)
 		}
+	}
+}
+
+// A nil Pool (the unit-test router's, and any pool-less deployment's) must
+// not panic /healthz, and must still report healthy: the existing response
+// shape ({"status":"ok"}) has to stay byte-identical for anything already
+// scraping it.
+func TestHealthzOK(t *testing.T) {
+	r := newTestRouter(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("got %d, want %d", w.Code, http.StatusOK)
+	}
+	if got, want := strings.TrimSpace(w.Body.String()), `{"status":"ok"}`; got != want {
+		t.Errorf("body = %q, want %q", got, want)
+	}
+}
+
+// A pool that cannot serve a connection must fail the health check with 503,
+// not panic and not report healthy — that is the whole point of this change:
+// a process that cannot reach its database is not healthy. A closed pool
+// fails Acquire/Ping immediately and deterministically, without needing a
+// real (or torn-down) Postgres to prove it.
+func TestHealthzDatabaseDown(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	pool, err := pgxpool.New(context.Background(), "postgres://user:pass@127.0.0.1:5432/nonexistent")
+	if err != nil {
+		t.Fatalf("construct pool: %v", err)
+	}
+	pool.Close()
+
+	r := NewRouter(Deps{
+		Queries: gen.New(nil),
+		Pool:    pool,
+		Tokens:  auth.NewTokenService("test-secret", "fleet", time.Hour, 24*time.Hour),
+		Storage: storage.NewLocal(t.TempDir(), "/media"),
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("got %d, want %d", w.Code, http.StatusServiceUnavailable)
+	}
+	if !strings.Contains(w.Body.String(), "database") {
+		t.Errorf("body = %q, want it to name the failing subsystem", w.Body.String())
 	}
 }
 

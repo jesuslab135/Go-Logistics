@@ -137,11 +137,11 @@ VALUES ('Acme', 'ACME-001', '', now(), '', '', '', NULL, '', '', '',
 INSERT INTO role (company_id, name, is_admin, permissions)
 VALUES (1, 'Admin', true, '{}');                                  -- id 1
 
-INSERT INTO employee (default_company_id, role_id, first_name, last_name,
+INSERT INTO employee (default_company_id, first_name, last_name,
                       employee_id, email, mobile_phone, work_phone, job_title,
                       license_class, license_number, license_state, street_address,
                       city, region, postal_code, country, updated_at)
-VALUES (1, 1, 'Admin', 'User', 'EMP-001', 'admin@example.com',
+VALUES (1, 'Admin', 'User', 'EMP-001', 'admin@example.com',
         '', '', '', '', '', '', '', '', '', '', 'MX', now());
 ```
 
@@ -155,8 +155,8 @@ go run ./cmd/cli bootstrap --email admin@example.com
 ```
 
 This creates the default roles (if absent), the default work order and asset
-statuses, the membership row, and points the employee's role and default company
-at them. `POST /api/v1/companies` does the same thing transactionally for
+statuses, and the membership row carrying the company's `Administrador` role, and
+points the employee's default company at it. `POST /api/v1/companies` does the same thing transactionally for
 companies created through the API, so this command is only for repairing rows
 inserted by hand.
 
@@ -184,10 +184,12 @@ existed pick it up.
 `/api/v1/admin/*` reads and writes other tenants' data — the cross-company
 employee register, membership replacement, company owners, provisioning
 verification. It requires a *platform* administrator, which is not the same
-thing as a tenant's own `is_admin`: `employee.role_id` is a single global FK, so
-an administrator of one company is an administrator of every company they belong
-to, and gating a cross-tenant namespace on that let any company admin rewrite
-another tenant's employees.
+thing as a tenant's own `is_admin`. When this flag was introduced,
+`employee.role_id` was a single global FK, so an administrator of one company was
+an administrator of every company they belonged to, and gating a cross-tenant
+namespace on that let any company admin rewrite another tenant's employees. Roles
+are now per company (see [Per-company roles and directors](#per-company-roles-and-directors)),
+but a tenant administrator is still not a platform operator, so the flag stays.
 
 Nobody holds the flag after migration `000010`, so grant the first one here —
 there is deliberately no API route that hands it out:
@@ -196,7 +198,14 @@ there is deliberately no API route that hands it out:
 go run ./cmd/cli platform-admin --email ops@example.com
 go run ./cmd/cli platform-admin --email ops@example.com --revoke
 go run ./cmd/cli platform-admin --list
+go run ./cmd/cli platform-admin --create --email ops@example.com \
+  --first-name Ops --last-name Team --password '<at least 12 characters>'
 ```
+
+`--create` makes a dedicated platform administrator: an employee with no
+account and no company. They log in with a company-less session that reaches
+`/api/v1/admin/*` and nothing tenant-scoped. Prefer it to granting the flag to
+one of a client's own employees, which mixes an operator with a tenant user.
 
 The flag is read from the database on every request, like every other
 authorization fact, so revoking it takes effect on the caller's next request
@@ -204,9 +213,11 @@ rather than at their next token refresh.
 
 Every membership addition and removal made through
 `PUT /api/v1/admin/employees/{id}/companies` is recorded in `membership_audit`,
-in the same transaction as the change. Granting a company confers administrator
-access there when the employee's role carries `is_admin`, which makes it the
-highest-privilege write in the system; it previously left no trace.
+in the same transaction as the change. A company newly granted there carries no
+role, and so grants nothing until a role is assigned; a company the employee
+already belonged to keeps its role untouched. Before roles moved onto the
+membership, the same grant conferred administrator access wherever the
+employee's single global role carried `is_admin`, and left no trace.
 
 Set the password with the CLI, then log in:
 
@@ -225,6 +236,247 @@ Call a protected endpoint:
 TOKEN=<access_token>
 curl http://localhost:8080/api/v1/companies -H "Authorization: Bearer $TOKEN"
 ```
+
+### Self-service onboarding
+
+Before this change there was no way into the system without seeding rows by
+hand: creating a company required a token, and logging in required membership
+in a company, so an employee with neither could never reach the one endpoint
+that would fix that. The fix splits provisioning a client from provisioning
+its first company:
+
+1. A platform administrator provisions a client account and its owner in one
+   call:
+
+   ```sh
+   curl -X POST http://localhost:8080/api/v1/admin/accounts \
+     -H "Authorization: Bearer $PLATFORM_TOKEN" -H 'Content-Type: application/json' \
+     -d '{"name":"Acme Fleet","owner_first_name":"Ada","owner_last_name":"Byron",
+          "owner_email":"ada@acme.test","owner_password":"correct-horse-battery"}'
+   ```
+
+2. The owner logs in immediately, before they belong to any company. The
+   session is scoped to their account rather than to a company: the access
+   token's payload carries `account_id` and omits `company_id` entirely (an
+   absent claim, not a zero company). Such a company-less session can reach
+   `/api/v1/me/permissions` but nothing tenant-scoped, such as
+   `/api/v1/assets`, which answers `403`.
+
+3. The owner creates their first company with `POST /api/v1/companies`. The
+   account is taken from their session, never from the request body, so an
+   owner can never plant a company inside another client's account. Creation
+   seeds the company's default admin role and — since the employee had no
+   `default_company_id` yet — points it at the new company, so the owner's
+   next login resolves to it automatically and they are placed into it.
+
+Platform staff hold no company memberships of their own: `employee.account_id`
+is `NULL` for them, and they reach tenant data only through `/api/v1/admin/*`.
+On this codebase's seed data, employee 1 currently holds both the
+client-owner role (for the pre-existing "Go Logistics" account) and the
+platform-admin flag, pending a follow-up that splits the two into separate
+identities.
+
+### Per-company roles and directors
+
+A role is granted **per company**, not per person: `role_id` lives on the
+`employee_companies` membership, and `employee.role_id` no longer exists
+(migration `000021`). One person can be an administrator of one company in the
+account, a read-only user in another, and absent from a third.
+
+- **A membership with no role grants nothing.** The person is associated with
+  the company and permitted nothing there — every module gate refuses, reads
+  included. Forgetting to assign a role fails closed.
+- **A role from another company cannot be attached**, by the API (`422` naming
+  `role_id`) or by direct SQL: the composite foreign key `fk_ec_role_company`
+  references `role(id, company_id)`.
+- **The account owner is an administrator throughout their own account** by
+  virtue of ownership, whatever role their own membership carries, so they cannot
+  lock themselves out of a company they own.
+- **An administrator of a company may edit that company's roles** (`/api/v1/roles`
+  is gated on the admin role of the session's company).
+- **An administrator of a company assigns roles in it** through the employee API.
+  `role_id` on `GET/POST/PUT /api/v1/employees` is the employee's role in the
+  session's company. Only an administrator of that company may change it (anyone
+  else gets `403`). An omitted `role_id` leaves the role alone and `null` removes
+  it, so a client that never sends the field cannot strip a role by accident. The
+  role must belong to the company (`422`), and an administrator cannot change
+  their own role unless they own the account. Every change is written to
+  `membership_audit`.
+- **A company-less session is administrator of nothing.** An account owner who has
+  not created a company yet gets `is_admin: false` and no readable modules from
+  `/me/permissions`, matching what the module routes enforce, until they enter one.
+- **Deactivation is per company.** `is_active` on `PUT /api/v1/employees/{id}`
+  suspends the person in the session's company only (`employee_companies.is_active`,
+  migration `000023`); they keep working in their other companies. Login refuses
+  someone suspended in every company (`403 inactive`). Reactivating also lifts a
+  deactivation left by the old account-wide flag. Omitting `is_active` leaves it
+  unchanged.
+- **Delete removes someone from the session's company.** A person who belongs to
+  other companies stays in them; only their last company deletes the person, and
+  that fails with `409` if they have history (labor time, issues, fuel entries,
+  inspections). The account owner and the caller themselves can be neither deleted
+  (`409`) nor deactivated (`422`).
+- Employee responses carry `role_name` beside `role_id`, so people who cannot read
+  `/roles` still see which role applies.
+
+Account ownership lives on `account.owner_employee_id`. The old
+`employee.is_account_owner` column was dropped in migration `000022`. The employee
+API still reports `is_account_owner`, read-only and computed from the account, and
+both `POST /api/v1/admin/accounts/{id}/set-owner` and
+`POST /api/v1/admin/companies/{id}/set-owner` transfer the account's ownership.
+
+The account owner appoints directors with account-scoped routes — not under
+`/api/v1/admin/*`, which is cross-tenant and platform-only:
+
+```sh
+# Everyone in the account, with the role they hold in each company
+curl http://localhost:8080/api/v1/account/employees -H "Authorization: Bearer $OWNER_TOKEN"
+
+# Every company in the account, whether or not the owner belongs to it,
+# and the roles of one of them to choose from in the PUT below
+curl http://localhost:8080/api/v1/account/companies -H "Authorization: Bearer $OWNER_TOKEN"
+curl http://localhost:8080/api/v1/account/companies/2/roles -H "Authorization: Bearer $OWNER_TOKEN"
+
+# Replace one person's memberships: admin in company 1, read-only in company 2,
+# revoked everywhere else. Omit role_id (or send null) for a membership with no role.
+curl -X PUT http://localhost:8080/api/v1/account/employees/42/companies \
+  -H "Authorization: Bearer $OWNER_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"grants":[{"company_id":1,"role_id":1},{"company_id":2,"role_id":7}]}'
+```
+
+The PUT is a full overwrite: every company named gets exactly the role paired
+with it, every company not named is revoked, and an empty `grants` list revokes
+every membership. Each grant and revoke is written to `membership_audit` in the
+same transaction. An employee or company outside the caller's account answers
+`404`, never confirming it exists elsewhere.
+
+Login resolves the company first and the role second, so the role in effect is
+always the one on the session's membership; switching company switches role.
+`GET /api/v1/me/permissions` reports it as `role` (`id`, `name`, `is_admin`), so
+a client can show which role applies.
+
+The migration preserved every existing user's effective permissions: each
+membership took the role of the same name in its own company, copying the
+definition where none existed.
+
+### Bulk import and export
+
+Every data-entry section can be loaded from a spreadsheet, and every list
+exported to one.
+
+```sh
+# 1. Download the section's template (Datos, Instrucciones, Catálogos)
+curl -OJ http://localhost:8080/api/v1/vendors/import/template -H "Authorization: Bearer $TOKEN"
+
+# 2. Check a filled-in file without saving anything
+curl -F file=@vendors.xlsx "http://localhost:8080/api/v1/vendors/import?dry_run=true" -H "Authorization: Bearer $TOKEN"
+
+# 3. Import it
+curl -F file=@vendors.xlsx http://localhost:8080/api/v1/vendors/import -H "Authorization: Bearer $TOKEN"
+
+# Export a list, with the same filters the list takes
+curl -OJ "http://localhost:8080/api/v1/work-orders/export?format=csv" -H "Authorization: Bearer $TOKEN"
+```
+
+- **All-or-nothing:** if any row fails, nothing is imported. The `422
+  import_failed` lists every problem by row and column. The whole file runs in
+  one transaction carried on the request context (`internal/platform/dbctx`).
+  Every problem that can be found without the database — bad dates and numbers,
+  missing required fields, unresolvable references — is collected first, so the
+  `422` names them all at once; a row that then fails *in* the database (a
+  unique or foreign-key violation) ends the import there, since nothing was
+  going to be kept either way.
+- **No updates:** import only ever inserts new rows; there is no upsert.
+  Re-importing a file into the company it came from is rejected by that
+  company's own unique constraints (a vendor's name, for example) rather than
+  updating the existing rows. Export is for reading, sharing and seeding a
+  *different* company — not for an edit-and-reupload round trip back into the
+  same one.
+- **Columns** are the API field names (`vehicle.engine_serial` for the vehicle
+  data of an asset, `cf.<key>` for custom fields). Unknown columns — such as
+  the `id` and timestamps an exported file carries — are silently ignored on
+  import, so an exported file needs no cleanup before it is used to seed
+  another company. A duplicate column in the header is a single error on row 1
+  (the header is row 1, so the first data row is row 2); the first occurrence
+  of a repeated column wins.
+- **References** accept the record's name (case and spaces ignored) or its id,
+  only within the caller's company. A name matching more than one record is a
+  row error telling the user to use the id instead. A file cannot reference a
+  record it creates itself: import parents first.
+- **Numbers.** A lone period is *always* the decimal point, so `19.432` is
+  19.432 and `1.234` is 1.234 — an `.xlsx` cell holding a number arrives in
+  exactly that form whatever the writer's display locale, and these columns are
+  every `decimal.Decimal` field (latitude, odometer, meter readings, quantity,
+  rate), not just money. When both separators appear the last one is the
+  decimal point, so `1.234,56` and `1,234.56` are both 1234.56. A lone comma is
+  also the decimal point — `1,5` is 1.5, `0,75` is 0.75 — *except* before
+  exactly three digits, where `1,234` is 1234 to an English writer and 1.234 to
+  a Spanish one: that one shape is refused rather than guessed at, so write
+  `1234` or `1,234.00` for thousands and `1.234` for a decimal. `$` and spaces
+  are ignored. The Instrucciones sheet of every template says the same, and a
+  rejected row is recoverable where a silently wrong value is not.
+- **Ignored columns are reported.** Unknown headers are still accepted, but the
+  report lists them under `ignored_columns`, so a misspelled *optional* column
+  no longer passes as a clean `201` with the data quietly missing. `error_count`
+  is the total number of problems found and `truncated` says whether `errors`
+  lists them all (it stops at 500).
+- **Exports are buffered in memory** while the list is paged, so
+  `EXPORT_MAX_ROWS` bounds the API's memory and not merely the file size. The
+  `.xlsx` writer then streams those rows out rather than building the whole
+  worksheet first.
+- **CSV exports quote formula-shaped cells.** A cell whose text begins with
+  `=`, `+`, `-`, `@`, a tab or a carriage return is written with a leading
+  apostrophe so it cannot execute as a formula when the file is opened. Nothing
+  strips that apostrophe on the way back in, so a note reading
+  `- revisar frenos` re-imports as `'- revisar frenos`. Prefer `format=xlsx`
+  for export → import round trips: the `.xlsx` writer emits inline strings,
+  which are never evaluated, so it needs no such quoting.
+- **A full export can be imported back.** `EXPORT_MAX_ROWS` (5000) matches
+  `IMPORT_MAX_ROWS` (5000), so an export never produces a file the import then
+  refuses. Raise one and raise the other: a file longer than `IMPORT_MAX_ROWS`
+  must be split into smaller files first, and the import otherwise refuses the
+  whole file with a `400` naming the limit.
+- **Importable:** the 33 sections in `bulkImporters`
+  (`internal/http/handler/bulk_registry.go`). **Exportable:** every list in
+  `exportPaths`.
+
+### Integration tests
+
+`go test ./...` never touches Postgres — every defect the onboarding flow
+above has had came from Go-to-schema drift a mocked test cannot see: a query
+missing a column a migration added, a route wired under the wrong gate. One
+integration test exercises the real chain end to end against a real,
+throwaway database:
+
+```
+POST /admin/accounts -> login as the owner -> POST /companies ->
+POST /employees -> PUT /admin/employees/{id}/companies
+```
+
+It lives at `internal/http/handler/integration_test.go`, behind a
+`//go:build integration` tag, so it is never part of `go test ./...` or CI —
+running it is a deliberate act, not a side effect of a normal test run.
+It creates its own uniquely named database, applies every migration in
+`internal/db/migrations` to it directly, and drops it when the test ends, so
+it never touches a developer's own `fleet` database. Run it with Postgres up
+(`docker compose up -d db`) and:
+
+```sh
+go test -tags=integration ./internal/http/handler/...
+```
+
+Beside the onboarding chain, the same file proves the per-company role model:
+a director who may write in one company and only read in another
+(`TestDirectorHasDifferentPowersPerCompany`), the owner backstop, a
+wrong-company role refused at the API and by the database, a role-less
+membership granting nothing, and an empty grant list revoking everything. It
+also covers a company-less owner being admin of nothing, the account-wide
+company and role listings, role assignment through the employee API, ownership
+transfer through the admin company route, and the `409` for a taken owner email.
+
+It looks for Postgres at `postgres://postgres:postgres@localhost:5433/postgres`
+(this project's own `db` service and the default `docker compose` port) by
+default; point it elsewhere with `INTEGRATION_DATABASE_URL`.
 
 ---
 
@@ -298,7 +550,7 @@ then passes three gates:
 |---|---|---|
 | Identity | `request.user.employee` | the employee exists and `is_active` |
 | Membership | `IsCompanyMember` | an `employee_companies` row for the token's company |
-| Module | `HasModuleAccess` | `role.is_admin`, or `role.permissions[module]` grants the method |
+| Module | `HasModuleAccess` | the role on that membership has `is_admin` (or the caller owns the account), or its `permissions[module]` grants the method |
 
 `role.permissions` is a JSON object keyed by module. An **empty object grants the
 whole module**; otherwise the request's method maps to an action
@@ -323,7 +575,7 @@ Four resources required membership only in Django and still do: `/locations`,
 `/vehicle-makes`, `/vehicle-models`, `/tire-assignment-requests` (plus
 `/uploads`). `/roles` requires an admin role. `/companies` is scoped to the
 caller's memberships — an employee may belong to several — with reads and
-mutations requiring an admin role and `POST` requiring `is_account_owner`.
+mutations requiring an admin role and `POST` requiring ownership of the account.
 
 ---
 
@@ -424,6 +676,19 @@ environment: `DATABASE_URL`, `JWT_SECRET`. Storage is chosen by `STORAGE_BACKEND
 | `UPLOAD_THUMBNAIL_MAX_DIM` | `320` | Longest side of a generated thumbnail, in pixels |
 | `DASHBOARD_UPCOMING_DAYS` | `30` | How far ahead `/dashboard/stats` counts a service reminder as upcoming |
 | `STORAGE_MINIO_PUBLIC_URL_IS_BUCKET_ROOT` | `false` | Skip the bucket-suffix check on `STORAGE_MINIO_PUBLIC_URL` |
+| `IMPORT_MAX_BYTES` | `10485760` | Largest spreadsheet an import accepts |
+| `IMPORT_MAX_ROWS` | `5000` | Most data rows per import |
+| `EXPORT_MAX_ROWS` | `5000` | Most rows per export; `X-Export-Truncated: true` beyond. Keep it at or below `IMPORT_MAX_ROWS` so an export can be imported back |
+
+`DATABASE_URL` carries `pool_max_conns=20`, which caps the pgx connection pool.
+Keep it set, and keep the value identical in `.env.example`,
+`docker-compose.yml` and `deploy/docker-compose.prod.yml`. Without it pgxpool
+defaults to `max(4, NumCPU)` — 4 connections on a 2-vCPU VPS — and a bulk
+import holds one connection for the whole import rather than the milliseconds
+every other handler needs, so a few concurrent imports would leave every other
+request blocked in `Acquire` with only `ReadHeaderTimeout` to break the wait.
+On top of that the API runs at most 2 imports and 2 exports at a time and
+answers `429` past that, rather than queueing.
 
 ---
 

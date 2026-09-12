@@ -10,49 +10,23 @@ import (
 	"time"
 )
 
-const bootstrapEmployeeCompany = `-- name: BootstrapEmployeeCompany :exec
+const bootstrapEmployeeDefaultCompany = `-- name: BootstrapEmployeeDefaultCompany :exec
 UPDATE employee SET
-    role_id            = COALESCE(role_id, $1),
-    default_company_id = COALESCE(default_company_id, $2),
-    updated_at         = $3
-WHERE id = $4
+    default_company_id = COALESCE(default_company_id, $1),
+    updated_at         = $2
+WHERE id = $3
 `
 
-type BootstrapEmployeeCompanyParams struct {
-	RoleID    *int64
+type BootstrapEmployeeDefaultCompanyParams struct {
 	CompanyID *int64
 	UpdatedAt time.Time
 	ID        int64
 }
 
-// Mirrors Django: only fills role/default_company when the employee has none.
-func (q *Queries) BootstrapEmployeeCompany(ctx context.Context, arg BootstrapEmployeeCompanyParams) error {
-	_, err := q.db.Exec(ctx, bootstrapEmployeeCompany,
-		arg.RoleID,
-		arg.CompanyID,
-		arg.UpdatedAt,
-		arg.ID,
-	)
-	return err
-}
-
-const clearCompanyAccountOwner = `-- name: ClearCompanyAccountOwner :exec
-UPDATE employee e SET is_account_owner = false, updated_at = $1
-FROM employee_companies ec
-WHERE ec.employee_id = e.id
-  AND ec.company_id = $2
-  AND e.is_account_owner = true
-`
-
-type ClearCompanyAccountOwnerParams struct {
-	UpdatedAt time.Time
-	CompanyID int64
-}
-
-// The clear half of set-owner. Runs in the same transaction as the set so a
-// company never has two owners, which plain CRUD on is_account_owner allows.
-func (q *Queries) ClearCompanyAccountOwner(ctx context.Context, arg ClearCompanyAccountOwnerParams) error {
-	_, err := q.db.Exec(ctx, clearCompanyAccountOwner, arg.UpdatedAt, arg.CompanyID)
+// Mirrors Django: only fills default_company when the employee has none. The
+// role half moved to the membership.
+func (q *Queries) BootstrapEmployeeDefaultCompany(ctx context.Context, arg BootstrapEmployeeDefaultCompanyParams) error {
+	_, err := q.db.Exec(ctx, bootstrapEmployeeDefaultCompany, arg.CompanyID, arg.UpdatedAt, arg.ID)
 	return err
 }
 
@@ -85,11 +59,11 @@ func (q *Queries) CountCompaniesByIDs(ctx context.Context, ids []int64) (int64, 
 const createCompany = `-- name: CreateCompany :one
 INSERT INTO company (
     name, tax_id, address, created_at, phone, email, website, logo,
-    city, region, postal_code, country, timezone, currency, system_of_measurement
+    city, region, postal_code, country, timezone, currency, system_of_measurement, account_id
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16
 )
-RETURNING id, name, tax_id, address, created_at, phone, email, website, logo, city, region, postal_code, country, timezone, currency, system_of_measurement
+RETURNING id, name, tax_id, address, created_at, phone, email, website, logo, city, region, postal_code, country, timezone, currency, system_of_measurement, account_id
 `
 
 type CreateCompanyParams struct {
@@ -108,6 +82,7 @@ type CreateCompanyParams struct {
 	Timezone            string
 	Currency            string
 	SystemOfMeasurement string
+	AccountID           int64
 }
 
 func (q *Queries) CreateCompany(ctx context.Context, arg CreateCompanyParams) (Company, error) {
@@ -127,6 +102,7 @@ func (q *Queries) CreateCompany(ctx context.Context, arg CreateCompanyParams) (C
 		arg.Timezone,
 		arg.Currency,
 		arg.SystemOfMeasurement,
+		arg.AccountID,
 	)
 	var i Company
 	err := row.Scan(
@@ -146,6 +122,7 @@ func (q *Queries) CreateCompany(ctx context.Context, arg CreateCompanyParams) (C
 		&i.Timezone,
 		&i.Currency,
 		&i.SystemOfMeasurement,
+		&i.AccountID,
 	)
 	return i, err
 }
@@ -168,7 +145,7 @@ func (q *Queries) DeleteCompany(ctx context.Context, arg DeleteCompanyParams) er
 
 const getCompany = `-- name: GetCompany :one
 
-SELECT c.id, c.name, c.tax_id, c.address, c.created_at, c.phone, c.email, c.website, c.logo, c.city, c.region, c.postal_code, c.country, c.timezone, c.currency, c.system_of_measurement FROM company c
+SELECT c.id, c.name, c.tax_id, c.address, c.created_at, c.phone, c.email, c.website, c.logo, c.city, c.region, c.postal_code, c.country, c.timezone, c.currency, c.system_of_measurement, c.account_id FROM company c
 WHERE c.id = $1
   AND EXISTS (SELECT 1 FROM employee_companies ec WHERE ec.company_id = c.id AND ec.employee_id = $2)
 `
@@ -202,12 +179,13 @@ func (q *Queries) GetCompany(ctx context.Context, arg GetCompanyParams) (Company
 		&i.Timezone,
 		&i.Currency,
 		&i.SystemOfMeasurement,
+		&i.AccountID,
 	)
 	return i, err
 }
 
 const getCompanyByID = `-- name: GetCompanyByID :one
-SELECT id, name, tax_id, address, created_at, phone, email, website, logo, city, region, postal_code, country, timezone, currency, system_of_measurement FROM company WHERE id = $1
+SELECT id, name, tax_id, address, created_at, phone, email, website, logo, city, region, postal_code, country, timezone, currency, system_of_measurement, account_id FROM company WHERE id = $1
 `
 
 // Unscoped single-company read for the admin namespace.
@@ -231,17 +209,17 @@ func (q *Queries) GetCompanyByID(ctx context.Context, id int64) (Company, error)
 		&i.Timezone,
 		&i.Currency,
 		&i.SystemOfMeasurement,
+		&i.AccountID,
 	)
 	return i, err
 }
 
 const getCompanyOwner = `-- name: GetCompanyOwner :one
 SELECT e.id, e.first_name, e.last_name, e.email, e.job_title
-FROM employee e
-JOIN employee_companies ec ON ec.employee_id = e.id AND ec.company_id = $1
-WHERE e.is_account_owner = true
-ORDER BY e.id
-LIMIT 1
+FROM company c
+JOIN account a  ON a.id = c.account_id
+JOIN employee e ON e.id = a.owner_employee_id
+WHERE c.id = $1
 `
 
 type GetCompanyOwnerRow struct {
@@ -252,10 +230,10 @@ type GetCompanyOwnerRow struct {
 	JobTitle  string
 }
 
-// employee.is_account_owner is a single global boolean, so a company's owner is
-// the member of that company carrying the flag. LIMIT 1 keeps the read total
-// even where historical data has more than one — SetCompanyAccountOwner is what
-// makes that impossible going forward.
+// A company's owner is the owner of the account it belongs to. Ownership lives
+// on account.owner_employee_id, not on the employee row, so an account has
+// exactly one owner and it is the same for every company in it. No row when
+// the account has no owner.
 func (q *Queries) GetCompanyOwner(ctx context.Context, companyID int64) (GetCompanyOwnerRow, error) {
 	row := q.db.QueryRow(ctx, getCompanyOwner, companyID)
 	var i GetCompanyOwnerRow
@@ -270,7 +248,7 @@ func (q *Queries) GetCompanyOwner(ctx context.Context, companyID int64) (GetComp
 }
 
 const listCompanies = `-- name: ListCompanies :many
-SELECT c.id, c.name, c.tax_id, c.address, c.created_at, c.phone, c.email, c.website, c.logo, c.city, c.region, c.postal_code, c.country, c.timezone, c.currency, c.system_of_measurement FROM company c
+SELECT c.id, c.name, c.tax_id, c.address, c.created_at, c.phone, c.email, c.website, c.logo, c.city, c.region, c.postal_code, c.country, c.timezone, c.currency, c.system_of_measurement, c.account_id FROM company c
 WHERE EXISTS (SELECT 1 FROM employee_companies ec WHERE ec.company_id = c.id AND ec.employee_id = $1)
 ORDER BY c.name, c.id
 LIMIT $3 OFFSET $2
@@ -308,55 +286,11 @@ func (q *Queries) ListCompanies(ctx context.Context, arg ListCompaniesParams) ([
 			&i.Timezone,
 			&i.Currency,
 			&i.SystemOfMeasurement,
+			&i.AccountID,
 		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listOwnersInOtherCompanies = `-- name: ListOwnersInOtherCompanies :many
-SELECT e.id FROM employee e
-WHERE e.is_account_owner = true
-  AND e.id <> $1
-  AND EXISTS (
-      SELECT 1 FROM employee_companies ec
-      WHERE ec.employee_id = e.id AND ec.company_id = $2
-  )
-  AND EXISTS (
-      SELECT 1 FROM employee_companies other
-      WHERE other.employee_id = e.id AND other.company_id <> $2
-  )
-ORDER BY e.id
-`
-
-type ListOwnersInOtherCompaniesParams struct {
-	NewOwnerID int64
-	CompanyID  int64
-}
-
-// Pre-flight for set-owner's clear half. is_account_owner is a single global
-// boolean, so clearing "this company's owner" also clears it for every other
-// company that employee belongs to, silently leaving those without an owner and
-// so without POST /api/v1/companies. The incoming owner is excluded: the same
-// transaction sets the flag straight back on them, so nothing is lost there.
-func (q *Queries) ListOwnersInOtherCompanies(ctx context.Context, arg ListOwnersInOtherCompaniesParams) ([]int64, error) {
-	rows, err := q.db.Query(ctx, listOwnersInOtherCompanies, arg.NewOwnerID, arg.CompanyID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []int64{}
-	for rows.Next() {
-		var id int64
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		items = append(items, id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -416,45 +350,6 @@ func (q *Queries) SeedWorkOrderStatus(ctx context.Context, arg SeedWorkOrderStat
 	return err
 }
 
-const setCompanyAccountOwner = `-- name: SetCompanyAccountOwner :one
-UPDATE employee SET is_account_owner = true, updated_at = $1
-WHERE employee.id = $2
-  AND EXISTS (
-      SELECT 1 FROM employee_companies ec
-      WHERE ec.employee_id = employee.id AND ec.company_id = $3
-  )
-RETURNING id, first_name, last_name, email, job_title
-`
-
-type SetCompanyAccountOwnerParams struct {
-	UpdatedAt time.Time
-	ID        int64
-	CompanyID int64
-}
-
-type SetCompanyAccountOwnerRow struct {
-	ID        int64
-	FirstName string
-	LastName  string
-	Email     string
-	JobTitle  string
-}
-
-// The membership EXISTS guard makes "not a member of this company" return no
-// row, so the caller cannot make an outsider the owner of a tenant.
-func (q *Queries) SetCompanyAccountOwner(ctx context.Context, arg SetCompanyAccountOwnerParams) (SetCompanyAccountOwnerRow, error) {
-	row := q.db.QueryRow(ctx, setCompanyAccountOwner, arg.UpdatedAt, arg.ID, arg.CompanyID)
-	var i SetCompanyAccountOwnerRow
-	err := row.Scan(
-		&i.ID,
-		&i.FirstName,
-		&i.LastName,
-		&i.Email,
-		&i.JobTitle,
-	)
-	return i, err
-}
-
 const updateCompany = `-- name: UpdateCompany :one
 UPDATE company c SET
     name = $1, tax_id = $2, address = $3,
@@ -465,7 +360,7 @@ UPDATE company c SET
     system_of_measurement = $14
 WHERE c.id = $15
   AND EXISTS (SELECT 1 FROM employee_companies ec WHERE ec.company_id = c.id AND ec.employee_id = $16)
-RETURNING c.id, c.name, c.tax_id, c.address, c.created_at, c.phone, c.email, c.website, c.logo, c.city, c.region, c.postal_code, c.country, c.timezone, c.currency, c.system_of_measurement
+RETURNING c.id, c.name, c.tax_id, c.address, c.created_at, c.phone, c.email, c.website, c.logo, c.city, c.region, c.postal_code, c.country, c.timezone, c.currency, c.system_of_measurement, c.account_id
 `
 
 type UpdateCompanyParams struct {
@@ -524,6 +419,7 @@ func (q *Queries) UpdateCompany(ctx context.Context, arg UpdateCompanyParams) (C
 		&i.Timezone,
 		&i.Currency,
 		&i.SystemOfMeasurement,
+		&i.AccountID,
 	)
 	return i, err
 }

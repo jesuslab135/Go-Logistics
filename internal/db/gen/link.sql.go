@@ -216,7 +216,7 @@ func (q *Queries) CountWorkOrderLineItemIssues(ctx context.Context, arg CountWor
 }
 
 const findIssueAssigneeCandidate = `-- name: FindIssueAssigneeCandidate :one
-SELECT e.id, e.user_id, e.default_company_id, e.first_name, e.last_name, e.employee_id, e.role_id, e.is_active, e.email, e.mobile_phone, e.work_phone, e.job_title, e.start_date, e.leave_date, e.birth_date, e.hourly_labor_rate, e.is_technician, e.is_vehicle_operator, e.is_account_owner, e.license_class, e.license_number, e.license_state, e.license_expiry, e.street_address, e.city, e.region, e.postal_code, e.country, e.group_id, e.custom_fields, e.table_preferences, e.dashboard_preferences, e.updated_at, e.password_hash, e.is_platform_admin FROM employee e
+SELECT e.id, e.user_id, e.default_company_id, e.first_name, e.last_name, e.employee_id, e.is_active, e.email, e.mobile_phone, e.work_phone, e.job_title, e.start_date, e.leave_date, e.birth_date, e.hourly_labor_rate, e.is_technician, e.is_vehicle_operator, e.license_class, e.license_number, e.license_state, e.license_expiry, e.street_address, e.city, e.region, e.postal_code, e.country, e.group_id, e.custom_fields, e.table_preferences, e.dashboard_preferences, e.updated_at, e.password_hash, e.is_platform_admin, e.account_id FROM employee e
 WHERE e.id = $1
   AND EXISTS (SELECT 1 FROM employee_companies ec WHERE ec.employee_id = e.id AND ec.company_id = $2)
   AND EXISTS (SELECT 1 FROM issue i WHERE i.id = $3 AND i.company_id = $2)
@@ -238,7 +238,6 @@ func (q *Queries) FindIssueAssigneeCandidate(ctx context.Context, arg FindIssueA
 		&i.FirstName,
 		&i.LastName,
 		&i.EmployeeID,
-		&i.RoleID,
 		&i.IsActive,
 		&i.Email,
 		&i.MobilePhone,
@@ -250,7 +249,6 @@ func (q *Queries) FindIssueAssigneeCandidate(ctx context.Context, arg FindIssueA
 		&i.HourlyLaborRate,
 		&i.IsTechnician,
 		&i.IsVehicleOperator,
-		&i.IsAccountOwner,
 		&i.LicenseClass,
 		&i.LicenseNumber,
 		&i.LicenseState,
@@ -267,12 +265,13 @@ func (q *Queries) FindIssueAssigneeCandidate(ctx context.Context, arg FindIssueA
 		&i.UpdatedAt,
 		&i.PasswordHash,
 		&i.IsPlatformAdmin,
+		&i.AccountID,
 	)
 	return i, err
 }
 
 const findIssueWatcherCandidate = `-- name: FindIssueWatcherCandidate :one
-SELECT e.id, e.user_id, e.default_company_id, e.first_name, e.last_name, e.employee_id, e.role_id, e.is_active, e.email, e.mobile_phone, e.work_phone, e.job_title, e.start_date, e.leave_date, e.birth_date, e.hourly_labor_rate, e.is_technician, e.is_vehicle_operator, e.is_account_owner, e.license_class, e.license_number, e.license_state, e.license_expiry, e.street_address, e.city, e.region, e.postal_code, e.country, e.group_id, e.custom_fields, e.table_preferences, e.dashboard_preferences, e.updated_at, e.password_hash, e.is_platform_admin FROM employee e
+SELECT e.id, e.user_id, e.default_company_id, e.first_name, e.last_name, e.employee_id, e.is_active, e.email, e.mobile_phone, e.work_phone, e.job_title, e.start_date, e.leave_date, e.birth_date, e.hourly_labor_rate, e.is_technician, e.is_vehicle_operator, e.license_class, e.license_number, e.license_state, e.license_expiry, e.street_address, e.city, e.region, e.postal_code, e.country, e.group_id, e.custom_fields, e.table_preferences, e.dashboard_preferences, e.updated_at, e.password_hash, e.is_platform_admin, e.account_id FROM employee e
 WHERE e.id = $1
   AND EXISTS (SELECT 1 FROM employee_companies ec WHERE ec.employee_id = e.id AND ec.company_id = $2)
   AND EXISTS (SELECT 1 FROM issue i WHERE i.id = $3 AND i.company_id = $2)
@@ -294,7 +293,6 @@ func (q *Queries) FindIssueWatcherCandidate(ctx context.Context, arg FindIssueWa
 		&i.FirstName,
 		&i.LastName,
 		&i.EmployeeID,
-		&i.RoleID,
 		&i.IsActive,
 		&i.Email,
 		&i.MobilePhone,
@@ -306,7 +304,6 @@ func (q *Queries) FindIssueWatcherCandidate(ctx context.Context, arg FindIssueWa
 		&i.HourlyLaborRate,
 		&i.IsTechnician,
 		&i.IsVehicleOperator,
-		&i.IsAccountOwner,
 		&i.LicenseClass,
 		&i.LicenseNumber,
 		&i.LicenseState,
@@ -323,6 +320,7 @@ func (q *Queries) FindIssueWatcherCandidate(ctx context.Context, arg FindIssueWa
 		&i.UpdatedAt,
 		&i.PasswordHash,
 		&i.IsPlatformAdmin,
+		&i.AccountID,
 	)
 	return i, err
 }
@@ -539,7 +537,7 @@ func (q *Queries) FindWorkOrderLineItemIssueCandidate(ctx context.Context, arg F
 const listIssueAssignees = `-- name: ListIssueAssignees :many
 
 
-SELECT e.id, e.user_id, e.default_company_id, e.first_name, e.last_name, e.employee_id, e.role_id, e.is_active, e.email, e.mobile_phone, e.work_phone, e.job_title, e.start_date, e.leave_date, e.birth_date, e.hourly_labor_rate, e.is_technician, e.is_vehicle_operator, e.is_account_owner, e.license_class, e.license_number, e.license_state, e.license_expiry, e.street_address, e.city, e.region, e.postal_code, e.country, e.group_id, e.custom_fields, e.table_preferences, e.dashboard_preferences, e.updated_at, e.password_hash, e.is_platform_admin FROM employee e
+SELECT e.id, e.user_id, e.default_company_id, e.first_name, e.last_name, e.employee_id, e.is_active, e.email, e.mobile_phone, e.work_phone, e.job_title, e.start_date, e.leave_date, e.birth_date, e.hourly_labor_rate, e.is_technician, e.is_vehicle_operator, e.license_class, e.license_number, e.license_state, e.license_expiry, e.street_address, e.city, e.region, e.postal_code, e.country, e.group_id, e.custom_fields, e.table_preferences, e.dashboard_preferences, e.updated_at, e.password_hash, e.is_platform_admin, e.account_id FROM employee e
 JOIN issue_assigned_to ia ON ia.employee_id = e.id
 JOIN issue i ON i.id = ia.issue_id
 WHERE ia.issue_id = $1 AND i.company_id = $2
@@ -587,7 +585,6 @@ func (q *Queries) ListIssueAssignees(ctx context.Context, arg ListIssueAssignees
 			&i.FirstName,
 			&i.LastName,
 			&i.EmployeeID,
-			&i.RoleID,
 			&i.IsActive,
 			&i.Email,
 			&i.MobilePhone,
@@ -599,7 +596,6 @@ func (q *Queries) ListIssueAssignees(ctx context.Context, arg ListIssueAssignees
 			&i.HourlyLaborRate,
 			&i.IsTechnician,
 			&i.IsVehicleOperator,
-			&i.IsAccountOwner,
 			&i.LicenseClass,
 			&i.LicenseNumber,
 			&i.LicenseState,
@@ -616,6 +612,7 @@ func (q *Queries) ListIssueAssignees(ctx context.Context, arg ListIssueAssignees
 			&i.UpdatedAt,
 			&i.PasswordHash,
 			&i.IsPlatformAdmin,
+			&i.AccountID,
 		); err != nil {
 			return nil, err
 		}
@@ -629,7 +626,7 @@ func (q *Queries) ListIssueAssignees(ctx context.Context, arg ListIssueAssignees
 
 const listIssueWatchers = `-- name: ListIssueWatchers :many
 
-SELECT e.id, e.user_id, e.default_company_id, e.first_name, e.last_name, e.employee_id, e.role_id, e.is_active, e.email, e.mobile_phone, e.work_phone, e.job_title, e.start_date, e.leave_date, e.birth_date, e.hourly_labor_rate, e.is_technician, e.is_vehicle_operator, e.is_account_owner, e.license_class, e.license_number, e.license_state, e.license_expiry, e.street_address, e.city, e.region, e.postal_code, e.country, e.group_id, e.custom_fields, e.table_preferences, e.dashboard_preferences, e.updated_at, e.password_hash, e.is_platform_admin FROM employee e
+SELECT e.id, e.user_id, e.default_company_id, e.first_name, e.last_name, e.employee_id, e.is_active, e.email, e.mobile_phone, e.work_phone, e.job_title, e.start_date, e.leave_date, e.birth_date, e.hourly_labor_rate, e.is_technician, e.is_vehicle_operator, e.license_class, e.license_number, e.license_state, e.license_expiry, e.street_address, e.city, e.region, e.postal_code, e.country, e.group_id, e.custom_fields, e.table_preferences, e.dashboard_preferences, e.updated_at, e.password_hash, e.is_platform_admin, e.account_id FROM employee e
 JOIN issue_watchers iw ON iw.employee_id = e.id
 JOIN issue i ON i.id = iw.issue_id
 WHERE iw.issue_id = $1 AND i.company_id = $2
@@ -668,7 +665,6 @@ func (q *Queries) ListIssueWatchers(ctx context.Context, arg ListIssueWatchersPa
 			&i.FirstName,
 			&i.LastName,
 			&i.EmployeeID,
-			&i.RoleID,
 			&i.IsActive,
 			&i.Email,
 			&i.MobilePhone,
@@ -680,7 +676,6 @@ func (q *Queries) ListIssueWatchers(ctx context.Context, arg ListIssueWatchersPa
 			&i.HourlyLaborRate,
 			&i.IsTechnician,
 			&i.IsVehicleOperator,
-			&i.IsAccountOwner,
 			&i.LicenseClass,
 			&i.LicenseNumber,
 			&i.LicenseState,
@@ -697,6 +692,7 @@ func (q *Queries) ListIssueWatchers(ctx context.Context, arg ListIssueWatchersPa
 			&i.UpdatedAt,
 			&i.PasswordHash,
 			&i.IsPlatformAdmin,
+			&i.AccountID,
 		); err != nil {
 			return nil, err
 		}

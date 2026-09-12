@@ -9,6 +9,7 @@ import (
 	"fleet/internal/db/gen"
 	"fleet/internal/http/dto"
 	"fleet/internal/http/middleware"
+	"fleet/internal/platform/dbctx"
 	"fleet/internal/platform/paginate"
 )
 
@@ -24,7 +25,7 @@ func NewFuelEntryStore(q *gen.Queries, pool *pgxpool.Pool) *FuelEntryStore {
 // inSeriesTx runs a write and the recalculation it invalidates in one
 // transaction, so no reader sees an entry whose successors are stale.
 func (s *FuelEntryStore) inSeriesTx(ctx context.Context, fn func(qtx *gen.Queries) error) error {
-	tx, err := s.pool.Begin(ctx)
+	tx, err := dbctx.Begin(ctx, s.pool)
 	if err != nil {
 		return err
 	}

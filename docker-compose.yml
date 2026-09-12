@@ -64,7 +64,11 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgres://postgres:postgres@db:5432/fleet?sslmode=disable
+      # pool_max_conns caps the pgx pool; keep it in step with .env.example and
+      # deploy/docker-compose.prod.yml. Without it pgxpool defaults to
+      # max(4, NumCPU), and a bulk import holds one connection for the whole
+      # import, so a few at once would starve every other request.
+      DATABASE_URL: postgres://postgres:postgres@db:5432/fleet?sslmode=disable&pool_max_conns=20
       STORAGE_MINIO_ENDPOINT: minio:9000
       # Must end with the bucket name: objects live at <endpoint>/<bucket>/<key>
       # and the public-read policy only covers arn:aws:s3:::fleet/*.

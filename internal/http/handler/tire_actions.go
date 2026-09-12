@@ -14,6 +14,7 @@ import (
 	"fleet/internal/http/dto"
 	"fleet/internal/http/middleware"
 	"fleet/internal/platform/apierr"
+	"fleet/internal/platform/dbctx"
 )
 
 type TireAssignmentActionHandler struct {
@@ -61,7 +62,7 @@ func (h *TireAssignmentActionHandler) Approve(c *gin.Context) {
 	employee := middleware.EmployeeFromContext(ctx)
 	now := time.Now().UTC()
 
-	tx, err := h.pool.Begin(ctx)
+	tx, err := dbctx.Begin(ctx, h.pool)
 	if err != nil {
 		apierr.Abort(c, err)
 		return

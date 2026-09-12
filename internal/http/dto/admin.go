@@ -17,8 +17,7 @@ type EmployeeCompaniesResponse struct {
 	DefaultCompanyID *int64  `json:"default_company_id"`
 }
 
-// CompanyOwnerResponse is the employee who currently carries
-// is_account_owner among a company's members.
+// CompanyOwnerResponse is the owner of the account a company belongs to.
 type CompanyOwnerResponse struct {
 	EmployeeID int64  `json:"employee_id"`
 	FirstName  string `json:"first_name"`

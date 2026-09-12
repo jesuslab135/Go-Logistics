@@ -16,7 +16,6 @@ type Employee struct {
 	FirstName            string
 	LastName             string
 	EmployeeID           string
-	RoleID               *int64
 	IsActive             bool
 	Email                string
 	MobilePhone          string
@@ -28,7 +27,6 @@ type Employee struct {
 	HourlyLaborRate      *decimal.Decimal
 	IsTechnician         bool
 	IsVehicleOperator    bool
-	IsAccountOwner       bool
 	LicenseClass         string
 	LicenseNumber        string
 	LicenseState         string

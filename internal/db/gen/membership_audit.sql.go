@@ -136,10 +136,10 @@ type RecordMembershipChangeParams struct {
 	OccurredAt        time.Time
 }
 
-// Membership changes confer access to a whole tenant — and, because
-// employee.role_id is a single global FK, administrator access there if the
-// employee's role carries is_admin. They are recorded here, append-only: there
-// is deliberately no update or delete.
+// Membership changes confer access to a whole tenant — and, since the role
+// now lives on the membership itself, administrator access to that one
+// company when the granted role carries is_admin. They are recorded here,
+// append-only: there is deliberately no update or delete.
 func (q *Queries) RecordMembershipChange(ctx context.Context, arg RecordMembershipChangeParams) error {
 	_, err := q.db.Exec(ctx, recordMembershipChange,
 		arg.ActorEmployeeID,

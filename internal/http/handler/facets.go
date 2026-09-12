@@ -45,6 +45,12 @@ func facetCount(value any, label *string) dto.FacetCount {
 // thin DB-touching shell around facetQuery's pure SQL and facetCount's pure
 // formatting, kept small because the DB round trip itself is not unit-tested.
 func scanFacets(ctx context.Context, pool *pgxpool.Pool, sql string, args []any) ([]dto.FacetCount, error) {
+	// Like runList (see listquery.go), this queries the pool directly rather
+	// than through dbctx.DB, so it does not join a transaction the request
+	// context carries. Facet counts are read-only and never run inside an
+	// import's transaction, so there is nothing to join; both files are
+	// allowlisted by TestHandlersUseDbctxRatherThanThePoolDirectly for exactly
+	// this reason.
 	rows, err := pool.Query(ctx, sql, args...)
 	if err != nil {
 		return nil, err

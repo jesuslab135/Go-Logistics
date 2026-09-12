@@ -15,6 +15,7 @@ import (
 	"fleet/internal/http/dto"
 	"fleet/internal/http/middleware"
 	"fleet/internal/platform/apierr"
+	"fleet/internal/platform/dbctx"
 	"fleet/internal/platform/paginate"
 )
 
@@ -77,7 +78,7 @@ func (s *InventoryJournalEntryStore) Get(ctx context.Context, id int64) (dto.Inv
 func (s *InventoryJournalEntryStore) Create(ctx context.Context, in dto.CreateInventoryJournalEntryRequest) (dto.InventoryJournalEntryResponse, error) {
 	company := middleware.CompanyFromContext(ctx)
 
-	tx, err := s.pool.Begin(ctx)
+	tx, err := dbctx.Begin(ctx, s.pool)
 	if err != nil {
 		return dto.InventoryJournalEntryResponse{}, err
 	}
@@ -256,7 +257,7 @@ func (h *InventoryJournalEntryHandler) Reverse(c *gin.Context) {
 func (s *InventoryJournalEntryStore) Reverse(ctx context.Context, id int64) (dto.InventoryJournalEntryResponse, error) {
 	company := middleware.CompanyFromContext(ctx)
 
-	tx, err := s.pool.Begin(ctx)
+	tx, err := dbctx.Begin(ctx, s.pool)
 	if err != nil {
 		return dto.InventoryJournalEntryResponse{}, err
 	}

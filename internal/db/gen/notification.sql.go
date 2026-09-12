@@ -146,8 +146,9 @@ INSERT INTO notification (company_id, employee_id, kind, title, body, url, creat
 SELECT $1, e.id, $2, $3, $4, $5, $6
 FROM employee e
 JOIN employee_companies ec ON ec.employee_id = e.id AND ec.company_id = $1
-LEFT JOIN role r ON r.id = e.role_id
+LEFT JOIN role r ON r.id = ec.role_id
 WHERE e.is_active
+  AND ec.is_active
   AND (
     COALESCE(r.is_admin, false)
     OR COALESCE(r.permissions -> 'tire_approvals' ->> 'approve', 'false') = 'true'
@@ -185,6 +186,7 @@ SELECT $1, $2, $3, $4, $5, $6, $7
 WHERE EXISTS (
     SELECT 1 FROM employee_companies ec
     WHERE ec.employee_id = $2 AND ec.company_id = $1
+      AND ec.is_active
 )
 `
 

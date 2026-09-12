@@ -9,6 +9,7 @@ import (
 
 	"fleet/internal/db/gen"
 	"fleet/internal/domain/money"
+	"fleet/internal/platform/dbctx"
 )
 
 // Totals are recomputed by the server, never accepted from a client.
@@ -203,7 +204,7 @@ func recalcServiceEntryLineItem(ctx context.Context, qtx *gen.Queries, lineItemI
 // whose totals were not updated is worse than one that was not written at all,
 // because it looks finished.
 func inTx(ctx context.Context, pool *pgxpool.Pool, q *gen.Queries, fn func(qtx *gen.Queries) error) error {
-	tx, err := pool.Begin(ctx)
+	tx, err := dbctx.Begin(ctx, pool)
 	if err != nil {
 		return err
 	}

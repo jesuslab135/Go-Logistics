@@ -13,6 +13,7 @@ import (
 	"fleet/internal/http/dto"
 	"fleet/internal/http/middleware"
 	"fleet/internal/platform/apierr"
+	"fleet/internal/platform/dbctx"
 	"fleet/internal/platform/paginate"
 )
 
@@ -141,6 +142,12 @@ func (h *AdminEmployeeHandler) List(c *gin.Context) {
 	for i, r := range rows {
 		out[i] = toEmployeeResponse(r)
 	}
+	// No session company applies across tenants, so role_id stays null here;
+	// account ownership does not depend on one.
+	if err := applyAccountOwners(ctx, h.q, out); err != nil {
+		apierr.Abort(c, err)
+		return
+	}
 	c.JSON(http.StatusOK, paginate.NewPage(out, total, p))
 }
 
@@ -255,7 +262,7 @@ func (h *AdminEmployeeHandler) ReplaceCompanies(c *gin.Context) {
 	}
 	before := normalizeCompanyIDs(current)
 
-	tx, err := h.pool.Begin(ctx)
+	tx, err := dbctx.Begin(ctx, h.pool)
 	if err != nil {
 		apierr.Abort(c, err)
 		return
@@ -273,17 +280,46 @@ func (h *AdminEmployeeHandler) ReplaceCompanies(c *gin.Context) {
 		apierr.Abort(c, err)
 		return
 	}
+	// GrantMembership's ON CONFLICT DO UPDATE SET role_id = EXCLUDED.role_id
+	// means calling it for a company the employee already belongs to would
+	// silently overwrite whatever role they hold there with NULL. So the loop
+	// below must only touch companies genuinely new to this employee, and that
+	// "already retained" set has to be read here, inside the transaction and
+	// after RemoveEmployeeCompaniesNotIn has run — not from the `before`
+	// variable above, which is read prior to tx.Begin(). Using `before` would
+	// swap this bug for a different one: a removal racing in that window could
+	// make a company this request asked to keep look already-present, and the
+	// loop would then skip re-granting it, silently dropping a company the
+	// caller explicitly listed. `before` stays reserved for the audit trail
+	// below, which is best-effort already.
+	retained, err := qtx.ListEmployeeCompanyIDs(ctx, id)
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	retainedSet := normalizeCompanyIDs(retained)
 	for _, cid := range ids {
-		if err := qtx.AddEmployeeCompany(ctx, gen.AddEmployeeCompanyParams{EmployeeID: id, CompanyID: cid}); err != nil {
+		if slices.Contains(retainedSet, cid) {
+			// Already a member post-delete, so this is a retained company, not
+			// a new one — leave its role_id exactly as it is.
+			continue
+		}
+		// A company newly added to the set has no role to grant, so the
+		// membership is created with none. A membership with no role is a
+		// legitimate state: the employee is associated with the company but
+		// permitted nothing there until someone assigns a role.
+		if err := qtx.GrantMembership(ctx, gen.GrantMembershipParams{EmployeeID: id, CompanyID: cid, RoleID: nil}); err != nil {
 			apierr.Abort(c, err)
 			return
 		}
 	}
-	// Granting a company confers administrator access there when the employee's
-	// role carries is_admin, because role_id is a single global FK. That makes
-	// this the highest-privilege write in the system, and it used to leave no
-	// trace at all. The audit rows go in the same transaction as the change, so
-	// a recorded grant is one that actually happened.
+	// Granting a company used to confer administrator access there whenever the
+	// employee's role carried is_admin, back when role_id was a single global
+	// FK. That is no longer possible: the role now lives on the membership
+	// itself, and this route only ever grants a bare one, to a company the
+	// employee did not already belong to. The audit rows still go in the same
+	// transaction as the change, so a recorded grant is one that actually
+	// happened.
 	now := time.Now().UTC()
 	actor := middleware.EmployeeFromContext(ctx)
 	for _, cid := range membershipDelta(before, ids) {

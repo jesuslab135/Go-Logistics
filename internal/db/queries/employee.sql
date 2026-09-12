@@ -1,32 +1,43 @@
 -- name: GetEmployeeAuthByEmail :one
-SELECT e.id, e.default_company_id, e.password_hash, COALESCE(r.is_admin, false) AS is_admin
+SELECT e.id, e.default_company_id, e.account_id, e.password_hash, e.is_platform_admin
 FROM employee e
-LEFT JOIN role r ON r.id = e.role_id
 WHERE e.email = $1 AND e.is_active = true
 LIMIT 1;
 
 -- name: UpdateEmployeePassword :exec
 UPDATE employee SET password_hash = $2, updated_at = $3 WHERE id = $1;
 
--- GetEmployeeIdentity backs the authorization middleware. Django resolved
--- request.user.employee (and its role) from the database on every request, so
--- revoking a role or deactivating an employee takes effect immediately rather
--- than at the next token refresh; this query preserves that.
+-- GetEmployeeIdentity backs the authorization middleware, resolved from the
+-- database on every request so a role change or deactivation takes effect at
+-- once rather than at the next token refresh.
+--
+-- The role now comes through the membership, so one join answers both "is this
+-- person a member of this company" and "what may they do here". company_id is
+-- nullable: a company-less session has no tenant, and sqlc.narg makes the join
+-- miss rather than requiring a sentinel id.
+--
+-- Both ownership expressions are COALESCEd because platform staff have
+-- account_id IS NULL, so the account join yields no row and the comparison is
+-- NULL. In SQL `false OR NULL` is NULL — an authorization value decided by NULL
+-- semantics rather than by a rule.
 -- name: GetEmployeeIdentity :one
 SELECT
     e.id,
     e.is_active,
-    e.is_account_owner,
-    e.role_id,
+    e.account_id,
     e.is_platform_admin,
-    COALESCE(r.is_admin, false)         AS is_admin,
+    ec.role_id,
+    (ec.id IS NOT NULL)::boolean         AS is_member,
+    (COALESCE(r.is_admin, false)
+        OR COALESCE(a.owner_employee_id = e.id, false))::boolean AS is_admin,
     COALESCE(r.permissions, '{}'::jsonb) AS permissions,
-    EXISTS (
-        SELECT 1 FROM employee_companies ec
-        WHERE ec.employee_id = e.id AND ec.company_id = sqlc.arg(company_id)
-    ) AS is_member
+    COALESCE(a.owner_employee_id = e.id, false)::boolean AS is_account_owner
 FROM employee e
-LEFT JOIN role r ON r.id = e.role_id
+LEFT JOIN employee_companies ec ON ec.employee_id = e.id
+                               AND ec.company_id = sqlc.narg(company_id)
+                               AND ec.is_active
+LEFT JOIN role r    ON r.id = ec.role_id
+LEFT JOIN account a ON a.id = e.account_id
 WHERE e.id = sqlc.arg(id);
 
 -- Employee CRUD is scoped by company membership via the employee_companies m2m,
@@ -48,18 +59,24 @@ SELECT count(*) FROM employee e
 WHERE EXISTS (SELECT 1 FROM employee_companies ec WHERE ec.employee_id = e.id AND ec.company_id = sqlc.arg(company_id));
 
 -- name: CreateEmployee :one
+-- account_id is a required argument, never a column the caller's JSON body can
+-- reach (see dto.CreateEmployeeRequest and CreateEmployee's one call site,
+-- EmployeeStore.Create, which sources it from AccountFromContext — the same
+-- rule company creation follows). Without it the employee row is left with a
+-- NULL account_id, and the composite FK fk_ec_employee_account rejects the
+-- membership GrantMembership then tries to create for it.
 INSERT INTO employee (
-    user_id, default_company_id, first_name, last_name, employee_id, role_id, is_active,
+    account_id, user_id, default_company_id, first_name, last_name, employee_id, is_active,
     email, mobile_phone, work_phone, job_title, start_date, leave_date, birth_date,
-    hourly_labor_rate, is_technician, is_vehicle_operator, is_account_owner, license_class,
+    hourly_labor_rate, is_technician, is_vehicle_operator, license_class,
     license_number, license_state, license_expiry, street_address, city, region, postal_code,
     country, group_id, custom_fields, table_preferences, dashboard_preferences, updated_at
 ) VALUES (
-    sqlc.arg(user_id), sqlc.arg(default_company_id), sqlc.arg(first_name), sqlc.arg(last_name),
-    sqlc.arg(employee_id), sqlc.arg(role_id), sqlc.arg(is_active), sqlc.arg(email),
+    sqlc.arg(account_id), sqlc.arg(user_id), sqlc.arg(default_company_id), sqlc.arg(first_name), sqlc.arg(last_name),
+    sqlc.arg(employee_id), sqlc.arg(is_active), sqlc.arg(email),
     sqlc.arg(mobile_phone), sqlc.arg(work_phone), sqlc.arg(job_title), sqlc.arg(start_date),
     sqlc.arg(leave_date), sqlc.arg(birth_date), sqlc.arg(hourly_labor_rate), sqlc.arg(is_technician),
-    sqlc.arg(is_vehicle_operator), sqlc.arg(is_account_owner), sqlc.arg(license_class),
+    sqlc.arg(is_vehicle_operator), sqlc.arg(license_class),
     sqlc.arg(license_number), sqlc.arg(license_state), sqlc.arg(license_expiry),
     sqlc.arg(street_address), sqlc.arg(city), sqlc.arg(region), sqlc.arg(postal_code),
     sqlc.arg(country), sqlc.arg(group_id), sqlc.arg(custom_fields), sqlc.arg(table_preferences),
@@ -67,10 +84,38 @@ INSERT INTO employee (
 )
 RETURNING *;
 
--- name: AddEmployeeCompany :exec
-INSERT INTO employee_companies (employee_id, company_id)
-VALUES (sqlc.arg(employee_id), sqlc.arg(company_id))
-ON CONFLICT (employee_id, company_id) DO NOTHING;
+-- CreateAccountOwnerEmployee provisions the account's owner employee with the
+-- minimum the employee table requires (see the NOT NULL columns with no
+-- default in 000001_init.up.sql) plus account_id and password_hash. It is
+-- separate from CreateEmployee because an owner is provisioned before there is
+-- any company, role or profile detail to give it; updated_at has no default
+-- either, so it is stamped here rather than threaded through as a param.
+-- name: CreateAccountOwnerEmployee :one
+INSERT INTO employee (
+    account_id, first_name, last_name, employee_id, email, mobile_phone,
+    work_phone, job_title, license_class, license_number, license_state,
+    street_address, city, region, postal_code, country, password_hash, updated_at
+) VALUES (
+    sqlc.arg(account_id), sqlc.arg(first_name), sqlc.arg(last_name), '', sqlc.arg(email),
+    '', '', '', '', '', '', '', '', '', '', '', sqlc.arg(password_hash), now()
+)
+RETURNING id;
+
+-- CreatePlatformStaffEmployee provisions platform staff: an employee with no
+-- account and no company, holding the flag that opens /api/v1/admin/*. It is
+-- created from the CLI only, like every grant of that flag. The NOT NULL
+-- columns with no default get empty values, as for an account owner.
+-- name: CreatePlatformStaffEmployee :one
+INSERT INTO employee (
+    account_id, first_name, last_name, employee_id, email, mobile_phone,
+    work_phone, job_title, license_class, license_number, license_state,
+    street_address, city, region, postal_code, country, password_hash,
+    is_platform_admin, updated_at
+) VALUES (
+    NULL, sqlc.arg(first_name), sqlc.arg(last_name), '', sqlc.arg(email),
+    '', '', '', '', '', '', '', '', '', '', '', sqlc.arg(password_hash), true, now()
+)
+RETURNING id;
 
 -- name: ListEmployeeCompanyIDs :many
 -- The companies an employee actually belongs to. Login resolves its company_id
@@ -84,11 +129,11 @@ ORDER BY company_id;
 UPDATE employee e SET
     user_id = sqlc.arg(user_id), default_company_id = sqlc.arg(default_company_id),
     first_name = sqlc.arg(first_name), last_name = sqlc.arg(last_name), employee_id = sqlc.arg(employee_id),
-    role_id = sqlc.arg(role_id), is_active = sqlc.arg(is_active), email = sqlc.arg(email),
+    email = sqlc.arg(email),
     mobile_phone = sqlc.arg(mobile_phone), work_phone = sqlc.arg(work_phone), job_title = sqlc.arg(job_title),
     start_date = sqlc.arg(start_date), leave_date = sqlc.arg(leave_date), birth_date = sqlc.arg(birth_date),
     hourly_labor_rate = sqlc.arg(hourly_labor_rate), is_technician = sqlc.arg(is_technician),
-    is_vehicle_operator = sqlc.arg(is_vehicle_operator), is_account_owner = sqlc.arg(is_account_owner),
+    is_vehicle_operator = sqlc.arg(is_vehicle_operator),
     license_class = sqlc.arg(license_class), license_number = sqlc.arg(license_number),
     license_state = sqlc.arg(license_state), license_expiry = sqlc.arg(license_expiry),
     street_address = sqlc.arg(street_address), city = sqlc.arg(city), region = sqlc.arg(region),
@@ -147,3 +192,32 @@ WHERE employee_id = sqlc.arg(employee_id)
 -- name: SetEmployeeDefaultCompany :exec
 UPDATE employee SET default_company_id = sqlc.narg(default_company_id), updated_at = sqlc.arg(updated_at)
 WHERE id = sqlc.arg(id);
+
+-- name: ListActiveEmployeeCompanyIDs :many
+-- The companies an employee may actually work in: memberships that are not
+-- deactivated. Login and refresh scope a session through this.
+SELECT company_id FROM employee_companies
+WHERE employee_id = sqlc.arg(employee_id) AND is_active
+ORDER BY company_id;
+
+-- name: CountEmployeeMemberships :one
+-- Every membership, active or not. Tells a person deactivated everywhere apart
+-- from one who belongs to no company yet.
+SELECT count(*) FROM employee_companies WHERE employee_id = sqlc.arg(employee_id);
+
+-- name: ActivateEmployee :exec
+-- Lifts the old account-wide deactivation. The API never sets employee.is_active
+-- false any more; reactivating a membership calls this so a deactivation made
+-- before 000023 does not keep the person locked out.
+UPDATE employee SET is_active = true, updated_at = sqlc.arg(updated_at)
+WHERE id = sqlc.arg(id) AND NOT is_active;
+
+-- name: ClearDefaultCompanyIf :exec
+-- Forgets a default company the employee no longer belongs to.
+UPDATE employee SET default_company_id = NULL
+WHERE id = sqlc.arg(id) AND default_company_id = sqlc.arg(company_id)::bigint;
+
+-- name: SetEmployeeDefaultCompanyIfUnset :exec
+UPDATE employee
+   SET default_company_id = sqlc.narg(default_company_id)
+ WHERE id = sqlc.arg(id) AND default_company_id IS NULL;

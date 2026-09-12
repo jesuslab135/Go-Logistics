@@ -2,11 +2,8 @@ package handler
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 	"strconv"
-	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
@@ -19,9 +16,9 @@ import (
 )
 
 // AdminCompanyHandler serves the cross-company /admin/companies routes: owner
-// read/set here, and (Task 5) the roles and work-order-statuses lists. Every
-// route is addressed by explicit company id rather than the caller's own
-// membership, which is what the /api/v1/companies namespace already covers.
+// read/set here, and the roles and work-order-statuses lists. Every route is
+// addressed by explicit company id rather than the caller's own membership,
+// which is what the /api/v1/companies namespace already covers.
 type AdminCompanyHandler struct {
 	q    *gen.Queries
 	pool *pgxpool.Pool
@@ -41,16 +38,6 @@ func adminCompanyParam(c *gin.Context) (int64, error) {
 	return id, nil
 }
 
-// joinInt64s renders ids for an error message, so the caller is told which
-// employee blocks the change rather than only that something does.
-func joinInt64s(ids []int64) string {
-	parts := make([]string, len(ids))
-	for i, id := range ids {
-		parts[i] = strconv.FormatInt(id, 10)
-	}
-	return strings.Join(parts, ", ")
-}
-
 func toCompanyOwnerResponse(row gen.GetCompanyOwnerRow) dto.CompanyOwnerResponse {
 	return dto.CompanyOwnerResponse{
 		EmployeeID: row.ID,
@@ -64,7 +51,7 @@ func toCompanyOwnerResponse(row gen.GetCompanyOwnerRow) dto.CompanyOwnerResponse
 // Owner godoc
 //
 //	@Summary		Get a company's account owner
-//	@Description	employee.is_account_owner is a single global boolean, not a per-company column: this reads the member of this company who carries it. A company with no owner is 200 with owner:null, not a 404 — that stays reserved for a company that does not exist.
+//	@Description	The owner of the account this company belongs to. Ownership is a property of the account, so every company in an account reports the same owner. A company whose account has no owner is 200 with owner:null, not a 404 — that stays reserved for a company that does not exist.
 //	@Tags			admin
 //	@Produce		json
 //	@Security		BearerAuth
@@ -90,7 +77,7 @@ func (h *AdminCompanyHandler) Owner(c *gin.Context) {
 
 	owner, err := h.q.GetCompanyOwner(ctx, id)
 	if errors.Is(err, pgx.ErrNoRows) {
-		// A company with no owner is a real, expected state — not a 404 the
+		// An account with no owner is a real, expected state — not a 404 the
 		// frontend has to distinguish from "no such company".
 		c.JSON(http.StatusOK, dto.CompanyOwnerEnvelope{})
 		return
@@ -107,7 +94,7 @@ func (h *AdminCompanyHandler) Owner(c *gin.Context) {
 // SetOwner godoc
 //
 //	@Summary		Set a company's account owner
-//	@Description	Clears the current owner and flags the named employee in one transaction, so a company never carries two. The employee must already be a member of this company. Note that employee.is_account_owner is a single global boolean rather than a per-company column: the clear half therefore also unsets ownership everywhere else the current owner belongs. Where the current owner belongs to another company this is refused with 409 owner_in_multiple_companies rather than silently leaving that company without an owner; move that owner out of this company, or hand the other company a new owner first.
+//	@Description	Makes the named employee the owner of the account this company belongs to — the same act as POST /api/v1/admin/accounts/{id}/set-owner, addressed by company. Ownership is a property of the account, so this changes the owner of every company in it. The employee must belong to that account.
 //	@Tags			admin
 //	@Accept			json
 //	@Produce		json
@@ -119,7 +106,6 @@ func (h *AdminCompanyHandler) Owner(c *gin.Context) {
 //	@Failure		401		{object}	dto.ErrorResponse
 //	@Failure		403		{object}	dto.ErrorResponse
 //	@Failure		404		{object}	dto.ErrorResponse
-//	@Failure		409		{object}	dto.ErrorResponse
 //	@Failure		422		{object}	dto.ErrorResponse
 //	@Router			/api/v1/admin/companies/{id}/set-owner [post]
 func (h *AdminCompanyHandler) SetOwner(c *gin.Context) {
@@ -136,65 +122,44 @@ func (h *AdminCompanyHandler) SetOwner(c *gin.Context) {
 	}
 
 	ctx := c.Request.Context()
-	if _, err := h.q.GetCompanyByID(ctx, id); err != nil {
+	company, err := h.q.GetCompanyByID(ctx, id)
+	if err != nil {
 		apierr.Abort(c, err)
 		return
 	}
 
-	// is_account_owner is global, so the clear below would strip it from an
-	// owner who also belongs to another company, leaving that company ownerless
-	// and unable to reach POST /api/v1/companies. Refuse instead of doing it.
-	shared, err := h.q.ListOwnersInOtherCompanies(ctx, gen.ListOwnersInOtherCompaniesParams{
-		CompanyID:  id,
-		NewOwnerID: req.EmployeeID,
+	// The owner must belong to the account being handed over, the same rule
+	// /admin/accounts/{id}/set-owner applies. An employee of another client
+	// can never own this one.
+	belongs, err := h.q.IsEmployeeInAccount(ctx, gen.IsEmployeeInAccountParams{
+		EmployeeID: req.EmployeeID,
+		AccountID:  &company.AccountID,
 	})
 	if err != nil {
 		apierr.Abort(c, err)
 		return
 	}
-	if len(shared) > 0 {
-		apierr.Abort(c, apierr.New(http.StatusConflict, "owner_in_multiple_companies",
-			fmt.Sprintf("employee %s carries the global is_account_owner flag and also belongs to another company; "+
-				"replacing this company's owner would leave that company without one", joinInt64s(shared))))
-		return
-	}
-
-	now := time.Now().UTC()
-	tx, err := h.pool.Begin(ctx)
-	if err != nil {
-		apierr.Abort(c, err)
-		return
-	}
-	defer tx.Rollback(ctx)
-	qtx := h.q.WithTx(tx)
-
-	if err := qtx.ClearCompanyAccountOwner(ctx, gen.ClearCompanyAccountOwnerParams{CompanyID: id, UpdatedAt: now}); err != nil {
-		apierr.Abort(c, err)
-		return
-	}
-	owner, err := qtx.SetCompanyAccountOwner(ctx, gen.SetCompanyAccountOwnerParams{ID: req.EmployeeID, CompanyID: id, UpdatedAt: now})
-	if errors.Is(err, pgx.ErrNoRows) {
+	if !belongs {
 		apierr.Abort(c, apierr.Validation(map[string]string{
-			"employee_id": "must be an employee who belongs to this company",
+			"employee_id": "must be an employee who belongs to this company's account",
 		}))
 		return
 	}
-	if err != nil {
-		apierr.Abort(c, err)
-		return
-	}
-	if err := tx.Commit(ctx); err != nil {
+
+	if err := h.q.SetAccountOwner(ctx, gen.SetAccountOwnerParams{
+		ID:              company.AccountID,
+		OwnerEmployeeID: &req.EmployeeID,
+	}); err != nil {
 		apierr.Abort(c, err)
 		return
 	}
 
-	resp := dto.CompanyOwnerResponse{
-		EmployeeID: owner.ID,
-		FirstName:  owner.FirstName,
-		LastName:   owner.LastName,
-		Email:      owner.Email,
-		JobTitle:   owner.JobTitle,
+	owner, err := h.q.GetCompanyOwner(ctx, id)
+	if err != nil {
+		apierr.Abort(c, err)
+		return
 	}
+	resp := toCompanyOwnerResponse(owner)
 	c.JSON(http.StatusOK, dto.CompanyOwnerEnvelope{Owner: &resp})
 }
 

@@ -12,19 +12,37 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-const addEmployeeCompany = `-- name: AddEmployeeCompany :exec
-INSERT INTO employee_companies (employee_id, company_id)
-VALUES ($1, $2)
-ON CONFLICT (employee_id, company_id) DO NOTHING
+const activateEmployee = `-- name: ActivateEmployee :exec
+UPDATE employee SET is_active = true, updated_at = $1
+WHERE id = $2 AND NOT is_active
 `
 
-type AddEmployeeCompanyParams struct {
-	EmployeeID int64
-	CompanyID  int64
+type ActivateEmployeeParams struct {
+	UpdatedAt time.Time
+	ID        int64
 }
 
-func (q *Queries) AddEmployeeCompany(ctx context.Context, arg AddEmployeeCompanyParams) error {
-	_, err := q.db.Exec(ctx, addEmployeeCompany, arg.EmployeeID, arg.CompanyID)
+// Lifts the old account-wide deactivation. The API never sets employee.is_active
+// false any more; reactivating a membership calls this so a deactivation made
+// before 000023 does not keep the person locked out.
+func (q *Queries) ActivateEmployee(ctx context.Context, arg ActivateEmployeeParams) error {
+	_, err := q.db.Exec(ctx, activateEmployee, arg.UpdatedAt, arg.ID)
+	return err
+}
+
+const clearDefaultCompanyIf = `-- name: ClearDefaultCompanyIf :exec
+UPDATE employee SET default_company_id = NULL
+WHERE id = $1 AND default_company_id = $2::bigint
+`
+
+type ClearDefaultCompanyIfParams struct {
+	ID        int64
+	CompanyID int64
+}
+
+// Forgets a default company the employee no longer belongs to.
+func (q *Queries) ClearDefaultCompanyIf(ctx context.Context, arg ClearDefaultCompanyIfParams) error {
+	_, err := q.db.Exec(ctx, clearDefaultCompanyIf, arg.ID, arg.CompanyID)
 	return err
 }
 
@@ -46,6 +64,19 @@ func (q *Queries) CountAllEmployees(ctx context.Context, companyID *int64) (int6
 	return count, err
 }
 
+const countEmployeeMemberships = `-- name: CountEmployeeMemberships :one
+SELECT count(*) FROM employee_companies WHERE employee_id = $1
+`
+
+// Every membership, active or not. Tells a person deactivated everywhere apart
+// from one who belongs to no company yet.
+func (q *Queries) CountEmployeeMemberships(ctx context.Context, employeeID int64) (int64, error) {
+	row := q.db.QueryRow(ctx, countEmployeeMemberships, employeeID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countEmployees = `-- name: CountEmployees :one
 SELECT count(*) FROM employee e
 WHERE EXISTS (SELECT 1 FROM employee_companies ec WHERE ec.employee_id = e.id AND ec.company_id = $1)
@@ -58,34 +89,73 @@ func (q *Queries) CountEmployees(ctx context.Context, companyID int64) (int64, e
 	return count, err
 }
 
+const createAccountOwnerEmployee = `-- name: CreateAccountOwnerEmployee :one
+INSERT INTO employee (
+    account_id, first_name, last_name, employee_id, email, mobile_phone,
+    work_phone, job_title, license_class, license_number, license_state,
+    street_address, city, region, postal_code, country, password_hash, updated_at
+) VALUES (
+    $1, $2, $3, '', $4,
+    '', '', '', '', '', '', '', '', '', '', '', $5, now()
+)
+RETURNING id
+`
+
+type CreateAccountOwnerEmployeeParams struct {
+	AccountID    *int64
+	FirstName    string
+	LastName     string
+	Email        string
+	PasswordHash string
+}
+
+// CreateAccountOwnerEmployee provisions the account's owner employee with the
+// minimum the employee table requires (see the NOT NULL columns with no
+// default in 000001_init.up.sql) plus account_id and password_hash. It is
+// separate from CreateEmployee because an owner is provisioned before there is
+// any company, role or profile detail to give it; updated_at has no default
+// either, so it is stamped here rather than threaded through as a param.
+func (q *Queries) CreateAccountOwnerEmployee(ctx context.Context, arg CreateAccountOwnerEmployeeParams) (int64, error) {
+	row := q.db.QueryRow(ctx, createAccountOwnerEmployee,
+		arg.AccountID,
+		arg.FirstName,
+		arg.LastName,
+		arg.Email,
+		arg.PasswordHash,
+	)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
 const createEmployee = `-- name: CreateEmployee :one
 INSERT INTO employee (
-    user_id, default_company_id, first_name, last_name, employee_id, role_id, is_active,
+    account_id, user_id, default_company_id, first_name, last_name, employee_id, is_active,
     email, mobile_phone, work_phone, job_title, start_date, leave_date, birth_date,
-    hourly_labor_rate, is_technician, is_vehicle_operator, is_account_owner, license_class,
+    hourly_labor_rate, is_technician, is_vehicle_operator, license_class,
     license_number, license_state, license_expiry, street_address, city, region, postal_code,
     country, group_id, custom_fields, table_preferences, dashboard_preferences, updated_at
 ) VALUES (
-    $1, $2, $3, $4,
-    $5, $6, $7, $8,
+    $1, $2, $3, $4, $5,
+    $6, $7, $8,
     $9, $10, $11, $12,
     $13, $14, $15, $16,
-    $17, $18, $19,
-    $20, $21, $22,
-    $23, $24, $25, $26,
-    $27, $28, $29, $30,
-    $31, $32
+    $17, $18,
+    $19, $20, $21,
+    $22, $23, $24, $25,
+    $26, $27, $28, $29,
+    $30, $31
 )
-RETURNING id, user_id, default_company_id, first_name, last_name, employee_id, role_id, is_active, email, mobile_phone, work_phone, job_title, start_date, leave_date, birth_date, hourly_labor_rate, is_technician, is_vehicle_operator, is_account_owner, license_class, license_number, license_state, license_expiry, street_address, city, region, postal_code, country, group_id, custom_fields, table_preferences, dashboard_preferences, updated_at, password_hash, is_platform_admin
+RETURNING id, user_id, default_company_id, first_name, last_name, employee_id, is_active, email, mobile_phone, work_phone, job_title, start_date, leave_date, birth_date, hourly_labor_rate, is_technician, is_vehicle_operator, license_class, license_number, license_state, license_expiry, street_address, city, region, postal_code, country, group_id, custom_fields, table_preferences, dashboard_preferences, updated_at, password_hash, is_platform_admin, account_id
 `
 
 type CreateEmployeeParams struct {
+	AccountID            *int64
 	UserID               *int64
 	DefaultCompanyID     *int64
 	FirstName            string
 	LastName             string
 	EmployeeID           string
-	RoleID               *int64
 	IsActive             bool
 	Email                string
 	MobilePhone          string
@@ -97,7 +167,6 @@ type CreateEmployeeParams struct {
 	HourlyLaborRate      *decimal.Decimal
 	IsTechnician         bool
 	IsVehicleOperator    bool
-	IsAccountOwner       bool
 	LicenseClass         string
 	LicenseNumber        string
 	LicenseState         string
@@ -114,14 +183,20 @@ type CreateEmployeeParams struct {
 	UpdatedAt            time.Time
 }
 
+// account_id is a required argument, never a column the caller's JSON body can
+// reach (see dto.CreateEmployeeRequest and CreateEmployee's one call site,
+// EmployeeStore.Create, which sources it from AccountFromContext — the same
+// rule company creation follows). Without it the employee row is left with a
+// NULL account_id, and the composite FK fk_ec_employee_account rejects the
+// membership GrantMembership then tries to create for it.
 func (q *Queries) CreateEmployee(ctx context.Context, arg CreateEmployeeParams) (Employee, error) {
 	row := q.db.QueryRow(ctx, createEmployee,
+		arg.AccountID,
 		arg.UserID,
 		arg.DefaultCompanyID,
 		arg.FirstName,
 		arg.LastName,
 		arg.EmployeeID,
-		arg.RoleID,
 		arg.IsActive,
 		arg.Email,
 		arg.MobilePhone,
@@ -133,7 +208,6 @@ func (q *Queries) CreateEmployee(ctx context.Context, arg CreateEmployeeParams) 
 		arg.HourlyLaborRate,
 		arg.IsTechnician,
 		arg.IsVehicleOperator,
-		arg.IsAccountOwner,
 		arg.LicenseClass,
 		arg.LicenseNumber,
 		arg.LicenseState,
@@ -157,7 +231,6 @@ func (q *Queries) CreateEmployee(ctx context.Context, arg CreateEmployeeParams) 
 		&i.FirstName,
 		&i.LastName,
 		&i.EmployeeID,
-		&i.RoleID,
 		&i.IsActive,
 		&i.Email,
 		&i.MobilePhone,
@@ -169,7 +242,6 @@ func (q *Queries) CreateEmployee(ctx context.Context, arg CreateEmployeeParams) 
 		&i.HourlyLaborRate,
 		&i.IsTechnician,
 		&i.IsVehicleOperator,
-		&i.IsAccountOwner,
 		&i.LicenseClass,
 		&i.LicenseNumber,
 		&i.LicenseState,
@@ -186,8 +258,45 @@ func (q *Queries) CreateEmployee(ctx context.Context, arg CreateEmployeeParams) 
 		&i.UpdatedAt,
 		&i.PasswordHash,
 		&i.IsPlatformAdmin,
+		&i.AccountID,
 	)
 	return i, err
+}
+
+const createPlatformStaffEmployee = `-- name: CreatePlatformStaffEmployee :one
+INSERT INTO employee (
+    account_id, first_name, last_name, employee_id, email, mobile_phone,
+    work_phone, job_title, license_class, license_number, license_state,
+    street_address, city, region, postal_code, country, password_hash,
+    is_platform_admin, updated_at
+) VALUES (
+    NULL, $1, $2, '', $3,
+    '', '', '', '', '', '', '', '', '', '', '', $4, true, now()
+)
+RETURNING id
+`
+
+type CreatePlatformStaffEmployeeParams struct {
+	FirstName    string
+	LastName     string
+	Email        string
+	PasswordHash string
+}
+
+// CreatePlatformStaffEmployee provisions platform staff: an employee with no
+// account and no company, holding the flag that opens /api/v1/admin/*. It is
+// created from the CLI only, like every grant of that flag. The NOT NULL
+// columns with no default get empty values, as for an account owner.
+func (q *Queries) CreatePlatformStaffEmployee(ctx context.Context, arg CreatePlatformStaffEmployeeParams) (int64, error) {
+	row := q.db.QueryRow(ctx, createPlatformStaffEmployee,
+		arg.FirstName,
+		arg.LastName,
+		arg.Email,
+		arg.PasswordHash,
+	)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
 }
 
 const deleteEmployee = `-- name: DeleteEmployee :exec
@@ -208,7 +317,7 @@ func (q *Queries) DeleteEmployee(ctx context.Context, arg DeleteEmployeeParams) 
 
 const getEmployee = `-- name: GetEmployee :one
 
-SELECT e.id, e.user_id, e.default_company_id, e.first_name, e.last_name, e.employee_id, e.role_id, e.is_active, e.email, e.mobile_phone, e.work_phone, e.job_title, e.start_date, e.leave_date, e.birth_date, e.hourly_labor_rate, e.is_technician, e.is_vehicle_operator, e.is_account_owner, e.license_class, e.license_number, e.license_state, e.license_expiry, e.street_address, e.city, e.region, e.postal_code, e.country, e.group_id, e.custom_fields, e.table_preferences, e.dashboard_preferences, e.updated_at, e.password_hash, e.is_platform_admin FROM employee e
+SELECT e.id, e.user_id, e.default_company_id, e.first_name, e.last_name, e.employee_id, e.is_active, e.email, e.mobile_phone, e.work_phone, e.job_title, e.start_date, e.leave_date, e.birth_date, e.hourly_labor_rate, e.is_technician, e.is_vehicle_operator, e.license_class, e.license_number, e.license_state, e.license_expiry, e.street_address, e.city, e.region, e.postal_code, e.country, e.group_id, e.custom_fields, e.table_preferences, e.dashboard_preferences, e.updated_at, e.password_hash, e.is_platform_admin, e.account_id FROM employee e
 WHERE e.id = $1
   AND EXISTS (SELECT 1 FROM employee_companies ec WHERE ec.employee_id = e.id AND ec.company_id = $2)
 `
@@ -230,7 +339,6 @@ func (q *Queries) GetEmployee(ctx context.Context, arg GetEmployeeParams) (Emplo
 		&i.FirstName,
 		&i.LastName,
 		&i.EmployeeID,
-		&i.RoleID,
 		&i.IsActive,
 		&i.Email,
 		&i.MobilePhone,
@@ -242,7 +350,6 @@ func (q *Queries) GetEmployee(ctx context.Context, arg GetEmployeeParams) (Emplo
 		&i.HourlyLaborRate,
 		&i.IsTechnician,
 		&i.IsVehicleOperator,
-		&i.IsAccountOwner,
 		&i.LicenseClass,
 		&i.LicenseNumber,
 		&i.LicenseState,
@@ -259,14 +366,14 @@ func (q *Queries) GetEmployee(ctx context.Context, arg GetEmployeeParams) (Emplo
 		&i.UpdatedAt,
 		&i.PasswordHash,
 		&i.IsPlatformAdmin,
+		&i.AccountID,
 	)
 	return i, err
 }
 
 const getEmployeeAuthByEmail = `-- name: GetEmployeeAuthByEmail :one
-SELECT e.id, e.default_company_id, e.password_hash, COALESCE(r.is_admin, false) AS is_admin
+SELECT e.id, e.default_company_id, e.account_id, e.password_hash, e.is_platform_admin
 FROM employee e
-LEFT JOIN role r ON r.id = e.role_id
 WHERE e.email = $1 AND e.is_active = true
 LIMIT 1
 `
@@ -274,8 +381,9 @@ LIMIT 1
 type GetEmployeeAuthByEmailRow struct {
 	ID               int64
 	DefaultCompanyID *int64
+	AccountID        *int64
 	PasswordHash     string
-	IsAdmin          bool
+	IsPlatformAdmin  bool
 }
 
 func (q *Queries) GetEmployeeAuthByEmail(ctx context.Context, email string) (GetEmployeeAuthByEmailRow, error) {
@@ -284,14 +392,15 @@ func (q *Queries) GetEmployeeAuthByEmail(ctx context.Context, email string) (Get
 	err := row.Scan(
 		&i.ID,
 		&i.DefaultCompanyID,
+		&i.AccountID,
 		&i.PasswordHash,
-		&i.IsAdmin,
+		&i.IsPlatformAdmin,
 	)
 	return i, err
 }
 
 const getEmployeeByID = `-- name: GetEmployeeByID :one
-SELECT id, user_id, default_company_id, first_name, last_name, employee_id, role_id, is_active, email, mobile_phone, work_phone, job_title, start_date, leave_date, birth_date, hourly_labor_rate, is_technician, is_vehicle_operator, is_account_owner, license_class, license_number, license_state, license_expiry, street_address, city, region, postal_code, country, group_id, custom_fields, table_preferences, dashboard_preferences, updated_at, password_hash, is_platform_admin FROM employee WHERE id = $1
+SELECT id, user_id, default_company_id, first_name, last_name, employee_id, is_active, email, mobile_phone, work_phone, job_title, start_date, leave_date, birth_date, hourly_labor_rate, is_technician, is_vehicle_operator, license_class, license_number, license_state, license_expiry, street_address, city, region, postal_code, country, group_id, custom_fields, table_preferences, dashboard_preferences, updated_at, password_hash, is_platform_admin, account_id FROM employee WHERE id = $1
 `
 
 // Unscoped single-employee read for the admin namespace.
@@ -305,7 +414,6 @@ func (q *Queries) GetEmployeeByID(ctx context.Context, id int64) (Employee, erro
 		&i.FirstName,
 		&i.LastName,
 		&i.EmployeeID,
-		&i.RoleID,
 		&i.IsActive,
 		&i.Email,
 		&i.MobilePhone,
@@ -317,7 +425,6 @@ func (q *Queries) GetEmployeeByID(ctx context.Context, id int64) (Employee, erro
 		&i.HourlyLaborRate,
 		&i.IsTechnician,
 		&i.IsVehicleOperator,
-		&i.IsAccountOwner,
 		&i.LicenseClass,
 		&i.LicenseNumber,
 		&i.LicenseState,
@@ -334,6 +441,7 @@ func (q *Queries) GetEmployeeByID(ctx context.Context, id int64) (Employee, erro
 		&i.UpdatedAt,
 		&i.PasswordHash,
 		&i.IsPlatformAdmin,
+		&i.AccountID,
 	)
 	return i, err
 }
@@ -342,58 +450,100 @@ const getEmployeeIdentity = `-- name: GetEmployeeIdentity :one
 SELECT
     e.id,
     e.is_active,
-    e.is_account_owner,
-    e.role_id,
+    e.account_id,
     e.is_platform_admin,
-    COALESCE(r.is_admin, false)         AS is_admin,
+    ec.role_id,
+    (ec.id IS NOT NULL)::boolean         AS is_member,
+    (COALESCE(r.is_admin, false)
+        OR COALESCE(a.owner_employee_id = e.id, false))::boolean AS is_admin,
     COALESCE(r.permissions, '{}'::jsonb) AS permissions,
-    EXISTS (
-        SELECT 1 FROM employee_companies ec
-        WHERE ec.employee_id = e.id AND ec.company_id = $1
-    ) AS is_member
+    COALESCE(a.owner_employee_id = e.id, false)::boolean AS is_account_owner
 FROM employee e
-LEFT JOIN role r ON r.id = e.role_id
+LEFT JOIN employee_companies ec ON ec.employee_id = e.id
+                               AND ec.company_id = $1
+                               AND ec.is_active
+LEFT JOIN role r    ON r.id = ec.role_id
+LEFT JOIN account a ON a.id = e.account_id
 WHERE e.id = $2
 `
 
 type GetEmployeeIdentityParams struct {
-	CompanyID int64
+	CompanyID *int64
 	ID        int64
 }
 
 type GetEmployeeIdentityRow struct {
 	ID              int64
 	IsActive        bool
-	IsAccountOwner  bool
-	RoleID          *int64
+	AccountID       *int64
 	IsPlatformAdmin bool
+	RoleID          *int64
+	IsMember        bool
 	IsAdmin         bool
 	Permissions     []byte
-	IsMember        bool
+	IsAccountOwner  bool
 }
 
-// GetEmployeeIdentity backs the authorization middleware. Django resolved
-// request.user.employee (and its role) from the database on every request, so
-// revoking a role or deactivating an employee takes effect immediately rather
-// than at the next token refresh; this query preserves that.
+// GetEmployeeIdentity backs the authorization middleware, resolved from the
+// database on every request so a role change or deactivation takes effect at
+// once rather than at the next token refresh.
+//
+// The role now comes through the membership, so one join answers both "is this
+// person a member of this company" and "what may they do here". company_id is
+// nullable: a company-less session has no tenant, and sqlc.narg makes the join
+// miss rather than requiring a sentinel id.
+//
+// Both ownership expressions are COALESCEd because platform staff have
+// account_id IS NULL, so the account join yields no row and the comparison is
+// NULL. In SQL `false OR NULL` is NULL — an authorization value decided by NULL
+// semantics rather than by a rule.
 func (q *Queries) GetEmployeeIdentity(ctx context.Context, arg GetEmployeeIdentityParams) (GetEmployeeIdentityRow, error) {
 	row := q.db.QueryRow(ctx, getEmployeeIdentity, arg.CompanyID, arg.ID)
 	var i GetEmployeeIdentityRow
 	err := row.Scan(
 		&i.ID,
 		&i.IsActive,
-		&i.IsAccountOwner,
-		&i.RoleID,
+		&i.AccountID,
 		&i.IsPlatformAdmin,
+		&i.RoleID,
+		&i.IsMember,
 		&i.IsAdmin,
 		&i.Permissions,
-		&i.IsMember,
+		&i.IsAccountOwner,
 	)
 	return i, err
 }
 
+const listActiveEmployeeCompanyIDs = `-- name: ListActiveEmployeeCompanyIDs :many
+SELECT company_id FROM employee_companies
+WHERE employee_id = $1 AND is_active
+ORDER BY company_id
+`
+
+// The companies an employee may actually work in: memberships that are not
+// deactivated. Login and refresh scope a session through this.
+func (q *Queries) ListActiveEmployeeCompanyIDs(ctx context.Context, employeeID int64) ([]int64, error) {
+	rows, err := q.db.Query(ctx, listActiveEmployeeCompanyIDs, employeeID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []int64{}
+	for rows.Next() {
+		var company_id int64
+		if err := rows.Scan(&company_id); err != nil {
+			return nil, err
+		}
+		items = append(items, company_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listAllEmployees = `-- name: ListAllEmployees :many
-SELECT e.id, e.user_id, e.default_company_id, e.first_name, e.last_name, e.employee_id, e.role_id, e.is_active, e.email, e.mobile_phone, e.work_phone, e.job_title, e.start_date, e.leave_date, e.birth_date, e.hourly_labor_rate, e.is_technician, e.is_vehicle_operator, e.is_account_owner, e.license_class, e.license_number, e.license_state, e.license_expiry, e.street_address, e.city, e.region, e.postal_code, e.country, e.group_id, e.custom_fields, e.table_preferences, e.dashboard_preferences, e.updated_at, e.password_hash, e.is_platform_admin FROM employee e
+SELECT e.id, e.user_id, e.default_company_id, e.first_name, e.last_name, e.employee_id, e.is_active, e.email, e.mobile_phone, e.work_phone, e.job_title, e.start_date, e.leave_date, e.birth_date, e.hourly_labor_rate, e.is_technician, e.is_vehicle_operator, e.license_class, e.license_number, e.license_state, e.license_expiry, e.street_address, e.city, e.region, e.postal_code, e.country, e.group_id, e.custom_fields, e.table_preferences, e.dashboard_preferences, e.updated_at, e.password_hash, e.is_platform_admin, e.account_id FROM employee e
 WHERE (
     $1::bigint IS NULL
     OR EXISTS (
@@ -435,7 +585,6 @@ func (q *Queries) ListAllEmployees(ctx context.Context, arg ListAllEmployeesPara
 			&i.FirstName,
 			&i.LastName,
 			&i.EmployeeID,
-			&i.RoleID,
 			&i.IsActive,
 			&i.Email,
 			&i.MobilePhone,
@@ -447,7 +596,6 @@ func (q *Queries) ListAllEmployees(ctx context.Context, arg ListAllEmployeesPara
 			&i.HourlyLaborRate,
 			&i.IsTechnician,
 			&i.IsVehicleOperator,
-			&i.IsAccountOwner,
 			&i.LicenseClass,
 			&i.LicenseNumber,
 			&i.LicenseState,
@@ -464,6 +612,7 @@ func (q *Queries) ListAllEmployees(ctx context.Context, arg ListAllEmployeesPara
 			&i.UpdatedAt,
 			&i.PasswordHash,
 			&i.IsPlatformAdmin,
+			&i.AccountID,
 		); err != nil {
 			return nil, err
 		}
@@ -505,7 +654,7 @@ func (q *Queries) ListEmployeeCompanyIDs(ctx context.Context, employeeID int64) 
 }
 
 const listEmployees = `-- name: ListEmployees :many
-SELECT e.id, e.user_id, e.default_company_id, e.first_name, e.last_name, e.employee_id, e.role_id, e.is_active, e.email, e.mobile_phone, e.work_phone, e.job_title, e.start_date, e.leave_date, e.birth_date, e.hourly_labor_rate, e.is_technician, e.is_vehicle_operator, e.is_account_owner, e.license_class, e.license_number, e.license_state, e.license_expiry, e.street_address, e.city, e.region, e.postal_code, e.country, e.group_id, e.custom_fields, e.table_preferences, e.dashboard_preferences, e.updated_at, e.password_hash, e.is_platform_admin FROM employee e
+SELECT e.id, e.user_id, e.default_company_id, e.first_name, e.last_name, e.employee_id, e.is_active, e.email, e.mobile_phone, e.work_phone, e.job_title, e.start_date, e.leave_date, e.birth_date, e.hourly_labor_rate, e.is_technician, e.is_vehicle_operator, e.license_class, e.license_number, e.license_state, e.license_expiry, e.street_address, e.city, e.region, e.postal_code, e.country, e.group_id, e.custom_fields, e.table_preferences, e.dashboard_preferences, e.updated_at, e.password_hash, e.is_platform_admin, e.account_id FROM employee e
 WHERE EXISTS (SELECT 1 FROM employee_companies ec WHERE ec.employee_id = e.id AND ec.company_id = $1)
 ORDER BY e.last_name, e.first_name, e.id
 LIMIT $3 OFFSET $2
@@ -533,7 +682,6 @@ func (q *Queries) ListEmployees(ctx context.Context, arg ListEmployeesParams) ([
 			&i.FirstName,
 			&i.LastName,
 			&i.EmployeeID,
-			&i.RoleID,
 			&i.IsActive,
 			&i.Email,
 			&i.MobilePhone,
@@ -545,7 +693,6 @@ func (q *Queries) ListEmployees(ctx context.Context, arg ListEmployeesParams) ([
 			&i.HourlyLaborRate,
 			&i.IsTechnician,
 			&i.IsVehicleOperator,
-			&i.IsAccountOwner,
 			&i.LicenseClass,
 			&i.LicenseNumber,
 			&i.LicenseState,
@@ -562,6 +709,7 @@ func (q *Queries) ListEmployees(ctx context.Context, arg ListEmployeesParams) ([
 			&i.UpdatedAt,
 			&i.PasswordHash,
 			&i.IsPlatformAdmin,
+			&i.AccountID,
 		); err != nil {
 			return nil, err
 		}
@@ -606,24 +754,40 @@ func (q *Queries) SetEmployeeDefaultCompany(ctx context.Context, arg SetEmployee
 	return err
 }
 
+const setEmployeeDefaultCompanyIfUnset = `-- name: SetEmployeeDefaultCompanyIfUnset :exec
+UPDATE employee
+   SET default_company_id = $1
+ WHERE id = $2 AND default_company_id IS NULL
+`
+
+type SetEmployeeDefaultCompanyIfUnsetParams struct {
+	DefaultCompanyID *int64
+	ID               int64
+}
+
+func (q *Queries) SetEmployeeDefaultCompanyIfUnset(ctx context.Context, arg SetEmployeeDefaultCompanyIfUnsetParams) error {
+	_, err := q.db.Exec(ctx, setEmployeeDefaultCompanyIfUnset, arg.DefaultCompanyID, arg.ID)
+	return err
+}
+
 const updateEmployee = `-- name: UpdateEmployee :one
 UPDATE employee e SET
     user_id = $1, default_company_id = $2,
     first_name = $3, last_name = $4, employee_id = $5,
-    role_id = $6, is_active = $7, email = $8,
-    mobile_phone = $9, work_phone = $10, job_title = $11,
-    start_date = $12, leave_date = $13, birth_date = $14,
-    hourly_labor_rate = $15, is_technician = $16,
-    is_vehicle_operator = $17, is_account_owner = $18,
-    license_class = $19, license_number = $20,
-    license_state = $21, license_expiry = $22,
-    street_address = $23, city = $24, region = $25,
-    postal_code = $26, country = $27, group_id = $28,
-    custom_fields = $29, table_preferences = $30,
-    dashboard_preferences = $31, updated_at = $32
-WHERE e.id = $33
-  AND EXISTS (SELECT 1 FROM employee_companies ec WHERE ec.employee_id = e.id AND ec.company_id = $34)
-RETURNING e.id, e.user_id, e.default_company_id, e.first_name, e.last_name, e.employee_id, e.role_id, e.is_active, e.email, e.mobile_phone, e.work_phone, e.job_title, e.start_date, e.leave_date, e.birth_date, e.hourly_labor_rate, e.is_technician, e.is_vehicle_operator, e.is_account_owner, e.license_class, e.license_number, e.license_state, e.license_expiry, e.street_address, e.city, e.region, e.postal_code, e.country, e.group_id, e.custom_fields, e.table_preferences, e.dashboard_preferences, e.updated_at, e.password_hash, e.is_platform_admin
+    email = $6,
+    mobile_phone = $7, work_phone = $8, job_title = $9,
+    start_date = $10, leave_date = $11, birth_date = $12,
+    hourly_labor_rate = $13, is_technician = $14,
+    is_vehicle_operator = $15,
+    license_class = $16, license_number = $17,
+    license_state = $18, license_expiry = $19,
+    street_address = $20, city = $21, region = $22,
+    postal_code = $23, country = $24, group_id = $25,
+    custom_fields = $26, table_preferences = $27,
+    dashboard_preferences = $28, updated_at = $29
+WHERE e.id = $30
+  AND EXISTS (SELECT 1 FROM employee_companies ec WHERE ec.employee_id = e.id AND ec.company_id = $31)
+RETURNING e.id, e.user_id, e.default_company_id, e.first_name, e.last_name, e.employee_id, e.is_active, e.email, e.mobile_phone, e.work_phone, e.job_title, e.start_date, e.leave_date, e.birth_date, e.hourly_labor_rate, e.is_technician, e.is_vehicle_operator, e.license_class, e.license_number, e.license_state, e.license_expiry, e.street_address, e.city, e.region, e.postal_code, e.country, e.group_id, e.custom_fields, e.table_preferences, e.dashboard_preferences, e.updated_at, e.password_hash, e.is_platform_admin, e.account_id
 `
 
 type UpdateEmployeeParams struct {
@@ -632,8 +796,6 @@ type UpdateEmployeeParams struct {
 	FirstName            string
 	LastName             string
 	EmployeeID           string
-	RoleID               *int64
-	IsActive             bool
 	Email                string
 	MobilePhone          string
 	WorkPhone            string
@@ -644,7 +806,6 @@ type UpdateEmployeeParams struct {
 	HourlyLaborRate      *decimal.Decimal
 	IsTechnician         bool
 	IsVehicleOperator    bool
-	IsAccountOwner       bool
 	LicenseClass         string
 	LicenseNumber        string
 	LicenseState         string
@@ -670,8 +831,6 @@ func (q *Queries) UpdateEmployee(ctx context.Context, arg UpdateEmployeeParams) 
 		arg.FirstName,
 		arg.LastName,
 		arg.EmployeeID,
-		arg.RoleID,
-		arg.IsActive,
 		arg.Email,
 		arg.MobilePhone,
 		arg.WorkPhone,
@@ -682,7 +841,6 @@ func (q *Queries) UpdateEmployee(ctx context.Context, arg UpdateEmployeeParams) 
 		arg.HourlyLaborRate,
 		arg.IsTechnician,
 		arg.IsVehicleOperator,
-		arg.IsAccountOwner,
 		arg.LicenseClass,
 		arg.LicenseNumber,
 		arg.LicenseState,
@@ -708,7 +866,6 @@ func (q *Queries) UpdateEmployee(ctx context.Context, arg UpdateEmployeeParams) 
 		&i.FirstName,
 		&i.LastName,
 		&i.EmployeeID,
-		&i.RoleID,
 		&i.IsActive,
 		&i.Email,
 		&i.MobilePhone,
@@ -720,7 +877,6 @@ func (q *Queries) UpdateEmployee(ctx context.Context, arg UpdateEmployeeParams) 
 		&i.HourlyLaborRate,
 		&i.IsTechnician,
 		&i.IsVehicleOperator,
-		&i.IsAccountOwner,
 		&i.LicenseClass,
 		&i.LicenseNumber,
 		&i.LicenseState,
@@ -737,6 +893,7 @@ func (q *Queries) UpdateEmployee(ctx context.Context, arg UpdateEmployeeParams) 
 		&i.UpdatedAt,
 		&i.PasswordHash,
 		&i.IsPlatformAdmin,
+		&i.AccountID,
 	)
 	return i, err
 }

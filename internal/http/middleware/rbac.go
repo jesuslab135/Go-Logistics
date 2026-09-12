@@ -14,9 +14,14 @@ import (
 // database rather than from the token, so role changes and deactivations apply
 // at once. It ports the inputs of api/permissions.py.
 type Identity struct {
-	EmployeeID     int64
-	CompanyID      int64
-	IsActive       bool
+	EmployeeID int64
+	CompanyID  int64
+	// AccountID is the client organisation this person belongs to. NULL means
+	// platform staff, who belong to no client and hold no company memberships.
+	AccountID *int64
+	IsActive  bool
+	// IsAccountOwner means this employee owns the account (AccountID) they
+	// belong to, not the retired global "may create companies" boolean.
 	IsAccountOwner bool
 	IsMember       bool
 	HasRole        bool
@@ -24,7 +29,10 @@ type Identity struct {
 	// IsPlatformAdmin is internal staff acting across tenants, which IsAdmin is
 	// not: that one is a tenant's own administrator.
 	IsPlatformAdmin bool
-	Permissions     map[string]ModulePermissions
+	// RoleID is the role held in the token's company, if any. Nil means the
+	// membership carries no role, which grants nothing.
+	RoleID      *int64
+	Permissions map[string]ModulePermissions
 }
 
 // ModulePermissions is one entry of role.permissions. An empty object grants the
@@ -37,7 +45,7 @@ type ModulePermissions struct {
 // IdentityLoader reads the caller's authorization state. Implemented in the
 // handler package over the sqlc queries, so this package stays transport-only.
 type IdentityLoader interface {
-	LoadIdentity(ctx context.Context, employeeID, companyID int64) (Identity, error)
+	LoadIdentity(ctx context.Context, employeeID int64, companyID *int64) (Identity, error)
 }
 
 // methodAction ports HasModuleAccess.METHOD_ACTION_MAP.
@@ -160,10 +168,34 @@ func (i Identity) moduleActions(module string) map[string]bool {
 
 type identityContextKey struct{}
 
+// ContextWithIdentity injects an identity. RequireIdentity uses it in the
+// request path; tests use it to construct a caller without a live database.
+func ContextWithIdentity(ctx context.Context, id Identity) context.Context {
+	return context.WithValue(ctx, identityContextKey{}, id)
+}
+
 // IdentityOf returns the identity resolved by RequireIdentity, if present.
 func IdentityOf(c *gin.Context) (Identity, bool) {
 	id, ok := c.Request.Context().Value(identityContextKey{}).(Identity)
 	return id, ok
+}
+
+// IdentityFromContext is IdentityOf for code holding a context rather than a
+// gin.Context, such as the stores behind the CRUD handlers.
+func IdentityFromContext(ctx context.Context) (Identity, bool) {
+	id, ok := ctx.Value(identityContextKey{}).(Identity)
+	return id, ok
+}
+
+// AccountFromContext returns the client organisation of the caller, or nil for
+// platform staff. Company creation reads it so a new company can never be
+// planted inside another client's account.
+func AccountFromContext(ctx context.Context) *int64 {
+	id, ok := ctx.Value(identityContextKey{}).(Identity)
+	if !ok {
+		return nil
+	}
+	return id.AccountID
 }
 
 // RequireIdentity must run after Auth. It resolves the caller once per request
@@ -186,9 +218,7 @@ func RequireIdentity(loader IdentityLoader) gin.HandlerFunc {
 			return
 		}
 
-		c.Request = c.Request.WithContext(
-			context.WithValue(c.Request.Context(), identityContextKey{}, identity),
-		)
+		c.Request = c.Request.WithContext(ContextWithIdentity(c.Request.Context(), identity))
 		c.Next()
 	}
 }
@@ -208,10 +238,11 @@ func RequireAdminRole() gin.HandlerFunc {
 }
 
 // RequirePlatformAdmin gates the cross-tenant /admin namespace. It is
-// deliberately not RequireAdminRole: employee.role_id is a single global FK, so
-// a tenant administrator is an administrator in every company they belong to,
-// and gating cross-tenant routes on that let any company admin read and rewrite
-// another tenant's employees.
+// deliberately not RequireAdminRole: an admin role is granted per company
+// membership now, so RequireAdminRole only proves the caller administers the
+// one company their token is scoped to — no standing at all over a tenant
+// they hold no membership in. Only a platform administrator, a flag the CLI
+// grants independently of any company role, may cross that boundary.
 func RequirePlatformAdmin() gin.HandlerFunc {
 	return gate(func(i Identity, _ *gin.Context) bool { return i.IsPlatformAdmin },
 		"platform administrator privileges are required for this action")

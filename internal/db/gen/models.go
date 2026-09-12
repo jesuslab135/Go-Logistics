@@ -10,6 +10,14 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+type Account struct {
+	ID              int64
+	Name            string
+	OwnerEmployeeID *int64
+	IsActive        bool
+	CreatedAt       time.Time
+}
+
 type Asset struct {
 	ID                          int64
 	CompanyID                   int64
@@ -163,6 +171,7 @@ type Company struct {
 	Timezone            string
 	Currency            string
 	SystemOfMeasurement string
+	AccountID           int64
 }
 
 type CustomFieldDefinition struct {
@@ -186,7 +195,6 @@ type Employee struct {
 	FirstName            string
 	LastName             string
 	EmployeeID           string
-	RoleID               *int64
 	IsActive             bool
 	Email                string
 	MobilePhone          string
@@ -198,7 +206,6 @@ type Employee struct {
 	HourlyLaborRate      *decimal.Decimal
 	IsTechnician         bool
 	IsVehicleOperator    bool
-	IsAccountOwner       bool
 	LicenseClass         string
 	LicenseNumber        string
 	LicenseState         string
@@ -215,12 +222,16 @@ type Employee struct {
 	UpdatedAt            time.Time
 	PasswordHash         string
 	IsPlatformAdmin      bool
+	AccountID            *int64
 }
 
 type EmployeeCompany struct {
 	ID         int64
 	EmployeeID int64
 	CompanyID  int64
+	AccountID  int64
+	RoleID     *int64
+	IsActive   bool
 }
 
 type Fault struct {

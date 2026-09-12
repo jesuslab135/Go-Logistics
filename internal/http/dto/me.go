@@ -4,11 +4,16 @@ package dto
 // shell in one request: who the caller is, what their role permits, and which
 // companies they can switch to.
 type MePermissionsResponse struct {
-	Employee       MeEmployee `json:"employee"`
-	CompanyID      int64      `json:"company_id"`
-	Role           *MeRole    `json:"role"`
-	IsAdmin        bool       `json:"is_admin"`
-	IsAccountOwner bool       `json:"is_account_owner"`
+	Employee MeEmployee `json:"employee"`
+	// CompanyID is absent, not 0, for a company-less session — the same care
+	// the access token itself takes (Claims.CompanyID omits the key entirely)
+	// so the one response such a client is meant to read to discover its own
+	// state does not reintroduce the sentinel the token went to trouble to
+	// keep out.
+	CompanyID      *int64  `json:"company_id,omitempty"`
+	Role           *MeRole `json:"role"`
+	IsAdmin        bool    `json:"is_admin"`
+	IsAccountOwner bool    `json:"is_account_owner"`
 	// IsPlatformAdmin gates the /api/v1/admin/* namespace. It is distinct from
 	// IsAdmin (a tenant administrator): only a platform administrator, granted via
 	// the CLI, receives true. Re-read every call, so a revocation shows next request.

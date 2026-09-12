@@ -35,28 +35,80 @@ func (v *EmployeeCredentialVerifier) Verify(ctx context.Context, email, password
 	// default_company_id is a plain writable field, so it is a hint, not an
 	// authority: the session is scoped to a company only after employee_companies
 	// confirms the membership — the same check /auth/switch-company already makes.
-	memberships, err := v.q.ListEmployeeCompanyIDs(ctx, row.ID)
+	memberships, err := v.q.ListActiveEmployeeCompanyIDs(ctx, row.ID)
 	if err != nil {
 		return Identity{}, ErrInvalidCredentials
 	}
-	companyID, ok := resolveLoginCompany(row.DefaultCompanyID, memberships)
-	if !ok {
+	companyID := resolveLoginCompany(row.DefaultCompanyID, memberships)
+
+	// No active membership is a company-less session only for someone with no
+	// memberships at all: a new account owner, or someone whose access the
+	// owner revoked. Memberships that exist but are all deactivated mean the
+	// person was deactivated everywhere, and a company-less session would
+	// quietly let them back in.
+	if companyID == nil {
+		total, err := v.q.CountEmployeeMemberships(ctx, row.ID)
+		if err != nil {
+			return Identity{}, ErrInvalidCredentials
+		}
+		if total > 0 {
+			return Identity{}, ErrInactiveEverywhere
+		}
+	}
+
+	if !mayLogIn(companyID, row.AccountID, row.IsPlatformAdmin) {
 		return Identity{}, ErrNoCompanyMembership
 	}
 
-	return Identity{EmployeeID: row.ID, CompanyID: companyID, IsAdmin: row.IsAdmin}, nil
+	// is_admin is a property of the role held in THIS company, so it cannot be
+	// resolved until the company is. It needs membership in that company, the
+	// same rule IdentityLoader applies at request time: a company-less session
+	// is admin of nothing, owner or not, and the token claim must not say
+	// otherwise.
+	ident, err := v.q.GetEmployeeIdentity(ctx, gen.GetEmployeeIdentityParams{
+		ID:        row.ID,
+		CompanyID: companyID,
+	})
+	if err != nil {
+		return Identity{}, ErrInvalidCredentials
+	}
+
+	return Identity{
+		EmployeeID: row.ID,
+		CompanyID:  companyID,
+		AccountID:  row.AccountID,
+		IsAdmin:    ident.IsAdmin && ident.IsMember,
+	}, nil
 }
 
 // resolveLoginCompany picks the company a session is scoped to. The employee's
 // default_company_id wins when it names a real membership; otherwise the lowest
-// membership id does, so the choice is deterministic across logins. An employee
-// with no membership resolves to nothing and must not be issued a token.
-func resolveLoginCompany(defaultCompanyID *int64, memberships []int64) (int64, bool) {
+// membership id does, so the choice is deterministic across logins.
+//
+// An employee with no membership resolves to nil, which is a company-less
+// session rather than a refusal: an account owner provisioned by a platform
+// admin has no company until they create one, and refusing them a token is the
+// deadlock this change exists to break. Whether they may log in at all is
+// decided by Verify, on whether they belong to an account.
+func resolveLoginCompany(defaultCompanyID *int64, memberships []int64) *int64 {
 	if len(memberships) == 0 {
-		return 0, false
+		return nil
 	}
 	if defaultCompanyID != nil && slices.Contains(memberships, *defaultCompanyID) {
-		return *defaultCompanyID, true
+		return defaultCompanyID
 	}
-	return slices.Min(memberships), true
+	lowest := slices.Min(memberships)
+	return &lowest
+}
+
+// mayLogIn reports whether an employee may receive a token at all.
+//
+// A company is not required: an account owner provisioned by a platform admin
+// has none until they create one, and refusing them a token is the deadlock
+// this change exists to break. Platform staff belong to no account and no
+// company by design and work only through /api/v1/admin/*, so they log in
+// company-less too. Belonging to NOTHING without the platform flag is still
+// refused — there is nowhere for such a session to be.
+func mayLogIn(companyID *int64, accountID *int64, isPlatformAdmin bool) bool {
+	return companyID != nil || accountID != nil || isPlatformAdmin
 }

@@ -1,8 +1,10 @@
 package handler
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -54,6 +56,27 @@ func NewRouter(d Deps) *gin.Engine {
 	)
 
 	r.GET("/healthz", func(c *gin.Context) {
+		// A pooled connection can be held for the duration of a bulk import
+		// (see the import handler), and the pool has a bounded ceiling, so a
+		// health check that only answers from memory can stay green while the
+		// pool is exhausted or Postgres is unreachable. Actually round-trip
+		// the pool, but bound it: a health check that can hang is worse than
+		// one that lies, since the deploy gate would then hang with it. 2s is
+		// comfortably above a healthy Ping (sub-millisecond) but short enough
+		// that a genuinely wedged database fails the gate quickly.
+		if d.Pool != nil {
+			ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
+			defer cancel()
+			if err := d.Pool.Ping(ctx); err != nil {
+				d.Logger.Error("healthz: database ping failed", "error", err)
+				c.JSON(http.StatusServiceUnavailable, gin.H{"status": "error", "subsystem": "database"})
+				return
+			}
+		}
+		// A nil Pool means "no pool configured" (the unit-test router, and any
+		// pool-less deployment), not "database unreachable" — every real
+		// deployment wires one in cmd/api, so treating nil as healthy here
+		// does not mask a real outage.
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 
@@ -83,7 +106,8 @@ func NewRouter(d Deps) *gin.Engine {
 	member.Use(WithIncludeArchived())
 
 	registerCompanyRoutes(api, member, d)
-	registerAdminRoutes(member, d)
+	registerAdminRoutes(api, d)
+	registerAccountEmployeeRoutes(api, d)
 
 	assets := member.Group("", middleware.RequireModule("assets"))
 	tires := member.Group("", middleware.RequireModule("tires"))
@@ -303,6 +327,13 @@ func NewRouter(d Deps) *gin.Engine {
 	crud.NewLinkHandler[dto.IssueResponse, dto.LinkIssueRequest](NewServiceEntryLineItemIssueStore(d.Queries)).Register(service, "/service-entry-line-items", "/issues", "issue_id")
 	crud.NewLinkHandler[dto.IssueResponse, dto.LinkIssueRequest](NewWorkOrderLineItemIssueStore(d.Queries)).Register(workOrders, "/work-order-line-items", "/issues", "issue_id")
 
+	registerBulkImports(bulkGroups{
+		member: member, assets: assets, tires: tires, parts: parts, inventory: inventory,
+		workOrders: workOrders, issues: issues, service: service, fuel: fuel, vendors: vendors,
+		warranties: warranties, mileageGoals: mileageGoals, employees: employees,
+	}, d)
+	registerExports(r, member)
+
 	return r
 }
 
@@ -400,13 +431,18 @@ func registerCompanyRoutes(api, member *gin.RouterGroup, d Deps) {
 // answer "who belongs to company X" or "did company X get seeded".
 //
 // It is gated on RequirePlatformAdmin, not RequireAdminRole. A tenant's own
-// administrator is not a platform operator, and because employee.role_id is a
-// single global FK, an admin of one company is an admin of every company they
-// belong to — so the previous gate let any company admin read and rewrite
-// another tenant's employees. Granting the flag is a CLI act (cmd/cli
-// platform-admin); nothing in the API hands it out.
-func registerAdminRoutes(member *gin.RouterGroup, d Deps) {
-	admin := member.Group("", middleware.RequirePlatformAdmin())
+// administrator is not a platform operator: an admin role is granted per
+// company membership, so RequireAdminRole only proves the caller administers
+// the one company their token is scoped to, and that grants no standing over
+// another tenant's employees. Granting the platform-admin flag is a CLI act
+// (cmd/cli platform-admin); nothing in the API hands it out.
+//
+// It is registered on api, not member: platform staff belong to no account and
+// hold no company memberships, so gating this namespace on RequireCompanyMember
+// would lock every genuine platform admin out of it. RequirePlatformAdmin is
+// gate enough — company membership is irrelevant to a cross-tenant route.
+func registerAdminRoutes(api *gin.RouterGroup, d Deps) {
+	admin := api.Group("", middleware.RequirePlatformAdmin())
 
 	employees := NewAdminEmployeeHandler(d.Queries, d.Pool)
 	admin.GET("/admin/employees", employees.List)
@@ -418,4 +454,32 @@ func registerAdminRoutes(member *gin.RouterGroup, d Deps) {
 	admin.POST("/admin/companies/:id/set-owner", companies.SetOwner)
 	admin.GET("/admin/companies/:id/roles", companies.Roles)
 	admin.GET("/admin/companies/:id/work-order-statuses", companies.WorkOrderStatuses)
+
+	accounts := NewAdminAccountHandler(d.Queries, d.Pool)
+	admin.POST("/admin/accounts", accounts.Create)
+	admin.GET("/admin/accounts", accounts.List)
+	admin.POST("/admin/accounts/:id/set-owner", accounts.SetOwner)
+}
+
+// registerAccountEmployeeRoutes wires the routes that let an account owner
+// appoint directors: list the account's people with the role they hold in
+// each company, and replace one person's memberships-with-roles.
+//
+// Account-scoped, deliberately NOT under /api/v1/admin: that namespace is
+// cross-tenant and platform-admin only. This one operates strictly inside the
+// caller's own account.
+//
+// Registered on api, not member: these are gated on RequireAccountOwner, and
+// an owner with no company of their own yet is not a company member —
+// registering on member would lock out exactly the person the routes exist to
+// serve. registerCompanyRoutes' POST /companies is the same precedent.
+func registerAccountEmployeeRoutes(api *gin.RouterGroup, d Deps) {
+	accountOwner := api.Group("", middleware.RequireAccountOwner())
+	accountEmployees := NewAccountEmployeeHandler(d.Queries, d.Pool)
+	accountOwner.GET("/account/employees", accountEmployees.List)
+	accountOwner.PUT("/account/employees/:id/companies", accountEmployees.ReplaceCompanies)
+
+	accountCompanies := NewAccountCompanyHandler(d.Queries)
+	accountOwner.GET("/account/companies", accountCompanies.List)
+	accountOwner.GET("/account/companies/:id/roles", accountCompanies.Roles)
 }
