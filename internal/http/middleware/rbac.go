@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -293,6 +294,14 @@ func DecodePermissions(raw []byte) map[string]ModulePermissions {
 		return out
 	}
 	for module, body := range modules {
+		// An explicit null is not an empty object. Unmarshalling null into a
+		// map succeeds and yields a nil map, which is also len 0 — so without
+		// this, `{"assets": null}` would take the {} path and grant the whole
+		// module. Only {} means "everything here"; null means the client named
+		// the module and selected nothing in it, which denies.
+		if bytes.Equal(bytes.TrimSpace(body), []byte("null")) {
+			continue
+		}
 		var actions map[string]bool
 		if err := json.Unmarshal(body, &actions); err != nil {
 			continue
