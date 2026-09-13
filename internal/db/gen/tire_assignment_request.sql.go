@@ -236,7 +236,7 @@ func (q *Queries) ResolveTireAssignmentRequest(ctx context.Context, arg ResolveT
 }
 
 const updateTireAssignmentRequest = `-- name: UpdateTireAssignmentRequest :one
-UPDATE tire_assignment_request SET tire_id = $3, vehicle_id = $4, position_code = $5, state = $6, requested_by_id = $7, requested_at = $8, approved_by_id = $9, resolved_at = $10, rejection_reason = $11, notes = $12
+UPDATE tire_assignment_request SET tire_id = $3, vehicle_id = $4, position_code = $5, requested_by_id = $6, requested_at = $7, rejection_reason = $8, notes = $9
 WHERE id = $1 AND company_id = $2
 RETURNING id, company_id, tire_id, vehicle_id, position_code, state, requested_by_id, requested_at, approved_by_id, resolved_at, rejection_reason, notes
 `
@@ -247,15 +247,18 @@ type UpdateTireAssignmentRequestParams struct {
 	TireID          int64
 	VehicleID       int64
 	PositionCode    string
-	State           string
 	RequestedByID   *int64
 	RequestedAt     time.Time
-	ApprovedByID    *int64
-	ResolvedAt      *time.Time
 	RejectionReason string
 	Notes           string
 }
 
+// state, approved_by_id and resolved_at are deliberately absent from the SET
+// list: they belong to ResolveTireAssignmentRequest below, which guards on
+// state = 'PENDING' and is reached only through the approve route's
+// tire_approvals/approve gate. Leaving them here made the ordinary update a
+// way to forge an approval, so the restriction lives in the statement rather
+// than in whichever handler happens to call it.
 func (q *Queries) UpdateTireAssignmentRequest(ctx context.Context, arg UpdateTireAssignmentRequestParams) (TireAssignmentRequest, error) {
 	row := q.db.QueryRow(ctx, updateTireAssignmentRequest,
 		arg.ID,
@@ -263,11 +266,8 @@ func (q *Queries) UpdateTireAssignmentRequest(ctx context.Context, arg UpdateTir
 		arg.TireID,
 		arg.VehicleID,
 		arg.PositionCode,
-		arg.State,
 		arg.RequestedByID,
 		arg.RequestedAt,
-		arg.ApprovedByID,
-		arg.ResolvedAt,
 		arg.RejectionReason,
 		arg.Notes,
 	)

@@ -23,8 +23,8 @@ import (
 // terms (rates, types, percentages), or any line beneath it.
 
 // recalcWorkOrder recomputes and stores a work order's totals.
-func recalcWorkOrder(ctx context.Context, qtx *gen.Queries, workOrderID int64, at time.Time) error {
-	order, err := qtx.GetWorkOrderByID(ctx, workOrderID)
+func recalcWorkOrder(ctx context.Context, qtx *gen.Queries, workOrderID, companyID int64, at time.Time) error {
+	order, err := qtx.GetWorkOrderByID(ctx, gen.GetWorkOrderByIDParams{ID: workOrderID, CompanyID: companyID})
 	if err != nil {
 		return err
 	}
@@ -46,6 +46,7 @@ func recalcWorkOrder(ctx context.Context, qtx *gen.Queries, workOrderID int64, a
 
 	return qtx.StoreWorkOrderTotals(ctx, gen.StoreWorkOrderTotalsParams{
 		ID:            workOrderID,
+		CompanyID:     companyID,
 		PartsSubtotal: totals.PartsSubtotal,
 		LaborSubtotal: totals.LaborSubtotal,
 		Subtotal:      totals.Subtotal,
@@ -57,8 +58,8 @@ func recalcWorkOrder(ctx context.Context, qtx *gen.Queries, workOrderID int64, a
 // recalcServiceEntry recomputes and stores a service entry's totals. Service
 // entries have no markup columns, so those terms are absent rather than zero —
 // the same formula with two fewer inputs.
-func recalcServiceEntry(ctx context.Context, qtx *gen.Queries, entryID int64, at time.Time) error {
-	entry, err := qtx.GetServiceEntryByID(ctx, entryID)
+func recalcServiceEntry(ctx context.Context, qtx *gen.Queries, entryID, companyID int64, at time.Time) error {
+	entry, err := qtx.GetServiceEntryByID(ctx, gen.GetServiceEntryByIDParams{ID: entryID, CompanyID: companyID})
 	if err != nil {
 		return err
 	}
@@ -78,6 +79,7 @@ func recalcServiceEntry(ctx context.Context, qtx *gen.Queries, entryID int64, at
 
 	return qtx.StoreServiceEntryTotals(ctx, gen.StoreServiceEntryTotalsParams{
 		ID:            entryID,
+		CompanyID:     companyID,
 		PartsSubtotal: totals.PartsSubtotal,
 		LaborSubtotal: totals.LaborSubtotal,
 		Subtotal:      totals.Subtotal,
@@ -89,8 +91,8 @@ func recalcServiceEntry(ctx context.Context, qtx *gen.Queries, entryID int64, at
 // recalcPurchaseOrder recomputes and stores a purchase order's totals. A
 // purchase order buys parts, so its lines are one undifferentiated subtotal with
 // no markup — and it is the only surface with shipping.
-func recalcPurchaseOrder(ctx context.Context, qtx *gen.Queries, orderID int64, at time.Time) error {
-	order, err := qtx.GetPurchaseOrderByID(ctx, orderID)
+func recalcPurchaseOrder(ctx context.Context, qtx *gen.Queries, orderID, companyID int64, at time.Time) error {
+	order, err := qtx.GetPurchaseOrderByID(ctx, gen.GetPurchaseOrderByIDParams{ID: orderID, CompanyID: companyID})
 	if err != nil {
 		return err
 	}
@@ -110,6 +112,7 @@ func recalcPurchaseOrder(ctx context.Context, qtx *gen.Queries, orderID int64, a
 
 	return qtx.StorePurchaseOrderTotals(ctx, gen.StorePurchaseOrderTotalsParams{
 		ID:          orderID,
+		CompanyID:   companyID,
 		Subtotal:    totals.Subtotal,
 		TotalAmount: effectiveTotal(totals, order.TotalOverride),
 		UpdatedAt:   at,
@@ -134,7 +137,7 @@ func effectiveTotal(totals money.Totals, override *decimal.Decimal) decimal.Deci
 // document from all of them. Both levels are stored, so both have to be
 // derived: a line showing a subtotal its sub-lines do not add up to is as wrong
 // as a document showing one its lines do not.
-func recalcWorkOrderLineItem(ctx context.Context, qtx *gen.Queries, lineItemID int64, at time.Time) error {
+func recalcWorkOrderLineItem(ctx context.Context, qtx *gen.Queries, lineItemID, companyID int64, at time.Time) error {
 	sums, err := qtx.SumWorkOrderSubLineCosts(ctx, lineItemID)
 	if err != nil {
 		return err
@@ -154,14 +157,14 @@ func recalcWorkOrderLineItem(ctx context.Context, qtx *gen.Queries, lineItemID i
 		return err
 	}
 	// The lines changed, so any override on the document no longer describes it.
-	if err := qtx.ClearWorkOrderTotalOverride(ctx, workOrderID); err != nil {
+	if err := qtx.ClearWorkOrderTotalOverride(ctx, gen.ClearWorkOrderTotalOverrideParams{ID: workOrderID, CompanyID: companyID}); err != nil {
 		return err
 	}
-	return recalcWorkOrder(ctx, qtx, workOrderID, at)
+	return recalcWorkOrder(ctx, qtx, workOrderID, companyID, at)
 }
 
 // recalcPurchaseOrderLineItem prices the line and then the order.
-func recalcPurchaseOrderLineItem(ctx context.Context, qtx *gen.Queries, lineItemID int64, at time.Time) error {
+func recalcPurchaseOrderLineItem(ctx context.Context, qtx *gen.Queries, lineItemID, companyID int64, at time.Time) error {
 	if err := qtx.StorePurchaseOrderLineItemSubtotal(ctx, gen.StorePurchaseOrderLineItemSubtotalParams{
 		ID: lineItemID, UpdatedAt: at,
 	}); err != nil {
@@ -171,10 +174,10 @@ func recalcPurchaseOrderLineItem(ctx context.Context, qtx *gen.Queries, lineItem
 	if err != nil {
 		return err
 	}
-	if err := qtx.ClearPurchaseOrderTotalOverride(ctx, orderID); err != nil {
+	if err := qtx.ClearPurchaseOrderTotalOverride(ctx, gen.ClearPurchaseOrderTotalOverrideParams{ID: orderID, CompanyID: companyID}); err != nil {
 		return err
 	}
-	return recalcPurchaseOrder(ctx, qtx, orderID, at)
+	return recalcPurchaseOrder(ctx, qtx, orderID, companyID, at)
 }
 
 // recalcServiceEntryLineItem prices the line and then the entry.
@@ -183,7 +186,7 @@ func recalcPurchaseOrderLineItem(ctx context.Context, qtx *gen.Queries, lineItem
 // labor_cost are not: they are the operator's split of that line between the
 // two buckets, which the schema gives every line and which nothing else can
 // infer. The entry's parts_subtotal and labor_subtotal sum them.
-func recalcServiceEntryLineItem(ctx context.Context, qtx *gen.Queries, lineItemID int64, at time.Time) error {
+func recalcServiceEntryLineItem(ctx context.Context, qtx *gen.Queries, lineItemID, companyID int64, at time.Time) error {
 	if err := qtx.StoreServiceEntryLineItemSubtotal(ctx, gen.StoreServiceEntryLineItemSubtotalParams{
 		ID: lineItemID, UpdatedAt: at,
 	}); err != nil {
@@ -193,10 +196,10 @@ func recalcServiceEntryLineItem(ctx context.Context, qtx *gen.Queries, lineItemI
 	if err != nil {
 		return err
 	}
-	if err := qtx.ClearServiceEntryTotalOverride(ctx, entryID); err != nil {
+	if err := qtx.ClearServiceEntryTotalOverride(ctx, gen.ClearServiceEntryTotalOverrideParams{ID: entryID, CompanyID: companyID}); err != nil {
 		return err
 	}
-	return recalcServiceEntry(ctx, qtx, entryID, at)
+	return recalcServiceEntry(ctx, qtx, entryID, companyID, at)
 }
 
 // inTx runs fn in a transaction, committing only if the write and the recompute

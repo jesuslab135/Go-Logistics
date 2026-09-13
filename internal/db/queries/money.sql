@@ -40,7 +40,7 @@ UPDATE work_order SET
     subtotal       = sqlc.arg(subtotal),
     total_amount   = sqlc.arg(total_amount),
     updated_at     = sqlc.arg(updated_at)
-WHERE id = sqlc.arg(id);
+WHERE id = sqlc.arg(id) AND company_id = sqlc.arg(company_id);
 
 -- name: StoreServiceEntryTotals :exec
 UPDATE service_entry SET
@@ -49,14 +49,14 @@ UPDATE service_entry SET
     subtotal       = sqlc.arg(subtotal),
     total_amount   = sqlc.arg(total_amount),
     updated_at     = sqlc.arg(updated_at)
-WHERE id = sqlc.arg(id);
+WHERE id = sqlc.arg(id) AND company_id = sqlc.arg(company_id);
 
 -- name: StorePurchaseOrderTotals :exec
 UPDATE purchase_order SET
     subtotal     = sqlc.arg(subtotal),
     total_amount = sqlc.arg(total_amount),
     updated_at   = sqlc.arg(updated_at)
-WHERE id = sqlc.arg(id);
+WHERE id = sqlc.arg(id) AND company_id = sqlc.arg(company_id);
 
 -- The override writes. Clearing is a separate statement from setting because
 -- clearing happens implicitly on any line-item edit, where there is no actor to
@@ -72,7 +72,7 @@ RETURNING *;
 -- name: ClearWorkOrderTotalOverride :exec
 UPDATE work_order SET
     total_override = NULL, total_override_reason = '', total_override_by_id = NULL, total_override_at = NULL
-WHERE id = sqlc.arg(id) AND total_override IS NOT NULL;
+WHERE id = sqlc.arg(id) AND company_id = sqlc.arg(company_id) AND total_override IS NOT NULL;
 
 -- name: SetPurchaseOrderTotalOverride :one
 UPDATE purchase_order SET
@@ -84,7 +84,7 @@ RETURNING *;
 -- name: ClearPurchaseOrderTotalOverride :exec
 UPDATE purchase_order SET
     total_override = NULL, total_override_reason = '', total_override_by_id = NULL, total_override_at = NULL
-WHERE id = sqlc.arg(id) AND total_override IS NOT NULL;
+WHERE id = sqlc.arg(id) AND company_id = sqlc.arg(company_id) AND total_override IS NOT NULL;
 
 -- name: SetServiceEntryTotalOverride :one
 UPDATE service_entry SET
@@ -96,7 +96,7 @@ RETURNING *;
 -- name: ClearServiceEntryTotalOverride :exec
 UPDATE service_entry SET
     total_override = NULL, total_override_reason = '', total_override_by_id = NULL, total_override_at = NULL
-WHERE id = sqlc.arg(id) AND total_override IS NOT NULL;
+WHERE id = sqlc.arg(id) AND company_id = sqlc.arg(company_id) AND total_override IS NOT NULL;
 
 -- Parent lookups for a recompute triggered from a child row, so a line-item
 -- write can find the document it belongs to without the handler carrying it.
@@ -109,19 +109,27 @@ SELECT li.work_order_id FROM work_order_sub_line_item sli
 JOIN work_order_line_item li ON li.id = sli.line_item_id
 WHERE sli.id = sqlc.arg(id);
 
--- Unscoped single-document reads for the recompute. The company scope is
--- already established by the write that triggered it — a recompute reached
--- through a line item the caller was allowed to write must not fail because the
--- recompute itself forgot to carry the tenant.
+-- Single-document reads for the recompute, scoped to the tenant like every
+-- other read in this file.
+--
+-- These were deliberately unscoped once, on the argument that the write which
+-- triggered the recompute had already established the company. That invariant
+-- was invisible, unenforced, and was in fact violated: the nested line-item
+-- deletes were :exec, so a delete matching no rows still recomputed the
+-- caller-supplied parent id — another tenant's document, whose totals were
+-- rewritten and whose audited override was cleared.
+--
+-- The tenant is carried explicitly now, so the guarantee no longer depends on
+-- every present and future caller remembering to establish it first.
 
 -- name: GetWorkOrderByID :one
-SELECT * FROM work_order WHERE id = sqlc.arg(id);
+SELECT * FROM work_order WHERE id = sqlc.arg(id) AND company_id = sqlc.arg(company_id);
 
 -- name: GetServiceEntryByID :one
-SELECT * FROM service_entry WHERE id = sqlc.arg(id);
+SELECT * FROM service_entry WHERE id = sqlc.arg(id) AND company_id = sqlc.arg(company_id);
 
 -- name: GetPurchaseOrderByID :one
-SELECT * FROM purchase_order WHERE id = sqlc.arg(id);
+SELECT * FROM purchase_order WHERE id = sqlc.arg(id) AND company_id = sqlc.arg(company_id);
 
 -- Line-level derivations. A line's own money columns are computed the same way
 -- the document's are, so a reader is never shown a line that disagrees with the

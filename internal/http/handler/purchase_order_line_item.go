@@ -9,6 +9,7 @@ import (
 	"fleet/internal/db/gen"
 	"fleet/internal/http/dto"
 	"fleet/internal/http/middleware"
+	"fleet/internal/platform/apierr"
 	"fleet/internal/platform/paginate"
 )
 
@@ -68,7 +69,7 @@ func (s *PurchaseOrderLineItemStore) Create(ctx context.Context, parentID int64,
 		if err != nil {
 			return err
 		}
-		if err := recalcPurchaseOrderLineItem(ctx, qtx, r.ID, now); err != nil {
+		if err := recalcPurchaseOrderLineItem(ctx, qtx, r.ID, company, now); err != nil {
 			return err
 		}
 		// Re-read: the line's subtotal was just derived.
@@ -102,7 +103,7 @@ func (s *PurchaseOrderLineItemStore) Update(ctx context.Context, parentID, id in
 		if err != nil {
 			return err
 		}
-		if err := recalcPurchaseOrderLineItem(ctx, qtx, r.ID, now); err != nil {
+		if err := recalcPurchaseOrderLineItem(ctx, qtx, r.ID, company, now); err != nil {
 			return err
 		}
 		r, err = qtx.GetPurchaseOrderLineItem(ctx, gen.GetPurchaseOrderLineItemParams{ID: id, ParentID: parentID, CompanyID: company})
@@ -118,12 +119,19 @@ func (s *PurchaseOrderLineItemStore) Update(ctx context.Context, parentID, id in
 func (s *PurchaseOrderLineItemStore) Delete(ctx context.Context, parentID, id int64) error {
 	now := time.Now().UTC()
 	return inTx(ctx, s.pool, s.q, func(qtx *gen.Queries) error {
-		if err := qtx.DeletePurchaseOrderLineItem(ctx, gen.DeletePurchaseOrderLineItemParams{
+		// Zero rows means the line, its order, or the tenancy between them did
+		// not match. The recompute below must not run for an order the caller
+		// was never allowed to write.
+		n, err := qtx.DeletePurchaseOrderLineItem(ctx, gen.DeletePurchaseOrderLineItemParams{
 			ID: id, ParentID: parentID, CompanyID: middleware.CompanyFromContext(ctx),
-		}); err != nil {
+		})
+		if err != nil {
 			return err
 		}
-		return recalcPurchaseOrder(ctx, qtx, parentID, now)
+		if n == 0 {
+			return apierr.NotFound("line item not found")
+		}
+		return recalcPurchaseOrder(ctx, qtx, parentID, middleware.CompanyFromContext(ctx), now)
 	})
 }
 

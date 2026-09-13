@@ -17,16 +17,23 @@ type CreateTireAssignmentRequestRequest struct {
 }
 
 type UpdateTireAssignmentRequestRequest struct {
-	TireID          int64      `json:"tire_id"`
-	VehicleID       int64      `json:"vehicle_id"`
-	PositionCode    string     `json:"position_code" binding:"omitempty,max=10"`
-	State           string     `json:"state" binding:"omitempty,max=10"`
-	RequestedByID   *int64     `json:"requested_by_id"`
-	RequestedAt     time.Time  `json:"requested_at"`
-	ApprovedByID    *int64     `json:"approved_by_id"`
-	ResolvedAt      *time.Time `json:"resolved_at"`
-	RejectionReason string     `json:"rejection_reason"`
-	Notes           string     `json:"notes"`
+	TireID        int64     `json:"tire_id"`
+	VehicleID     int64     `json:"vehicle_id"`
+	PositionCode  string    `json:"position_code" binding:"omitempty,max=10"`
+	RequestedByID *int64    `json:"requested_by_id"`
+	RequestedAt   time.Time `json:"requested_at"`
+	// state, resolved_at and approved_by_id are response-only. They are moved
+	// by POST /tire-assignment-requests/{id}/approve, which is gated on
+	// tire_approvals/approve and is the only thing that can check the request
+	// is still PENDING and stamp who resolved it. Carrying them here would be
+	// a way around that gate: a PUT could forge an approval and attribute it
+	// to another employee.
+	//
+	// rejection_reason stays editable. No reject action exists yet, so nothing
+	// else can write it, and on its own it is a free-text note with no
+	// privilege meaning once state is out of reach.
+	RejectionReason string `json:"rejection_reason"`
+	Notes           string `json:"notes"`
 }
 
 type TireAssignmentRequestResponse struct {

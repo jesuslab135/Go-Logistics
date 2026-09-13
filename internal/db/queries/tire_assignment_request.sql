@@ -16,7 +16,13 @@ INSERT INTO tire_assignment_request (
 RETURNING *;
 
 -- name: UpdateTireAssignmentRequest :one
-UPDATE tire_assignment_request SET tire_id = $3, vehicle_id = $4, position_code = $5, state = $6, requested_by_id = $7, requested_at = $8, approved_by_id = $9, resolved_at = $10, rejection_reason = $11, notes = $12
+-- state, approved_by_id and resolved_at are deliberately absent from the SET
+-- list: they belong to ResolveTireAssignmentRequest below, which guards on
+-- state = 'PENDING' and is reached only through the approve route's
+-- tire_approvals/approve gate. Leaving them here made the ordinary update a
+-- way to forge an approval, so the restriction lives in the statement rather
+-- than in whichever handler happens to call it.
+UPDATE tire_assignment_request SET tire_id = $3, vehicle_id = $4, position_code = $5, requested_by_id = $6, requested_at = $7, rejection_reason = $8, notes = $9
 WHERE id = $1 AND company_id = $2
 RETURNING *;
 

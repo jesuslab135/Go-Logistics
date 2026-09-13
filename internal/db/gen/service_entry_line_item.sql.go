@@ -100,7 +100,7 @@ func (q *Queries) CreateServiceEntryLineItem(ctx context.Context, arg CreateServ
 	return i, err
 }
 
-const deleteServiceEntryLineItem = `-- name: DeleteServiceEntryLineItem :exec
+const deleteServiceEntryLineItem = `-- name: DeleteServiceEntryLineItem :execrows
 DELETE FROM service_entry_line_item AS c USING service_entry p
 WHERE c.id = $1 AND c.service_entry_id = $2 AND p.company_id = $3 AND p.id = c.service_entry_id
 `
@@ -111,9 +111,12 @@ type DeleteServiceEntryLineItemParams struct {
 	CompanyID int64
 }
 
-func (q *Queries) DeleteServiceEntryLineItem(ctx context.Context, arg DeleteServiceEntryLineItemParams) error {
-	_, err := q.db.Exec(ctx, deleteServiceEntryLineItem, arg.ID, arg.ParentID, arg.CompanyID)
-	return err
+func (q *Queries) DeleteServiceEntryLineItem(ctx context.Context, arg DeleteServiceEntryLineItemParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteServiceEntryLineItem, arg.ID, arg.ParentID, arg.CompanyID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const getServiceEntryLineItem = `-- name: GetServiceEntryLineItem :one

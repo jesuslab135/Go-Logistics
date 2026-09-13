@@ -9,6 +9,7 @@ import (
 	"fleet/internal/db/gen"
 	"fleet/internal/http/dto"
 	"fleet/internal/http/middleware"
+	"fleet/internal/platform/apierr"
 	"fleet/internal/platform/paginate"
 )
 
@@ -72,7 +73,7 @@ func (s *WorkOrderLineItemStore) Create(ctx context.Context, parentID int64, in 
 		// A new line has no sub-line items yet, so its own costs are zero; the
 		// document is still recomputed because an empty line changes nothing but
 		// the caller should see consistent numbers either way.
-		if err := recalcWorkOrderLineItem(ctx, qtx, r.ID, now); err != nil {
+		if err := recalcWorkOrderLineItem(ctx, qtx, r.ID, company, now); err != nil {
 			return err
 		}
 		r, err = qtx.GetWorkOrderLineItem(ctx, gen.GetWorkOrderLineItemParams{ID: r.ID, ParentID: parentID, CompanyID: company})
@@ -105,7 +106,7 @@ func (s *WorkOrderLineItemStore) Update(ctx context.Context, parentID, id int64,
 		if err != nil {
 			return err
 		}
-		if err := recalcWorkOrderLineItem(ctx, qtx, r.ID, now); err != nil {
+		if err := recalcWorkOrderLineItem(ctx, qtx, r.ID, company, now); err != nil {
 			return err
 		}
 		r, err = qtx.GetWorkOrderLineItem(ctx, gen.GetWorkOrderLineItemParams{ID: id, ParentID: parentID, CompanyID: company})
@@ -121,14 +122,22 @@ func (s *WorkOrderLineItemStore) Update(ctx context.Context, parentID, id int64,
 func (s *WorkOrderLineItemStore) Delete(ctx context.Context, parentID, id int64) error {
 	now := time.Now().UTC()
 	return inTx(ctx, s.pool, s.q, func(qtx *gen.Queries) error {
-		if err := qtx.DeleteWorkOrderLineItem(ctx, gen.DeleteWorkOrderLineItemParams{
+		// The DELETE is tenant-scoped, so zero rows means the line item, its
+		// parent, or the tenancy between them did not match. Recomputing on
+		// that parentID anyway would recompute a document the caller was never
+		// allowed to touch — and clear its audited total override.
+		n, err := qtx.DeleteWorkOrderLineItem(ctx, gen.DeleteWorkOrderLineItemParams{
 			ID: id, ParentID: parentID, CompanyID: middleware.CompanyFromContext(ctx),
-		}); err != nil {
+		})
+		if err != nil {
 			return err
+		}
+		if n == 0 {
+			return apierr.NotFound("line item not found")
 		}
 		// The line is gone, so only the document is recomputed - and it must be,
 		// or its total still includes work that no longer exists.
-		return recalcWorkOrder(ctx, qtx, parentID, now)
+		return recalcWorkOrder(ctx, qtx, parentID, middleware.CompanyFromContext(ctx), now)
 	})
 }
 

@@ -24,6 +24,17 @@ func CompanyFromContext(ctx context.Context) int64 {
 	return id
 }
 
+// ContextWithCompany carries a tenant on a context that did not come from Auth.
+//
+// Auth is the only thing that sets this for a request; this exists for the
+// callers that have a tenant but no HTTP request to have carried it — tests,
+// and the CLI's own commands. It is deliberately the single way to do so, so
+// that a search for it finds every place a tenant is asserted rather than
+// derived from a token.
+func ContextWithCompany(ctx context.Context, companyID int64) context.Context {
+	return context.WithValue(ctx, companyContextKey{}, companyID)
+}
+
 // EmployeeFromContext returns the authenticated employee id set by Auth, or 0.
 func EmployeeFromContext(ctx context.Context) int64 {
 	id, _ := ctx.Value(employeeContextKey{}).(int64)

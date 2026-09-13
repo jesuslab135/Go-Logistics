@@ -100,11 +100,8 @@ func (s *TireAssignmentRequestStore) Update(ctx context.Context, id int64, in dt
 		TireID:          in.TireID,
 		VehicleID:       in.VehicleID,
 		PositionCode:    in.PositionCode,
-		State:           in.State,
 		RequestedByID:   in.RequestedByID,
 		RequestedAt:     in.RequestedAt,
-		ApprovedByID:    in.ApprovedByID,
-		ResolvedAt:      in.ResolvedAt,
 		RejectionReason: in.RejectionReason,
 		Notes:           in.Notes,
 	})
