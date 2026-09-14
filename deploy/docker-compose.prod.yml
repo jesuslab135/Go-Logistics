@@ -9,6 +9,10 @@
 # Derived values (DATABASE_URL, the MinIO endpoint) are assembled HERE from the
 # raw secrets in .env — compose interpolates ${...} in this file; it does NOT
 # expand references inside .env values.
+#
+# The QA stack (/opt/fleet-qa, branch `qa`) runs this same file. Its .env sets
+# COMPOSE_PROJECT_NAME=fleet-qa (which overrides `name:` below), EDGE_ALIAS and
+# MINIO_CONSOLE_PORT; production sets none of them and gets the defaults.
 name: fleet
 
 networks:
@@ -45,7 +49,8 @@ services:
     ports:
       # Console on loopback only — reach it with:
       #   ssh -L 9001:127.0.0.1:9001 deploy@74.208.73.82   then http://localhost:9001
-      - "127.0.0.1:9001:9001"
+      # QA sets MINIO_CONSOLE_PORT=9002 so both stacks can bind loopback.
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
     volumes:
       - minio_data:/data
     networks:
@@ -53,7 +58,10 @@ services:
       edge:
         # The edge nginx proxies /fleet/ here. Aliased rather than reachable as
         # bare "minio" so the shared network cannot collide with another stack.
-        aliases: [fleet-minio]
+        # EDGE_ALIAS MUST differ per stack: two containers holding one alias on
+        # `edge` makes Docker DNS round-robin between them — production
+        # traffic landing on QA. QA sets it to fleet-qa.
+        aliases: ["${EDGE_ALIAS:-fleet}-minio"]
     healthcheck:
       test: ["CMD-SHELL", "mc ready local || exit 1"]
       interval: 5s
@@ -98,7 +106,7 @@ services:
     networks:
       default:
       edge:
-        aliases: [fleet-api]
+        aliases: ["${EDGE_ALIAS:-fleet}-api"]
     depends_on:
       db:
         condition: service_healthy

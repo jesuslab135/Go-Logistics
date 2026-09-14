@@ -38,8 +38,17 @@ docker compose up -d --remove-orphans
 # unrelated `sga` project, and a global prune would eat its images too. Keep the
 # three most recent tags of our own repository and drop the rest; docker refuses
 # to remove an image still in use, so the running release is safe either way.
+#
+# Production (<sha>) and QA (qa-<sha>) tags share the repository, so each stack
+# only counts and prunes its own kind — a burst of QA deploys must never evict
+# production's rollback images.
+case "${IMAGE##*:}" in
+    qa-*) own_tags() { grep ':qa-'; } ;;
+    *)    own_tags() { grep -v ':qa'; } ;;
+esac
 docker images --filter "reference=${IMAGE%:*}" --format '{{.Repository}}:{{.Tag}}' \
     | grep -v ':latest$' \
+    | own_tags \
     | tail -n +4 \
     | xargs -r docker rmi >/dev/null 2>&1 || true
 
