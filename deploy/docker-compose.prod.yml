@@ -11,17 +11,25 @@
 # expand references inside .env values.
 #
 # The QA stack (/opt/fleet-qa, branch `qa`) runs this same file. Its .env sets
-# COMPOSE_PROJECT_NAME=fleet-qa (which overrides `name:` below), EDGE_ALIAS and
-# MINIO_CONSOLE_PORT; production sets none of them and gets the defaults.
+# COMPOSE_PROJECT_NAME=fleet-qa (which overrides `name:` below), EDGE_NETWORK,
+# EDGE_ALIAS and MINIO_CONSOLE_PORT; production sets none of them and gets the
+# defaults.
 name: fleet
 
 networks:
   # Internal: db, minio, migrate, api, cli talk to each other here.
   default:
   # Shared with the sga nginx. Created once by hand:
-  #   docker network create edge
+  #   docker network create edge      (QA: docker network create edge-qa,
+  #                                    then docker network connect edge-qa sga_nginx)
+  #
+  # Each stack MUST have its own edge network. Compose always registers the bare
+  # service names (api, minio) on every network a service joins, and the api
+  # dials minio:9000 — on a shared edge that name resolves to BOTH stacks'
+  # MinIO, round-robin. Unique aliases alone do not prevent it.
   edge:
     external: true
+    name: ${EDGE_NETWORK:-edge}
 
 services:
   db:

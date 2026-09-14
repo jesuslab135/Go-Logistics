@@ -237,6 +237,38 @@ load. That is deliberate: every deploy replaces the `api` container with a new
 IP, and a statically resolved upstream would 502 until someone reloaded nginx
 by hand.
 
+## QA
+
+Branch `qa` deploys to **https://qa-go-logistics.jesuslab135.com** through
+`.github/workflows/deploy-qa.yml`; `main` stays production-only. It is a second,
+fully separate stack on the same VPS: its own database, MinIO, JWT secret and
+backups-free data (it is disposable).
+
+| | Production | QA |
+|---|---|---|
+| Branch / workflow | `main` / `deploy.yml` | `qa` / `deploy-qa.yml` |
+| Directory | `/opt/fleet` | `/opt/fleet-qa` |
+| Compose project | `fleet` | `fleet-qa` (`COMPOSE_PROJECT_NAME` in `.env`) |
+| Edge network | `edge` | `edge-qa` (`EDGE_NETWORK`) |
+| Edge aliases | `fleet-api`, `fleet-minio` | `fleet-qa-api`, `fleet-qa-minio` (`EDGE_ALIAS`) |
+| MinIO console | `127.0.0.1:9001` | `127.0.0.1:9002` (`MINIO_CONSOLE_PORT`) |
+| Image tags | `<sha>`, `:latest` | `qa-<sha>`, `:qa` |
+| GitHub environment | `production` | `qa` (overrides `API_DOMAIN`) |
+| Vhost | `deploy/nginx/go-logistics.conf` | `deploy/nginx/go-logistics-qa.conf` |
+
+Both stacks run the same `docker-compose.prod.yml`; the QA values above come
+from `/opt/fleet-qa/.env`, and production sets none of them. **Never point QA
+at the `edge` network**: compose registers the bare service names on every
+network, so on a shared network `minio:9000` resolves to both stacks' MinIO.
+
+Note the hostname has ONE hyphen. `qa--go-logistics` (two) is an R-LDH label
+that Let's Encrypt refuses to certify.
+
+```sh
+ssh deploy@74.208.73.82 'cd /opt/fleet-qa && docker compose logs -f api'
+ssh deploy@74.208.73.82 'cd /opt/fleet-qa && docker compose run --rm cli setpass --email <email> --password <password>'
+```
+
 ## SSH
 
 Key-only, enforced by `/etc/ssh/sshd_config.d/00-hardening.conf`. The `00`
