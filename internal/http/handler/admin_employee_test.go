@@ -1,11 +1,14 @@
 package handler
 
 import (
+	"encoding/json"
 	"errors"
 	"reflect"
 	"slices"
 	"testing"
 
+	"fleet/internal/db/gen"
+	"fleet/internal/http/dto"
 	"fleet/internal/platform/apierr"
 )
 
@@ -125,5 +128,45 @@ func TestMembershipDelta(t *testing.T) {
 				t.Errorf("membershipDelta(%v, %v) = %v, want %v", tt.before, tt.after, got, tt.want)
 			}
 		})
+	}
+}
+
+// The cross-tenant employee row must say which client a person belongs to and
+// whether they are platform staff, flattened next to the normal employee fields.
+func TestToAdminEmployeeResponsesCarriesAccountAndPlatformFlag(t *testing.T) {
+	account := int64(9)
+	rows := []gen.Employee{
+		{ID: 1, Email: "ops@platform.test", IsPlatformAdmin: true},
+		{ID: 2, Email: "owner@client.test", AccountID: &account},
+	}
+	base := []dto.EmployeeResponse{
+		{ID: 1, Email: "ops@platform.test"},
+		{ID: 2, Email: "owner@client.test", IsAccountOwner: true},
+	}
+
+	got := toAdminEmployeeResponses(rows, base)
+	if len(got) != 2 {
+		t.Fatalf("len = %d, want 2", len(got))
+	}
+	if got[0].AccountID != nil || !got[0].IsPlatformAdmin {
+		t.Errorf("platform staff row = %+v, want account_id nil and is_platform_admin true", got[0])
+	}
+	if got[1].AccountID == nil || *got[1].AccountID != 9 || got[1].IsPlatformAdmin || !got[1].IsAccountOwner {
+		t.Errorf("client row = %+v, want account_id 9, not platform staff, owner flag kept", got[1])
+	}
+
+	body, err := json.Marshal(got[0])
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var flat map[string]any
+	if err := json.Unmarshal(body, &flat); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if v, present := flat["account_id"]; !present || v != nil {
+		t.Errorf("account_id must be present and null for platform staff, body %s", body)
+	}
+	if flat["email"] != "ops@platform.test" || flat["is_platform_admin"] != true {
+		t.Errorf("fields not flattened, body %s", body)
 	}
 }

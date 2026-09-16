@@ -130,6 +130,130 @@ definitions:
       website:
         type: string
     type: object
+  dto.AdminEmployeePage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.AdminEmployeeResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.AdminEmployeeResponse:
+    properties:
+      account_id:
+        type: integer
+      birth_date:
+        type: string
+      city:
+        maxLength: 100
+        type: string
+      country:
+        maxLength: 50
+        type: string
+      custom_fields:
+        type: object
+      dashboard_preferences:
+        items:
+          type: integer
+        type: array
+      default_company_id:
+        type: integer
+      email:
+        maxLength: 254
+        type: string
+      employee_id:
+        maxLength: 50
+        type: string
+      first_name:
+        maxLength: 100
+        type: string
+      group_id:
+        type: integer
+      hourly_labor_rate:
+        type: number
+      id:
+        type: integer
+      is_account_owner:
+        description: |-
+          IsAccountOwner is read-only and computed from account ownership. It is
+          ignored if sent; ownership is transferred with
+          POST /api/v1/admin/accounts/{id}/set-owner.
+        type: boolean
+      is_active:
+        description: |-
+          IsActive is the employee's status in the session's company. On the
+          cross-company /admin/employees listing it is the account-wide flag.
+        type: boolean
+      is_platform_admin:
+        type: boolean
+      is_technician:
+        type: boolean
+      is_vehicle_operator:
+        type: boolean
+      job_title:
+        maxLength: 100
+        type: string
+      last_name:
+        maxLength: 100
+        type: string
+      leave_date:
+        type: string
+      license_class:
+        maxLength: 10
+        type: string
+      license_expiry:
+        type: string
+      license_number:
+        maxLength: 50
+        type: string
+      license_state:
+        maxLength: 50
+        type: string
+      mobile_phone:
+        maxLength: 20
+        type: string
+      postal_code:
+        maxLength: 20
+        type: string
+      region:
+        maxLength: 50
+        type: string
+      role_id:
+        description: |-
+          RoleID is the role this employee holds in the session's company, not a
+          property of the person: the same employee can hold a different role, or
+          none, in another company. Null means no role there. Always null on the
+          cross-company /admin/employees listing, which has no session company.
+        type: integer
+      role_name:
+        description: |-
+          RoleName is that role's name, so a client can show it without reading
+          /roles, which only administrators may.
+        type: string
+      start_date:
+        type: string
+      street_address:
+        maxLength: 200
+        type: string
+      table_preferences:
+        items:
+          type: integer
+        type: array
+      updated_at:
+        type: string
+      user_id:
+        type: integer
+      work_phone:
+        maxLength: 20
+        type: string
+    type: object
   dto.ApproveTireAssignmentRequestRequest:
     properties:
       notes:
@@ -8033,11 +8157,16 @@ paths:
         which is what assigning an employee to a second company needs. Pass company_id
         to narrow it to one tenant''s staff — that is membership (employee_companies),
         not default_company_id, so an employee who belongs to a company that is not
-        their default is still listed.'
+        their default is still listed. Each row adds account_id (null for platform
+        staff) and is_platform_admin.'
       parameters:
       - description: Only employees who belong to this company
         in: query
         name: company_id
+        type: integer
+      - description: Only employees of this account
+        in: query
+        name: account_id
         type: integer
       - description: Page size
         in: query
@@ -8053,7 +8182,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.EmployeePage'
+            $ref: '#/definitions/dto.AdminEmployeePage'
         "400":
           description: Bad Request
           schema:

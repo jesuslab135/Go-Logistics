@@ -93,17 +93,33 @@ func membershipDelta(before, after []int64) []membershipChange {
 	return out
 }
 
+// toAdminEmployeeResponses pairs each row with its already-rendered base
+// response (which carries is_account_owner) and adds the cross-tenant fields.
+// rows and base must be the same length and order.
+func toAdminEmployeeResponses(rows []gen.Employee, base []dto.EmployeeResponse) []dto.AdminEmployeeResponse {
+	out := make([]dto.AdminEmployeeResponse, len(rows))
+	for i, r := range rows {
+		out[i] = dto.AdminEmployeeResponse{
+			EmployeeResponse: base[i],
+			AccountID:        r.AccountID,
+			IsPlatformAdmin:  r.IsPlatformAdmin,
+		}
+	}
+	return out
+}
+
 // List godoc
 //
 //	@Summary		List employees across every company
-//	@Description	Cross-company employee register. Unlike GET /api/v1/employees this is not scoped to the caller's company: it answers "who exists anywhere", which is what assigning an employee to a second company needs. Pass company_id to narrow it to one tenant's staff — that is membership (employee_companies), not default_company_id, so an employee who belongs to a company that is not their default is still listed.
+//	@Description	Cross-company employee register. Unlike GET /api/v1/employees this is not scoped to the caller's company: it answers "who exists anywhere", which is what assigning an employee to a second company needs. Pass company_id to narrow it to one tenant's staff — that is membership (employee_companies), not default_company_id, so an employee who belongs to a company that is not their default is still listed. Each row adds account_id (null for platform staff) and is_platform_admin.
 //	@Tags			admin
 //	@Produce		json
 //	@Security		BearerAuth
 //	@Param		company_id	query		int	false	"Only employees who belong to this company"
+//	@Param		account_id	query		int	false	"Only employees of this account"
 //	@Param		limit		query		int	false	"Page size"
 //	@Param		offset		query		int	false	"Offset"
-//	@Success		200			{object}	dto.EmployeePage
+//	@Success		200			{object}	dto.AdminEmployeePage
 //	@Failure		400			{object}	dto.ErrorResponse
 //	@Failure		401			{object}	dto.ErrorResponse
 //	@Failure		403			{object}	dto.ErrorResponse
@@ -120,9 +136,15 @@ func (h *AdminEmployeeHandler) List(c *gin.Context) {
 		apierr.Abort(c, err)
 		return
 	}
+	accountID, err := queryInt64(c, "account_id")
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
 
 	rows, err := h.q.ListAllEmployees(ctx, gen.ListAllEmployeesParams{
 		CompanyID: companyID,
+		AccountID: accountID,
 		Lim:       int32(p.Limit),
 		Off:       int32(p.Offset),
 	})
@@ -130,25 +152,28 @@ func (h *AdminEmployeeHandler) List(c *gin.Context) {
 		apierr.Abort(c, err)
 		return
 	}
-	// The count takes the same filter, or the page envelope would report a total
+	// The count takes the same filters, or the page envelope would report a total
 	// from a different question than the rows answer.
-	total, err := h.q.CountAllEmployees(ctx, companyID)
+	total, err := h.q.CountAllEmployees(ctx, gen.CountAllEmployeesParams{
+		CompanyID: companyID,
+		AccountID: accountID,
+	})
 	if err != nil {
 		apierr.Abort(c, err)
 		return
 	}
 
-	out := make([]dto.EmployeeResponse, len(rows))
+	base := make([]dto.EmployeeResponse, len(rows))
 	for i, r := range rows {
-		out[i] = toEmployeeResponse(r)
+		base[i] = toEmployeeResponse(r)
 	}
 	// No session company applies across tenants, so role_id stays null here;
 	// account ownership does not depend on one.
-	if err := applyAccountOwners(ctx, h.q, out); err != nil {
+	if err := applyAccountOwners(ctx, h.q, base); err != nil {
 		apierr.Abort(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, paginate.NewPage(out, total, p))
+	c.JSON(http.StatusOK, paginate.NewPage(toAdminEmployeeResponses(rows, base), total, p))
 }
 
 // ListCompanies godoc

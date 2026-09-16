@@ -701,7 +701,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Cross-company employee register. Unlike GET /api/v1/employees this is not scoped to the caller's company: it answers \"who exists anywhere\", which is what assigning an employee to a second company needs. Pass company_id to narrow it to one tenant's staff — that is membership (employee_companies), not default_company_id, so an employee who belongs to a company that is not their default is still listed.",
+                "description": "Cross-company employee register. Unlike GET /api/v1/employees this is not scoped to the caller's company: it answers \"who exists anywhere\", which is what assigning an employee to a second company needs. Pass company_id to narrow it to one tenant's staff — that is membership (employee_companies), not default_company_id, so an employee who belongs to a company that is not their default is still listed. Each row adds account_id (null for platform staff) and is_platform_admin.",
                 "produces": [
                     "application/json"
                 ],
@@ -714,6 +714,12 @@ const docTemplate = `{
                         "type": "integer",
                         "description": "Only employees who belong to this company",
                         "name": "company_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Only employees of this account",
+                        "name": "account_id",
                         "in": "query"
                     },
                     {
@@ -733,7 +739,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dto.EmployeePage"
+                            "$ref": "#/definitions/dto.AdminEmployeePage"
                         }
                     },
                     "400": {
@@ -18084,6 +18090,167 @@ const docTemplate = `{
                 },
                 "website": {
                     "type": "string"
+                }
+            }
+        },
+        "dto.AdminEmployeePage": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.AdminEmployeeResponse"
+                    }
+                },
+                "has_next": {
+                    "type": "boolean"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.AdminEmployeeResponse": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "integer"
+                },
+                "birth_date": {
+                    "type": "string"
+                },
+                "city": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "country": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "custom_fields": {
+                    "type": "object"
+                },
+                "dashboard_preferences": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "default_company_id": {
+                    "type": "integer"
+                },
+                "email": {
+                    "type": "string",
+                    "maxLength": 254
+                },
+                "employee_id": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "first_name": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "group_id": {
+                    "type": "integer"
+                },
+                "hourly_labor_rate": {
+                    "type": "number"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "is_account_owner": {
+                    "description": "IsAccountOwner is read-only and computed from account ownership. It is\nignored if sent; ownership is transferred with\nPOST /api/v1/admin/accounts/{id}/set-owner.",
+                    "type": "boolean"
+                },
+                "is_active": {
+                    "description": "IsActive is the employee's status in the session's company. On the\ncross-company /admin/employees listing it is the account-wide flag.",
+                    "type": "boolean"
+                },
+                "is_platform_admin": {
+                    "type": "boolean"
+                },
+                "is_technician": {
+                    "type": "boolean"
+                },
+                "is_vehicle_operator": {
+                    "type": "boolean"
+                },
+                "job_title": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "last_name": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "leave_date": {
+                    "type": "string"
+                },
+                "license_class": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "license_expiry": {
+                    "type": "string"
+                },
+                "license_number": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "license_state": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "mobile_phone": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "postal_code": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "region": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "role_id": {
+                    "description": "RoleID is the role this employee holds in the session's company, not a\nproperty of the person: the same employee can hold a different role, or\nnone, in another company. Null means no role there. Always null on the\ncross-company /admin/employees listing, which has no session company.",
+                    "type": "integer"
+                },
+                "role_name": {
+                    "description": "RoleName is that role's name, so a client can show it without reading\n/roles, which only administrators may.",
+                    "type": "string"
+                },
+                "start_date": {
+                    "type": "string"
+                },
+                "street_address": {
+                    "type": "string",
+                    "maxLength": 200
+                },
+                "table_preferences": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "integer"
+                },
+                "work_phone": {
+                    "type": "string",
+                    "maxLength": 20
                 }
             }
         },
