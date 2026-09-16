@@ -460,6 +460,7 @@ func registerAdminRoutes(api *gin.RouterGroup, d Deps) {
 	accounts := NewAdminAccountHandler(d.Queries, d.Pool)
 	admin.POST("/admin/accounts", accounts.Create)
 	admin.GET("/admin/accounts", accounts.List)
+	admin.GET("/admin/accounts/:id", accounts.Get)
 	admin.POST("/admin/accounts/:id/set-owner", accounts.SetOwner)
 }
 

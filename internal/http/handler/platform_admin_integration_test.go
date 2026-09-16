@@ -70,3 +70,40 @@ func TestAdminListsCompaniesAcrossAccounts(t *testing.T) {
 	// A client owner is not platform staff.
 	getJSON(t, srv.URL+"/api/v1/admin/companies", ownerA, http.StatusForbidden, nil)
 }
+
+// adminAccount is the subset of dto.AccountResponse these tests assert on.
+type adminAccount struct {
+	ID              int64  `json:"id"`
+	OwnerEmployeeID *int64 `json:"owner_employee_id"`
+	OwnerEmail      string `json:"owner_email"`
+	CompanyCount    int64  `json:"company_count"`
+	EmployeeCount   int64  `json:"employee_count"`
+}
+
+func TestAdminAccountDetailAndSetOwnerCarryCounts(t *testing.T) {
+	ctx := context.Background()
+	pool := setupThrowawayDB(t, ctx)
+	srv := httptest.NewServer(newIntegrationRouter(pool))
+	defer srv.Close()
+
+	platformToken := seedPlatformAdmin(t, ctx, pool, srv.URL)
+	accountID, ownerID, ownerEmail, ownerToken := provisionAccountOwner(t, srv.URL, platformToken)
+	createCompany(t, srv.URL, ownerToken, "Gamma Fleet", fmt.Sprintf("GAMMA-%d", time.Now().UnixNano()))
+
+	var detail adminAccount
+	getJSON(t, fmt.Sprintf("%s/api/v1/admin/accounts/%d", srv.URL, accountID), platformToken, http.StatusOK, &detail)
+	if detail.ID != accountID || detail.OwnerEmail != ownerEmail || detail.CompanyCount != 1 || detail.EmployeeCount != 1 {
+		t.Fatalf("account detail = %+v, want id %d, owner %s, 1 company, 1 employee", detail, accountID, ownerEmail)
+	}
+	getJSON(t, srv.URL+"/api/v1/admin/accounts/999999", platformToken, http.StatusNotFound, nil)
+	getJSON(t, fmt.Sprintf("%s/api/v1/admin/accounts/%d", srv.URL, accountID), ownerToken, http.StatusForbidden, nil)
+
+	// Re-affirming the current owner is a valid transfer; the response must be
+	// the same complete account the detail route returns, not a partial one.
+	var afterSet adminAccount
+	postJSON(t, fmt.Sprintf("%s/api/v1/admin/accounts/%d/set-owner", srv.URL, accountID), platformToken,
+		map[string]any{"employee_id": ownerID}, http.StatusOK, &afterSet)
+	if afterSet.OwnerEmail != ownerEmail || afterSet.CompanyCount != 1 || afterSet.EmployeeCount != 1 {
+		t.Fatalf("set-owner response = %+v, want owner %s with counts 1/1", afterSet, ownerEmail)
+	}
+}

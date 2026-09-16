@@ -51,3 +51,16 @@ SELECT EXISTS (
     SELECT 1 FROM employee e
     WHERE e.id = sqlc.arg(employee_id) AND e.account_id = sqlc.arg(account_id)
 );
+
+-- GetAccountWithCounts is ListAccountsWithCounts for one account. The select list
+-- must stay identical to ListAccountsWithCounts: the handler converts this row
+-- to that row type, which only compiles while the two match.
+-- name: GetAccountWithCounts :one
+SELECT
+    a.*,
+    oe.email AS owner_email,
+    (SELECT count(*) FROM company  c WHERE c.account_id = a.id) AS company_count,
+    (SELECT count(*) FROM employee e WHERE e.account_id = a.id) AS employee_count
+FROM account a
+LEFT JOIN employee oe ON oe.id = a.owner_employee_id
+WHERE a.id = sqlc.arg(id);

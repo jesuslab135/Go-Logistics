@@ -55,6 +55,25 @@ definitions:
           $ref: '#/definitions/dto.AccountEmployeeMembership'
         type: array
     type: object
+  dto.AccountResponse:
+    properties:
+      company_count:
+        type: integer
+      created_at:
+        type: string
+      employee_count:
+        type: integer
+      id:
+        type: integer
+      is_active:
+        type: boolean
+      name:
+        type: string
+      owner_email:
+        type: string
+      owner_employee_id:
+        type: integer
+    type: object
   dto.AdminCompanyPage:
     properties:
       data:
@@ -7700,6 +7719,44 @@ paths:
       summary: Replace one person's company memberships and roles
       tags:
       - account
+  /api/v1/admin/accounts/{id}:
+    get:
+      description: The account with its owner's email and its company and employee
+        counts — the same row GET /api/v1/admin/accounts lists.
+      parameters:
+      - description: Account id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.AccountResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get one client account
+      tags:
+      - admin
   /api/v1/admin/companies:
     get:
       description: Cross-tenant company register. GET /api/v1/companies is scoped

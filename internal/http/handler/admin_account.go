@@ -204,6 +204,35 @@ func (h *AdminAccountHandler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, paginate.NewPage(out, total, p))
 }
 
+// Get godoc
+//
+//	@Summary		Get one client account
+//	@Description	The account with its owner's email and its company and employee counts — the same row GET /api/v1/admin/accounts lists.
+//	@Tags			admin
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			id	path		int	true	"Account id"
+//	@Success		200	{object}	dto.AccountResponse
+//	@Failure		400	{object}	dto.ErrorResponse
+//	@Failure		401	{object}	dto.ErrorResponse
+//	@Failure		403	{object}	dto.ErrorResponse
+//	@Failure		404	{object}	dto.ErrorResponse
+//	@Router			/api/v1/admin/accounts/{id} [get]
+func (h *AdminAccountHandler) Get(c *gin.Context) {
+	id, err := adminAccountParam(c)
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	row, err := h.q.GetAccountWithCounts(c.Request.Context(), id)
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	// The two row types are field-for-field identical (see the query comment).
+	c.JSON(http.StatusOK, toAccountResponse(gen.ListAccountsWithCountsRow(row)))
+}
+
 // SetOwner transfers ownership of an account to an employee who already
 // belongs to it. "No such account" (404, via GetAccount) and "that employee is
 // not a member of this account" (422) are different failures: the first means
@@ -254,16 +283,12 @@ func (h *AdminAccountHandler) SetOwner(c *gin.Context) {
 		return
 	}
 
-	updated, err := h.q.GetAccount(ctx, id)
+	// Return the same complete row as Get, so a client can replace its list row
+	// with this response instead of re-fetching.
+	updated, err := h.q.GetAccountWithCounts(ctx, id)
 	if err != nil {
 		apierr.Abort(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, dto.AccountResponse{
-		ID:              updated.ID,
-		Name:            updated.Name,
-		OwnerEmployeeID: updated.OwnerEmployeeID,
-		IsActive:        updated.IsActive,
-		CreatedAt:       updated.CreatedAt,
-	})
+	c.JSON(http.StatusOK, toAccountResponse(gen.ListAccountsWithCountsRow(updated)))
 }
