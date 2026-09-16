@@ -241,6 +241,185 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/admin/accounts/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "The account with its owner's email and its company and employee counts — the same row GET /api/v1/admin/accounts lists.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Get one client account",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Account id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.AccountResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/companies": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Cross-tenant company register. GET /api/v1/companies is scoped to the caller's memberships and platform staff hold none, so this is the only way to enumerate companies. Pass account_id to narrow it to one client. employee_count counts memberships.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "List companies across every client",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Only companies of this account",
+                        "name": "account_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Offset",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.AdminCompanyPage"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/companies/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "One company from any client, with the same account fields as the list.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Get any company",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Company id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.AdminCompanyResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/admin/companies/{id}/owner": {
             "get": {
                 "security": [
@@ -522,7 +701,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Cross-company employee register. Unlike GET /api/v1/employees this is not scoped to the caller's company: it answers \"who exists anywhere\", which is what assigning an employee to a second company needs. Pass company_id to narrow it to one tenant's staff — that is membership (employee_companies), not default_company_id, so an employee who belongs to a company that is not their default is still listed.",
+                "description": "Cross-company employee register. Unlike GET /api/v1/employees this is not scoped to the caller's company: it answers \"who exists anywhere\", which is what assigning an employee to a second company needs. Pass company_id to narrow it to one tenant's staff — that is membership (employee_companies), not default_company_id, so an employee who belongs to a company that is not their default is still listed. Each row adds account_id (null for platform staff) and is_platform_admin.",
                 "produces": [
                     "application/json"
                 ],
@@ -535,6 +714,12 @@ const docTemplate = `{
                         "type": "integer",
                         "description": "Only employees who belong to this company",
                         "name": "company_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Only employees of this account",
+                        "name": "account_id",
                         "in": "query"
                     },
                     {
@@ -554,7 +739,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dto.EmployeePage"
+                            "$ref": "#/definitions/dto.AdminEmployeePage"
                         }
                     },
                     "400": {
@@ -641,7 +826,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Full overwrite of employee_companies. Requires a platform administrator. company_ids must be non-empty — an employee with no membership cannot log in, so use is_active to deactivate instead. default_company_id must be null or one of company_ids; omitting it clears the employee's stored default_company_id, so send it on every call unless you mean to clear it. Every addition and removal is recorded in membership_audit in the same transaction as the change.",
+                "description": "Full overwrite of employee_companies. Requires a platform administrator. company_ids must be non-empty — an employee with no membership cannot log in, so use is_active to deactivate instead. default_company_id must be null or one of company_ids; omitting it clears the employee's stored default_company_id, so send it on every call unless you mean to clear it. Every addition and removal is recorded in membership_audit in the same transaction as the change. Every company must belong to the employee's account, and platform staff can hold no membership; either violation is a 422 naming company_ids.",
                 "consumes": [
                     "application/json"
                 ],
@@ -17791,6 +17976,281 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/dto.AccountEmployeeMembership"
                     }
+                }
+            }
+        },
+        "dto.AccountResponse": {
+            "type": "object",
+            "properties": {
+                "company_count": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "employee_count": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "owner_email": {
+                    "type": "string"
+                },
+                "owner_employee_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.AdminCompanyPage": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.AdminCompanyResponse"
+                    }
+                },
+                "has_next": {
+                    "type": "boolean"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.AdminCompanyResponse": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "integer"
+                },
+                "account_name": {
+                    "type": "string"
+                },
+                "address": {
+                    "type": "string"
+                },
+                "city": {
+                    "type": "string"
+                },
+                "country": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "employee_count": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "logo": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "postal_code": {
+                    "type": "string"
+                },
+                "region": {
+                    "type": "string"
+                },
+                "system_of_measurement": {
+                    "type": "string"
+                },
+                "tax_id": {
+                    "type": "string"
+                },
+                "timezone": {
+                    "type": "string"
+                },
+                "website": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.AdminEmployeePage": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.AdminEmployeeResponse"
+                    }
+                },
+                "has_next": {
+                    "type": "boolean"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.AdminEmployeeResponse": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "integer"
+                },
+                "birth_date": {
+                    "type": "string"
+                },
+                "city": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "country": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "custom_fields": {
+                    "type": "object"
+                },
+                "dashboard_preferences": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "default_company_id": {
+                    "type": "integer"
+                },
+                "email": {
+                    "type": "string",
+                    "maxLength": 254
+                },
+                "employee_id": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "first_name": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "group_id": {
+                    "type": "integer"
+                },
+                "hourly_labor_rate": {
+                    "type": "number"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "is_account_owner": {
+                    "description": "IsAccountOwner is read-only and computed from account ownership. It is\nignored if sent; ownership is transferred with\nPOST /api/v1/admin/accounts/{id}/set-owner.",
+                    "type": "boolean"
+                },
+                "is_active": {
+                    "description": "IsActive is the employee's status in the session's company. On the\ncross-company /admin/employees listing it is the account-wide flag.",
+                    "type": "boolean"
+                },
+                "is_platform_admin": {
+                    "type": "boolean"
+                },
+                "is_technician": {
+                    "type": "boolean"
+                },
+                "is_vehicle_operator": {
+                    "type": "boolean"
+                },
+                "job_title": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "last_name": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "leave_date": {
+                    "type": "string"
+                },
+                "license_class": {
+                    "type": "string",
+                    "maxLength": 10
+                },
+                "license_expiry": {
+                    "type": "string"
+                },
+                "license_number": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "license_state": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "mobile_phone": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "postal_code": {
+                    "type": "string",
+                    "maxLength": 20
+                },
+                "region": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "role_id": {
+                    "description": "RoleID is the role this employee holds in the session's company, not a\nproperty of the person: the same employee can hold a different role, or\nnone, in another company. Null means no role there. Always null on the\ncross-company /admin/employees listing, which has no session company.",
+                    "type": "integer"
+                },
+                "role_name": {
+                    "description": "RoleName is that role's name, so a client can show it without reading\n/roles, which only administrators may.",
+                    "type": "string"
+                },
+                "start_date": {
+                    "type": "string"
+                },
+                "street_address": {
+                    "type": "string",
+                    "maxLength": 200
+                },
+                "table_preferences": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "integer"
+                },
+                "work_phone": {
+                    "type": "string",
+                    "maxLength": 20
                 }
             }
         },

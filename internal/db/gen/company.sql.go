@@ -30,6 +30,18 @@ func (q *Queries) BootstrapEmployeeDefaultCompany(ctx context.Context, arg Boots
 	return err
 }
 
+const countAdminCompanies = `-- name: CountAdminCompanies :one
+SELECT count(*) FROM company c
+WHERE $1::bigint IS NULL OR c.account_id = $1
+`
+
+func (q *Queries) CountAdminCompanies(ctx context.Context, accountID *int64) (int64, error) {
+	row := q.db.QueryRow(ctx, countAdminCompanies, accountID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countCompanies = `-- name: CountCompanies :one
 SELECT count(*) FROM company c
 WHERE EXISTS (SELECT 1 FROM employee_companies ec WHERE ec.company_id = c.id AND ec.employee_id = $1)
@@ -51,6 +63,27 @@ SELECT count(*) FROM company WHERE id = ANY($1::bigint[])
 // foreign-key violation would surface as.
 func (q *Queries) CountCompaniesByIDs(ctx context.Context, ids []int64) (int64, error) {
 	row := q.db.QueryRow(ctx, countCompaniesByIDs, ids)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countCompaniesInAccount = `-- name: CountCompaniesInAccount :one
+SELECT count(*) FROM company
+WHERE id = ANY($1::bigint[]) AND account_id = $2
+`
+
+type CountCompaniesInAccountParams struct {
+	Ids       []int64
+	AccountID int64
+}
+
+// Pre-flight for a membership replace, after CountCompaniesByIDs has confirmed
+// every id exists: a mismatch means at least one company belongs to a different
+// client, which is a 422 naming company_ids rather than the unnamed 409 the
+// composite foreign key on employee_companies would raise.
+func (q *Queries) CountCompaniesInAccount(ctx context.Context, arg CountCompaniesInAccountParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countCompaniesInAccount, arg.Ids, arg.AccountID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -141,6 +174,49 @@ type DeleteCompanyParams struct {
 func (q *Queries) DeleteCompany(ctx context.Context, arg DeleteCompanyParams) error {
 	_, err := q.db.Exec(ctx, deleteCompany, arg.ID, arg.EmployeeID)
 	return err
+}
+
+const getAdminCompany = `-- name: GetAdminCompany :one
+SELECT c.id, c.name, c.tax_id, c.address, c.created_at, c.phone, c.email, c.website, c.logo, c.city, c.region, c.postal_code, c.country, c.timezone, c.currency, c.system_of_measurement, c.account_id,
+    a.name AS account_name,
+    (SELECT count(*) FROM employee_companies ec WHERE ec.company_id = c.id) AS employee_count
+FROM company c
+JOIN account a ON a.id = c.account_id
+WHERE c.id = $1
+`
+
+type GetAdminCompanyRow struct {
+	Company       Company
+	AccountName   string
+	EmployeeCount int64
+}
+
+// Single-company read with the same account fields as ListAdminCompanies.
+func (q *Queries) GetAdminCompany(ctx context.Context, id int64) (GetAdminCompanyRow, error) {
+	row := q.db.QueryRow(ctx, getAdminCompany, id)
+	var i GetAdminCompanyRow
+	err := row.Scan(
+		&i.Company.ID,
+		&i.Company.Name,
+		&i.Company.TaxID,
+		&i.Company.Address,
+		&i.Company.CreatedAt,
+		&i.Company.Phone,
+		&i.Company.Email,
+		&i.Company.Website,
+		&i.Company.Logo,
+		&i.Company.City,
+		&i.Company.Region,
+		&i.Company.PostalCode,
+		&i.Company.Country,
+		&i.Company.Timezone,
+		&i.Company.Currency,
+		&i.Company.SystemOfMeasurement,
+		&i.Company.AccountID,
+		&i.AccountName,
+		&i.EmployeeCount,
+	)
+	return i, err
 }
 
 const getCompany = `-- name: GetCompany :one
@@ -245,6 +321,72 @@ func (q *Queries) GetCompanyOwner(ctx context.Context, companyID int64) (GetComp
 		&i.JobTitle,
 	)
 	return i, err
+}
+
+const listAdminCompanies = `-- name: ListAdminCompanies :many
+SELECT c.id, c.name, c.tax_id, c.address, c.created_at, c.phone, c.email, c.website, c.logo, c.city, c.region, c.postal_code, c.country, c.timezone, c.currency, c.system_of_measurement, c.account_id,
+    a.name AS account_name,
+    (SELECT count(*) FROM employee_companies ec WHERE ec.company_id = c.id) AS employee_count
+FROM company c
+JOIN account a ON a.id = c.account_id
+WHERE $1::bigint IS NULL OR c.account_id = $1
+ORDER BY c.name, c.id
+LIMIT $3 OFFSET $2
+`
+
+type ListAdminCompaniesParams struct {
+	AccountID *int64
+	Off       int32
+	Lim       int32
+}
+
+type ListAdminCompaniesRow struct {
+	Company       Company
+	AccountName   string
+	EmployeeCount int64
+}
+
+// Cross-tenant company list for the admin namespace. ListCompanies is scoped to
+// the caller's memberships, and platform staff hold none. account_id narrows it
+// to one client; a null argument means every client.
+func (q *Queries) ListAdminCompanies(ctx context.Context, arg ListAdminCompaniesParams) ([]ListAdminCompaniesRow, error) {
+	rows, err := q.db.Query(ctx, listAdminCompanies, arg.AccountID, arg.Off, arg.Lim)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAdminCompaniesRow{}
+	for rows.Next() {
+		var i ListAdminCompaniesRow
+		if err := rows.Scan(
+			&i.Company.ID,
+			&i.Company.Name,
+			&i.Company.TaxID,
+			&i.Company.Address,
+			&i.Company.CreatedAt,
+			&i.Company.Phone,
+			&i.Company.Email,
+			&i.Company.Website,
+			&i.Company.Logo,
+			&i.Company.City,
+			&i.Company.Region,
+			&i.Company.PostalCode,
+			&i.Company.Country,
+			&i.Company.Timezone,
+			&i.Company.Currency,
+			&i.Company.SystemOfMeasurement,
+			&i.Company.AccountID,
+			&i.AccountName,
+			&i.EmployeeCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listCompanies = `-- name: ListCompanies :many

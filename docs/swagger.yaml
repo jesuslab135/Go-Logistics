@@ -55,6 +55,205 @@ definitions:
           $ref: '#/definitions/dto.AccountEmployeeMembership'
         type: array
     type: object
+  dto.AccountResponse:
+    properties:
+      company_count:
+        type: integer
+      created_at:
+        type: string
+      employee_count:
+        type: integer
+      id:
+        type: integer
+      is_active:
+        type: boolean
+      name:
+        type: string
+      owner_email:
+        type: string
+      owner_employee_id:
+        type: integer
+    type: object
+  dto.AdminCompanyPage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.AdminCompanyResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.AdminCompanyResponse:
+    properties:
+      account_id:
+        type: integer
+      account_name:
+        type: string
+      address:
+        type: string
+      city:
+        type: string
+      country:
+        type: string
+      created_at:
+        type: string
+      currency:
+        type: string
+      email:
+        type: string
+      employee_count:
+        type: integer
+      id:
+        type: integer
+      logo:
+        type: string
+      name:
+        type: string
+      phone:
+        type: string
+      postal_code:
+        type: string
+      region:
+        type: string
+      system_of_measurement:
+        type: string
+      tax_id:
+        type: string
+      timezone:
+        type: string
+      website:
+        type: string
+    type: object
+  dto.AdminEmployeePage:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.AdminEmployeeResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.AdminEmployeeResponse:
+    properties:
+      account_id:
+        type: integer
+      birth_date:
+        type: string
+      city:
+        maxLength: 100
+        type: string
+      country:
+        maxLength: 50
+        type: string
+      custom_fields:
+        type: object
+      dashboard_preferences:
+        items:
+          type: integer
+        type: array
+      default_company_id:
+        type: integer
+      email:
+        maxLength: 254
+        type: string
+      employee_id:
+        maxLength: 50
+        type: string
+      first_name:
+        maxLength: 100
+        type: string
+      group_id:
+        type: integer
+      hourly_labor_rate:
+        type: number
+      id:
+        type: integer
+      is_account_owner:
+        description: |-
+          IsAccountOwner is read-only and computed from account ownership. It is
+          ignored if sent; ownership is transferred with
+          POST /api/v1/admin/accounts/{id}/set-owner.
+        type: boolean
+      is_active:
+        description: |-
+          IsActive is the employee's status in the session's company. On the
+          cross-company /admin/employees listing it is the account-wide flag.
+        type: boolean
+      is_platform_admin:
+        type: boolean
+      is_technician:
+        type: boolean
+      is_vehicle_operator:
+        type: boolean
+      job_title:
+        maxLength: 100
+        type: string
+      last_name:
+        maxLength: 100
+        type: string
+      leave_date:
+        type: string
+      license_class:
+        maxLength: 10
+        type: string
+      license_expiry:
+        type: string
+      license_number:
+        maxLength: 50
+        type: string
+      license_state:
+        maxLength: 50
+        type: string
+      mobile_phone:
+        maxLength: 20
+        type: string
+      postal_code:
+        maxLength: 20
+        type: string
+      region:
+        maxLength: 50
+        type: string
+      role_id:
+        description: |-
+          RoleID is the role this employee holds in the session's company, not a
+          property of the person: the same employee can hold a different role, or
+          none, in another company. Null means no role there. Always null on the
+          cross-company /admin/employees listing, which has no session company.
+        type: integer
+      role_name:
+        description: |-
+          RoleName is that role's name, so a client can show it without reading
+          /roles, which only administrators may.
+        type: string
+      start_date:
+        type: string
+      street_address:
+        maxLength: 200
+        type: string
+      table_preferences:
+        items:
+          type: integer
+        type: array
+      updated_at:
+        type: string
+      user_id:
+        type: integer
+      work_phone:
+        maxLength: 20
+        type: string
+    type: object
   dto.ApproveTireAssignmentRequestRequest:
     properties:
       notes:
@@ -7644,6 +7843,125 @@ paths:
       summary: Replace one person's company memberships and roles
       tags:
       - account
+  /api/v1/admin/accounts/{id}:
+    get:
+      description: The account with its owner's email and its company and employee
+        counts — the same row GET /api/v1/admin/accounts lists.
+      parameters:
+      - description: Account id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.AccountResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get one client account
+      tags:
+      - admin
+  /api/v1/admin/companies:
+    get:
+      description: Cross-tenant company register. GET /api/v1/companies is scoped
+        to the caller's memberships and platform staff hold none, so this is the only
+        way to enumerate companies. Pass account_id to narrow it to one client. employee_count
+        counts memberships.
+      parameters:
+      - description: Only companies of this account
+        in: query
+        name: account_id
+        type: integer
+      - description: Page size
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.AdminCompanyPage'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List companies across every client
+      tags:
+      - admin
+  /api/v1/admin/companies/{id}:
+    get:
+      description: One company from any client, with the same account fields as the
+        list.
+      parameters:
+      - description: Company id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.AdminCompanyResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get any company
+      tags:
+      - admin
   /api/v1/admin/companies/{id}/owner:
     get:
       description: The owner of the account this company belongs to. Ownership is
@@ -7839,11 +8157,16 @@ paths:
         which is what assigning an employee to a second company needs. Pass company_id
         to narrow it to one tenant''s staff — that is membership (employee_companies),
         not default_company_id, so an employee who belongs to a company that is not
-        their default is still listed.'
+        their default is still listed. Each row adds account_id (null for platform
+        staff) and is_platform_admin.'
       parameters:
       - description: Only employees who belong to this company
         in: query
         name: company_id
+        type: integer
+      - description: Only employees of this account
+        in: query
+        name: account_id
         type: integer
       - description: Page size
         in: query
@@ -7859,7 +8182,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.EmployeePage'
+            $ref: '#/definitions/dto.AdminEmployeePage'
         "400":
           description: Bad Request
           schema:
@@ -7923,7 +8246,9 @@ paths:
         in, so use is_active to deactivate instead. default_company_id must be null
         or one of company_ids; omitting it clears the employee's stored default_company_id,
         so send it on every call unless you mean to clear it. Every addition and removal
-        is recorded in membership_audit in the same transaction as the change.
+        is recorded in membership_audit in the same transaction as the change. Every
+        company must belong to the employee's account, and platform staff can hold
+        no membership; either violation is a 422 naming company_ids.
       parameters:
       - description: Employee id
         in: path
