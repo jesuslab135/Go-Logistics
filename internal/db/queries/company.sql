@@ -90,3 +90,29 @@ FROM company c
 JOIN account a  ON a.id = c.account_id
 JOIN employee e ON e.id = a.owner_employee_id
 WHERE c.id = sqlc.arg(company_id);
+
+-- name: ListAdminCompanies :many
+-- Cross-tenant company list for the admin namespace. ListCompanies is scoped to
+-- the caller's memberships, and platform staff hold none. account_id narrows it
+-- to one client; a null argument means every client.
+SELECT sqlc.embed(c),
+    a.name AS account_name,
+    (SELECT count(*) FROM employee_companies ec WHERE ec.company_id = c.id) AS employee_count
+FROM company c
+JOIN account a ON a.id = c.account_id
+WHERE sqlc.narg(account_id)::bigint IS NULL OR c.account_id = sqlc.narg(account_id)
+ORDER BY c.name, c.id
+LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off);
+
+-- name: CountAdminCompanies :one
+SELECT count(*) FROM company c
+WHERE sqlc.narg(account_id)::bigint IS NULL OR c.account_id = sqlc.narg(account_id);
+
+-- name: GetAdminCompany :one
+-- Single-company read with the same account fields as ListAdminCompanies.
+SELECT sqlc.embed(c),
+    a.name AS account_name,
+    (SELECT count(*) FROM employee_companies ec WHERE ec.company_id = c.id) AS employee_count
+FROM company c
+JOIN account a ON a.id = c.account_id
+WHERE c.id = sqlc.arg(id);
