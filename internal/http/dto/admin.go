@@ -36,3 +36,21 @@ type CompanyOwnerEnvelope struct {
 type SetCompanyOwnerRequest struct {
 	EmployeeID int64 `json:"employee_id" binding:"required,min=1"`
 }
+
+// AdminCompanyResponse is a company as the platform sees it: the tenant fields
+// plus the client it belongs to, which the tenant-facing CompanyResponse leaves
+// out because a tenant only ever sees its own. Embedded, so the JSON is flat.
+type AdminCompanyResponse struct {
+	CompanyResponse
+	AccountID     int64  `json:"account_id"`
+	AccountName   string `json:"account_name"`
+	EmployeeCount int64  `json:"employee_count"`
+}
+
+type AdminCompanyPage struct {
+	Data    []AdminCompanyResponse `json:"data"`
+	Total   int64                  `json:"total"`
+	Limit   int                    `json:"limit"`
+	Offset  int                    `json:"offset"`
+	HasNext bool                   `json:"has_next"`
+}

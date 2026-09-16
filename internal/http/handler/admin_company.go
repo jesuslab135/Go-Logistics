@@ -15,10 +15,11 @@ import (
 	"fleet/internal/platform/paginate"
 )
 
-// AdminCompanyHandler serves the cross-company /admin/companies routes: owner
-// read/set here, and the roles and work-order-statuses lists. Every route is
-// addressed by explicit company id rather than the caller's own membership,
-// which is what the /api/v1/companies namespace already covers.
+// AdminCompanyHandler serves the cross-company /admin/companies routes: the
+// cross-tenant list and detail, owner read/set, and the roles and
+// work-order-statuses lists. Every route is addressed by explicit company id
+// rather than the caller's own membership, which is what the
+// /api/v1/companies namespace already covers.
 type AdminCompanyHandler struct {
 	q    *gen.Queries
 	pool *pgxpool.Pool
@@ -46,6 +47,90 @@ func toCompanyOwnerResponse(row gen.GetCompanyOwnerRow) dto.CompanyOwnerResponse
 		Email:      row.Email,
 		JobTitle:   row.JobTitle,
 	}
+}
+
+func toAdminCompanyResponse(c gen.Company, accountName string, employeeCount int64) dto.AdminCompanyResponse {
+	return dto.AdminCompanyResponse{
+		CompanyResponse: toCompanyResponse(c),
+		AccountID:       c.AccountID,
+		AccountName:     accountName,
+		EmployeeCount:   employeeCount,
+	}
+}
+
+// List godoc
+//
+//	@Summary		List companies across every client
+//	@Description	Cross-tenant company register. GET /api/v1/companies is scoped to the caller's memberships and platform staff hold none, so this is the only way to enumerate companies. Pass account_id to narrow it to one client. employee_count counts memberships.
+//	@Tags			admin
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			account_id	query		int	false	"Only companies of this account"
+//	@Param			limit		query		int	false	"Page size"
+//	@Param			offset		query		int	false	"Offset"
+//	@Success		200			{object}	dto.AdminCompanyPage
+//	@Failure		400			{object}	dto.ErrorResponse
+//	@Failure		401			{object}	dto.ErrorResponse
+//	@Failure		403			{object}	dto.ErrorResponse
+//	@Router			/api/v1/admin/companies [get]
+func (h *AdminCompanyHandler) List(c *gin.Context) {
+	accountID, err := queryInt64(c, "account_id")
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+
+	ctx := c.Request.Context()
+	p := paginate.Parse(c)
+	rows, err := h.q.ListAdminCompanies(ctx, gen.ListAdminCompaniesParams{
+		AccountID: accountID,
+		Lim:       int32(p.Limit),
+		Off:       int32(p.Offset),
+	})
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	// Same filter as the rows, or the envelope's total answers a different question.
+	total, err := h.q.CountAdminCompanies(ctx, accountID)
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+
+	out := make([]dto.AdminCompanyResponse, len(rows))
+	for i, r := range rows {
+		out[i] = toAdminCompanyResponse(r.Company, r.AccountName, r.EmployeeCount)
+	}
+	c.JSON(http.StatusOK, paginate.NewPage(out, total, p))
+}
+
+// Get godoc
+//
+//	@Summary		Get any company
+//	@Description	One company from any client, with the same account fields as the list.
+//	@Tags			admin
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			id	path		int	true	"Company id"
+//	@Success		200	{object}	dto.AdminCompanyResponse
+//	@Failure		400	{object}	dto.ErrorResponse
+//	@Failure		401	{object}	dto.ErrorResponse
+//	@Failure		403	{object}	dto.ErrorResponse
+//	@Failure		404	{object}	dto.ErrorResponse
+//	@Router			/api/v1/admin/companies/{id} [get]
+func (h *AdminCompanyHandler) Get(c *gin.Context) {
+	id, err := adminCompanyParam(c)
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	row, err := h.q.GetAdminCompany(c.Request.Context(), id)
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, toAdminCompanyResponse(row.Company, row.AccountName, row.EmployeeCount))
 }
 
 // Owner godoc
