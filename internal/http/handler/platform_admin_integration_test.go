@@ -4,6 +4,7 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -169,4 +170,61 @@ func TestAdminEmployeesSayWhichClientTheyBelongTo(t *testing.T) {
 	}
 
 	getJSON(t, srv.URL+"/api/v1/admin/employees?account_id=x", platformToken, http.StatusBadRequest, nil)
+}
+
+func TestMembershipAcrossClientsIsA422NamingCompanyIDs(t *testing.T) {
+	ctx := context.Background()
+	pool := setupThrowawayDB(t, ctx)
+	srv := httptest.NewServer(newIntegrationRouter(pool))
+	defer srv.Close()
+
+	platformToken := seedPlatformAdmin(t, ctx, pool, srv.URL)
+	platformID := meEmployeeID(t, srv.URL, platformToken)
+	_, ownerA, _, tokenA := provisionAccountOwner(t, srv.URL, platformToken)
+	_, _, _, tokenB := provisionAccountOwner(t, srv.URL, platformToken)
+	ts := time.Now().UnixNano()
+	companyA := createCompany(t, srv.URL, tokenA, "Delta Fleet", fmt.Sprintf("DELTA-%d", ts))
+	companyB := createCompany(t, srv.URL, tokenB, "Epsilon Fleet", fmt.Sprintf("EPS-%d", ts))
+
+	namesCompanyIDs := func(body []byte) {
+		t.Helper()
+		var e struct {
+			Error struct {
+				Code    string            `json:"code"`
+				Details map[string]string `json:"details"`
+			} `json:"error"`
+		}
+		if err := json.Unmarshal(body, &e); err != nil {
+			t.Fatalf("decode error body: %v (%s)", err, body)
+		}
+		if e.Error.Code != "validation_failed" || e.Error.Details["company_ids"] == "" {
+			t.Fatalf("error = %s, want validation_failed naming company_ids", body)
+		}
+	}
+
+	// Owner A into client B's company.
+	body := putJSON(t, fmt.Sprintf("%s/api/v1/admin/employees/%d/companies", srv.URL, ownerA), platformToken,
+		map[string]any{"company_ids": []int64{companyA, companyB}, "default_company_id": companyA},
+		http.StatusUnprocessableEntity, nil)
+	namesCompanyIDs(body)
+
+	// Nothing changed.
+	var memberships struct {
+		CompanyIDs []int64 `json:"company_ids"`
+	}
+	getJSON(t, fmt.Sprintf("%s/api/v1/admin/employees/%d/companies", srv.URL, ownerA), platformToken, http.StatusOK, &memberships)
+	if len(memberships.CompanyIDs) != 1 || memberships.CompanyIDs[0] != companyA {
+		t.Fatalf("owner A memberships = %v, want unchanged [%d]", memberships.CompanyIDs, companyA)
+	}
+
+	// Platform staff into any company.
+	body = putJSON(t, fmt.Sprintf("%s/api/v1/admin/employees/%d/companies", srv.URL, platformID), platformToken,
+		map[string]any{"company_ids": []int64{companyA}, "default_company_id": companyA},
+		http.StatusUnprocessableEntity, nil)
+	namesCompanyIDs(body)
+
+	// The valid case still works.
+	putJSON(t, fmt.Sprintf("%s/api/v1/admin/employees/%d/companies", srv.URL, ownerA), platformToken,
+		map[string]any{"company_ids": []int64{companyA}, "default_company_id": companyA},
+		http.StatusOK, nil)
 }
