@@ -207,6 +207,22 @@ account and no company. They log in with a company-less session that reaches
 `/api/v1/admin/*` and nothing tenant-scoped. Prefer it to granting the flag to
 one of a client's own employees, which mixes an operator with a tenant user.
 
+The namespace, all gated on the flag:
+
+| Route | Purpose |
+|---|---|
+| `GET /api/v1/admin/accounts`, `GET /api/v1/admin/accounts/{id}` | Clients, with owner email and company/employee counts |
+| `POST /api/v1/admin/accounts` | Provision a client: account, owner and password in one transaction |
+| `POST /api/v1/admin/accounts/{id}/set-owner` | Transfer ownership; returns the full account |
+| `GET /api/v1/admin/companies?account_id=`, `GET /api/v1/admin/companies/{id}` | Every company, with its account |
+| `GET /api/v1/admin/companies/{id}/owner`, `POST …/set-owner` | The owner of a company's account |
+| `GET /api/v1/admin/companies/{id}/roles`, `…/work-order-statuses` | Provisioning check |
+| `GET /api/v1/admin/employees?company_id=&account_id=` | Everyone, with `account_id` and `is_platform_admin` |
+| `GET`/`PUT /api/v1/admin/employees/{id}/companies` | Memberships; every company must belong to the employee's account |
+
+Tenant data (assets, work orders, inventory…) is deliberately not reachable from
+this namespace.
+
 The flag is read from the database on every request, like every other
 authorization fact, so revoking it takes effect on the caller's next request
 rather than at their next token refresh.
