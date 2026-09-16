@@ -80,6 +80,14 @@ SELECT count(*) FROM company WHERE id = ANY(sqlc.arg(ids)::bigint[]);
 -- Unscoped single-company read for the admin namespace.
 SELECT * FROM company WHERE id = sqlc.arg(id);
 
+-- name: CountCompaniesInAccount :one
+-- Pre-flight for a membership replace, after CountCompaniesByIDs has confirmed
+-- every id exists: a mismatch means at least one company belongs to a different
+-- client, which is a 422 naming company_ids rather than the unnamed 409 the
+-- composite foreign key on employee_companies would raise.
+SELECT count(*) FROM company
+WHERE id = ANY(sqlc.arg(ids)::bigint[]) AND account_id = sqlc.arg(account_id);
+
 -- name: GetCompanyOwner :one
 -- A company's owner is the owner of the account it belongs to. Ownership lives
 -- on account.owner_employee_id, not on the employee row, so an account has

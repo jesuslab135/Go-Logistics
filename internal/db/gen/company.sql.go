@@ -68,6 +68,27 @@ func (q *Queries) CountCompaniesByIDs(ctx context.Context, ids []int64) (int64, 
 	return count, err
 }
 
+const countCompaniesInAccount = `-- name: CountCompaniesInAccount :one
+SELECT count(*) FROM company
+WHERE id = ANY($1::bigint[]) AND account_id = $2
+`
+
+type CountCompaniesInAccountParams struct {
+	Ids       []int64
+	AccountID int64
+}
+
+// Pre-flight for a membership replace, after CountCompaniesByIDs has confirmed
+// every id exists: a mismatch means at least one company belongs to a different
+// client, which is a 422 naming company_ids rather than the unnamed 409 the
+// composite foreign key on employee_companies would raise.
+func (q *Queries) CountCompaniesInAccount(ctx context.Context, arg CountCompaniesInAccountParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countCompaniesInAccount, arg.Ids, arg.AccountID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createCompany = `-- name: CreateCompany :one
 INSERT INTO company (
     name, tax_id, address, created_at, phone, email, website, logo,

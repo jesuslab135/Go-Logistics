@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"errors"
+	"net/http"
 	"reflect"
 	"slices"
 	"testing"
@@ -168,5 +169,42 @@ func TestToAdminEmployeeResponsesCarriesAccountAndPlatformFlag(t *testing.T) {
 	}
 	if flat["email"] != "ops@platform.test" || flat["is_platform_admin"] != true {
 		t.Errorf("fields not flattened, body %s", body)
+	}
+}
+
+func TestValidateMembershipAccount(t *testing.T) {
+	account := int64(4)
+	tests := []struct {
+		name      string
+		accountID *int64
+		inAccount int64
+		requested int
+		wantErr   bool
+	}{
+		{"every company in the employee's account", &account, 2, 2, false},
+		{"one company from another account", &account, 1, 2, true},
+		{"platform staff have no account", nil, 0, 1, true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateMembershipAccount(tc.accountID, tc.inAccount, tc.requested)
+			if !tc.wantErr {
+				if err != nil {
+					t.Fatalf("expected nil, got %v", err)
+				}
+				return
+			}
+			var apiErr *apierr.Error
+			if !errors.As(err, &apiErr) {
+				t.Fatalf("expected *apierr.Error, got %T (%v)", err, err)
+			}
+			if apiErr.Status != http.StatusUnprocessableEntity || apiErr.Code != "validation_failed" {
+				t.Fatalf("status/code = %d/%q, want 422/validation_failed", apiErr.Status, apiErr.Code)
+			}
+			details, ok := apiErr.Details.(map[string]string)
+			if !ok || details["company_ids"] == "" {
+				t.Fatalf("details = %#v, want company_ids named", apiErr.Details)
+			}
+		})
 	}
 }

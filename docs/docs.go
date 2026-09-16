@@ -826,7 +826,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Full overwrite of employee_companies. Requires a platform administrator. company_ids must be non-empty — an employee with no membership cannot log in, so use is_active to deactivate instead. default_company_id must be null or one of company_ids; omitting it clears the employee's stored default_company_id, so send it on every call unless you mean to clear it. Every addition and removal is recorded in membership_audit in the same transaction as the change.",
+                "description": "Full overwrite of employee_companies. Requires a platform administrator. company_ids must be non-empty — an employee with no membership cannot log in, so use is_active to deactivate instead. default_company_id must be null or one of company_ids; omitting it clears the employee's stored default_company_id, so send it on every call unless you mean to clear it. Every addition and removal is recorded in membership_audit in the same transaction as the change. Every company must belong to the employee's account, and platform staff can hold no membership; either violation is a 422 naming company_ids.",
                 "consumes": [
                     "application/json"
                 ],
