@@ -59,6 +59,47 @@ func (q *Queries) GetAccount(ctx context.Context, id int64) (Account, error) {
 	return i, err
 }
 
+const getAccountWithCounts = `-- name: GetAccountWithCounts :one
+SELECT
+    a.id, a.name, a.owner_employee_id, a.is_active, a.created_at,
+    oe.email AS owner_email,
+    (SELECT count(*) FROM company  c WHERE c.account_id = a.id) AS company_count,
+    (SELECT count(*) FROM employee e WHERE e.account_id = a.id) AS employee_count
+FROM account a
+LEFT JOIN employee oe ON oe.id = a.owner_employee_id
+WHERE a.id = $1
+`
+
+type GetAccountWithCountsRow struct {
+	ID              int64
+	Name            string
+	OwnerEmployeeID *int64
+	IsActive        bool
+	CreatedAt       time.Time
+	OwnerEmail      *string
+	CompanyCount    int64
+	EmployeeCount   int64
+}
+
+// GetAccountWithCounts is ListAccountsWithCounts for one account. The select list
+// must stay identical to ListAccountsWithCounts: the handler converts this row
+// to that row type, which only compiles while the two match.
+func (q *Queries) GetAccountWithCounts(ctx context.Context, id int64) (GetAccountWithCountsRow, error) {
+	row := q.db.QueryRow(ctx, getAccountWithCounts, id)
+	var i GetAccountWithCountsRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.OwnerEmployeeID,
+		&i.IsActive,
+		&i.CreatedAt,
+		&i.OwnerEmail,
+		&i.CompanyCount,
+		&i.EmployeeCount,
+	)
+	return i, err
+}
+
 const isEmployeeInAccount = `-- name: IsEmployeeInAccount :one
 SELECT EXISTS (
     SELECT 1 FROM employee e
