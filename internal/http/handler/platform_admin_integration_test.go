@@ -107,3 +107,66 @@ func TestAdminAccountDetailAndSetOwnerCarryCounts(t *testing.T) {
 		t.Fatalf("set-owner response = %+v, want owner %s with counts 1/1", afterSet, ownerEmail)
 	}
 }
+
+// meEmployeeID reads the signed-in employee's id off /me/permissions.
+func meEmployeeID(t *testing.T, baseURL, token string) int64 {
+	t.Helper()
+	var me struct {
+		Employee struct {
+			ID int64 `json:"id"`
+		} `json:"employee"`
+	}
+	getJSON(t, baseURL+"/api/v1/me/permissions", token, http.StatusOK, &me)
+	if me.Employee.ID == 0 {
+		t.Fatal("/me/permissions returned no employee id")
+	}
+	return me.Employee.ID
+}
+
+type adminEmployee struct {
+	ID              int64  `json:"id"`
+	AccountID       *int64 `json:"account_id"`
+	IsPlatformAdmin bool   `json:"is_platform_admin"`
+}
+
+func TestAdminEmployeesSayWhichClientTheyBelongTo(t *testing.T) {
+	ctx := context.Background()
+	pool := setupThrowawayDB(t, ctx)
+	srv := httptest.NewServer(newIntegrationRouter(pool))
+	defer srv.Close()
+
+	platformToken := seedPlatformAdmin(t, ctx, pool, srv.URL)
+	platformID := meEmployeeID(t, srv.URL, platformToken)
+	accountA, ownerA, _, _ := provisionAccountOwner(t, srv.URL, platformToken)
+	_, ownerB, _, _ := provisionAccountOwner(t, srv.URL, platformToken)
+
+	var all struct {
+		Data  []adminEmployee `json:"data"`
+		Total int64           `json:"total"`
+	}
+	getJSON(t, srv.URL+"/api/v1/admin/employees", platformToken, http.StatusOK, &all)
+	if all.Total != 3 {
+		t.Fatalf("unfiltered total = %d, want 3 (platform admin + two owners)", all.Total)
+	}
+	byID := map[int64]adminEmployee{}
+	for _, e := range all.Data {
+		byID[e.ID] = e
+	}
+	if p := byID[platformID]; p.AccountID != nil || !p.IsPlatformAdmin {
+		t.Fatalf("platform admin row = %+v, want no account and the flag", p)
+	}
+	if a := byID[ownerA]; a.AccountID == nil || *a.AccountID != accountA || a.IsPlatformAdmin {
+		t.Fatalf("owner A row = %+v, want account %d", a, accountA)
+	}
+
+	var onlyA struct {
+		Data  []adminEmployee `json:"data"`
+		Total int64           `json:"total"`
+	}
+	getJSON(t, fmt.Sprintf("%s/api/v1/admin/employees?account_id=%d", srv.URL, accountA), platformToken, http.StatusOK, &onlyA)
+	if onlyA.Total != 1 || len(onlyA.Data) != 1 || onlyA.Data[0].ID != ownerA {
+		t.Fatalf("account_id filter = %+v, want only owner A (%d), not owner B (%d)", onlyA, ownerA, ownerB)
+	}
+
+	getJSON(t, srv.URL+"/api/v1/admin/employees?account_id=x", platformToken, http.StatusBadRequest, nil)
+}

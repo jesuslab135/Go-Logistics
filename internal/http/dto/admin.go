@@ -54,3 +54,20 @@ type AdminCompanyPage struct {
 	Offset  int                    `json:"offset"`
 	HasNext bool                   `json:"has_next"`
 }
+
+// AdminEmployeeResponse is an employee as the platform sees it. account_id is
+// null for platform staff, who belong to no client; the tenant-facing
+// EmployeeResponse has neither field because a tenant only sees its own people.
+type AdminEmployeeResponse struct {
+	EmployeeResponse
+	AccountID       *int64 `json:"account_id"`
+	IsPlatformAdmin bool   `json:"is_platform_admin"`
+}
+
+type AdminEmployeePage struct {
+	Data    []AdminEmployeeResponse `json:"data"`
+	Total   int64                   `json:"total"`
+	Limit   int                     `json:"limit"`
+	Offset  int                     `json:"offset"`
+	HasNext bool                    `json:"has_next"`
+}
