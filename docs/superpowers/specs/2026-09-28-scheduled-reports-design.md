@@ -107,7 +107,7 @@ CREATE TABLE report_run (
   company_id   bigint      NOT NULL,
   report_kind  varchar(30) NOT NULL,
   period_start date        NOT NULL,   -- local date, first day of the period
-  status       varchar(20) NOT NULL,   -- see below
+  status       varchar(30) NOT NULL,   -- see below
   attempts     int         NOT NULL DEFAULT 0,
   error        text,
   recipients   int         NOT NULL DEFAULT 0,
@@ -187,11 +187,13 @@ date; footer with page number. Amounts carry `company.currency`. Dates are
 Source: `fuel_entry` joined to `asset`, filtered by `asset.company_id` and
 `fuel_entry.date` within the period.
 
-- **Per vehicle:** number of fills, volume, total cost, distance, efficiency
-  (distance / volume over full-tank series, as `fuel_efficiency` is derived
-  today), average unit cost.
+- **Per vehicle and fuel type:** number of fills, volume, total cost, distance,
+  efficiency (distance / volume over full-tank series, as `fuel_efficiency` is
+  derived today), average unit cost.
 - **Totals:** cost for the company; volume and distance grouped by unit,
   because units are set per asset (`fuel_volume_units`, `meter_unit`).
+- A vehicle that takes two fuels (diesel and DEF) has one row per fuel. Its
+  distance in the company total is the longest of its rows, not their sum.
 - **Comparison:** total cost and volume against the previous week, as a
   difference and a percentage.
 
@@ -199,7 +201,10 @@ All entries count, including those flagged `personal`.
 
 ### Monthly maintenance — "Reporte mensual de costos de mantenimiento"
 
-Sources, both filtered by `company_id` and `completed_at` within the period:
+Sources, both filtered by `company_id` and by the completion date within the
+period. `completed_at` is optional on both tables; a job without one is dated
+by `updated_at` (work order) or `created_at` (service entry), so that it is
+reported late rather than never:
 
 - `service_entry` with `status = 'COMPLETED'`;
 - `work_order` whose status has `marks_as_completed = true` **and** which no
@@ -285,16 +290,9 @@ and the README table.
 
 CI gates unchanged: build, vet, gofmt, tests, sqlc drift, swag drift.
 
-## To verify first in the implementation plan
+## Verified
 
-These are stated as decisions above and must be confirmed against the code
-before the queries are written. If one is false, the spec is corrected first.
-
-1. `fuel_entry.miles_traveled` is an odometer difference in the asset's
-   `meter_unit`, not a value converted to miles.
-2. Completing a work order creates or links a service entry, so that
-   "service entry wins" does not drop work orders.
-3. `maroto/v2` builds under the repository's Go version with CGO disabled.
+Confirmed against the code on 2026-09-28; see the implementation plan.
 
 ## Follow-up outside this spec
 
