@@ -34,6 +34,8 @@ func main() {
 		err = platformAdmin(os.Args[2:])
 	case "inventory-drift":
 		err = inventoryDrift(os.Args[2:])
+	case "reports":
+		err = reportsCmd(os.Args[2:])
 	default:
 		usage()
 		os.Exit(2)
@@ -160,6 +162,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "  fleet-cli platform-admin --email <email> [--revoke] | --list")
 	fmt.Fprintln(os.Stderr, "  fleet-cli platform-admin --create --email <email> --first-name <name> --last-name <name> --password <password>")
 	fmt.Fprintln(os.Stderr, "  fleet-cli inventory-drift")
+	fmt.Fprintln(os.Stderr, "  fleet-cli reports send --company <id> --report <fuel_weekly|maintenance_monthly> [--period <YYYY-MM-DD>] [--force]")
 }
 
 // platformAdmin grants or revokes the flag that opens /api/v1/admin/*. It is a
