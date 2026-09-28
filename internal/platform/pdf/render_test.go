@@ -87,6 +87,82 @@ func TestFuelWeeklyEmpty(t *testing.T) {
 	}
 }
 
+// TestFuelWeeklyRendersEachFuelAndUnit exercises the per-(fuel type, unit)
+// loop over r.Volumes in the "Resumen" table with more than one entry: three
+// combinations in the current week (diesel/liters, def/liters,
+// diesel/gallons) plus a fourth, gasoline/liters, that appears only in the
+// previous week. That gives one entry with a zero previous (nil Percent —
+// there is no percentage change from nothing) and one with a zero current
+// (a non-nil Percent, since its previous is non-zero).
+func TestFuelWeeklyRendersEachFuelAndUnit(t *testing.T) {
+	current := []reports.FuelRow{
+		{AssetID: 1, AssetName: "Unidad 001", LicensePlate: "ABC-123", MeterUnit: "km", VolumeUnit: "liters", FuelType: "diesel", Fills: 2,
+			Volume: dec("200"), Cost: dec("5000"), Distance: dec("600")},
+		{AssetID: 2, AssetName: "Unidad 002", LicensePlate: "ABC-124", MeterUnit: "km", VolumeUnit: "liters", FuelType: "def", Fills: 1,
+			Volume: dec("50"), Cost: dec("900"), Distance: dec("300")},
+		{AssetID: 3, AssetName: "Unidad 003", LicensePlate: "ABC-125", MeterUnit: "km", VolumeUnit: "gallons", FuelType: "diesel", Fills: 1,
+			Volume: dec("80"), Cost: dec("3000"), Distance: dec("500")},
+	}
+	previous := []reports.FuelRow{
+		{AssetID: 4, AssetName: "Unidad 004", LicensePlate: "XYZ-999", MeterUnit: "km", VolumeUnit: "liters", FuelType: "gasoline", Fills: 2,
+			Volume: dec("120"), Cost: dec("2400"), Distance: dec("400")},
+	}
+	r := reports.BuildFuelWeekly(header(t, reports.FuelWeekly), current, previous)
+
+	want := []struct{ fuelType, unit string }{
+		{"def", "liters"},
+		{"diesel", "gallons"},
+		{"diesel", "liters"},
+		{"gasoline", "liters"},
+	}
+	if len(r.Volumes) != len(want) {
+		t.Fatalf("Volumes = %d entries, want %d: %+v", len(r.Volumes), len(want), r.Volumes)
+	}
+	for i, w := range want {
+		if r.Volumes[i].FuelType != w.fuelType || r.Volumes[i].Unit != w.unit {
+			t.Errorf("Volumes[%d] = %s/%s, want %s/%s", i, r.Volumes[i].FuelType, r.Volumes[i].Unit, w.fuelType, w.unit)
+		}
+	}
+	// gasoline/liters exists only in the previous week: zero current, and a
+	// Percent since its previous is non-zero.
+	gasoline := r.Volumes[3]
+	if !gasoline.Change.Current.IsZero() {
+		t.Errorf("gasoline current = %s, want 0", gasoline.Change.Current)
+	}
+	if gasoline.Change.Percent == nil {
+		t.Error("gasoline Percent = nil, want a change computed against a non-zero previous")
+	}
+	// def/liters, diesel/gallons and diesel/liters exist only in the current
+	// week: zero previous, and no Percent.
+	for _, v := range r.Volumes[:3] {
+		if !v.Change.Previous.IsZero() {
+			t.Errorf("%s/%s previous = %s, want 0", v.FuelType, v.Unit, v.Change.Previous)
+		}
+		if v.Change.Percent != nil {
+			t.Errorf("%s/%s Percent = %v, want nil", v.FuelType, v.Unit, *v.Change.Percent)
+		}
+	}
+
+	out, err := FuelWeekly(r, nil)
+	assertPDF(t, out, err)
+
+	// maroto does not Flate-compress content streams in this configuration
+	// (Step 8's sample PDF could be grepped for plain Spanish text directly,
+	// and a throwaway probe confirmed it for this very report), so checking
+	// the rendered row labels as raw bytes is reliable. PDF string literals
+	// escape "(" and ")" as "\(" and "\)".
+	for _, label := range []string{
+		`Volumen def \(L\)`,
+		`Volumen diesel \(gal\)`,
+		`Volumen diesel \(L\)`,
+		`Volumen gasoline \(L\)`,
+	} {
+		if !bytes.Contains(out, []byte(label)) {
+			t.Errorf("output does not contain label %q", label)
+		}
+	}
+}
+
 // A fleet of 500 units must flow onto more pages, not fail and not be cut off.
 func TestFuelWeeklyLargeFleetPaginates(t *testing.T) {
 	r := reports.BuildFuelWeekly(header(t, reports.FuelWeekly), fuelRows(500), nil)
