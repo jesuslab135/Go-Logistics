@@ -1,0 +1,5653 @@
+# Scheduled PDF Reports by Email — Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Each tenant company receives a weekly fuel report and a monthly maintenance cost report as a PDF by email, once per period, at 06:00 in its own timezone, and can download the same PDFs on demand.
+
+**Architecture:** Four new packages under `internal/platform` with one job each: `reports` (queries and arithmetic), `pdf` (rendering), `mail` (SMTP), `scheduler` (clock, claim, delivery). One cron job ticks every 15 minutes inside the API process and asks, per company, "which period is due and was it handled?". A unique row in `report_run` is the send-once guarantee; a Postgres advisory lock in front of it only saves work.
+
+**Tech Stack:** Go 1.26.5, Gin, pgx v5, sqlc v1.29.0, golang-migrate, `github.com/johnfercher/maroto/v2` v2.4.2 (PDF, MIT), `github.com/robfig/cron/v3` v3.0.1 (MIT), `net/smtp` from the standard library.
+
+**Spec:** `docs/superpowers/specs/2026-09-28-scheduled-reports-design.md`
+
+## Global Constraints
+
+- **No paid service and no AI.** Every dependency is MIT or BSD. Nothing calls an external API except the SMTP server the operator configures.
+- **Work in `C:\Users\lider\golog-reports`** (branch `feat/scheduled-reports`). The main checkout is under OneDrive, where `go build` does not work. Every command below is run from the worktree root, in Git Bash.
+- **Report text is Spanish.** Code, comments, log lines and API error messages are English, as in the rest of the repository.
+- **Report kinds** are exactly `fuel_weekly` and `maintenance_monthly`.
+- **Run statuses** are exactly `running`, `sent`, `not_sent`, `skipped_empty`, `skipped_no_recipients`, `failed`.
+- **Defaults:** `REPORTS_ENABLED=false`, `REPORTS_TICK=*/15 * * * *`, `REPORTS_SEND_HOUR=6`, `SMTP_PORT=587`. An empty `SMTP_HOST` means "build, record `not_sent`, send nothing".
+- **Retries:** a failed run is retried until `attempts` = 3. A run left `running` for more than 30 minutes is taken over.
+- **Shutdown** waits up to 60 seconds for the tick in flight, then cancels it.
+- **Generated code is committed.** After any change to `internal/db/queries` or `internal/db/migrations` run `sqlc generate`; after any change to a `godoc` comment run the `swag init` command in Task 7. Check drift with `git diff --exit-code <path>` only. On this checkout `git status` and `diff` both report false changes because of line endings.
+- **`gofmt -l` on the whole tree lists files that are not yours** for the same reason. Run it on the files you wrote.
+- **Commits carry no attribution lines**: no `Co-Authored-By`, no "Generated with".
+- **Integration tests** need Postgres on `localhost:5433`: start Docker Desktop, then `docker start fleet-pg`. They are behind `-tags=integration` and are not part of CI.
+- **`-race` cannot run on this machine.** Do not add it to any command.
+
+## Verified before this plan was written
+
+The spec listed three facts to confirm. All three hold:
+
+1. `fuel_entry.miles_traveled` is `entry.Odometer - prev.Odometer` (`internal/http/handler/fuel_recalc.go`, `deriveFuel`). It is in the asset's own `meter_unit`; nothing converts it.
+2. Completing a work order does **not** create a service entry. `service_entry.work_order_id` is set only by the client. So "count the service entry when one is linked" never drops a work order that stands alone.
+3. `maroto/v2` v2.4.2 and `robfig/cron/v3` v3.0.1 build and run under Go 1.26.5 with `CGO_ENABLED=0`.
+
+Every code block in this plan was compiled and its tests run, unit and integration, in a scratch copy of local `main` (`606aecb`) before being pasted here.
+
+## Departures from the spec
+
+Found while verifying. The spec file is corrected in Task 0 so the two documents agree.
+
+| Spec said | Plan does | Why |
+|---|---|---|
+| `report_run.status varchar(20)` | `varchar(30)` | `skipped_no_recipients` is 21 characters |
+| Fuel detail "per vehicle" | per vehicle **and fuel type** | A truck that takes diesel and DEF has two independent series. Adding their litres, or their distances, gives a wrong efficiency and counts the same road twice |
+| Jobs dated by `completed_at` | `COALESCE(completed_at, …)` | `completed_at` is optional on both tables. Without a fallback a finished job with no date is never in any month. Work orders fall back to `updated_at`, service entries to `created_at` |
+| Recipients "one message, all in `To`" | unchanged | Confirmed with the user |
+
+## File Structure
+
+| File | Responsibility |
+|---|---|
+| `internal/db/migrations/000025_scheduled_reports.{up,down}.sql` | `report_recipient`, `report_run`, fuel index |
+| `internal/db/queries/report.sql` | every query the feature runs |
+| `internal/db/gen/report.sql.go`, `models.go` | generated by sqlc |
+| `internal/platform/reports/kind.go` | the two report kinds and their Spanish titles |
+| `internal/platform/reports/period.go` | weeks, months, "what is due now", timezone fallback |
+| `internal/platform/reports/report.go` | shared types: `Company`, `Header`, `Comparison`, `UnitTotal` |
+| `internal/platform/reports/fuel.go` | fuel arithmetic, pure |
+| `internal/platform/reports/maintenance.go` | maintenance arithmetic, pure |
+| `internal/platform/reports/store.go` | reads the rows through sqlc and calls the pure builders |
+| `internal/platform/pdf/format.go` | numbers, money, dates, units as text |
+| `internal/platform/pdf/render.go` | page layout of both reports |
+| `internal/platform/pdf/report.go` | `Render`: the one path from "company + period" to PDF bytes |
+| `internal/platform/mail/mail.go` | MIME message and SMTP delivery |
+| `internal/platform/scheduler/runner.go` | tick, advisory lock, claim, deliver, record |
+| `internal/platform/scheduler/cron.go` | cron wiring and shutdown drain |
+| `internal/config/config.go` | `SMTP_*` and `REPORTS_*` |
+| `internal/http/dto/report.go` | request and response bodies |
+| `internal/http/handler/report.go` | the six endpoints and the logo loader |
+| `internal/http/handler/router.go` | `registerReportRoutes` |
+| `internal/http/middleware/rbac.go` | the `reports` module |
+| `cmd/api/main.go` | starts and stops the scheduler |
+| `cmd/cli/reports.go`, `cmd/cli/main.go` | `fleet-cli reports send` |
+
+Dependency direction: `scheduler → pdf → reports → db/gen`, `scheduler → mail`. `handler` imports `pdf`, `reports`, `mail`. Nothing imports `scheduler` except `cmd/api`, `cmd/cli` and tests. `scheduler` does not import `handler`: the logo loader is passed in as a function.
+
+## Review Focus
+
+Inputs the spec implies but does not spell out, most likely first. Each has a test in the task that owns the code.
+
+1. **A completed job with no `completed_at`.** A person expects last month's repair to be in last month's report even if nobody typed the date. Pinned by `TestReportMaintenanceCountsJobsWithoutACompletionDate` (Task 1).
+2. **A company whose `timezone` is empty or misspelled.** It must still get its report, on the default timezone, not be skipped silently. Pinned by `TestLoadLocationFallsBack` (Task 2) and `TestUnknownTimezoneFallsBack` (Task 6).
+3. **A mail server that accepts the connection and then says nothing.** The tick must not hang; the run is recorded as failed and the next company is served. Pinned by `TestSMTPSendTimesOutOnASilentServer` (Task 4).
+4. **A recipient address carrying a line break or a display name.** It would add headers to the outgoing message. It is refused at the API and again when the message is built. Pinned by `TestCleanAddress`, `TestBuildRefusesHeaderInjection` (Task 4) and `TestRecipientEndpoints` (Task 7).
+5. **A company logo that is WebP, GIF, missing or not an image.** Those are normal uploads here and the PDF library embeds PNG and JPEG only. The report renders without a logo. Pinned by `TestUnsupportedOrBrokenLogoIsIgnored` (Task 3).
+
+Also covered, less likely: a fleet of 500 units (`TestFuelWeeklyLargeFleetPaginates`), a week containing a daylight saving change (`TestWeekAcrossDaylightSavingChange`), a previous period of zero (`TestCompare`).
+
+---
+
+### Task 0: Base branch and tools
+
+No product code. This task makes sure the ground is what the plan assumes, and stops if it is not.
+
+**Files:**
+- Modify: `docs/superpowers/specs/2026-09-28-scheduled-reports-design.md`
+
+- [ ] **Step 1: Check the base has what the plan builds on**
+
+```bash
+cd /c/Users/lider/golog-reports
+git status -sb
+grep -c shutdownDone cmd/api/main.go
+ls internal/db/migrations | tail -2
+grep -c fileKeyForCompany internal/http/handler/fileref.go
+```
+
+Expected: branch `feat/scheduled-reports`; `shutdownDone` count is `3`; the last migration is `000024_inventory_non_negative`; `fileKeyForCompany` count is at least `1`.
+
+**If any of these is missing, STOP and tell the human.** The branch was cut from `origin/main`, which at the time of writing lacks 15 commits that exist only on the local `main` (the shutdown drain fix, migration `000024`, the tenant check on file references). Those must reach `origin/main` first, and this branch must then be rebased onto it:
+
+```bash
+git fetch origin
+git rebase origin/main
+```
+
+Do not push the local `main`, merge it, or cherry-pick from it yourself. That is the human's decision.
+
+- [ ] **Step 2: Check the tools**
+
+```bash
+go version
+sqlc version
+swag --version
+docker start fleet-pg && docker ps --filter name=fleet-pg --format '{{.Status}}'
+```
+
+Expected: `go1.26.5`, `v1.29.0`, swag `v1.16.4`, and a status that starts with `Up`. If sqlc or swag is missing:
+
+```bash
+go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.29.0
+go install github.com/swaggo/swag/cmd/swag@v1.16.4
+```
+
+- [ ] **Step 3: Check the tree is green before touching it**
+
+```bash
+go build ./... && go vet ./... && go test ./...
+```
+
+Expected: no output from build and vet, every package `ok` or `no test files`.
+
+- [ ] **Step 4: Correct the spec**
+
+In `docs/superpowers/specs/2026-09-28-scheduled-reports-design.md`:
+
+1. In the `report_run` DDL change `status       varchar(20) NOT NULL,` to `status       varchar(30) NOT NULL,`.
+2. Under "Weekly fuel", change `- **Per vehicle:**` to `- **Per vehicle and fuel type:**`, and add after the "Totals" bullet:
+
+```markdown
+- A vehicle that takes two fuels (diesel and DEF) has one row per fuel. Its
+  distance in the company total is the longest of its rows, not their sum.
+```
+
+3. Under "Monthly maintenance", replace `Sources, both filtered by `company_id` and `completed_at` within the period:` with:
+
+```markdown
+Sources, both filtered by `company_id` and by the completion date within the
+period. `completed_at` is optional on both tables; a job without one is dated
+by `updated_at` (work order) or `created_at` (service entry), so that it is
+reported late rather than never:
+```
+
+4. Replace the whole section "To verify first in the implementation plan" with:
+
+```markdown
+## Verified
+
+Confirmed against the code on 2026-09-28; see the implementation plan.
+```
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add docs/superpowers/specs/2026-09-28-scheduled-reports-design.md
+git commit -m "docs: correct the scheduled reports spec after verification"
+```
+
+---
+
+### Task 1: Schema and queries
+
+**Files:**
+- Create: `internal/db/migrations/000025_scheduled_reports.up.sql`
+- Create: `internal/db/migrations/000025_scheduled_reports.down.sql`
+- Create: `internal/db/queries/report.sql`
+- Create (generated): `internal/db/gen/report.sql.go`
+- Modify (generated): `internal/db/gen/models.go`
+- Test: `internal/http/handler/report_query_integration_test.go`
+
+**Interfaces:**
+- Consumes: nothing from earlier tasks. The test uses helpers that already exist in `internal/http/handler/integration_test.go`: `setupThrowawayDB`, `newIntegrationRouter`, `seedPlatformAdmin`, `provisionAccountOwner`, `createCompany`, `switchCompany`, `createDirectorCandidate`, `setPasswordAndLogIn`, `employeeEmail`, `postJSON`.
+- Produces, on `*gen.Queries`:
+  - `ListReportCompanies(ctx) ([]gen.ListReportCompaniesRow, error)` and `GetReportCompany(ctx, id int64) (gen.GetReportCompanyRow, error)`; both rows have `ID int64, Name string, Logo *string, Timezone string, Currency string`
+  - `ReportFuelByAsset(ctx, gen.ReportFuelByAssetParams{CompanyID int64, PeriodStart, PeriodEnd time.Time}) ([]gen.ReportFuelByAssetRow, error)`; row fields `AssetID int64, AssetName, LicensePlate, MeterUnit, VolumeUnit, FuelType string, Fills int64, Volume, Cost, Distance, EffDistance, EffVolume decimal.Decimal`
+  - `ReportMaintenanceByAsset(ctx, gen.ReportMaintenanceByAssetParams{CompanyID, PeriodStart, PeriodEnd}) ([]gen.ReportMaintenanceByAssetRow, error)`; row fields `AssetID int64, AssetName, LicensePlate string, Jobs int64, Parts, Labor, Total decimal.Decimal, HasOverride bool`
+  - `ListReportRecipients(ctx, gen.ListReportRecipientsParams{CompanyID int64, ReportKind *string}) ([]gen.ReportRecipient, error)`
+  - `ListActiveReportRecipientEmails(ctx, gen.ListActiveReportRecipientEmailsParams{CompanyID int64, ReportKind string}) ([]string, error)`
+  - `CreateReportRecipient(ctx, gen.CreateReportRecipientParams{CompanyID int64, ReportKind, Email string}) (gen.ReportRecipient, error)`
+  - `DeleteReportRecipient(ctx, gen.DeleteReportRecipientParams{ID, CompanyID int64}) (int64, error)` — rows deleted
+  - `ClaimReportRun(ctx, gen.ClaimReportRunParams{CompanyID int64, ReportKind string, PeriodStart time.Time, Force bool, MaxAttempts, StaleMinutes int32}) (int64, error)` — the run id, or `pgx.ErrNoRows` when not claimed
+  - `FinishReportRun(ctx, gen.FinishReportRunParams{Status string, Error *string, Recipients int32, ID int64}) error`
+  - `ListReportRuns(ctx, gen.ListReportRunsParams{CompanyID int64, Off, Lim int32}) ([]gen.ReportRun, error)` and `CountReportRuns(ctx, companyID int64) (int64, error)`
+  - models `gen.ReportRecipient{ID, CompanyID int64, ReportKind, Email string, IsActive bool, CreatedAt time.Time}` and `gen.ReportRun{ID, CompanyID int64, ReportKind string, PeriodStart time.Time, Status string, Attempts int32, Error *string, Recipients int32, StartedAt time.Time, FinishedAt *time.Time}`
+- Produces, for later test files in package `handler`: `reportFixture` with fields `srv, token, owner string`, `company int64`, `pool *pgxpool.Pool`, `q *gen.Queries`, `loc *time.Location`; `newReportFixture(t)`; methods `limitedToken(t) string`, `exec(t, sql, args...)`, `asset(t, token, name) int64`, `fuel(t, assetID, employeeID, vendorID, at, quantity, cost, miles, efficiency)`; and `wantDec(t, name, got, want)`.
+
+- [ ] **Step 1: Write the failing test**
+
+Create `internal/http/handler/report_query_integration_test.go`:
+
+```go
+//go:build integration
+
+package handler
+
+// The scheduled reports' SQL against a real Postgres: whether the two
+// aggregates select the right rows, and whether the claim on report_run has
+// exactly one winner. The arithmetic and the rendering are unit-tested in
+// internal/platform/reports and internal/platform/pdf.
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/shopspring/decimal"
+
+	"fleet/internal/db/gen"
+	"fleet/internal/platform/dbctx"
+	"fleet/internal/platform/reports"
+)
+
+// reportFixture is an owner signed in to a fresh company, plus the pool, so a
+// test can set columns the API computes or does not expose.
+type reportFixture struct {
+	srv     string
+	token   string // the owner, scoped to company
+	owner   string // the owner, scoped to no company
+	company int64
+	pool    *pgxpool.Pool
+	q       *gen.Queries
+	loc     *time.Location
+}
+
+func newReportFixture(t *testing.T) reportFixture {
+	t.Helper()
+	ctx := context.Background()
+	pool := setupThrowawayDB(t, ctx)
+	srv := httptest.NewServer(newIntegrationRouter(pool))
+	t.Cleanup(srv.Close)
+
+	platformToken := seedPlatformAdmin(t, ctx, pool, srv.URL)
+	_, _, _, owner := provisionAccountOwner(t, srv.URL, platformToken)
+	company := createCompany(t, srv.URL, owner, "Transportes Reporte", fmt.Sprintf("TAX-REP-%d", time.Now().UnixNano()))
+
+	loc, err := time.LoadLocation("America/Mexico_City")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return reportFixture{
+		srv:     srv.URL,
+		token:   switchCompany(t, srv.URL, owner, company),
+		owner:   owner,
+		company: company,
+		pool:    pool,
+		q:       gen.New(dbctx.New(pool)),
+		loc:     loc,
+	}
+}
+
+// limitedToken logs in as a member of the company who holds no role, and so
+// no module at all.
+func (f reportFixture) limitedToken(t *testing.T) string {
+	t.Helper()
+	id := createDirectorCandidate(t, f.srv, f.token, "sin-reportes")
+	return setPasswordAndLogIn(t, f.srv, f.token, id, employeeEmail(t, f.srv, f.token, id))
+}
+
+func (f reportFixture) exec(t *testing.T, sql string, args ...any) {
+	t.Helper()
+	if _, err := f.pool.Exec(context.Background(), sql, args...); err != nil {
+		t.Fatalf("%s: %v", sql, err)
+	}
+}
+
+func (f reportFixture) asset(t *testing.T, token, name string) int64 {
+	t.Helper()
+	var out struct {
+		ID int64 `json:"id"`
+	}
+	postJSON(t, f.srv+"/api/v1/assets", token, map[string]any{"name": name, "vin_sn": "VIN-" + name}, http.StatusCreated, &out)
+	return out.ID
+}
+
+// fuel inserts a fuel entry directly. The API derives miles_traveled and
+// fuel_efficiency from the series; the report only reads them, so the test
+// states them.
+func (f reportFixture) fuel(t *testing.T, assetID, employeeID, vendorID int64, at time.Time, quantity, cost, miles string, efficiency any) {
+	t.Helper()
+	f.exec(t, `
+		INSERT INTO fuel_entry (
+			asset_id, employee_id, date, fuel_type, quantity, unit_cost, total_cost, odometer,
+			vendor_id, full_tank, miles_traveled, fuel_efficiency, state, reference, external_id, updated_at
+		) VALUES ($1,$2,$3,'diesel',$4,1,$5,0,$6,true,$7,$8,'','','',now())`,
+		assetID, employeeID, at, quantity, cost, vendorID, miles, efficiency)
+}
+
+func TestReportFuelQuery(t *testing.T) {
+	f := newReportFixture(t)
+	ctx := context.Background()
+
+	asset := f.asset(t, f.token, "Unidad 7")
+	employee := createDirectorCandidate(t, f.srv, f.token, "fuel-report")
+	var vendor struct {
+		ID int64 `json:"id"`
+	}
+	postJSON(t, f.srv+"/api/v1/vendors", f.token, map[string]any{"name": "Gasolinera"}, http.StatusCreated, &vendor)
+
+	// Week of Monday 2026-09-21, Mexico City.
+	week := reports.WeekOf(time.Date(2026, 9, 23, 12, 0, 0, 0, f.loc), f.loc)
+
+	f.fuel(t, asset, employee, vendor.ID, week.Start, "100", "2500", "0", nil)                        // first instant: in
+	f.fuel(t, asset, employee, vendor.ID, week.Start.Add(48*time.Hour), "120", "3000", "800", "6.67") // in, with efficiency
+	f.fuel(t, asset, employee, vendor.ID, week.End.Add(-time.Second), "80", "2000", "500", nil)       // last second: in
+	f.fuel(t, asset, employee, vendor.ID, week.Start.Add(-time.Second), "999", "9999", "999", "1")    // the second before: out
+	f.fuel(t, asset, employee, vendor.ID, week.End, "999", "9999", "999", "1")                        // the end itself: out
+
+	// Another tenant's fuel, in the same week, must not appear.
+	other := createCompany(t, f.srv, f.owner, "Otra Empresa", fmt.Sprintf("TAX-OTRA-%d", time.Now().UnixNano()))
+	otherToken := switchCompany(t, f.srv, f.owner, other)
+	otherAsset := f.asset(t, otherToken, "Ajena")
+	f.fuel(t, otherAsset, employee, vendor.ID, week.Start.Add(time.Hour), "777", "7777", "777", "1")
+
+	rows, err := f.q.ReportFuelByAsset(ctx, gen.ReportFuelByAssetParams{
+		CompanyID: f.company, PeriodStart: week.Start, PeriodEnd: week.End,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("rows = %d, want 1: %+v", len(rows), rows)
+	}
+	r := rows[0]
+	if r.AssetName != "Unidad 7" || r.Fills != 3 {
+		t.Fatalf("row = %+v", r)
+	}
+	wantDec(t, "volume", r.Volume, "300")
+	wantDec(t, "cost", r.Cost, "7500")
+	wantDec(t, "distance", r.Distance, "1300")
+	// Only the entry with a derived efficiency counts towards the ratio.
+	wantDec(t, "eff_distance", r.EffDistance, "800")
+	wantDec(t, "eff_volume", r.EffVolume, "120")
+}
+
+func wantDec(t *testing.T, name string, got decimal.Decimal, want string) {
+	t.Helper()
+	if !got.Equal(decimal.RequireFromString(want)) {
+		t.Fatalf("%s = %s, want %s", name, got, want)
+	}
+}
+
+// statuses returns the id of the company's status that marks a work
+// order as completed, and of one that does not.
+func (f reportFixture) statuses(t *testing.T) (completed, open int64) {
+	t.Helper()
+	ctx := context.Background()
+	if err := f.pool.QueryRow(ctx,
+		`SELECT id FROM work_order_status WHERE company_id = $1 AND marks_as_completed ORDER BY id LIMIT 1`, f.company,
+	).Scan(&completed); err != nil {
+		t.Fatalf("completed status: %v", err)
+	}
+	if err := f.pool.QueryRow(ctx,
+		`SELECT id FROM work_order_status WHERE company_id = $1 AND NOT marks_as_completed ORDER BY id LIMIT 1`, f.company,
+	).Scan(&open); err != nil {
+		t.Fatalf("open status: %v", err)
+	}
+	return completed, open
+}
+
+func (f reportFixture) workOrder(t *testing.T, asset, status int64, completedAt *time.Time, parts, labor, total string) int64 {
+	t.Helper()
+	var out struct {
+		ID int64 `json:"id"`
+	}
+	postJSON(t, f.srv+"/api/v1/work-orders", f.token, map[string]any{
+		"asset_id": asset, "status_id": status, "issued_at": time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC),
+		"completed_at": completedAt, "number": fmt.Sprintf("WO-%d", time.Now().UnixNano()),
+	}, http.StatusCreated, &out)
+	// The API computes money from line items; the report reads the stored
+	// columns, so the test writes them.
+	f.exec(t, `UPDATE work_order SET parts_subtotal = $2, labor_subtotal = $3, total_amount = $4 WHERE id = $1`,
+		out.ID, parts, labor, total)
+	return out.ID
+}
+
+func (f reportFixture) serviceEntry(t *testing.T, asset int64, workOrder *int64, completedAt *time.Time, parts, labor, total string) int64 {
+	t.Helper()
+	var out struct {
+		ID int64 `json:"id"`
+	}
+	postJSON(t, f.srv+"/api/v1/service-entries", f.token, map[string]any{
+		"asset_id": asset, "status": "COMPLETED", "work_order_id": workOrder, "completed_at": completedAt,
+	}, http.StatusCreated, &out)
+	f.exec(t, `UPDATE service_entry SET parts_subtotal = $2, labor_subtotal = $3, total_amount = $4 WHERE id = $1`,
+		out.ID, parts, labor, total)
+	return out.ID
+}
+
+func TestReportMaintenanceQuery(t *testing.T) {
+	f := newReportFixture(t)
+	ctx := context.Background()
+
+	asset := f.asset(t, f.token, "Unidad 7")
+	completed, open := f.statuses(t)
+
+	month := reports.MonthOf(time.Date(2026, 8, 15, 0, 0, 0, 0, f.loc), f.loc)
+	inMonth := month.Start.Add(10 * 24 * time.Hour)
+	before := month.Start.Add(-time.Hour)
+
+	// 1. A completed work order on its own: counted.
+	f.workOrder(t, asset, completed, &inMonth, "100", "50", "150")
+	// 2. A completed work order with a linked service entry: one job, and the
+	//    service entry's figures are the ones counted.
+	linked := f.workOrder(t, asset, completed, &inMonth, "9000", "9000", "18000")
+	f.serviceEntry(t, asset, &linked, &inMonth, "200", "100", "300")
+	// 3. A service entry with a manual override: the override is the total.
+	overridden := f.serviceEntry(t, asset, nil, &inMonth, "10", "10", "20")
+	f.exec(t, `UPDATE service_entry SET total_override = 1000 WHERE id = $1`, overridden)
+	// 4. A work order that is not completed: not counted.
+	f.workOrder(t, asset, open, &inMonth, "7000", "7000", "14000")
+	// 5. A completed work order from the month before: not counted.
+	f.workOrder(t, asset, completed, &before, "5000", "5000", "10000")
+
+	rows, err := f.q.ReportMaintenanceByAsset(ctx, gen.ReportMaintenanceByAssetParams{
+		CompanyID: f.company, PeriodStart: month.Start, PeriodEnd: month.End,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("rows = %d, want 1: %+v", len(rows), rows)
+	}
+	r := rows[0]
+	if r.Jobs != 3 {
+		t.Fatalf("jobs = %d, want 3 (the linked pair is one job)", r.Jobs)
+	}
+	wantDec(t, "parts", r.Parts, "310")
+	wantDec(t, "labor", r.Labor, "160")
+	wantDec(t, "total", r.Total, "1450") // 150 + 300 + 1000
+	if !r.HasOverride {
+		t.Fatal("has_override = false, want true")
+	}
+}
+
+// A completed job with no completed_at is dated by when it was recorded, so
+// it is reported rather than silently left out of every month.
+func TestReportMaintenanceCountsJobsWithoutACompletionDate(t *testing.T) {
+	f := newReportFixture(t)
+	asset := f.asset(t, f.token, "Unidad 7")
+	completed, _ := f.statuses(t)
+
+	f.workOrder(t, asset, completed, nil, "100", "50", "150")
+	f.serviceEntry(t, asset, nil, nil, "200", "100", "300")
+
+	month := reports.MonthOf(time.Now(), f.loc)
+	rows, err := f.q.ReportMaintenanceByAsset(context.Background(), gen.ReportMaintenanceByAssetParams{
+		CompanyID: f.company, PeriodStart: month.Start, PeriodEnd: month.End,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 || rows[0].Jobs != 2 {
+		t.Fatalf("rows = %+v, want one row with 2 jobs", rows)
+	}
+	wantDec(t, "total", rows[0].Total, "450")
+}
+
+// The claim alone, without the advisory lock in front of it.
+func TestConcurrentClaimsHaveOneWinner(t *testing.T) {
+	f := newReportFixture(t)
+	week := reports.WeekOf(time.Date(2026, 9, 23, 0, 0, 0, 0, f.loc), f.loc)
+
+	var won atomic.Int64
+	var wg sync.WaitGroup
+	for range 16 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, err := f.q.ClaimReportRun(context.Background(), gen.ClaimReportRunParams{
+				CompanyID: f.company, ReportKind: "fuel_weekly", PeriodStart: week.StartDate(),
+				MaxAttempts: 3, StaleMinutes: 30,
+			})
+			switch {
+			case err == nil:
+				won.Add(1)
+			case errors.Is(err, pgx.ErrNoRows):
+			default:
+				t.Errorf("claim: %v", err)
+			}
+		}()
+	}
+	wg.Wait()
+	if got := won.Load(); got != 1 {
+		t.Fatalf("claims won = %d, want 1", got)
+	}
+}
+```
+
+- [ ] **Step 2: Run it to see it fail**
+
+```bash
+go vet -tags=integration ./internal/http/handler/
+```
+
+Expected: FAIL, with `f.q.ReportFuelByAsset undefined` and `undefined: gen.ReportFuelByAssetParams`.
+
+- [ ] **Step 3: Write the migration**
+
+Create `internal/db/migrations/000025_scheduled_reports.up.sql`:
+
+```sql
+-- 000025_scheduled_reports.up.sql
+-- Reports the system builds on a clock and emails to the tenant company:
+-- a weekly fuel report and a monthly maintenance cost report.
+--
+-- Until now nothing in this deployment ran without a request (see the note on
+-- PruneNotifications). The API process now carries a ticker, and these two
+-- tables are what make it safe: report_recipient says who is told, and
+-- report_run remembers what was already sent.
+
+CREATE TABLE report_recipient (
+    id          bigserial    PRIMARY KEY,
+    company_id  bigint       NOT NULL,
+    report_kind varchar(30)  NOT NULL,
+    email       varchar(254) NOT NULL,
+    is_active   boolean      NOT NULL DEFAULT true,
+    created_at  timestamptz  NOT NULL DEFAULT now(),
+    CONSTRAINT ck_report_recipient_kind
+        CHECK (report_kind IN ('fuel_weekly', 'maintenance_monthly'))
+);
+
+ALTER TABLE report_recipient
+    ADD CONSTRAINT fk_report_recipient_company
+    FOREIGN KEY (company_id) REFERENCES company (id) ON DELETE CASCADE;
+
+-- Case-insensitive: Flota@Empresa.mx and flota@empresa.mx are one mailbox, and
+-- listing it twice would deliver the same report twice.
+CREATE UNIQUE INDEX uq_report_recipient_company_kind_email
+    ON report_recipient (company_id, report_kind, lower(email));
+
+-- One row per company, report and period. The unique constraint is the
+-- send-once guarantee: whoever inserts the row owns the run, and a second API
+-- container, a restart or a manual CLI run finds it already there.
+--
+-- period_start is the first local day of the period, in the company's own
+-- timezone. It is a date, not a timestamp, so that the same week is the same
+-- row regardless of the offset it was computed in.
+CREATE TABLE report_run (
+    id          bigserial   PRIMARY KEY,
+    company_id  bigint      NOT NULL,
+    report_kind varchar(30) NOT NULL,
+    period_start date       NOT NULL,
+    status      varchar(30) NOT NULL,
+    attempts    integer     NOT NULL DEFAULT 0,
+    error       text,
+    recipients  integer     NOT NULL DEFAULT 0,
+    started_at  timestamptz NOT NULL DEFAULT now(),
+    finished_at timestamptz,
+    CONSTRAINT ck_report_run_kind
+        CHECK (report_kind IN ('fuel_weekly', 'maintenance_monthly')),
+    CONSTRAINT ck_report_run_status
+        CHECK (status IN ('running', 'sent', 'not_sent', 'skipped_empty', 'skipped_no_recipients', 'failed')),
+    CONSTRAINT uq_report_run_company_kind_period
+        UNIQUE (company_id, report_kind, period_start)
+);
+
+ALTER TABLE report_run
+    ADD CONSTRAINT fk_report_run_company
+    FOREIGN KEY (company_id) REFERENCES company (id) ON DELETE CASCADE;
+
+CREATE INDEX idx_report_run_company_started_at
+    ON report_run (company_id, started_at DESC);
+
+-- fuel_entry had only its primary key. The weekly report reads a date range
+-- per asset, which without this is a scan of the company's whole fuel history.
+CREATE INDEX idx_fuel_entry_asset_date ON fuel_entry (asset_id, date);
+```
+
+Create `internal/db/migrations/000025_scheduled_reports.down.sql`:
+
+```sql
+-- 000025_scheduled_reports.down.sql
+-- Dropping report_run forgets what was sent. If the migration is applied again
+-- afterwards, the scheduler owes the latest period of every report to every
+-- company and will send it once more.
+DROP INDEX IF EXISTS idx_fuel_entry_asset_date;
+DROP TABLE IF EXISTS report_run;
+DROP TABLE IF EXISTS report_recipient;
+```
+
+- [ ] **Step 4: Write the queries**
+
+Create `internal/db/queries/report.sql`:
+
+```sql
+-- Scheduled reports: the aggregates the PDFs are built from, who receives
+-- them, and the record of what was sent.
+--
+-- The scheduler has no request and therefore no company in its context, so
+-- every query here takes company_id as an explicit argument.
+
+-- name: ListReportCompanies :many
+-- Every company the scheduler owes reports to: those of an active account.
+SELECT c.id, c.name, c.logo, c.timezone, c.currency
+FROM company c
+JOIN account a ON a.id = c.account_id
+WHERE a.is_active
+ORDER BY c.id;
+
+-- name: GetReportCompany :one
+SELECT c.id, c.name, c.logo, c.timezone, c.currency
+FROM company c
+WHERE c.id = sqlc.arg(id);
+
+-- name: ReportFuelByAsset :many
+-- One row per asset and fuel type. fuel_entry carries no company_id; tenancy
+-- comes through asset.
+--
+-- eff_distance and eff_volume cover only the entries whose efficiency the
+-- server could derive (full tank to full tank, see fuel_recalc.go), so their
+-- ratio is a real consumption figure and not distance over every litre bought.
+SELECT
+    a.id                AS asset_id,
+    a.name              AS asset_name,
+    a.license_plate     AS license_plate,
+    a.meter_unit        AS meter_unit,
+    a.fuel_volume_units AS volume_unit,
+    fe.fuel_type        AS fuel_type,
+    count(*)::bigint                                    AS fills,
+    COALESCE(sum(fe.quantity), 0)::numeric              AS volume,
+    COALESCE(sum(fe.total_cost), 0)::numeric            AS cost,
+    COALESCE(sum(fe.miles_traveled), 0)::numeric        AS distance,
+    COALESCE(sum(fe.miles_traveled) FILTER (WHERE fe.fuel_efficiency IS NOT NULL), 0)::numeric AS eff_distance,
+    COALESCE(sum(fe.quantity) FILTER (WHERE fe.fuel_efficiency IS NOT NULL), 0)::numeric       AS eff_volume
+FROM fuel_entry fe
+JOIN asset a ON a.id = fe.asset_id
+WHERE a.company_id = sqlc.arg(company_id)
+  AND fe.date >= sqlc.arg(period_start)::timestamptz
+  AND fe.date <  sqlc.arg(period_end)::timestamptz
+GROUP BY a.id, a.name, a.license_plate, a.meter_unit, a.fuel_volume_units, fe.fuel_type
+ORDER BY cost DESC, a.name, fe.fuel_type;
+
+-- name: ReportMaintenanceByAsset :many
+-- One row per asset, over the jobs completed in the period.
+--
+-- A job is a completed service entry, or a completed work order that no
+-- service entry points at. When a service entry is linked to a work order they
+-- describe the same job, and counting both would double its cost; the service
+-- entry is the one counted.
+--
+-- completed_at is optional on both tables. A job finished without one is dated
+-- by the moment it was recorded, so that it is reported late rather than never.
+--
+-- The total honours a manual override, as effectiveTotal does in money.go.
+WITH job AS (
+    SELECT se.asset_id,
+           se.parts_subtotal,
+           se.labor_subtotal,
+           COALESCE(se.total_override, se.total_amount) AS total,
+           (se.total_override IS NOT NULL)              AS overridden
+    FROM service_entry se
+    WHERE se.company_id = sqlc.arg(company_id)
+      AND upper(se.status) = 'COMPLETED'
+      AND COALESCE(se.completed_at, se.created_at) >= sqlc.arg(period_start)::timestamptz
+      AND COALESCE(se.completed_at, se.created_at) <  sqlc.arg(period_end)::timestamptz
+    UNION ALL
+    SELECT wo.asset_id,
+           wo.parts_subtotal,
+           wo.labor_subtotal,
+           COALESCE(wo.total_override, wo.total_amount) AS total,
+           (wo.total_override IS NOT NULL)              AS overridden
+    FROM work_order wo
+    JOIN work_order_status ws ON ws.id = wo.status_id
+    WHERE wo.company_id = sqlc.arg(company_id)
+      AND ws.marks_as_completed
+      AND COALESCE(wo.completed_at, wo.updated_at) >= sqlc.arg(period_start)::timestamptz
+      AND COALESCE(wo.completed_at, wo.updated_at) <  sqlc.arg(period_end)::timestamptz
+      AND NOT EXISTS (SELECT 1 FROM service_entry linked WHERE linked.work_order_id = wo.id)
+)
+SELECT
+    a.id            AS asset_id,
+    a.name          AS asset_name,
+    a.license_plate AS license_plate,
+    count(*)::bigint                             AS jobs,
+    COALESCE(sum(j.parts_subtotal), 0)::numeric  AS parts,
+    COALESCE(sum(j.labor_subtotal), 0)::numeric  AS labor,
+    COALESCE(sum(j.total), 0)::numeric           AS total,
+    bool_or(j.overridden)::boolean               AS has_override
+FROM job j
+JOIN asset a ON a.id = j.asset_id
+WHERE a.company_id = sqlc.arg(company_id)
+GROUP BY a.id, a.name, a.license_plate
+ORDER BY total DESC, a.name;
+
+-- name: ListReportRecipients :many
+SELECT * FROM report_recipient
+WHERE company_id = sqlc.arg(company_id)
+  AND (sqlc.narg(report_kind)::text IS NULL OR report_kind = sqlc.narg(report_kind)::text)
+ORDER BY report_kind, lower(email);
+
+-- name: ListActiveReportRecipientEmails :many
+SELECT email FROM report_recipient
+WHERE company_id = sqlc.arg(company_id)
+  AND report_kind = sqlc.arg(report_kind)
+  AND is_active
+ORDER BY lower(email);
+
+-- name: CreateReportRecipient :one
+INSERT INTO report_recipient (company_id, report_kind, email)
+VALUES (sqlc.arg(company_id), sqlc.arg(report_kind), sqlc.arg(email))
+RETURNING *;
+
+-- name: DeleteReportRecipient :execrows
+-- The company predicate makes another tenant's id indistinguishable from a
+-- missing one.
+DELETE FROM report_recipient
+WHERE id = sqlc.arg(id) AND company_id = sqlc.arg(company_id);
+
+-- name: ClaimReportRun :one
+-- Takes ownership of one company's report for one period, or returns no row
+-- when somebody else has it or it is already done.
+--
+-- It is a single statement on purpose. Two schedulers racing both run it, the
+-- unique constraint lets exactly one insert, and the other falls into the
+-- DO UPDATE whose WHERE then refuses it.
+--
+-- A row can be taken over in three cases: it failed and has attempts left; it
+-- has been running for longer than any run takes, so its owner died; or the
+-- caller forces a re-send.
+INSERT INTO report_run (company_id, report_kind, period_start, status, attempts, started_at)
+VALUES (sqlc.arg(company_id), sqlc.arg(report_kind), sqlc.arg(period_start), 'running', 1, now())
+ON CONFLICT ON CONSTRAINT uq_report_run_company_kind_period DO UPDATE
+SET status      = 'running',
+    attempts    = report_run.attempts + 1,
+    error       = NULL,
+    recipients  = 0,
+    started_at  = now(),
+    finished_at = NULL
+WHERE sqlc.arg(force)::boolean
+   OR (report_run.status = 'failed'
+       AND report_run.attempts < sqlc.arg(max_attempts)::integer)
+   OR (report_run.status = 'running'
+       AND report_run.attempts < sqlc.arg(max_attempts)::integer
+       AND report_run.started_at < now() - make_interval(mins => sqlc.arg(stale_minutes)::integer))
+RETURNING id;
+
+-- name: FinishReportRun :exec
+UPDATE report_run
+SET status      = sqlc.arg(status),
+    error       = sqlc.narg(error),
+    recipients  = sqlc.arg(recipients),
+    finished_at = now()
+WHERE id = sqlc.arg(id);
+
+-- name: ListReportRuns :many
+SELECT * FROM report_run
+WHERE company_id = sqlc.arg(company_id)
+ORDER BY started_at DESC, id DESC
+LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off);
+
+-- name: CountReportRuns :one
+SELECT count(*) FROM report_run
+WHERE company_id = sqlc.arg(company_id);
+```
+
+- [ ] **Step 5: Generate**
+
+```bash
+sqlc generate
+go build ./...
+```
+
+Expected: no output. Then confirm the generated names match the **Interfaces** block above:
+
+```bash
+grep -n "^type ReportFuelByAssetRow struct" -A13 internal/db/gen/report.sql.go
+grep -n "^type ClaimReportRunParams struct" -A7 internal/db/gen/report.sql.go
+```
+
+If a field has a different name or is `interface{}`, the SQL alias or cast was changed by mistake. Fix the SQL; do not edit generated code.
+
+- [ ] **Step 6: Run the test to see it pass**
+
+```bash
+go test -tags=integration -count=1 -run 'TestReportFuelQuery|TestReportMaintenance|TestConcurrentClaims' ./internal/http/handler/
+```
+
+Expected: `ok  	fleet/internal/http/handler`.
+
+- [ ] **Step 7: Check the down migration**
+
+```bash
+docker exec fleet-pg psql -U postgres -c "DROP DATABASE IF EXISTS fleet_mig_check" -c "CREATE DATABASE fleet_mig_check"
+for f in internal/db/migrations/*.up.sql; do docker exec -i fleet-pg psql -q -v ON_ERROR_STOP=1 -U postgres -d fleet_mig_check < "$f" || break; done
+docker exec -i fleet-pg psql -v ON_ERROR_STOP=1 -U postgres -d fleet_mig_check < internal/db/migrations/000025_scheduled_reports.down.sql
+docker exec fleet-pg psql -U postgres -d fleet_mig_check -Atc "SELECT count(*) FROM pg_class WHERE relname IN ('report_run','report_recipient','idx_fuel_entry_asset_date')"
+docker exec -i fleet-pg psql -q -v ON_ERROR_STOP=1 -U postgres -d fleet_mig_check < internal/db/migrations/000025_scheduled_reports.up.sql
+docker exec fleet-pg psql -U postgres -c "DROP DATABASE fleet_mig_check"
+```
+
+Expected: the count printed is `0`, and re-applying the up migration prints no error.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git diff --exit-code internal/db/gen; echo "exit=$?"
+```
+
+Expected here: `exit=1`, because the generated files changed and are not committed yet. Then:
+
+```bash
+git add internal/db/migrations/000025_scheduled_reports.up.sql internal/db/migrations/000025_scheduled_reports.down.sql internal/db/queries/report.sql internal/db/gen internal/http/handler/report_query_integration_test.go
+git commit -m "feat(reports): schema and queries for scheduled reports"
+sqlc generate && git diff --exit-code internal/db/gen; echo "exit=$?"
+```
+
+Expected: `exit=0`.
+
+---
+
+### Task 2: Report arithmetic
+
+**Files:**
+- Create: `internal/platform/reports/kind.go`
+- Create: `internal/platform/reports/period.go`
+- Create: `internal/platform/reports/report.go`
+- Create: `internal/platform/reports/fuel.go`
+- Create: `internal/platform/reports/maintenance.go`
+- Create: `internal/platform/reports/store.go`
+- Test: `internal/platform/reports/period_test.go`
+- Test: `internal/platform/reports/build_test.go`
+
+**Interfaces:**
+- Consumes from Task 1: `gen.ReportFuelByAssetParams`, `gen.ReportFuelByAssetRow`, `gen.ReportMaintenanceByAssetParams`, `gen.ReportMaintenanceByAssetRow`.
+- Produces:
+  - `type Kind string`; `FuelWeekly`, `MaintenanceMonthly`; `var Kinds []Kind`; `ParseKind(s string) (Kind, bool)`; `(Kind).Title() string`; `(Kind).FilePrefix() string`
+  - `type Period struct{ Start, End time.Time }`; `(Period).Previous(kind Kind) Period`; `(Period).StartDate() time.Time`; `(Period).LastDay() time.Time`
+  - `LoadLocation(name string) (*time.Location, error)` — always returns a usable location; the error reports a fallback
+  - `WeekOf(t, loc) Period`, `MonthOf(t, loc) Period`, `PeriodOf(kind, t, loc) Period`, `LatestDue(kind Kind, now time.Time, loc *time.Location, sendHour int) Period`
+  - `type Company struct{ ID int64; Name string; Logo *string; Timezone, Currency string }`
+  - `type Header struct{ Kind Kind; Company Company; Period Period; GeneratedAt time.Time }`
+  - `type Comparison struct{ Current, Previous, Difference decimal.Decimal; Percent *decimal.Decimal }`; `Compare(current, previous decimal.Decimal) Comparison`
+  - `type UnitTotal struct{ Label, Unit string; Amount decimal.Decimal }`
+  - `FuelRow`, `FuelLine`, `FuelWeeklyReport` (embeds `Header`; has `Lines`, `Fills`, `TotalCost`, `Volumes`, `Distances`, `Cost`, `Volume`; method `Empty() bool`); `BuildFuelWeekly(h Header, current, previous []FuelRow) FuelWeeklyReport`
+  - `MaintenanceRow`, `MaintenanceLine`, `MaintenanceMonthlyReport` (embeds `Header`; has `Lines`, `Top`, `Jobs`, `Parts`, `Labor`, `Total`, `HasOverride`, `Cost`; method `Empty() bool`); `BuildMaintenanceMonthly(h Header, current, previous []MaintenanceRow) MaintenanceMonthlyReport`
+  - `type Querier interface{ ReportFuelByAsset(...); ReportMaintenanceByAsset(...) }` — satisfied by `*gen.Queries`
+  - `FuelWeeklyFor(ctx, q Querier, c Company, p Period, now time.Time) (FuelWeeklyReport, error)` and `MaintenanceMonthlyFor(...) (MaintenanceMonthlyReport, error)`
+
+- [ ] **Step 1: Write the failing tests**
+
+Create `internal/platform/reports/period_test.go`:
+
+```go
+package reports
+
+import (
+	"testing"
+	"time"
+)
+
+func mustLoc(t *testing.T, name string) *time.Location {
+	t.Helper()
+	loc, err := time.LoadLocation(name)
+	if err != nil {
+		t.Fatalf("load %s: %v", name, err)
+	}
+	return loc
+}
+
+func day(loc *time.Location, y int, m time.Month, d, h int) time.Time {
+	return time.Date(y, m, d, h, 0, 0, 0, loc)
+}
+
+func TestLatestDueWeekly(t *testing.T) {
+	mx := mustLoc(t, "America/Mexico_City")
+	tests := []struct {
+		name      string
+		now       time.Time
+		wantStart time.Time
+	}{
+		// 2026-09-28 is a Monday.
+		{"monday before the send hour still owes the week before last", day(mx, 2026, 9, 28, 5), day(mx, 2026, 9, 14, 0)},
+		{"monday at the send hour owes last week", day(mx, 2026, 9, 28, 6), day(mx, 2026, 9, 21, 0)},
+		{"sunday night owes the week that ended a week ago", day(mx, 2026, 9, 27, 23), day(mx, 2026, 9, 14, 0)},
+		{"midweek owes last week", day(mx, 2026, 9, 30, 12), day(mx, 2026, 9, 21, 0)},
+		{"year boundary", day(mx, 2027, 1, 4, 7), day(mx, 2026, 12, 28, 0)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := LatestDue(FuelWeekly, tt.now, mx, 6)
+			if !got.Start.Equal(tt.wantStart) {
+				t.Fatalf("start = %s, want %s", got.Start, tt.wantStart)
+			}
+			if want := tt.wantStart.AddDate(0, 0, 7); !got.End.Equal(want) {
+				t.Fatalf("end = %s, want %s", got.End, want)
+			}
+		})
+	}
+}
+
+func TestLatestDueMonthly(t *testing.T) {
+	mx := mustLoc(t, "America/Mexico_City")
+	tests := []struct {
+		name      string
+		now       time.Time
+		wantStart time.Time
+		wantEnd   time.Time
+	}{
+		{"the 1st before the send hour", day(mx, 2026, 10, 1, 5), day(mx, 2026, 8, 1, 0), day(mx, 2026, 9, 1, 0)},
+		{"the 1st at the send hour", day(mx, 2026, 10, 1, 6), day(mx, 2026, 9, 1, 0), day(mx, 2026, 10, 1, 0)},
+		{"january owes december", day(mx, 2027, 1, 15, 12), day(mx, 2026, 12, 1, 0), day(mx, 2027, 1, 1, 0)},
+		{"march owes a 28-day february", day(mx, 2027, 3, 31, 12), day(mx, 2027, 2, 1, 0), day(mx, 2027, 3, 1, 0)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := LatestDue(MaintenanceMonthly, tt.now, mx, 6)
+			if !got.Start.Equal(tt.wantStart) || !got.End.Equal(tt.wantEnd) {
+				t.Fatalf("got %s..%s, want %s..%s", got.Start, got.End, tt.wantStart, tt.wantEnd)
+			}
+		})
+	}
+}
+
+// The same instant is a different local day in different timezones, so two
+// companies can owe different periods at the same moment.
+func TestLatestDueUsesTheCompanyTimezone(t *testing.T) {
+	mx := mustLoc(t, "America/Mexico_City")
+	tokyo := mustLoc(t, "Asia/Tokyo")
+	now := time.Date(2026, 9, 27, 22, 0, 0, 0, time.UTC) // Sunday 16:00 in Mexico, Monday 07:00 in Tokyo
+
+	if got, want := LatestDue(FuelWeekly, now, mx, 6).Start, day(mx, 2026, 9, 14, 0); !got.Equal(want) {
+		t.Fatalf("mexico start = %s, want %s", got, want)
+	}
+	if got, want := LatestDue(FuelWeekly, now, tokyo, 6).Start, day(tokyo, 2026, 9, 21, 0); !got.Equal(want) {
+		t.Fatalf("tokyo start = %s, want %s", got, want)
+	}
+}
+
+// A week containing a daylight saving change is not 168 hours long. Both ends
+// must still be local midnight.
+func TestWeekAcrossDaylightSavingChange(t *testing.T) {
+	ny := mustLoc(t, "America/New_York")
+	// US clocks go back on Sunday 2026-11-01.
+	p := LatestDue(FuelWeekly, day(ny, 2026, 11, 2, 8), ny, 6)
+	if want := day(ny, 2026, 10, 26, 0); !p.Start.Equal(want) {
+		t.Fatalf("start = %s, want %s", p.Start, want)
+	}
+	if want := day(ny, 2026, 11, 2, 0); !p.End.Equal(want) {
+		t.Fatalf("end = %s, want %s", p.End, want)
+	}
+	if got := p.End.Sub(p.Start); got != 169*time.Hour {
+		t.Fatalf("week length = %s, want 169h", got)
+	}
+	prev := p.Previous(FuelWeekly)
+	if h, m, s := prev.Start.Clock(); h != 0 || m != 0 || s != 0 {
+		t.Fatalf("previous start is not local midnight: %s", prev.Start)
+	}
+}
+
+func TestStartDateKeepsTheLocalDay(t *testing.T) {
+	tokyo := mustLoc(t, "Asia/Tokyo")
+	p := WeekOf(day(tokyo, 2026, 9, 23, 12), tokyo)
+	// Monday 00:00 in Tokyo is still Sunday in UTC; the date column must say Monday.
+	if got, want := p.StartDate(), time.Date(2026, 9, 21, 0, 0, 0, 0, time.UTC); !got.Equal(want) {
+		t.Fatalf("start date = %s, want %s", got, want)
+	}
+	if got, want := p.LastDay().Format("2006-01-02"), "2026-09-27"; got != want {
+		t.Fatalf("last day = %s, want %s", got, want)
+	}
+}
+
+func TestLoadLocationFallsBack(t *testing.T) {
+	for _, name := range []string{"", "Mars/Olympus_Mons", "  "} {
+		loc, err := LoadLocation(name)
+		if err == nil {
+			t.Fatalf("%q: expected the fallback to be reported", name)
+		}
+		if loc.String() != DefaultTimezone {
+			t.Fatalf("%q: location = %s, want %s", name, loc, DefaultTimezone)
+		}
+	}
+	loc, err := LoadLocation("America/Tijuana")
+	if err != nil || loc.String() != "America/Tijuana" {
+		t.Fatalf("valid name: loc = %v, err = %v", loc, err)
+	}
+}
+```
+
+Create `internal/platform/reports/build_test.go`:
+
+```go
+package reports
+
+import (
+	"testing"
+
+	"github.com/shopspring/decimal"
+)
+
+func dec(s string) decimal.Decimal { return decimal.RequireFromString(s) }
+
+func assertDec(t *testing.T, name string, got decimal.Decimal, want string) {
+	t.Helper()
+	if !got.Equal(dec(want)) {
+		t.Fatalf("%s = %s, want %s", name, got, want)
+	}
+}
+
+func TestCompare(t *testing.T) {
+	c := Compare(dec("150"), dec("120"))
+	assertDec(t, "difference", c.Difference, "30")
+	if c.Percent == nil {
+		t.Fatal("percent is nil")
+	}
+	assertDec(t, "percent", *c.Percent, "25")
+
+	down := Compare(dec("90"), dec("120"))
+	assertDec(t, "difference", down.Difference, "-30")
+	assertDec(t, "percent", *down.Percent, "-25")
+
+	// No division by zero, and no invented percentage, when there is nothing
+	// to compare against.
+	fresh := Compare(dec("90"), decimal.Zero)
+	if fresh.Percent != nil {
+		t.Fatalf("percent = %s, want nil when the previous period is zero", fresh.Percent)
+	}
+	assertDec(t, "difference", fresh.Difference, "90")
+}
+
+func TestBuildFuelWeekly(t *testing.T) {
+	current := []FuelRow{
+		{AssetID: 1, AssetName: "Unidad 7", MeterUnit: "km", VolumeUnit: "liters", FuelType: "diesel",
+			Fills: 3, Volume: dec("300"), Cost: dec("7500"), Distance: dec("900"), EffDistance: dec("600"), EffVolume: dec("200")},
+		{AssetID: 1, AssetName: "Unidad 7", MeterUnit: "km", VolumeUnit: "liters", FuelType: "def",
+			Fills: 1, Volume: dec("20"), Cost: dec("400"), Distance: dec("850")},
+		{AssetID: 2, AssetName: "Unidad 9", MeterUnit: "mi", VolumeUnit: "gallons", FuelType: "diesel",
+			Fills: 1, Volume: dec("50"), Cost: dec("2100"), Distance: decimal.Zero},
+	}
+	previous := []FuelRow{{AssetID: 1, Volume: dec("400"), Cost: dec("8000")}}
+
+	r := BuildFuelWeekly(Header{Kind: FuelWeekly}, current, previous)
+
+	if r.Empty() || len(r.Lines) != 3 {
+		t.Fatalf("lines = %d, want 3", len(r.Lines))
+	}
+	if r.Fills != 5 {
+		t.Fatalf("fills = %d, want 5", r.Fills)
+	}
+	assertDec(t, "total cost", r.TotalCost, "10000")
+
+	first := r.Lines[0]
+	assertDec(t, "average unit cost", *first.AvgUnitCost, "25")
+	// 600 over 200, not 900 over 300: only full-tank intervals count.
+	assertDec(t, "efficiency", *first.Efficiency, "3")
+	if r.Lines[1].Efficiency != nil {
+		t.Fatal("a row with no derivable interval must have no efficiency")
+	}
+
+	if len(r.Volumes) != 3 {
+		t.Fatalf("volume totals = %+v, want one per fuel type and unit", r.Volumes)
+	}
+	if got := r.Volumes[0]; got.Label != "def" || got.Unit != "liters" || !got.Amount.Equal(dec("20")) {
+		t.Fatalf("first volume total = %+v", got)
+	}
+
+	if len(r.Distances) != 2 {
+		t.Fatalf("distance totals = %+v, want km and mi", r.Distances)
+	}
+	// Unidad 7 drove 900 km once, not 900 + 850.
+	if got := r.Distances[0]; got.Unit != "km" || !got.Amount.Equal(dec("900")) {
+		t.Fatalf("km total = %+v, want 900", got)
+	}
+
+	assertDec(t, "cost difference", r.Cost.Difference, "2000")
+	assertDec(t, "cost percent", *r.Cost.Percent, "25")
+	assertDec(t, "volume previous", r.Volume.Previous, "400")
+}
+
+func TestBuildFuelWeeklyEmpty(t *testing.T) {
+	r := BuildFuelWeekly(Header{}, nil, nil)
+	if !r.Empty() {
+		t.Fatal("no rows must be an empty report")
+	}
+	if r.Cost.Percent != nil {
+		t.Fatal("an empty report has no percentage")
+	}
+	assertDec(t, "total cost", r.TotalCost, "0")
+}
+
+// A fill of zero volume (a correction row) must not divide by zero.
+func TestBuildFuelWeeklyZeroVolume(t *testing.T) {
+	r := BuildFuelWeekly(Header{}, []FuelRow{{AssetID: 1, AssetName: "U", Fills: 1, Cost: dec("10")}}, nil)
+	if r.Lines[0].AvgUnitCost != nil || r.Lines[0].Efficiency != nil {
+		t.Fatalf("line = %+v, want no ratios", r.Lines[0])
+	}
+}
+
+func TestBuildMaintenanceMonthly(t *testing.T) {
+	var current []MaintenanceRow
+	for i := range 7 {
+		current = append(current, MaintenanceRow{
+			AssetID: int64(i + 1), AssetName: "U", Jobs: 2,
+			Parts: dec("100"), Labor: dec("50"), Total: dec("150"),
+		})
+	}
+	// An overridden job: the total is what somebody typed, not parts + labor.
+	current[0].Total = dec("1000")
+	current[0].HasOverride = true
+	previous := []MaintenanceRow{{Total: dec("950")}}
+
+	r := BuildMaintenanceMonthly(Header{Kind: MaintenanceMonthly}, current, previous)
+
+	if len(r.Lines) != 7 || len(r.Top) != 5 {
+		t.Fatalf("lines = %d, top = %d, want 7 and 5", len(r.Lines), len(r.Top))
+	}
+	if r.Jobs != 14 {
+		t.Fatalf("jobs = %d, want 14", r.Jobs)
+	}
+	assertDec(t, "parts", r.Parts, "700")
+	assertDec(t, "labor", r.Labor, "350")
+	assertDec(t, "total", r.Total, "1900")
+	if !r.HasOverride {
+		t.Fatal("the report must say that a total was overridden")
+	}
+	assertDec(t, "percent", *r.Cost.Percent, "100")
+}
+
+func TestBuildMaintenanceMonthlyFewerThanTop(t *testing.T) {
+	r := BuildMaintenanceMonthly(Header{}, []MaintenanceRow{{AssetName: "U", Total: dec("1")}}, nil)
+	if len(r.Top) != 1 {
+		t.Fatalf("top = %d, want 1", len(r.Top))
+	}
+	if empty := BuildMaintenanceMonthly(Header{}, nil, nil); !empty.Empty() || len(empty.Top) != 0 {
+		t.Fatal("no rows must be an empty report with an empty top")
+	}
+}
+```
+
+- [ ] **Step 2: Run them to see them fail**
+
+```bash
+go test ./internal/platform/reports/
+```
+
+Expected: FAIL, `undefined: LatestDue`, `undefined: FuelWeekly`, `undefined: Compare`.
+
+- [ ] **Step 3: Write the kinds and the periods**
+
+Create `internal/platform/reports/kind.go`:
+
+```go
+// Package reports computes the scheduled reports. It knows the data and the
+// arithmetic; it does not know PDF, email or HTTP.
+package reports
+
+// Kind names a report. The values are stored in report_recipient.report_kind
+// and report_run.report_kind, so they are part of the schema.
+type Kind string
+
+const (
+	FuelWeekly         Kind = "fuel_weekly"
+	MaintenanceMonthly Kind = "maintenance_monthly"
+)
+
+// Kinds lists every report the scheduler produces, in the order it runs them.
+var Kinds = []Kind{FuelWeekly, MaintenanceMonthly}
+
+func ParseKind(s string) (Kind, bool) {
+	for _, k := range Kinds {
+		if string(k) == s {
+			return k, true
+		}
+	}
+	return "", false
+}
+
+// Title is the heading printed on the PDF and used as the email subject.
+func (k Kind) Title() string {
+	if k == MaintenanceMonthly {
+		return "Reporte mensual de costos de mantenimiento"
+	}
+	return "Reporte semanal de combustible"
+}
+
+// FilePrefix starts the attachment's file name.
+func (k Kind) FilePrefix() string {
+	if k == MaintenanceMonthly {
+		return "mantenimiento-mensual"
+	}
+	return "combustible-semanal"
+}
+```
+
+Create `internal/platform/reports/period.go`:
+
+```go
+package reports
+
+import (
+	"fmt"
+	"strings"
+	"time"
+)
+
+// DefaultTimezone matches the column default of company.timezone.
+const DefaultTimezone = "America/Mexico_City"
+
+// Period is the half-open interval [Start, End) a report covers, in the
+// company's own timezone.
+type Period struct {
+	Start time.Time
+	End   time.Time
+}
+
+// LoadLocation resolves a company's timezone. An empty or unknown name falls
+// back to DefaultTimezone and reports the problem, so one mistyped company
+// still gets its report instead of being skipped.
+func LoadLocation(name string) (*time.Location, error) {
+	name = strings.TrimSpace(name)
+	if name != "" {
+		if loc, err := time.LoadLocation(name); err == nil {
+			return loc, nil
+		}
+	}
+	loc, err := time.LoadLocation(DefaultTimezone)
+	if err != nil {
+		return time.UTC, fmt.Errorf("reports: timezone %q and the default are both unavailable: %w", name, err)
+	}
+	return loc, fmt.Errorf("reports: unknown timezone %q, using %s", name, DefaultTimezone)
+}
+
+// WeekOf returns the Monday-to-Monday week that contains t.
+func WeekOf(t time.Time, loc *time.Location) Period {
+	t = t.In(loc)
+	// time.Weekday counts from Sunday; shift so Monday is 0.
+	back := (int(t.Weekday()) + 6) % 7
+	start := time.Date(t.Year(), t.Month(), t.Day()-back, 0, 0, 0, 0, loc)
+	return Period{Start: start, End: start.AddDate(0, 0, 7)}
+}
+
+// MonthOf returns the calendar month that contains t.
+func MonthOf(t time.Time, loc *time.Location) Period {
+	t = t.In(loc)
+	start := time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, loc)
+	return Period{Start: start, End: start.AddDate(0, 1, 0)}
+}
+
+// PeriodOf returns the period of the given kind that contains t.
+func PeriodOf(kind Kind, t time.Time, loc *time.Location) Period {
+	if kind == MaintenanceMonthly {
+		return MonthOf(t, loc)
+	}
+	return WeekOf(t, loc)
+}
+
+// Previous returns the period immediately before p.
+//
+// It steps by calendar date, not by duration: a week that contains a daylight
+// saving change is 167 or 169 hours long, and subtracting 168 would land an
+// hour off midnight.
+func (p Period) Previous(kind Kind) Period {
+	if kind == MaintenanceMonthly {
+		return Period{Start: p.Start.AddDate(0, -1, 0), End: p.Start}
+	}
+	return Period{Start: p.Start.AddDate(0, 0, -7), End: p.Start}
+}
+
+// StartDate is the period's first local day as a UTC midnight, the form the
+// report_run.period_start date column is written and compared in.
+func (p Period) StartDate() time.Time {
+	return time.Date(p.Start.Year(), p.Start.Month(), p.Start.Day(), 0, 0, 0, 0, time.UTC)
+}
+
+// LastDay is the last local day inside the period, for display.
+func (p Period) LastDay() time.Time {
+	return p.End.AddDate(0, 0, -1)
+}
+
+// LatestDue returns the most recent period whose report is due at now: the
+// period before the current one once sendHour has passed on the current
+// period's first day, and the one before that until then.
+func LatestDue(kind Kind, now time.Time, loc *time.Location, sendHour int) Period {
+	current := PeriodOf(kind, now, loc)
+	s := current.Start
+	due := time.Date(s.Year(), s.Month(), s.Day(), sendHour, 0, 0, 0, loc)
+	last := current.Previous(kind)
+	if now.Before(due) {
+		return last.Previous(kind)
+	}
+	return last
+}
+```
+
+- [ ] **Step 4: Write the shared types and the two builders**
+
+Create `internal/platform/reports/report.go`:
+
+```go
+package reports
+
+import (
+	"time"
+
+	"github.com/shopspring/decimal"
+)
+
+// Company is what a report needs to know about the tenant it is for.
+type Company struct {
+	ID       int64
+	Name     string
+	Logo     *string
+	Timezone string
+	Currency string
+}
+
+// Header is the part every report shares.
+type Header struct {
+	Kind        Kind
+	Company     Company
+	Period      Period
+	GeneratedAt time.Time
+}
+
+// Comparison sets a figure against the same figure one period earlier.
+// Percent is nil when the earlier figure is zero: there is no percentage
+// change from nothing.
+type Comparison struct {
+	Current    decimal.Decimal
+	Previous   decimal.Decimal
+	Difference decimal.Decimal
+	Percent    *decimal.Decimal
+}
+
+var hundred = decimal.NewFromInt(100)
+
+func Compare(current, previous decimal.Decimal) Comparison {
+	c := Comparison{Current: current, Previous: previous, Difference: current.Sub(previous)}
+	if !previous.IsZero() {
+		pct := c.Difference.Div(previous).Mul(hundred).Round(1)
+		c.Percent = &pct
+	}
+	return c
+}
+
+// UnitTotal is a quantity summed over the rows that share a unit. Units are
+// set per asset, so a company total is only meaningful unit by unit.
+type UnitTotal struct {
+	Label  string
+	Unit   string
+	Amount decimal.Decimal
+}
+```
+
+Create `internal/platform/reports/fuel.go`:
+
+```go
+package reports
+
+import (
+	"sort"
+
+	"github.com/shopspring/decimal"
+)
+
+// FuelRow is one asset and fuel type, aggregated over a period by the
+// database. EffDistance and EffVolume cover only the entries whose efficiency
+// the server could derive (full tank to full tank).
+type FuelRow struct {
+	AssetID      int64
+	AssetName    string
+	LicensePlate string
+	MeterUnit    string
+	VolumeUnit   string
+	FuelType     string
+	Fills        int64
+	Volume       decimal.Decimal
+	Cost         decimal.Decimal
+	Distance     decimal.Decimal
+	EffDistance  decimal.Decimal
+	EffVolume    decimal.Decimal
+}
+
+type FuelLine struct {
+	AssetName    string
+	LicensePlate string
+	FuelType     string
+	Fills        int64
+	Volume       decimal.Decimal
+	VolumeUnit   string
+	Cost         decimal.Decimal
+	AvgUnitCost  *decimal.Decimal
+	Distance     decimal.Decimal
+	MeterUnit    string
+	Efficiency   *decimal.Decimal
+}
+
+type FuelWeeklyReport struct {
+	Header
+	Lines     []FuelLine
+	Fills     int64
+	TotalCost decimal.Decimal
+	Volumes   []UnitTotal
+	Distances []UnitTotal
+	Cost      Comparison
+	Volume    Comparison
+}
+
+func (r FuelWeeklyReport) Empty() bool { return len(r.Lines) == 0 }
+
+// BuildFuelWeekly turns the aggregated rows of a week, and of the week before
+// it, into the report.
+func BuildFuelWeekly(h Header, current, previous []FuelRow) FuelWeeklyReport {
+	r := FuelWeeklyReport{Header: h, Lines: make([]FuelLine, 0, len(current))}
+
+	volumes := map[[2]string]decimal.Decimal{}
+	// An asset that burns two fuels (diesel and DEF) has two rows covering the
+	// same road, so its distance is the longest of them, not their sum.
+	distances := map[int64]decimal.Decimal{}
+	units := map[int64]string{}
+	rawVolume := decimal.Zero
+
+	for _, row := range current {
+		line := FuelLine{
+			AssetName:    row.AssetName,
+			LicensePlate: row.LicensePlate,
+			FuelType:     row.FuelType,
+			Fills:        row.Fills,
+			Volume:       row.Volume,
+			VolumeUnit:   row.VolumeUnit,
+			Cost:         row.Cost,
+			Distance:     row.Distance,
+			MeterUnit:    row.MeterUnit,
+		}
+		if row.Volume.Sign() > 0 {
+			avg := row.Cost.Div(row.Volume).Round(3)
+			line.AvgUnitCost = &avg
+		}
+		if row.EffVolume.Sign() > 0 && row.EffDistance.Sign() > 0 {
+			eff := row.EffDistance.Div(row.EffVolume).Round(2)
+			line.Efficiency = &eff
+		}
+		r.Lines = append(r.Lines, line)
+
+		r.Fills += row.Fills
+		r.TotalCost = r.TotalCost.Add(row.Cost)
+		rawVolume = rawVolume.Add(row.Volume)
+		key := [2]string{row.FuelType, row.VolumeUnit}
+		volumes[key] = volumes[key].Add(row.Volume)
+		if d, seen := distances[row.AssetID]; !seen || row.Distance.GreaterThan(d) {
+			distances[row.AssetID] = row.Distance
+		}
+		units[row.AssetID] = row.MeterUnit
+	}
+
+	for key, amount := range volumes {
+		r.Volumes = append(r.Volumes, UnitTotal{Label: key[0], Unit: key[1], Amount: amount})
+	}
+	sort.Slice(r.Volumes, func(i, j int) bool {
+		if r.Volumes[i].Label != r.Volumes[j].Label {
+			return r.Volumes[i].Label < r.Volumes[j].Label
+		}
+		return r.Volumes[i].Unit < r.Volumes[j].Unit
+	})
+
+	byUnit := map[string]decimal.Decimal{}
+	for asset, d := range distances {
+		byUnit[units[asset]] = byUnit[units[asset]].Add(d)
+	}
+	for unit, amount := range byUnit {
+		r.Distances = append(r.Distances, UnitTotal{Unit: unit, Amount: amount})
+	}
+	sort.Slice(r.Distances, func(i, j int) bool { return r.Distances[i].Unit < r.Distances[j].Unit })
+
+	prevCost, prevVolume := decimal.Zero, decimal.Zero
+	for _, row := range previous {
+		prevCost = prevCost.Add(row.Cost)
+		prevVolume = prevVolume.Add(row.Volume)
+	}
+	r.Cost = Compare(r.TotalCost, prevCost)
+	r.Volume = Compare(rawVolume, prevVolume)
+	return r
+}
+```
+
+Create `internal/platform/reports/maintenance.go`:
+
+```go
+package reports
+
+import "github.com/shopspring/decimal"
+
+// topAssets is how many assets the "most expensive" table lists.
+const topAssets = 5
+
+// MaintenanceRow is one asset's completed jobs in a period, aggregated by the
+// database. Total already honours a manual override, so Parts plus Labor may
+// differ from it; HasOverride says when that can be the reason.
+type MaintenanceRow struct {
+	AssetID      int64
+	AssetName    string
+	LicensePlate string
+	Jobs         int64
+	Parts        decimal.Decimal
+	Labor        decimal.Decimal
+	Total        decimal.Decimal
+	HasOverride  bool
+}
+
+type MaintenanceLine struct {
+	AssetName    string
+	LicensePlate string
+	Jobs         int64
+	Parts        decimal.Decimal
+	Labor        decimal.Decimal
+	Total        decimal.Decimal
+	HasOverride  bool
+}
+
+type MaintenanceMonthlyReport struct {
+	Header
+	// Lines is ordered as the database returned it: most expensive first.
+	Lines       []MaintenanceLine
+	Top         []MaintenanceLine
+	Jobs        int64
+	Parts       decimal.Decimal
+	Labor       decimal.Decimal
+	Total       decimal.Decimal
+	HasOverride bool
+	Cost        Comparison
+}
+
+func (r MaintenanceMonthlyReport) Empty() bool { return len(r.Lines) == 0 }
+
+// BuildMaintenanceMonthly turns the aggregated rows of a month, and of the
+// month before it, into the report.
+func BuildMaintenanceMonthly(h Header, current, previous []MaintenanceRow) MaintenanceMonthlyReport {
+	r := MaintenanceMonthlyReport{Header: h, Lines: make([]MaintenanceLine, 0, len(current))}
+	for _, row := range current {
+		r.Lines = append(r.Lines, MaintenanceLine{
+			AssetName:    row.AssetName,
+			LicensePlate: row.LicensePlate,
+			Jobs:         row.Jobs,
+			Parts:        row.Parts,
+			Labor:        row.Labor,
+			Total:        row.Total,
+			HasOverride:  row.HasOverride,
+		})
+		r.Jobs += row.Jobs
+		r.Parts = r.Parts.Add(row.Parts)
+		r.Labor = r.Labor.Add(row.Labor)
+		r.Total = r.Total.Add(row.Total)
+		r.HasOverride = r.HasOverride || row.HasOverride
+	}
+	r.Top = r.Lines[:min(topAssets, len(r.Lines))]
+
+	prev := decimal.Zero
+	for _, row := range previous {
+		prev = prev.Add(row.Total)
+	}
+	r.Cost = Compare(r.Total, prev)
+	return r
+}
+```
+
+- [ ] **Step 5: Write the store**
+
+Create `internal/platform/reports/store.go`:
+
+```go
+package reports
+
+import (
+	"context"
+	"time"
+
+	"fleet/internal/db/gen"
+)
+
+// Querier is the slice of the generated queries the reports read through.
+// *gen.Queries satisfies it.
+type Querier interface {
+	ReportFuelByAsset(ctx context.Context, arg gen.ReportFuelByAssetParams) ([]gen.ReportFuelByAssetRow, error)
+	ReportMaintenanceByAsset(ctx context.Context, arg gen.ReportMaintenanceByAssetParams) ([]gen.ReportMaintenanceByAssetRow, error)
+}
+
+// FuelWeeklyFor reads one company's week, and the week before it, and builds
+// the report.
+func FuelWeeklyFor(ctx context.Context, q Querier, c Company, p Period, now time.Time) (FuelWeeklyReport, error) {
+	current, err := fuelRows(ctx, q, c.ID, p)
+	if err != nil {
+		return FuelWeeklyReport{}, err
+	}
+	previous, err := fuelRows(ctx, q, c.ID, p.Previous(FuelWeekly))
+	if err != nil {
+		return FuelWeeklyReport{}, err
+	}
+	h := Header{Kind: FuelWeekly, Company: c, Period: p, GeneratedAt: now}
+	return BuildFuelWeekly(h, current, previous), nil
+}
+
+func fuelRows(ctx context.Context, q Querier, companyID int64, p Period) ([]FuelRow, error) {
+	rows, err := q.ReportFuelByAsset(ctx, gen.ReportFuelByAssetParams{
+		CompanyID:   companyID,
+		PeriodStart: p.Start,
+		PeriodEnd:   p.End,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]FuelRow, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, FuelRow{
+			AssetID:      r.AssetID,
+			AssetName:    r.AssetName,
+			LicensePlate: r.LicensePlate,
+			MeterUnit:    r.MeterUnit,
+			VolumeUnit:   r.VolumeUnit,
+			FuelType:     r.FuelType,
+			Fills:        r.Fills,
+			Volume:       r.Volume,
+			Cost:         r.Cost,
+			Distance:     r.Distance,
+			EffDistance:  r.EffDistance,
+			EffVolume:    r.EffVolume,
+		})
+	}
+	return out, nil
+}
+
+// MaintenanceMonthlyFor reads one company's month, and the month before it,
+// and builds the report.
+func MaintenanceMonthlyFor(ctx context.Context, q Querier, c Company, p Period, now time.Time) (MaintenanceMonthlyReport, error) {
+	current, err := maintenanceRows(ctx, q, c.ID, p)
+	if err != nil {
+		return MaintenanceMonthlyReport{}, err
+	}
+	previous, err := maintenanceRows(ctx, q, c.ID, p.Previous(MaintenanceMonthly))
+	if err != nil {
+		return MaintenanceMonthlyReport{}, err
+	}
+	h := Header{Kind: MaintenanceMonthly, Company: c, Period: p, GeneratedAt: now}
+	return BuildMaintenanceMonthly(h, current, previous), nil
+}
+
+func maintenanceRows(ctx context.Context, q Querier, companyID int64, p Period) ([]MaintenanceRow, error) {
+	rows, err := q.ReportMaintenanceByAsset(ctx, gen.ReportMaintenanceByAssetParams{
+		CompanyID:   companyID,
+		PeriodStart: p.Start,
+		PeriodEnd:   p.End,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]MaintenanceRow, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, MaintenanceRow{
+			AssetID:      r.AssetID,
+			AssetName:    r.AssetName,
+			LicensePlate: r.LicensePlate,
+			Jobs:         r.Jobs,
+			Parts:        r.Parts,
+			Labor:        r.Labor,
+			Total:        r.Total,
+			HasOverride:  r.HasOverride,
+		})
+	}
+	return out, nil
+}
+```
+
+- [ ] **Step 6: Run the tests to see them pass**
+
+```bash
+gofmt -l internal/platform/reports
+go vet ./internal/platform/reports/
+go test ./internal/platform/reports/
+```
+
+Expected: no output from gofmt and vet; `ok  	fleet/internal/platform/reports`.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add internal/platform/reports
+git commit -m "feat(reports): periods and report arithmetic"
+```
+
+---
+
+### Task 3: PDF rendering
+
+**Files:**
+- Modify: `go.mod`, `go.sum`
+- Create: `internal/platform/pdf/format.go`
+- Create: `internal/platform/pdf/render.go`
+- Create: `internal/platform/pdf/report.go`
+- Test: `internal/platform/pdf/format_test.go`
+- Test: `internal/platform/pdf/render_test.go`
+
+**Interfaces:**
+- Consumes from Task 2: `reports.Kind`, `reports.Header`, `reports.Company`, `reports.Period`, `reports.Comparison`, `reports.FuelWeeklyReport`, `reports.MaintenanceMonthlyReport`, `reports.MaintenanceLine`, `reports.FuelRow`, `reports.MaintenanceRow`, `reports.BuildFuelWeekly`, `reports.BuildMaintenanceMonthly`, `reports.LatestDue`, `reports.Querier`, `reports.FuelWeeklyFor`, `reports.MaintenanceMonthlyFor`.
+- Produces:
+  - `Number(d decimal.Decimal, places int32) string`, `Money(d decimal.Decimal, currency string) string`, `Optional(d *decimal.Decimal, places int32) string`, `Percent(d *decimal.Decimal) string`, `Date(t time.Time, loc *time.Location) string`, `Unit(code string) string`
+  - `FuelWeekly(r reports.FuelWeeklyReport, logo []byte) ([]byte, error)` and `MaintenanceMonthly(r reports.MaintenanceMonthlyReport, logo []byte) ([]byte, error)`; `logo` may be nil
+  - `type Document struct{ Filename string; Data []byte; Empty bool }`
+  - `Render(ctx context.Context, q reports.Querier, kind reports.Kind, c reports.Company, p reports.Period, logo []byte, now time.Time) (Document, error)`
+
+- [ ] **Step 1: Add the dependency**
+
+```bash
+go get github.com/johnfercher/maroto/v2@v2.4.2
+```
+
+- [ ] **Step 2: Write the failing tests**
+
+Create `internal/platform/pdf/format_test.go`:
+
+```go
+package pdf
+
+import (
+	"testing"
+	"time"
+
+	"github.com/shopspring/decimal"
+)
+
+func dec(s string) decimal.Decimal { return decimal.RequireFromString(s) }
+
+func TestNumber(t *testing.T) {
+	tests := []struct {
+		in     string
+		places int32
+		want   string
+	}{
+		{"0", 2, "0.00"},
+		{"5", 0, "5"},
+		{"999.999", 2, "1,000.00"},
+		{"1234.5", 2, "1,234.50"},
+		{"1234567.891", 2, "1,234,567.89"},
+		{"12345678", 0, "12,345,678"},
+		{"-1234.5", 2, "-1,234.50"},
+		{"-0.001", 2, "0.00"},
+		{"100", 1, "100.0"},
+	}
+	for _, tt := range tests {
+		if got := Number(dec(tt.in), tt.places); got != tt.want {
+			t.Errorf("Number(%s, %d) = %q, want %q", tt.in, tt.places, got, tt.want)
+		}
+	}
+}
+
+func TestMoney(t *testing.T) {
+	if got := Money(dec("25000"), "MXN"); got != "$25,000.00 MXN" {
+		t.Errorf("got %q", got)
+	}
+	if got := Money(dec("-12.5"), "USD"); got != "-$12.50 USD" {
+		t.Errorf("got %q", got)
+	}
+	if got := Money(dec("1"), ""); got != "$1.00" {
+		t.Errorf("got %q", got)
+	}
+}
+
+func TestPercentAndOptional(t *testing.T) {
+	up, down, flat := dec("25"), dec("-3.24"), dec("0")
+	if got := Percent(&up); got != "+25.0%" {
+		t.Errorf("got %q", got)
+	}
+	if got := Percent(&down); got != "-3.2%" {
+		t.Errorf("got %q", got)
+	}
+	if got := Percent(&flat); got != "0.0%" {
+		t.Errorf("got %q", got)
+	}
+	if got := Percent(nil); got != dash {
+		t.Errorf("got %q", got)
+	}
+	if got := Optional(nil, 2); got != dash {
+		t.Errorf("got %q", got)
+	}
+}
+
+func TestDateUsesTheLocation(t *testing.T) {
+	mx, err := time.LoadLocation("America/Mexico_City")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 03:00 UTC on the 28th is still the 27th in Mexico City.
+	at := time.Date(2026, 9, 28, 3, 0, 0, 0, time.UTC)
+	if got := Date(at, mx); got != "27/09/2026" {
+		t.Errorf("got %q", got)
+	}
+	if got := Date(at, nil); got != "28/09/2026" {
+		t.Errorf("got %q", got)
+	}
+}
+
+func TestUnit(t *testing.T) {
+	if Unit("liters") != "L" || Unit("GALLONS") != "gal" || Unit("furlongs") != "furlongs" {
+		t.Error("unit labels")
+	}
+}
+```
+
+Create `internal/platform/pdf/render_test.go`:
+
+```go
+package pdf
+
+import (
+	"bytes"
+	"fmt"
+	"image"
+	"image/color"
+	"image/png"
+	"strings"
+	"testing"
+	"time"
+
+	"fleet/internal/platform/reports"
+)
+
+func header(t *testing.T, kind reports.Kind) reports.Header {
+	t.Helper()
+	mx, err := time.LoadLocation("America/Mexico_City")
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 9, 28, 6, 0, 0, 0, mx)
+	return reports.Header{
+		Kind:        kind,
+		Company:     reports.Company{ID: 1, Name: "Transportes Durán S.A. de C.V.", Currency: "MXN", Timezone: mx.String()},
+		Period:      reports.LatestDue(kind, now, mx, 6),
+		GeneratedAt: now,
+	}
+}
+
+func testLogo(t *testing.T) []byte {
+	t.Helper()
+	img := image.NewRGBA(image.Rect(0, 0, 40, 20))
+	for x := range 40 {
+		for y := range 20 {
+			img.Set(x, y, color.RGBA{R: 200, A: 255})
+		}
+	}
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
+
+func assertPDF(t *testing.T, out []byte, err error) {
+	t.Helper()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.HasPrefix(out, []byte("%PDF-")) {
+		t.Fatalf("output does not start with %%PDF-: %q", out[:min(20, len(out))])
+	}
+}
+
+// pageCount counts page objects. maroto writes each as "/Type /Page" followed
+// by a line break; "/Type /Pages" is the page tree and must not be counted.
+func pageCount(out []byte) int {
+	return bytes.Count(out, []byte("/Type /Page\n"))
+}
+
+func fuelRows(n int) []reports.FuelRow {
+	rows := make([]reports.FuelRow, 0, n)
+	for i := range n {
+		rows = append(rows, reports.FuelRow{
+			AssetID: int64(i + 1), AssetName: fmt.Sprintf("Unidad %03d", i+1), LicensePlate: "ABC-123",
+			MeterUnit: "km", VolumeUnit: "liters", FuelType: "diesel", Fills: 3,
+			Volume: dec("300"), Cost: dec("7500"), Distance: dec("900"),
+			EffDistance: dec("600"), EffVolume: dec("200"),
+		})
+	}
+	return rows
+}
+
+func TestFuelWeekly(t *testing.T) {
+	r := reports.BuildFuelWeekly(header(t, reports.FuelWeekly), fuelRows(3), fuelRows(2))
+	out, err := FuelWeekly(r, testLogo(t))
+	assertPDF(t, out, err)
+}
+
+func TestFuelWeeklyEmpty(t *testing.T) {
+	r := reports.BuildFuelWeekly(header(t, reports.FuelWeekly), nil, nil)
+	out, err := FuelWeekly(r, nil)
+	assertPDF(t, out, err)
+	if pageCount(out) != 1 {
+		t.Fatalf("pages = %d, want 1 for an empty report", pageCount(out))
+	}
+}
+
+// A fleet of 500 units must flow onto more pages, not fail and not be cut off.
+func TestFuelWeeklyLargeFleetPaginates(t *testing.T) {
+	r := reports.BuildFuelWeekly(header(t, reports.FuelWeekly), fuelRows(500), nil)
+	out, err := FuelWeekly(r, testLogo(t))
+	assertPDF(t, out, err)
+	if pageCount(out) < 5 {
+		t.Fatalf("pages = %d, want several for 500 rows", pageCount(out))
+	}
+}
+
+// Asset names are free text up to 100 characters.
+func TestLongNamesAndAccentsRender(t *testing.T) {
+	rows := fuelRows(2)
+	rows[0].AssetName = strings.Repeat("Tractocamión Kenworth ", 5)[:100]
+	rows[1].AssetName = "Ñandú — «grúa» 100% añejo"
+	r := reports.BuildFuelWeekly(header(t, reports.FuelWeekly), rows, nil)
+	out, err := FuelWeekly(r, nil)
+	assertPDF(t, out, err)
+}
+
+// A logo maroto cannot embed is dropped; the report still renders.
+func TestUnsupportedOrBrokenLogoIsIgnored(t *testing.T) {
+	r := reports.BuildFuelWeekly(header(t, reports.FuelWeekly), fuelRows(1), nil)
+	logos := map[string][]byte{
+		"webp":      []byte("RIFF\x00\x00\x00\x00WEBPVP8 "),
+		"gif":       []byte("GIF89a\x01\x00\x01\x00\x00\x00\x00;"),
+		"not image": []byte("<html>404</html>"),
+		"empty":     {},
+	}
+	for name, logo := range logos {
+		t.Run(name, func(t *testing.T) {
+			out, err := FuelWeekly(r, logo)
+			assertPDF(t, out, err)
+		})
+	}
+}
+
+func TestMaintenanceMonthly(t *testing.T) {
+	var rows []reports.MaintenanceRow
+	for i := range 8 {
+		rows = append(rows, reports.MaintenanceRow{
+			AssetID: int64(i + 1), AssetName: fmt.Sprintf("Unidad %d", i+1), LicensePlate: "XYZ-1",
+			Jobs: 2, Parts: dec("1000"), Labor: dec("500"), Total: dec("1500"),
+		})
+	}
+	rows[0].HasOverride = true
+	rows[0].Total = dec("9000")
+
+	r := reports.BuildMaintenanceMonthly(header(t, reports.MaintenanceMonthly), rows, nil)
+	out, err := MaintenanceMonthly(r, testLogo(t))
+	assertPDF(t, out, err)
+
+	empty := reports.BuildMaintenanceMonthly(header(t, reports.MaintenanceMonthly), nil, nil)
+	out, err = MaintenanceMonthly(empty, nil)
+	assertPDF(t, out, err)
+}
+```
+
+- [ ] **Step 3: Run them to see them fail**
+
+```bash
+go test ./internal/platform/pdf/
+```
+
+Expected: FAIL, `undefined: Number`, `undefined: FuelWeekly`, `undefined: dash`.
+
+- [ ] **Step 4: Write the formatting**
+
+Create `internal/platform/pdf/format.go`:
+
+```go
+// Package pdf renders a report to PDF bytes. It knows layout and formatting;
+// it does not know the database or email.
+package pdf
+
+import (
+	"strings"
+	"time"
+
+	"github.com/shopspring/decimal"
+)
+
+const dateLayout = "02/01/2006"
+
+// dash stands in for a value that does not exist, such as the efficiency of
+// an asset with no full-tank interval.
+const dash = "—"
+
+// Number formats d with thousands separators and a fixed number of decimals:
+// 1234567.5 with 2 places is "1,234,567.50".
+func Number(d decimal.Decimal, places int32) string {
+	s := d.Abs().StringFixed(places)
+	whole, frac, _ := strings.Cut(s, ".")
+
+	var b strings.Builder
+	if d.Round(places).Sign() < 0 {
+		b.WriteByte('-')
+	}
+	lead := len(whole) % 3
+	if lead > 0 {
+		b.WriteString(whole[:lead])
+	}
+	for i := lead; i < len(whole); i += 3 {
+		if b.Len() > 0 && whole[:i] != "" {
+			b.WriteByte(',')
+		}
+		b.WriteString(whole[i : i+3])
+	}
+	if frac != "" {
+		b.WriteByte('.')
+		b.WriteString(frac)
+	}
+	return b.String()
+}
+
+// Money formats an amount in the company's currency: "$1,234.50 MXN".
+func Money(d decimal.Decimal, currency string) string {
+	s := Number(d, 2)
+	sign := ""
+	if strings.HasPrefix(s, "-") {
+		sign, s = "-", s[1:]
+	}
+	out := sign + "$" + s
+	if currency != "" {
+		out += " " + currency
+	}
+	return out
+}
+
+// Optional formats a value that may be absent.
+func Optional(d *decimal.Decimal, places int32) string {
+	if d == nil {
+		return dash
+	}
+	return Number(*d, places)
+}
+
+// Percent formats a signed percentage change: "+25.0%", "-3.2%".
+func Percent(d *decimal.Decimal) string {
+	if d == nil {
+		return dash
+	}
+	sign := ""
+	if d.Sign() > 0 {
+		sign = "+"
+	}
+	return sign + Number(*d, 1) + "%"
+}
+
+// Date formats t as dd/mm/yyyy in loc.
+func Date(t time.Time, loc *time.Location) string {
+	if loc == nil {
+		loc = time.UTC
+	}
+	return t.In(loc).Format(dateLayout)
+}
+
+// unitLabels translates the unit codes the API stores into what a Spanish
+// reader expects. An unknown code is printed as it is stored.
+var unitLabels = map[string]string{
+	"liters":  "L",
+	"gallons": "gal",
+	"km":      "km",
+	"mi":      "mi",
+	"hr":      "h",
+}
+
+func Unit(code string) string {
+	if label, ok := unitLabels[strings.ToLower(code)]; ok {
+		return label
+	}
+	return code
+}
+```
+
+- [ ] **Step 5: Write the layout**
+
+Create `internal/platform/pdf/render.go`:
+
+```go
+package pdf
+
+import (
+	"fmt"
+	"net/http"
+
+	"github.com/johnfercher/maroto/v2"
+	"github.com/johnfercher/maroto/v2/pkg/components/col"
+	"github.com/johnfercher/maroto/v2/pkg/components/image"
+	"github.com/johnfercher/maroto/v2/pkg/components/line"
+	"github.com/johnfercher/maroto/v2/pkg/components/row"
+	"github.com/johnfercher/maroto/v2/pkg/components/text"
+	"github.com/johnfercher/maroto/v2/pkg/config"
+	"github.com/johnfercher/maroto/v2/pkg/consts/align"
+	"github.com/johnfercher/maroto/v2/pkg/consts/extension"
+	"github.com/johnfercher/maroto/v2/pkg/consts/fontstyle"
+	"github.com/johnfercher/maroto/v2/pkg/consts/orientation"
+	"github.com/johnfercher/maroto/v2/pkg/consts/pagesize"
+	"github.com/johnfercher/maroto/v2/pkg/core"
+	"github.com/johnfercher/maroto/v2/pkg/props"
+
+	"fleet/internal/platform/reports"
+)
+
+// emptyNotice is printed instead of the tables when a period has no data.
+const emptyNotice = "Sin registros en el periodo"
+
+// overrideNote explains the asterisk on a maintenance row.
+const overrideNote = "* El total de al menos un trabajo fue ajustado manualmente, por lo que puede no coincidir con refacciones más mano de obra."
+
+var (
+	headStyle  = props.Text{Size: 8, Style: fontstyle.Bold, Align: align.Left}
+	headRight  = props.Text{Size: 8, Style: fontstyle.Bold, Align: align.Right}
+	cellStyle  = props.Text{Size: 8, Align: align.Left}
+	cellRight  = props.Text{Size: 8, Align: align.Right}
+	titleStyle = props.Text{Size: 14, Style: fontstyle.Bold, Align: align.Left}
+	subStyle   = props.Text{Size: 9, Align: align.Left, Top: 7}
+	metaStyle  = props.Text{Size: 8, Align: align.Left, Top: 12}
+	sectionTop = props.Text{Size: 10, Style: fontstyle.Bold, Align: align.Left, Top: 3}
+)
+
+// column is one column of a table: its heading, its width out of 12, and
+// whether its values are numbers (right-aligned).
+type column struct {
+	title   string
+	width   int
+	numeric bool
+}
+
+// imageExtension reports the format of an image maroto can embed. It embeds
+// PNG and JPEG only; a WebP or GIF logo is a normal upload here, so an
+// unsupported format means "no logo", not an error.
+func imageExtension(data []byte) (extension.Type, bool) {
+	switch http.DetectContentType(data) {
+	case "image/png":
+		return extension.Png, true
+	case "image/jpeg":
+		return extension.Jpg, true
+	default:
+		return "", false
+	}
+}
+
+func newDocument(h reports.Header, logo []byte) (core.Maroto, error) {
+	cfg := config.NewBuilder().
+		WithPageSize(pagesize.Letter).
+		WithOrientation(orientation.Horizontal).
+		WithLeftMargin(12).
+		WithTopMargin(12).
+		WithRightMargin(12).
+		WithBottomMargin(12).
+		WithPageNumber(props.PageNumber{
+			Pattern: "Página {current} de {total}",
+			Place:   props.RightBottom,
+			Size:    8,
+		}).
+		Build()
+	m := maroto.New(cfg)
+
+	loc := h.Period.Start.Location()
+	header := row.New(22)
+	if ext, ok := imageExtension(logo); ok {
+		header.Add(image.NewFromBytesCol(2, logo, ext, props.Rect{Center: true, Percent: 90}))
+	} else {
+		header.Add(col.New(2))
+	}
+	header.Add(col.New(10).Add(
+		text.New(h.Kind.Title(), titleStyle),
+		text.New(h.Company.Name, subStyle),
+		text.New(fmt.Sprintf("Periodo: %s a %s    Generado: %s",
+			Date(h.Period.Start, loc), Date(h.Period.LastDay(), loc), Date(h.GeneratedAt, loc)), metaStyle),
+	))
+	if err := m.RegisterHeader(header, row.New(1).Add(line.NewCol(12)), row.New(3)); err != nil {
+		return nil, fmt.Errorf("pdf: register header: %w", err)
+	}
+	return m, nil
+}
+
+func section(m core.Maroto, title string) {
+	m.AddRow(9, text.NewCol(12, title, sectionTop))
+}
+
+func table(m core.Maroto, columns []column, rows [][]string) {
+	heads := make([]core.Col, 0, len(columns))
+	for _, c := range columns {
+		style := headStyle
+		if c.numeric {
+			style = headRight
+		}
+		heads = append(heads, text.NewCol(c.width, c.title, style))
+	}
+	m.AddRow(6, heads...)
+	m.AddRow(1, line.NewCol(12))
+
+	for _, values := range rows {
+		cells := make([]core.Col, 0, len(columns))
+		for i, c := range columns {
+			style := cellStyle
+			if c.numeric {
+				style = cellRight
+			}
+			cells = append(cells, text.NewCol(c.width, values[i], style))
+		}
+		// An auto row grows with its tallest cell, so a long asset name wraps
+		// instead of running over the next column.
+		m.AddAutoRow(cells...)
+	}
+	m.AddRow(3)
+}
+
+func finish(m core.Maroto) ([]byte, error) {
+	doc, err := m.Generate()
+	if err != nil {
+		return nil, fmt.Errorf("pdf: generate: %w", err)
+	}
+	return doc.GetBytes(), nil
+}
+
+func comparisonRows(label string, c reports.Comparison, format func(v reports.Comparison) [3]string) []string {
+	v := format(c)
+	return []string{label, v[0], v[1], v[2], Percent(c.Percent)}
+}
+
+var comparisonColumns = []column{
+	{"Concepto", 4, false},
+	{"Periodo", 2, true},
+	{"Periodo anterior", 2, true},
+	{"Diferencia", 2, true},
+	{"Cambio", 2, true},
+}
+
+// FuelWeekly renders the weekly fuel report. logo may be nil.
+func FuelWeekly(r reports.FuelWeeklyReport, logo []byte) ([]byte, error) {
+	m, err := newDocument(r.Header, logo)
+	if err != nil {
+		return nil, err
+	}
+	if r.Empty() {
+		m.AddRow(12, text.NewCol(12, emptyNotice, props.Text{Size: 11, Align: align.Center, Top: 4}))
+		return finish(m)
+	}
+	currency := r.Company.Currency
+
+	section(m, "Resumen")
+	summary := [][]string{
+		comparisonRows("Costo total", r.Cost, func(c reports.Comparison) [3]string {
+			return [3]string{Money(c.Current, currency), Money(c.Previous, currency), Money(c.Difference, currency)}
+		}),
+		comparisonRows("Volumen total", r.Volume, func(c reports.Comparison) [3]string {
+			return [3]string{Number(c.Current, 2), Number(c.Previous, 2), Number(c.Difference, 2)}
+		}),
+	}
+	table(m, comparisonColumns, summary)
+
+	totals := make([][]string, 0, len(r.Volumes)+len(r.Distances)+1)
+	totals = append(totals, []string{"Cargas", fmt.Sprint(r.Fills)})
+	for _, v := range r.Volumes {
+		totals = append(totals, []string{"Volumen " + v.Label, Number(v.Amount, 2) + " " + Unit(v.Unit)})
+	}
+	for _, d := range r.Distances {
+		totals = append(totals, []string{"Distancia", Number(d.Amount, 0) + " " + Unit(d.Unit)})
+	}
+	table(m, []column{{"Totales", 4, false}, {"", 3, true}}, totals)
+
+	section(m, "Detalle por unidad")
+	rows := make([][]string, 0, len(r.Lines))
+	for _, l := range r.Lines {
+		rows = append(rows, []string{
+			l.AssetName,
+			l.LicensePlate,
+			l.FuelType,
+			fmt.Sprint(l.Fills),
+			Number(l.Volume, 2) + " " + Unit(l.VolumeUnit),
+			Money(l.Cost, currency),
+			Optional(l.AvgUnitCost, 3),
+			Number(l.Distance, 0) + " " + Unit(l.MeterUnit),
+			Optional(l.Efficiency, 2),
+		})
+	}
+	table(m, []column{
+		{"Unidad", 2, false},
+		{"Placas", 1, false},
+		{"Combustible", 1, false},
+		{"Cargas", 1, true},
+		{"Volumen", 2, true},
+		{"Costo", 2, true},
+		{"Costo unitario", 1, true},
+		{"Distancia", 1, true},
+		{"Rendimiento", 1, true},
+	}, rows)
+	return finish(m)
+}
+
+var maintenanceColumns = []column{
+	{"Unidad", 3, false},
+	{"Placas", 2, false},
+	{"Trabajos", 1, true},
+	{"Refacciones", 2, true},
+	{"Mano de obra", 2, true},
+	{"Total", 2, true},
+}
+
+func maintenanceRows(lines []reports.MaintenanceLine, currency string) [][]string {
+	rows := make([][]string, 0, len(lines))
+	for _, l := range lines {
+		total := Money(l.Total, currency)
+		if l.HasOverride {
+			total += " *"
+		}
+		rows = append(rows, []string{
+			l.AssetName,
+			l.LicensePlate,
+			fmt.Sprint(l.Jobs),
+			Money(l.Parts, currency),
+			Money(l.Labor, currency),
+			total,
+		})
+	}
+	return rows
+}
+
+// MaintenanceMonthly renders the monthly maintenance cost report. logo may be nil.
+func MaintenanceMonthly(r reports.MaintenanceMonthlyReport, logo []byte) ([]byte, error) {
+	m, err := newDocument(r.Header, logo)
+	if err != nil {
+		return nil, err
+	}
+	if r.Empty() {
+		m.AddRow(12, text.NewCol(12, emptyNotice, props.Text{Size: 11, Align: align.Center, Top: 4}))
+		return finish(m)
+	}
+	currency := r.Company.Currency
+
+	section(m, "Resumen")
+	table(m, comparisonColumns, [][]string{
+		comparisonRows("Costo total", r.Cost, func(c reports.Comparison) [3]string {
+			return [3]string{Money(c.Current, currency), Money(c.Previous, currency), Money(c.Difference, currency)}
+		}),
+	})
+	table(m, []column{{"Totales", 4, false}, {"", 3, true}}, [][]string{
+		{"Trabajos", fmt.Sprint(r.Jobs)},
+		{"Refacciones", Money(r.Parts, currency)},
+		{"Mano de obra", Money(r.Labor, currency)},
+		{"Total", Money(r.Total, currency)},
+	})
+
+	section(m, fmt.Sprintf("Las %d unidades con mayor costo", len(r.Top)))
+	table(m, maintenanceColumns, maintenanceRows(r.Top, currency))
+
+	section(m, "Detalle por unidad")
+	table(m, maintenanceColumns, maintenanceRows(r.Lines, currency))
+
+	if r.HasOverride {
+		m.AddAutoRow(text.NewCol(12, overrideNote, props.Text{Size: 7, Align: align.Left}))
+	}
+	return finish(m)
+}
+```
+
+- [ ] **Step 6: Write the single render path**
+
+Create `internal/platform/pdf/report.go`:
+
+```go
+package pdf
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"fleet/internal/platform/reports"
+)
+
+// Document is a rendered report, ready to download or attach.
+type Document struct {
+	Filename string
+	Data     []byte
+	// Empty says the period had no data. A download still serves the document;
+	// the scheduler does not email it.
+	Empty bool
+}
+
+// Render reads one company's report for one period and renders it. It is the
+// single path behind the scheduler, the download endpoints and the CLI, so
+// what is emailed and what is downloaded cannot differ.
+func Render(ctx context.Context, q reports.Querier, kind reports.Kind, c reports.Company, p reports.Period, logo []byte, now time.Time) (Document, error) {
+	doc := Document{
+		Filename: fmt.Sprintf("%s-%s.pdf", kind.FilePrefix(), p.StartDate().Format("2006-01-02")),
+	}
+
+	var err error
+	switch kind {
+	case reports.FuelWeekly:
+		var r reports.FuelWeeklyReport
+		if r, err = reports.FuelWeeklyFor(ctx, q, c, p, now); err != nil {
+			return Document{}, err
+		}
+		doc.Empty = r.Empty()
+		doc.Data, err = FuelWeekly(r, logo)
+	case reports.MaintenanceMonthly:
+		var r reports.MaintenanceMonthlyReport
+		if r, err = reports.MaintenanceMonthlyFor(ctx, q, c, p, now); err != nil {
+			return Document{}, err
+		}
+		doc.Empty = r.Empty()
+		doc.Data, err = MaintenanceMonthly(r, logo)
+	default:
+		return Document{}, fmt.Errorf("pdf: unknown report kind %q", kind)
+	}
+	if err != nil {
+		return Document{}, err
+	}
+	return doc, nil
+}
+```
+
+- [ ] **Step 7: Run the tests to see them pass**
+
+```bash
+go mod tidy
+gofmt -l internal/platform/pdf
+go vet ./internal/platform/pdf/
+CGO_ENABLED=0 go test ./internal/platform/pdf/
+```
+
+Expected: no output from gofmt and vet; `ok  	fleet/internal/platform/pdf`. The 500-row test takes a few seconds.
+
+- [ ] **Step 8: Look at one**
+
+A test cannot say whether a page is readable. Write one PDF to disk and open it:
+
+```bash
+cat > /tmp/pdf_look_test.go <<'EOF'
+package pdf
+
+import (
+	"os"
+	"testing"
+
+	"fleet/internal/platform/reports"
+)
+
+func TestWriteSample(t *testing.T) {
+	r := reports.BuildFuelWeekly(header(t, reports.FuelWeekly), fuelRows(40), fuelRows(30))
+	out, err := FuelWeekly(r, testLogo(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(os.Getenv("SAMPLE_OUT"), out, 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+EOF
+cp /tmp/pdf_look_test.go internal/platform/pdf/zz_look_test.go
+SAMPLE_OUT="$HOME/reporte-muestra.pdf" go test -run TestWriteSample ./internal/platform/pdf/
+rm internal/platform/pdf/zz_look_test.go
+```
+
+Open `~/reporte-muestra.pdf`. Check: the header with logo repeats on page 2, no column text runs into its neighbour, accents render, the page number is bottom right. If a column is too narrow, change its `width` in `render.go`; the widths of one table must add up to 12. `zz_look_test.go` must not be committed.
+
+- [ ] **Step 9: Commit**
+
+```bash
+git status --short internal/platform/pdf
+git add go.mod go.sum internal/platform/pdf
+git commit -m "feat(reports): render the two reports as PDF"
+```
+
+---
+
+### Task 4: Email
+
+**Files:**
+- Create: `internal/platform/mail/mail.go`
+- Test: `internal/platform/mail/mail_test.go`
+
+**Interfaces:**
+- Consumes: nothing from earlier tasks.
+- Produces:
+  - `type Config struct{ Host string; Port int; User, Password, From string }`; `(Config).Enabled() bool`
+  - `type Attachment struct{ Filename, ContentType string; Data []byte }`
+  - `type Message struct{ To []string; Subject, Body string; Attachments []Attachment }`
+  - `type Sender interface{ Send(ctx context.Context, m Message) error }`
+  - `CleanAddress(s string) (string, error)` — trims; refuses empty, line breaks, display names, lists
+  - `Build(from string, m Message, now time.Time) ([]byte, error)`
+  - `NewSMTP(cfg Config) *SMTP`; `(*SMTP).Send(ctx, m) error`
+
+- [ ] **Step 1: Write the failing test**
+
+Create `internal/platform/mail/mail_test.go`:
+
+```go
+package mail
+
+import (
+	"bufio"
+	"bytes"
+	"context"
+	"io"
+	"mime"
+	"mime/multipart"
+	"net"
+	netmail "net/mail"
+	"strconv"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+)
+
+var fixedNow = time.Date(2026, 9, 28, 12, 0, 0, 0, time.UTC)
+
+func TestCleanAddress(t *testing.T) {
+	good := []string{"flota@empresa.mx", "  flota@empresa.mx  ", "a.b+c@sub.empresa.com.mx"}
+	for _, s := range good {
+		got, err := CleanAddress(s)
+		if err != nil {
+			t.Fatalf("%q: %v", s, err)
+		}
+		if got != strings.TrimSpace(s) {
+			t.Fatalf("%q: got %q", s, got)
+		}
+	}
+
+	bad := []string{
+		"",
+		"no-at-sign",
+		"Flota <flota@empresa.mx>",
+		"a@b.mx, c@d.mx",
+		"a@b.mx\r\nBcc: x@y.mx",
+		"a@b.mx\nBcc: x@y.mx",
+	}
+	for _, s := range bad {
+		if _, err := CleanAddress(s); err == nil {
+			t.Fatalf("%q: accepted, want an error", s)
+		}
+	}
+}
+
+func TestBuild(t *testing.T) {
+	pdf := bytes.Repeat([]byte("%PDF-1.4 contenido "), 200)
+	raw, err := Build("reportes@empresa.mx", Message{
+		To:      []string{"a@cliente.mx", "b@cliente.mx"},
+		Subject: "Reporte semanal de combustible — Transportes Durán",
+		Body:    "Adjunto encontrará el reporte.\nPeriodo: 21/09/2026 a 27/09/2026.\n",
+		Attachments: []Attachment{{
+			Filename: "combustible-semanal-2026-09-21.pdf", ContentType: "application/pdf", Data: pdf,
+		}},
+	}, fixedNow)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	msg, err := netmail.ReadMessage(bytes.NewReader(raw))
+	if err != nil {
+		t.Fatalf("the message does not parse: %v", err)
+	}
+	if got := msg.Header.Get("To"); got != "a@cliente.mx, b@cliente.mx" {
+		t.Fatalf("To = %q", got)
+	}
+	subject, err := new(mime.WordDecoder).DecodeHeader(msg.Header.Get("Subject"))
+	if err != nil || subject != "Reporte semanal de combustible — Transportes Durán" {
+		t.Fatalf("Subject = %q, err = %v", subject, err)
+	}
+	if msg.Header.Get("Message-ID") == "" || msg.Header.Get("Date") == "" {
+		t.Fatal("Message-ID and Date are required by most receiving servers")
+	}
+
+	mediaType, params, err := mime.ParseMediaType(msg.Header.Get("Content-Type"))
+	if err != nil || mediaType != "multipart/mixed" {
+		t.Fatalf("Content-Type = %q, err = %v", mediaType, err)
+	}
+	mr := multipart.NewReader(msg.Body, params["boundary"])
+
+	text, err := mr.NextPart()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// multipart.Reader decodes quoted-printable transparently.
+	body, _ := io.ReadAll(text)
+	if !strings.Contains(string(body), "Adjunto encontrará el reporte.") {
+		t.Fatalf("body = %q", body)
+	}
+
+	att, err := mr.NextPart()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if att.FileName() != "combustible-semanal-2026-09-21.pdf" {
+		t.Fatalf("filename = %q", att.FileName())
+	}
+	encoded, _ := io.ReadAll(att)
+	for _, line := range strings.Split(strings.TrimSpace(string(encoded)), "\r\n") {
+		if len(line) > 76 {
+			t.Fatalf("base64 line of %d characters, the limit is 76", len(line))
+		}
+	}
+}
+
+func TestBuildRefusesHeaderInjection(t *testing.T) {
+	base := Message{To: []string{"a@cliente.mx"}, Subject: "s", Body: "b"}
+
+	injected := base
+	injected.To = []string{"a@cliente.mx\r\nBcc: espia@otro.mx"}
+	if _, err := Build("reportes@empresa.mx", injected, fixedNow); err == nil {
+		t.Fatal("a recipient with a line break was accepted")
+	}
+
+	injected = base
+	injected.Subject = "hola\r\nBcc: espia@otro.mx"
+	if _, err := Build("reportes@empresa.mx", injected, fixedNow); err == nil {
+		t.Fatal("a subject with a line break was accepted")
+	}
+
+	if _, err := Build("reportes@empresa.mx", Message{Subject: "s"}, fixedNow); err == nil {
+		t.Fatal("a message with no recipients was accepted")
+	}
+	if _, err := Build("", base, fixedNow); err == nil {
+		t.Fatal("an empty sender was accepted")
+	}
+}
+
+// fakeSMTP is the smallest server net/smtp will complete a delivery against.
+// It offers no STARTTLS and no AUTH, so the client sends in the clear, which
+// is what a test on the loopback interface wants.
+type fakeSMTP struct {
+	ln net.Listener
+
+	mu       sync.Mutex
+	from     string
+	rcpts    []string
+	data     string
+	silent   bool // accept the connection and never greet
+	rejectTo string
+}
+
+func newFakeSMTP(t *testing.T) *fakeSMTP {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := &fakeSMTP{ln: ln}
+	t.Cleanup(func() { ln.Close() })
+	go f.serve()
+	return f
+}
+
+func (f *fakeSMTP) config() Config {
+	host, port, _ := net.SplitHostPort(f.ln.Addr().String())
+	p, _ := strconv.Atoi(port)
+	return Config{Host: host, Port: p, From: "reportes@empresa.mx"}
+}
+
+func (f *fakeSMTP) serve() {
+	for {
+		conn, err := f.ln.Accept()
+		if err != nil {
+			return
+		}
+		go f.handle(conn)
+	}
+}
+
+func (f *fakeSMTP) handle(conn net.Conn) {
+	defer conn.Close()
+	f.mu.Lock()
+	silent, rejectTo := f.silent, f.rejectTo
+	f.mu.Unlock()
+	if silent {
+		_, _ = io.Copy(io.Discard, conn)
+		return
+	}
+
+	r := bufio.NewReader(conn)
+	say := func(s string) { _, _ = conn.Write([]byte(s + "\r\n")) }
+	say("220 fake ESMTP")
+	for {
+		line, err := r.ReadString('\n')
+		if err != nil {
+			return
+		}
+		line = strings.TrimRight(line, "\r\n")
+		upper := strings.ToUpper(line)
+		switch {
+		case strings.HasPrefix(upper, "EHLO"), strings.HasPrefix(upper, "HELO"):
+			say("250 fake")
+		case strings.HasPrefix(upper, "MAIL FROM:"):
+			f.mu.Lock()
+			f.from = strings.Trim(line[len("MAIL FROM:"):], "<> ")
+			f.mu.Unlock()
+			say("250 ok")
+		case strings.HasPrefix(upper, "RCPT TO:"):
+			addr := strings.Trim(line[len("RCPT TO:"):], "<> ")
+			if addr == rejectTo {
+				say("550 no such user")
+				continue
+			}
+			f.mu.Lock()
+			f.rcpts = append(f.rcpts, addr)
+			f.mu.Unlock()
+			say("250 ok")
+		case upper == "DATA":
+			say("354 go ahead")
+			var data strings.Builder
+			for {
+				l, err := r.ReadString('\n')
+				if err != nil {
+					return
+				}
+				if l == ".\r\n" {
+					break
+				}
+				data.WriteString(l)
+			}
+			f.mu.Lock()
+			f.data = data.String()
+			f.mu.Unlock()
+			say("250 queued")
+		case upper == "QUIT":
+			say("221 bye")
+			return
+		default:
+			say("500 unknown")
+		}
+	}
+}
+
+func TestSMTPSend(t *testing.T) {
+	srv := newFakeSMTP(t)
+	sender := NewSMTP(srv.config())
+
+	err := sender.Send(context.Background(), Message{
+		To:          []string{"a@cliente.mx", "b@cliente.mx"},
+		Subject:     "Reporte",
+		Body:        "Adjunto.",
+		Attachments: []Attachment{{Filename: "r.pdf", ContentType: "application/pdf", Data: []byte("%PDF-1.4")}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	srv.mu.Lock()
+	defer srv.mu.Unlock()
+	if srv.from != "reportes@empresa.mx" {
+		t.Fatalf("envelope sender = %q", srv.from)
+	}
+	if len(srv.rcpts) != 2 {
+		t.Fatalf("envelope recipients = %v, want both", srv.rcpts)
+	}
+	if !strings.Contains(srv.data, "Subject: ") || !strings.Contains(srv.data, "filename=r.pdf") {
+		t.Fatalf("the server did not receive the message: %q", srv.data)
+	}
+}
+
+func TestSMTPSendReportsARefusedRecipient(t *testing.T) {
+	srv := newFakeSMTP(t)
+	srv.rejectTo = "b@cliente.mx"
+
+	err := NewSMTP(srv.config()).Send(context.Background(), Message{
+		To: []string{"a@cliente.mx", "b@cliente.mx"}, Subject: "s", Body: "b",
+	})
+	if err == nil || !strings.Contains(err.Error(), "b@cliente.mx") {
+		t.Fatalf("err = %v, want it to name the refused recipient", err)
+	}
+}
+
+// A server that accepts the connection and then says nothing must make Send
+// return, not hang.
+func TestSMTPSendTimesOutOnASilentServer(t *testing.T) {
+	srv := newFakeSMTP(t)
+	srv.silent = true
+
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	defer cancel()
+
+	done := make(chan error, 1)
+	go func() {
+		done <- NewSMTP(srv.config()).Send(ctx, Message{To: []string{"a@cliente.mx"}, Subject: "s", Body: "b"})
+	}()
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("Send succeeded against a server that never answered")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Send did not return; the deadline is not enforced on the connection")
+	}
+}
+
+func TestSMTPSendFailsWhenNothingListens(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	host, port, _ := net.SplitHostPort(ln.Addr().String())
+	ln.Close()
+	p, _ := strconv.Atoi(port)
+
+	err = NewSMTP(Config{Host: host, Port: p, From: "r@empresa.mx"}).
+		Send(context.Background(), Message{To: []string{"a@cliente.mx"}, Subject: "s", Body: "b"})
+	if err == nil {
+		t.Fatal("Send succeeded with nothing listening")
+	}
+}
+```
+
+- [ ] **Step 2: Run it to see it fail**
+
+```bash
+go test ./internal/platform/mail/
+```
+
+Expected: FAIL, `undefined: CleanAddress`, `undefined: Build`, `undefined: NewSMTP`.
+
+- [ ] **Step 3: Write the implementation**
+
+Create `internal/platform/mail/mail.go`:
+
+```go
+// Package mail sends a message with attachments over SMTP, using only the
+// standard library. It knows nothing about reports.
+package mail
+
+import (
+	"bytes"
+	"context"
+	"crypto/rand"
+	"crypto/tls"
+	"encoding/base64"
+	"encoding/hex"
+	"errors"
+	"fmt"
+	"mime"
+	"mime/multipart"
+	"mime/quotedprintable"
+	"net"
+	"net/mail"
+	"net/smtp"
+	"net/textproto"
+	"strconv"
+	"strings"
+	"time"
+)
+
+// sendTimeout bounds one whole delivery. A mail server that accepts the
+// connection and then says nothing must not hold the scheduler's tick open.
+const sendTimeout = 60 * time.Second
+
+// implicitTLSPort is the one port where TLS starts before the first byte.
+// Every other port is upgraded with STARTTLS.
+const implicitTLSPort = 465
+
+type Config struct {
+	Host     string
+	Port     int
+	User     string
+	Password string
+	From     string
+}
+
+// Enabled reports whether a mail server is configured at all. When it is not,
+// reports are still built and their runs recorded as not sent.
+func (c Config) Enabled() bool { return c.Host != "" }
+
+type Attachment struct {
+	Filename    string
+	ContentType string
+	Data        []byte
+}
+
+type Message struct {
+	To          []string
+	Subject     string
+	Body        string
+	Attachments []Attachment
+}
+
+// Sender is what the scheduler depends on, so a test can record messages
+// instead of sending them.
+type Sender interface {
+	Send(ctx context.Context, m Message) error
+}
+
+// CleanAddress returns the bare address of s, or an error if s is anything
+// other than one plain address.
+//
+// A display name or a line break is refused rather than stripped. The value is
+// written into a message header, where a line break starts a new header: an
+// address of "a@b.mx\r\nBcc: x@y.mx" would otherwise add a recipient.
+func CleanAddress(s string) (string, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return "", errors.New("mail: address is empty")
+	}
+	if strings.ContainsAny(s, "\r\n") {
+		return "", errors.New("mail: address contains a line break")
+	}
+	a, err := mail.ParseAddress(s)
+	if err != nil {
+		return "", fmt.Errorf("mail: %q is not an email address", s)
+	}
+	if a.Name != "" || a.Address != s {
+		return "", fmt.Errorf("mail: %q must be a bare address, with no name", s)
+	}
+	return a.Address, nil
+}
+
+// Build renders m as an RFC 5322 message: a text body, then each attachment
+// base64-encoded.
+func Build(from string, m Message, now time.Time) ([]byte, error) {
+	from, err := CleanAddress(from)
+	if err != nil {
+		return nil, fmt.Errorf("mail: from: %w", err)
+	}
+	if len(m.To) == 0 {
+		return nil, errors.New("mail: no recipients")
+	}
+	to := make([]string, 0, len(m.To))
+	for _, addr := range m.To {
+		clean, err := CleanAddress(addr)
+		if err != nil {
+			return nil, err
+		}
+		to = append(to, clean)
+	}
+	if strings.ContainsAny(m.Subject, "\r\n") {
+		return nil, errors.New("mail: subject contains a line break")
+	}
+
+	var body bytes.Buffer
+	mw := multipart.NewWriter(&body)
+
+	text, err := mw.CreatePart(textproto.MIMEHeader{
+		"Content-Type":              {"text/plain; charset=utf-8"},
+		"Content-Transfer-Encoding": {"quoted-printable"},
+	})
+	if err != nil {
+		return nil, err
+	}
+	qp := quotedprintable.NewWriter(text)
+	if _, err := qp.Write([]byte(m.Body)); err != nil {
+		return nil, err
+	}
+	if err := qp.Close(); err != nil {
+		return nil, err
+	}
+
+	for _, a := range m.Attachments {
+		name := strings.NewReplacer("\r", "", "\n", "", `"`, "").Replace(a.Filename)
+		part, err := mw.CreatePart(textproto.MIMEHeader{
+			"Content-Type":              {a.ContentType},
+			"Content-Transfer-Encoding": {"base64"},
+			"Content-Disposition":       {mime.FormatMediaType("attachment", map[string]string{"filename": name})},
+		})
+		if err != nil {
+			return nil, err
+		}
+		if err := writeBase64Lines(part, a.Data); err != nil {
+			return nil, err
+		}
+	}
+	if err := mw.Close(); err != nil {
+		return nil, err
+	}
+
+	domain := from[strings.LastIndexByte(from, '@')+1:]
+	var out bytes.Buffer
+	fmt.Fprintf(&out, "From: %s\r\n", from)
+	fmt.Fprintf(&out, "To: %s\r\n", strings.Join(to, ", "))
+	fmt.Fprintf(&out, "Subject: %s\r\n", mime.QEncoding.Encode("utf-8", m.Subject))
+	fmt.Fprintf(&out, "Date: %s\r\n", now.Format(time.RFC1123Z))
+	fmt.Fprintf(&out, "Message-ID: <%s@%s>\r\n", randomID(), domain)
+	fmt.Fprintf(&out, "MIME-Version: 1.0\r\n")
+	fmt.Fprintf(&out, "Content-Type: multipart/mixed; boundary=%q\r\n\r\n", mw.Boundary())
+	out.Write(body.Bytes())
+	return out.Bytes(), nil
+}
+
+// writeBase64Lines wraps at 76 characters, the line length RFC 2045 allows.
+func writeBase64Lines(w interface{ Write([]byte) (int, error) }, data []byte) error {
+	const width = 76
+	encoded := base64.StdEncoding.EncodeToString(data)
+	for len(encoded) > 0 {
+		n := min(width, len(encoded))
+		if _, err := w.Write([]byte(encoded[:n] + "\r\n")); err != nil {
+			return err
+		}
+		encoded = encoded[n:]
+	}
+	return nil
+}
+
+func randomID() string {
+	b := make([]byte, 12)
+	_, _ = rand.Read(b)
+	return hex.EncodeToString(b)
+}
+
+// SMTP is the Sender that talks to a real server.
+type SMTP struct {
+	cfg Config
+	now func() time.Time
+}
+
+func NewSMTP(cfg Config) *SMTP {
+	return &SMTP{cfg: cfg, now: time.Now}
+}
+
+func (s *SMTP) Send(ctx context.Context, m Message) error {
+	raw, err := Build(s.cfg.From, m, s.now())
+	if err != nil {
+		return err
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, sendTimeout)
+	defer cancel()
+
+	addr := net.JoinHostPort(s.cfg.Host, strconv.Itoa(s.cfg.Port))
+	conn, err := (&net.Dialer{}).DialContext(ctx, "tcp", addr)
+	if err != nil {
+		return fmt.Errorf("mail: connect to %s: %w", addr, err)
+	}
+	defer conn.Close()
+	// net/smtp takes no context, so the deadline on the connection is what
+	// enforces the timeout for everything after the dial.
+	if deadline, ok := ctx.Deadline(); ok {
+		_ = conn.SetDeadline(deadline)
+	}
+
+	tlsConfig := &tls.Config{ServerName: s.cfg.Host, MinVersion: tls.VersionTLS12}
+	if s.cfg.Port == implicitTLSPort {
+		conn = tls.Client(conn, tlsConfig)
+	}
+
+	client, err := smtp.NewClient(conn, s.cfg.Host)
+	if err != nil {
+		return fmt.Errorf("mail: greeting from %s: %w", addr, err)
+	}
+	defer client.Close()
+
+	if s.cfg.Port != implicitTLSPort {
+		if ok, _ := client.Extension("STARTTLS"); ok {
+			if err := client.StartTLS(tlsConfig); err != nil {
+				return fmt.Errorf("mail: starttls: %w", err)
+			}
+		}
+	}
+	if s.cfg.User != "" {
+		// PlainAuth itself refuses to send the password over a connection
+		// that is neither TLS nor localhost.
+		auth := smtp.PlainAuth("", s.cfg.User, s.cfg.Password, s.cfg.Host)
+		if err := client.Auth(auth); err != nil {
+			return fmt.Errorf("mail: authenticate: %w", err)
+		}
+	}
+
+	if err := client.Mail(s.cfg.From); err != nil {
+		return fmt.Errorf("mail: sender refused: %w", err)
+	}
+	for _, to := range m.To {
+		if err := client.Rcpt(strings.TrimSpace(to)); err != nil {
+			return fmt.Errorf("mail: recipient %s refused: %w", to, err)
+		}
+	}
+	w, err := client.Data()
+	if err != nil {
+		return fmt.Errorf("mail: data: %w", err)
+	}
+	if _, err := w.Write(raw); err != nil {
+		return fmt.Errorf("mail: write message: %w", err)
+	}
+	if err := w.Close(); err != nil {
+		return fmt.Errorf("mail: message refused: %w", err)
+	}
+	return client.Quit()
+}
+```
+
+- [ ] **Step 4: Run the test to see it pass**
+
+```bash
+gofmt -l internal/platform/mail
+go vet ./internal/platform/mail/
+go test -count=1 ./internal/platform/mail/
+```
+
+Expected: no output from gofmt and vet; `ok  	fleet/internal/platform/mail` in about a second. If it takes close to 60 seconds, the deadline on the connection is not being set and `TestSMTPSendTimesOutOnASilentServer` is waiting on the fallback.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add internal/platform/mail
+git commit -m "feat(reports): send mail with attachments over SMTP"
+```
+
+---
+
+### Task 5: Configuration
+
+**Files:**
+- Modify: `internal/config/config.go`
+- Test: `internal/config/config_test.go` (new)
+
+**Interfaces:**
+- Consumes: nothing from earlier tasks.
+- Produces: `config.Config` gains `SMTP config.SMTPConfig{Host string; Port int; User, Password, From string}` and `Reports config.ReportsConfig{Enabled bool; Tick string; SendHour int}`.
+
+- [ ] **Step 1: Write the failing test**
+
+Create `internal/config/config_test.go`:
+
+```go
+package config
+
+import (
+	"strings"
+	"testing"
+)
+
+// setRequired sets what Load refuses to start without, and clears every
+// variable these tests read so the developer's own .env cannot leak in.
+func setRequired(t *testing.T) {
+	t.Helper()
+	t.Setenv("DATABASE_URL", "postgres://localhost/fleet")
+	t.Setenv("JWT_SECRET", "secret")
+	for _, k := range []string{
+		"SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD", "SMTP_FROM",
+		"REPORTS_ENABLED", "REPORTS_TICK", "REPORTS_SEND_HOUR",
+	} {
+		t.Setenv(k, "")
+	}
+}
+
+func TestReportsDefaults(t *testing.T) {
+	setRequired(t)
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Reports.Enabled {
+		t.Error("the scheduler must be off unless REPORTS_ENABLED says otherwise")
+	}
+	if cfg.Reports.Tick != "*/15 * * * *" || cfg.Reports.SendHour != 6 {
+		t.Errorf("reports = %+v", cfg.Reports)
+	}
+	if cfg.SMTP.Host != "" || cfg.SMTP.Port != 587 {
+		t.Errorf("smtp = %+v", cfg.SMTP)
+	}
+}
+
+func TestReportsFromEnv(t *testing.T) {
+	setRequired(t)
+	t.Setenv("REPORTS_ENABLED", "true")
+	t.Setenv("REPORTS_TICK", "@hourly")
+	t.Setenv("REPORTS_SEND_HOUR", "8")
+	t.Setenv("SMTP_HOST", " smtp.ionos.mx ")
+	t.Setenv("SMTP_PORT", "465")
+	t.Setenv("SMTP_USER", "reportes@empresa.mx")
+	t.Setenv("SMTP_PASSWORD", "s3cret")
+	t.Setenv("SMTP_FROM", "reportes@empresa.mx")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.Reports.Enabled || cfg.Reports.Tick != "@hourly" || cfg.Reports.SendHour != 8 {
+		t.Errorf("reports = %+v", cfg.Reports)
+	}
+	if cfg.SMTP.Host != "smtp.ionos.mx" || cfg.SMTP.Port != 465 || cfg.SMTP.From != "reportes@empresa.mx" {
+		t.Errorf("smtp = %+v", cfg.SMTP)
+	}
+}
+
+func TestReportsConfigIsValidated(t *testing.T) {
+	tests := []struct {
+		name string
+		env  map[string]string
+		want string
+	}{
+		{"a mail server with no sender", map[string]string{"SMTP_HOST": "smtp.ionos.mx"}, "SMTP_FROM"},
+		{"port out of range", map[string]string{"SMTP_PORT": "70000"}, "SMTP_PORT"},
+		{"port zero", map[string]string{"SMTP_PORT": "0"}, "SMTP_PORT"},
+		{"hour 24", map[string]string{"REPORTS_SEND_HOUR": "24"}, "REPORTS_SEND_HOUR"},
+		{"negative hour", map[string]string{"REPORTS_SEND_HOUR": "-1"}, "REPORTS_SEND_HOUR"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setRequired(t)
+			for k, v := range tt.env {
+				t.Setenv(k, v)
+			}
+			_, err := Load()
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("err = %v, want it to name %s", err, tt.want)
+			}
+		})
+	}
+}
+
+// A value that is not a number falls back to the default, as the other env
+// helpers do, rather than stopping the process.
+func TestNonNumericValuesFallBack(t *testing.T) {
+	setRequired(t)
+	t.Setenv("SMTP_PORT", "quinientos")
+	t.Setenv("REPORTS_SEND_HOUR", "seis")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.SMTP.Port != 587 || cfg.Reports.SendHour != 6 {
+		t.Errorf("port = %d, hour = %d", cfg.SMTP.Port, cfg.Reports.SendHour)
+	}
+}
+```
+
+- [ ] **Step 2: Run it to see it fail**
+
+```bash
+go test ./internal/config/
+```
+
+Expected: FAIL, `cfg.Reports undefined`, `cfg.SMTP undefined`.
+
+- [ ] **Step 3: Write the implementation**
+
+Replace `internal/config/config.go` with:
+
+```go
+package config
+
+import (
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+)
+
+type Config struct {
+	Env         string
+	HTTPAddr    string
+	DatabaseURL string
+	CORSOrigins []string
+	Swagger     bool
+	JWT         JWTConfig
+	SMTP        SMTPConfig
+	Reports     ReportsConfig
+}
+
+type JWTConfig struct {
+	Secret     string
+	Issuer     string
+	AccessTTL  time.Duration
+	RefreshTTL time.Duration
+}
+
+// SMTPConfig is the mail server the scheduled reports are sent through. An
+// empty Host means none is configured: reports are still built, and their runs
+// recorded as not sent.
+type SMTPConfig struct {
+	Host     string
+	Port     int
+	User     string
+	Password string
+	From     string
+}
+
+// ReportsConfig drives the in-process scheduler.
+type ReportsConfig struct {
+	// Enabled starts the scheduler. It defaults to off so that a development
+	// or QA process pointed at real data does not email anyone by accident.
+	Enabled bool
+	// Tick is the cron expression of the single job that looks for due reports.
+	Tick string
+	// SendHour is the local hour, in each company's own timezone, at which a
+	// finished period becomes due.
+	SendHour int
+}
+
+// Load reads configuration from the environment. DATABASE_URL and JWT_SECRET are
+// required; everything else has a development-friendly default.
+func Load() (Config, error) {
+	cfg := Config{
+		Env:         env("APP_ENV", "development"),
+		HTTPAddr:    env("HTTP_ADDR", ":8080"),
+		DatabaseURL: os.Getenv("DATABASE_URL"),
+		CORSOrigins: splitCSV(env("CORS_ORIGINS", "*")),
+		JWT: JWTConfig{
+			Secret:     os.Getenv("JWT_SECRET"),
+			Issuer:     env("JWT_ISSUER", "fleet"),
+			AccessTTL:  envDuration("JWT_ACCESS_TTL", time.Hour),
+			RefreshTTL: envDuration("JWT_REFRESH_TTL", 7*24*time.Hour),
+		},
+		SMTP: SMTPConfig{
+			Host:     strings.TrimSpace(os.Getenv("SMTP_HOST")),
+			Port:     envInt("SMTP_PORT", 587),
+			User:     os.Getenv("SMTP_USER"),
+			Password: os.Getenv("SMTP_PASSWORD"),
+			From:     strings.TrimSpace(os.Getenv("SMTP_FROM")),
+		},
+		Reports: ReportsConfig{
+			Enabled:  envBool("REPORTS_ENABLED", false),
+			Tick:     env("REPORTS_TICK", "*/15 * * * *"),
+			SendHour: envInt("REPORTS_SEND_HOUR", 6),
+		},
+	}
+
+	// Serving the docs publishes the entire API surface, so production defaults
+	// to off — but that is a judgement call, not a safety property, and it is
+	// separate from APP_ENV so turning the docs on does not also drop the app
+	// out of Gin's release mode.
+	cfg.Swagger = envBool("SWAGGER_ENABLED", !cfg.IsProduction())
+
+	if cfg.DatabaseURL == "" {
+		return Config{}, fmt.Errorf("config: DATABASE_URL is required")
+	}
+	if cfg.JWT.Secret == "" {
+		return Config{}, fmt.Errorf("config: JWT_SECRET is required")
+	}
+	if cfg.SMTP.Host != "" && cfg.SMTP.From == "" {
+		return Config{}, fmt.Errorf("config: SMTP_FROM is required when SMTP_HOST is set")
+	}
+	if cfg.SMTP.Port < 1 || cfg.SMTP.Port > 65535 {
+		return Config{}, fmt.Errorf("config: SMTP_PORT must be between 1 and 65535")
+	}
+	if cfg.Reports.SendHour < 0 || cfg.Reports.SendHour > 23 {
+		return Config{}, fmt.Errorf("config: REPORTS_SEND_HOUR must be between 0 and 23")
+	}
+	return cfg, nil
+}
+
+func (c Config) IsProduction() bool { return c.Env == "production" }
+
+func env(key, fallback string) string {
+	if v, ok := os.LookupEnv(key); ok && v != "" {
+		return v
+	}
+	return fallback
+}
+
+// envBool accepts the values people actually type. Anything unrecognised falls
+// back rather than silently reading as false.
+func envBool(key string, fallback bool) bool {
+	switch strings.ToLower(env(key, "")) {
+	case "1", "true", "yes", "on":
+		return true
+	case "0", "false", "no", "off":
+		return false
+	default:
+		return fallback
+	}
+}
+
+func envDuration(key string, fallback time.Duration) time.Duration {
+	if v, ok := os.LookupEnv(key); ok {
+		if d, err := time.ParseDuration(v); err == nil {
+			return d
+		}
+	}
+	return fallback
+}
+
+// envInt falls back on anything that is not a whole number, as envBool and
+// envDuration do for their types.
+func envInt(key string, fallback int) int {
+	if v, ok := os.LookupEnv(key); ok {
+		if n, err := strconv.Atoi(strings.TrimSpace(v)); err == nil {
+			return n
+		}
+	}
+	return fallback
+}
+
+func splitCSV(raw string) []string {
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+```
+
+What changed against the existing file: the `strconv` import; the `SMTP` and `Reports` fields; the `SMTPConfig` and `ReportsConfig` types; their two blocks inside `Load`; three validations before `return cfg, nil`; and the `envInt` helper. Nothing else.
+
+- [ ] **Step 4: Run the test to see it pass**
+
+```bash
+gofmt -l internal/config
+go test -count=1 ./internal/config/
+go build ./...
+```
+
+Expected: no output from gofmt; `ok  	fleet/internal/config`; build silent.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add internal/config
+git commit -m "feat(reports): SMTP and scheduler configuration"
+```
+
+---
+
+### Task 6: Scheduler
+
+**Files:**
+- Modify: `go.mod`, `go.sum`
+- Create: `internal/platform/scheduler/runner.go`
+- Create: `internal/platform/scheduler/cron.go`
+- Test: `internal/platform/scheduler/runner_test.go`
+
+**Interfaces:**
+- Consumes from Task 1: `gen.ListReportCompaniesRow`, `gen.ListActiveReportRecipientEmailsParams`, `gen.ClaimReportRunParams`, `gen.FinishReportRunParams`. From Task 2: `reports.Querier`, `reports.Company`, `reports.Kind`, `reports.Kinds`, `reports.Period`, `reports.LoadLocation`, `reports.LatestDue`. From Task 3: `pdf.Render`, `pdf.Date`. From Task 4: `mail.Sender`, `mail.Message`, `mail.Attachment`.
+- Produces:
+  - constants `StatusSent = "sent"`, `StatusNotSent = "not_sent"`, `StatusEmpty = "skipped_empty"`, `StatusNoRecipients = "skipped_no_recipients"`, `StatusFailed = "failed"`, `StatusNotClaimed = "not_claimed"` (returned, never stored)
+  - `type Store interface` — `reports.Querier` plus `ListReportCompanies`, `ListActiveReportRecipientEmails`, `ClaimReportRun`, `FinishReportRun`; satisfied by `*gen.Queries`
+  - `type LogoLoader func(ctx context.Context, c reports.Company) []byte`
+  - `type Deps struct{ Pool *pgxpool.Pool; Store Store; Mail mail.Sender; Logo LogoLoader; Logger *slog.Logger; Now func() time.Time; SendHour int }` — `Pool` nil skips the advisory lock; `Mail` nil means no mail server
+  - `NewRunner(d Deps) *Runner`; `(*Runner).Tick(ctx) error`; `(*Runner).RunOne(ctx, c reports.Company, kind reports.Kind, p reports.Period, force bool) (status string, err error)`
+  - `Start(r *Runner, expression string, logger *slog.Logger) (stop func(), err error)`
+
+- [ ] **Step 1: Add the dependency**
+
+```bash
+go get github.com/robfig/cron/v3@v3.0.1
+```
+
+- [ ] **Step 2: Write the failing test**
+
+Create `internal/platform/scheduler/runner_test.go`:
+
+```go
+package scheduler
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"log/slog"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/shopspring/decimal"
+
+	"fleet/internal/db/gen"
+	"fleet/internal/platform/mail"
+	"fleet/internal/platform/reports"
+)
+
+// fakeStore stands in for the database. Claims follow the rule ClaimReportRun
+// implements in SQL: a period is handed out once, unless forced.
+type fakeStore struct {
+	mu         sync.Mutex
+	companies  []gen.ListReportCompaniesRow
+	recipients map[int64][]string
+	fuel       map[int64][]gen.ReportFuelByAssetRow
+	fuelErr    map[int64]error
+	claimed    map[string]int64
+	finished   map[int64]gen.FinishReportRunParams
+	nextID     int64
+}
+
+func newFakeStore() *fakeStore {
+	return &fakeStore{
+		recipients: map[int64][]string{},
+		fuel:       map[int64][]gen.ReportFuelByAssetRow{},
+		fuelErr:    map[int64]error{},
+		claimed:    map[string]int64{},
+		finished:   map[int64]gen.FinishReportRunParams{},
+	}
+}
+
+func (f *fakeStore) ListReportCompanies(context.Context) ([]gen.ListReportCompaniesRow, error) {
+	return f.companies, nil
+}
+
+func (f *fakeStore) ListActiveReportRecipientEmails(_ context.Context, arg gen.ListActiveReportRecipientEmailsParams) ([]string, error) {
+	return f.recipients[arg.CompanyID], nil
+}
+
+func (f *fakeStore) ClaimReportRun(_ context.Context, arg gen.ClaimReportRunParams) (int64, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	key := fmt.Sprintf("%d|%s|%s", arg.CompanyID, arg.ReportKind, arg.PeriodStart.Format("2006-01-02"))
+	if id, ok := f.claimed[key]; ok {
+		if !arg.Force {
+			return 0, pgx.ErrNoRows
+		}
+		return id, nil
+	}
+	f.nextID++
+	f.claimed[key] = f.nextID
+	return f.nextID, nil
+}
+
+func (f *fakeStore) FinishReportRun(_ context.Context, arg gen.FinishReportRunParams) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.finished[arg.ID] = arg
+	return nil
+}
+
+func (f *fakeStore) ReportFuelByAsset(_ context.Context, arg gen.ReportFuelByAssetParams) ([]gen.ReportFuelByAssetRow, error) {
+	if err := f.fuelErr[arg.CompanyID]; err != nil {
+		return nil, err
+	}
+	return f.fuel[arg.CompanyID], nil
+}
+
+func (f *fakeStore) ReportMaintenanceByAsset(context.Context, gen.ReportMaintenanceByAssetParams) ([]gen.ReportMaintenanceByAssetRow, error) {
+	return nil, nil
+}
+
+func (f *fakeStore) statuses() map[string]int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	out := map[string]int{}
+	for _, fin := range f.finished {
+		out[fin.Status]++
+	}
+	return out
+}
+
+type fakeMail struct {
+	mu   sync.Mutex
+	sent []mail.Message
+	err  error
+}
+
+func (f *fakeMail) Send(_ context.Context, m mail.Message) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.err != nil {
+		return f.err
+	}
+	f.sent = append(f.sent, m)
+	return nil
+}
+
+func fuelRow(name string) gen.ReportFuelByAssetRow {
+	return gen.ReportFuelByAssetRow{
+		AssetID: 1, AssetName: name, MeterUnit: "km", VolumeUnit: "liters", FuelType: "diesel",
+		Fills: 1, Volume: decimal.NewFromInt(100), Cost: decimal.NewFromInt(2500),
+	}
+}
+
+var quiet = slog.New(slog.NewTextHandler(io.Discard, nil))
+
+// monday is a Monday at 07:00 in Mexico City, an hour after the send hour.
+func monday(t *testing.T) time.Time {
+	t.Helper()
+	mx, err := time.LoadLocation("America/Mexico_City")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return time.Date(2026, 9, 28, 7, 0, 0, 0, mx)
+}
+
+func newTestRunner(t *testing.T, store *fakeStore, sender mail.Sender) *Runner {
+	t.Helper()
+	now := monday(t)
+	return NewRunner(Deps{Store: store, Mail: sender, Logger: quiet, Now: func() time.Time { return now }, SendHour: 6})
+}
+
+func company(id int64, tz string) gen.ListReportCompaniesRow {
+	return gen.ListReportCompaniesRow{ID: id, Name: "Transportes Durán", Timezone: tz, Currency: "MXN"}
+}
+
+func TestTickSendsOncePerPeriod(t *testing.T) {
+	store := newFakeStore()
+	store.companies = []gen.ListReportCompaniesRow{company(1, "America/Mexico_City")}
+	store.recipients[1] = []string{"flota@cliente.mx", "dueno@cliente.mx"}
+	store.fuel[1] = []gen.ReportFuelByAssetRow{fuelRow("Unidad 7")}
+	sender := &fakeMail{}
+	r := newTestRunner(t, store, sender)
+
+	for range 3 {
+		if err := r.Tick(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if len(sender.sent) != 1 {
+		t.Fatalf("emails sent = %d, want 1 after three ticks", len(sender.sent))
+	}
+	msg := sender.sent[0]
+	if len(msg.To) != 2 {
+		t.Fatalf("recipients = %v", msg.To)
+	}
+	if !strings.Contains(msg.Subject, "Reporte semanal de combustible") || !strings.Contains(msg.Subject, "Transportes Durán") {
+		t.Fatalf("subject = %q", msg.Subject)
+	}
+	if !strings.Contains(msg.Body, "21/09/2026 a 27/09/2026") {
+		t.Fatalf("body does not name the period: %q", msg.Body)
+	}
+	if len(msg.Attachments) != 1 || msg.Attachments[0].Filename != "combustible-semanal-2026-09-21.pdf" {
+		t.Fatalf("attachments = %+v", msg.Attachments)
+	}
+	if !strings.HasPrefix(string(msg.Attachments[0].Data), "%PDF-") {
+		t.Fatal("the attachment is not a PDF")
+	}
+}
+
+func TestStatuses(t *testing.T) {
+	tests := []struct {
+		name       string
+		recipients []string
+		rows       []gen.ReportFuelByAssetRow
+		sender     mail.Sender
+		want       string
+	}{
+		{"sent", []string{"a@c.mx"}, []gen.ReportFuelByAssetRow{fuelRow("U")}, &fakeMail{}, StatusSent},
+		{"no mail server", []string{"a@c.mx"}, []gen.ReportFuelByAssetRow{fuelRow("U")}, nil, StatusNotSent},
+		{"no recipients", nil, []gen.ReportFuelByAssetRow{fuelRow("U")}, &fakeMail{}, StatusNoRecipients},
+		{"no data", []string{"a@c.mx"}, nil, &fakeMail{}, StatusEmpty},
+		{"mail server refuses", []string{"a@c.mx"}, []gen.ReportFuelByAssetRow{fuelRow("U")}, &fakeMail{err: errors.New("550 refused")}, StatusFailed},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := newFakeStore()
+			store.recipients[1] = tt.recipients
+			store.fuel[1] = tt.rows
+			r := newTestRunner(t, store, tt.sender)
+
+			c := reports.Company{ID: 1, Name: "C", Timezone: "America/Mexico_City", Currency: "MXN"}
+			loc, _ := reports.LoadLocation(c.Timezone)
+			p := reports.LatestDue(reports.FuelWeekly, monday(t), loc, 6)
+
+			status, err := r.RunOne(context.Background(), c, reports.FuelWeekly, p, false)
+			if status != tt.want {
+				t.Fatalf("status = %s (err %v), want %s", status, err, tt.want)
+			}
+			if (tt.want == StatusFailed) != (err != nil) {
+				t.Fatalf("err = %v for status %s", err, status)
+			}
+			got := store.finished[1]
+			if got.Status != tt.want {
+				t.Fatalf("stored status = %q, want %q", got.Status, tt.want)
+			}
+			if (got.Error != nil) != (tt.want == StatusFailed) {
+				t.Fatalf("stored error = %v for status %s", got.Error, tt.want)
+			}
+		})
+	}
+}
+
+// One company's failure is recorded and the others still get their report.
+func TestOneCompanyFailingDoesNotStopTheRest(t *testing.T) {
+	store := newFakeStore()
+	for id := int64(1); id <= 3; id++ {
+		store.companies = append(store.companies, company(id, "America/Mexico_City"))
+		store.recipients[id] = []string{"a@c.mx"}
+		store.fuel[id] = []gen.ReportFuelByAssetRow{fuelRow("U")}
+	}
+	store.fuelErr[2] = errors.New("connection reset")
+	sender := &fakeMail{}
+
+	if err := newTestRunner(t, store, sender).Tick(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(sender.sent) != 2 {
+		t.Fatalf("emails sent = %d, want 2", len(sender.sent))
+	}
+	if got := store.statuses(); got[StatusFailed] != 1 || got[StatusSent] != 2 {
+		t.Fatalf("fuel statuses = %v", got)
+	}
+}
+
+// A company whose timezone is unknown still gets its report, on the default.
+func TestUnknownTimezoneFallsBack(t *testing.T) {
+	for _, tz := range []string{"", "Mars/Olympus_Mons"} {
+		store := newFakeStore()
+		store.companies = []gen.ListReportCompaniesRow{company(1, tz)}
+		store.recipients[1] = []string{"a@c.mx"}
+		store.fuel[1] = []gen.ReportFuelByAssetRow{fuelRow("U")}
+		sender := &fakeMail{}
+
+		if err := newTestRunner(t, store, sender).Tick(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		if len(sender.sent) != 1 {
+			t.Fatalf("timezone %q: emails sent = %d, want 1", tz, len(sender.sent))
+		}
+	}
+}
+
+func TestForceSendsAgain(t *testing.T) {
+	store := newFakeStore()
+	store.recipients[1] = []string{"a@c.mx"}
+	store.fuel[1] = []gen.ReportFuelByAssetRow{fuelRow("U")}
+	sender := &fakeMail{}
+	r := newTestRunner(t, store, sender)
+
+	c := reports.Company{ID: 1, Name: "C", Timezone: "America/Mexico_City", Currency: "MXN"}
+	loc, _ := reports.LoadLocation(c.Timezone)
+	p := reports.LatestDue(reports.FuelWeekly, monday(t), loc, 6)
+
+	if s, _ := r.RunOne(context.Background(), c, reports.FuelWeekly, p, false); s != StatusSent {
+		t.Fatalf("first run = %s", s)
+	}
+	if s, _ := r.RunOne(context.Background(), c, reports.FuelWeekly, p, false); s != StatusNotClaimed {
+		t.Fatalf("second run = %s, want not claimed", s)
+	}
+	if s, _ := r.RunOne(context.Background(), c, reports.FuelWeekly, p, true); s != StatusSent {
+		t.Fatalf("forced run = %s", s)
+	}
+	if len(sender.sent) != 2 {
+		t.Fatalf("emails sent = %d, want 2", len(sender.sent))
+	}
+}
+
+func TestStartRejectsABadExpression(t *testing.T) {
+	if _, err := start(func(context.Context) error { return nil }, "cada lunes", quiet, time.Second); err == nil {
+		t.Fatal("a bad cron expression was accepted")
+	}
+}
+
+// stop must wait for the tick in flight, so the pool is not closed under it.
+func TestStopWaitsForTheTickInFlight(t *testing.T) {
+	started := make(chan struct{})
+	var finished atomic.Bool
+	var once sync.Once
+
+	stop, err := start(func(context.Context) error {
+		once.Do(func() { close(started) })
+		time.Sleep(300 * time.Millisecond)
+		finished.Store(true)
+		return nil
+	}, "@every 1s", quiet, 5*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case <-started:
+	case <-time.After(3 * time.Second):
+		t.Fatal("the tick never ran")
+	}
+	stop()
+	if !finished.Load() {
+		t.Fatal("stop returned while the tick was still running")
+	}
+}
+
+// A tick that ignores the drain window is cancelled rather than waited on forever.
+func TestStopCancelsATickThatOverstays(t *testing.T) {
+	started := make(chan struct{})
+	var once sync.Once
+
+	stop, err := start(func(ctx context.Context) error {
+		once.Do(func() { close(started) })
+		<-ctx.Done()
+		return ctx.Err()
+	}, "@every 1s", quiet, 200*time.Millisecond)
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-started
+
+	done := make(chan struct{})
+	go func() { stop(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("stop did not return")
+	}
+}
+```
+
+- [ ] **Step 3: Run it to see it fail**
+
+```bash
+go test ./internal/platform/scheduler/
+```
+
+Expected: FAIL, `undefined: NewRunner`, `undefined: Deps`, `undefined: start`.
+
+- [ ] **Step 4: Write the runner**
+
+Create `internal/platform/scheduler/runner.go`:
+
+```go
+// Package scheduler runs the reports on a clock: it decides what is due,
+// claims the run, builds and sends the report, and records what happened.
+package scheduler
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"log/slog"
+	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"fleet/internal/db/gen"
+	"fleet/internal/platform/mail"
+	"fleet/internal/platform/pdf"
+	"fleet/internal/platform/reports"
+)
+
+// Run statuses, as stored in report_run.status.
+const (
+	StatusSent         = "sent"
+	StatusNotSent      = "not_sent"
+	StatusEmpty        = "skipped_empty"
+	StatusNoRecipients = "skipped_no_recipients"
+	StatusFailed       = "failed"
+	// StatusNotClaimed is returned, never stored: the run belongs to someone
+	// else or is already finished.
+	StatusNotClaimed = "not_claimed"
+)
+
+const (
+	// maxAttempts is how many times a failing report is tried before it is
+	// left as failed for a person to look at.
+	maxAttempts = 3
+	// staleMinutes is how long a run may stay "running" before its owner is
+	// presumed dead. No report takes this long.
+	staleMinutes = 30
+	// lockKey is the advisory lock one tick holds. The number is arbitrary;
+	// it only has to be the same in every process.
+	lockKey int64 = 7205001
+)
+
+// Store is the slice of the generated queries the runner needs.
+// *gen.Queries satisfies it.
+type Store interface {
+	reports.Querier
+	ListReportCompanies(ctx context.Context) ([]gen.ListReportCompaniesRow, error)
+	ListActiveReportRecipientEmails(ctx context.Context, arg gen.ListActiveReportRecipientEmailsParams) ([]string, error)
+	ClaimReportRun(ctx context.Context, arg gen.ClaimReportRunParams) (int64, error)
+	FinishReportRun(ctx context.Context, arg gen.FinishReportRunParams) error
+}
+
+// LogoLoader returns a company's logo bytes, or nil when it has none or it
+// cannot be read. A missing logo never fails a report.
+type LogoLoader func(ctx context.Context, c reports.Company) []byte
+
+type Deps struct {
+	// Pool is used only to take the advisory lock. Nil skips locking, which is
+	// right for the CLI and for unit tests.
+	Pool  *pgxpool.Pool
+	Store Store
+	// Mail is nil when no mail server is configured.
+	Mail     mail.Sender
+	Logo     LogoLoader
+	Logger   *slog.Logger
+	Now      func() time.Time
+	SendHour int
+}
+
+type Runner struct {
+	d Deps
+}
+
+func NewRunner(d Deps) *Runner {
+	if d.Logger == nil {
+		d.Logger = slog.Default()
+	}
+	if d.Now == nil {
+		d.Now = time.Now
+	}
+	if d.Logo == nil {
+		d.Logo = func(context.Context, reports.Company) []byte { return nil }
+	}
+	return &Runner{d: d}
+}
+
+// Tick runs every report that is due, for every company. It returns an error
+// only when it could not start; a report that fails is recorded and the loop
+// goes on to the next.
+func (r *Runner) Tick(ctx context.Context) error {
+	release, ok, err := r.lock(ctx)
+	if err != nil {
+		return fmt.Errorf("scheduler: advisory lock: %w", err)
+	}
+	if !ok {
+		r.d.Logger.Info("scheduler: another process holds the tick, skipping")
+		return nil
+	}
+	defer release()
+
+	companies, err := r.d.Store.ListReportCompanies(ctx)
+	if err != nil {
+		return fmt.Errorf("scheduler: list companies: %w", err)
+	}
+
+	now := r.d.Now()
+	for _, row := range companies {
+		c := reports.Company{ID: row.ID, Name: row.Name, Logo: row.Logo, Timezone: row.Timezone, Currency: row.Currency}
+		loc, err := reports.LoadLocation(c.Timezone)
+		if err != nil {
+			r.d.Logger.Warn("scheduler: company timezone", "company_id", c.ID, "error", err)
+		}
+		for _, kind := range reports.Kinds {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			period := reports.LatestDue(kind, now, loc, r.d.SendHour)
+			status, err := r.RunOne(ctx, c, kind, period, false)
+			if status == StatusNotClaimed {
+				continue
+			}
+			r.d.Logger.Info("scheduler: report run",
+				"company_id", c.ID, "report", kind, "period_start", period.StartDate().Format("2006-01-02"),
+				"status", status, "error", err)
+		}
+	}
+	return nil
+}
+
+// lock takes the advisory lock on a connection of its own. Advisory locks
+// belong to the session, so the connection is held until release.
+func (r *Runner) lock(ctx context.Context) (release func(), ok bool, err error) {
+	if r.d.Pool == nil {
+		return func() {}, true, nil
+	}
+	conn, err := r.d.Pool.Acquire(ctx)
+	if err != nil {
+		return nil, false, err
+	}
+	if err := conn.QueryRow(ctx, "SELECT pg_try_advisory_lock($1)", lockKey).Scan(&ok); err != nil || !ok {
+		conn.Release()
+		return nil, false, err
+	}
+	return func() {
+		// A fresh context: the caller's may already be cancelled, and the
+		// lock must be given back regardless.
+		unlockCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if _, err := conn.Exec(unlockCtx, "SELECT pg_advisory_unlock($1)", lockKey); err != nil {
+			// Closing the session releases the lock; returning the
+			// connection to the pool would keep it held.
+			_ = conn.Conn().Close(unlockCtx)
+		}
+		conn.Release()
+	}, true, nil
+}
+
+// RunOne claims one company's report for one period and delivers it. The
+// returned status is what was stored, or StatusNotClaimed when there was
+// nothing to do. force re-sends a report that was already handled.
+func (r *Runner) RunOne(ctx context.Context, c reports.Company, kind reports.Kind, p reports.Period, force bool) (string, error) {
+	id, err := r.d.Store.ClaimReportRun(ctx, gen.ClaimReportRunParams{
+		CompanyID:    c.ID,
+		ReportKind:   string(kind),
+		PeriodStart:  p.StartDate(),
+		Force:        force,
+		MaxAttempts:  maxAttempts,
+		StaleMinutes: staleMinutes,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return StatusNotClaimed, nil
+	}
+	if err != nil {
+		return StatusFailed, fmt.Errorf("scheduler: claim run: %w", err)
+	}
+
+	status, recipients, runErr := r.deliver(ctx, c, kind, p)
+
+	finish := gen.FinishReportRunParams{ID: id, Status: status, Recipients: int32(recipients)}
+	if runErr != nil {
+		msg := runErr.Error()
+		finish.Error = &msg
+	}
+	// A fresh context: if the run failed because ctx was cancelled, the
+	// failure must still be written, or the row stays "running" for 30 minutes.
+	finishCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+	defer cancel()
+	if err := r.d.Store.FinishReportRun(finishCtx, finish); err != nil {
+		return status, errors.Join(runErr, fmt.Errorf("scheduler: record run: %w", err))
+	}
+	return status, runErr
+}
+
+func (r *Runner) deliver(ctx context.Context, c reports.Company, kind reports.Kind, p reports.Period) (status string, recipients int, err error) {
+	// A panic in one report (a rendering bug on one company's data) must not
+	// take the API process down with it.
+	defer func() {
+		if rec := recover(); rec != nil {
+			status, err = StatusFailed, fmt.Errorf("scheduler: panic: %v", rec)
+		}
+	}()
+
+	to, err := r.d.Store.ListActiveReportRecipientEmails(ctx, gen.ListActiveReportRecipientEmailsParams{
+		CompanyID:  c.ID,
+		ReportKind: string(kind),
+	})
+	if err != nil {
+		return StatusFailed, 0, fmt.Errorf("list recipients: %w", err)
+	}
+
+	doc, err := pdf.Render(ctx, r.d.Store, kind, c, p, r.d.Logo(ctx, c), r.d.Now())
+	if err != nil {
+		return StatusFailed, len(to), fmt.Errorf("render: %w", err)
+	}
+	if doc.Empty {
+		return StatusEmpty, len(to), nil
+	}
+	if len(to) == 0 {
+		return StatusNoRecipients, 0, nil
+	}
+	if r.d.Mail == nil {
+		return StatusNotSent, len(to), nil
+	}
+
+	loc := p.Start.Location()
+	msg := mail.Message{
+		To:      to,
+		Subject: fmt.Sprintf("%s — %s", kind.Title(), c.Name),
+		Body: fmt.Sprintf("Adjunto encontrará el %s de %s.\n\nPeriodo: %s a %s.\n\nEste mensaje se genera automáticamente.\n",
+			lowerFirst(kind.Title()), c.Name, pdf.Date(p.Start, loc), pdf.Date(p.LastDay(), loc)),
+		Attachments: []mail.Attachment{{Filename: doc.Filename, ContentType: "application/pdf", Data: doc.Data}},
+	}
+	if err := r.d.Mail.Send(ctx, msg); err != nil {
+		return StatusFailed, len(to), err
+	}
+	return StatusSent, len(to), nil
+}
+
+func lowerFirst(s string) string {
+	if s == "" {
+		return s
+	}
+	r := []rune(s)
+	if r[0] >= 'A' && r[0] <= 'Z' {
+		r[0] += 'a' - 'A'
+	}
+	return string(r)
+}
+```
+
+- [ ] **Step 5: Write the cron wiring**
+
+Create `internal/platform/scheduler/cron.go`:
+
+```go
+package scheduler
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+	"time"
+
+	"github.com/robfig/cron/v3"
+)
+
+// drainTimeout is how long shutdown waits for a tick in flight before it
+// cancels it. A cancelled run is recorded as failed and retried next start.
+const drainTimeout = 60 * time.Second
+
+// Start runs r.Tick on the given cron expression until the returned stop
+// function is called. stop blocks until the tick in flight has finished, so
+// the caller can close the database pool after it returns.
+func Start(r *Runner, expression string, logger *slog.Logger) (stop func(), err error) {
+	return start(r.Tick, expression, logger, drainTimeout)
+}
+
+func start(tick func(context.Context) error, expression string, logger *slog.Logger, drain time.Duration) (func(), error) {
+	if logger == nil {
+		logger = slog.Default()
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// SkipIfStillRunning: a tick that outlasts the interval is not joined by a
+	// second one. The advisory lock would refuse it anyway; this saves the
+	// connection.
+	c := cron.New(cron.WithChain(
+		cron.Recover(cron.DiscardLogger),
+		cron.SkipIfStillRunning(cron.DiscardLogger),
+	))
+	_, err := c.AddFunc(expression, func() {
+		if err := tick(ctx); err != nil {
+			logger.Error("scheduler: tick failed", "error", err)
+		}
+	})
+	if err != nil {
+		cancel()
+		return nil, fmt.Errorf("scheduler: REPORTS_TICK %q is not a cron expression: %w", expression, err)
+	}
+	c.Start()
+	logger.Info("scheduler: started", "tick", expression)
+
+	return func() {
+		done := c.Stop().Done()
+		select {
+		case <-done:
+		case <-time.After(drain):
+			logger.Warn("scheduler: tick still running at shutdown, cancelling it")
+			cancel()
+			<-done
+		}
+		cancel()
+		logger.Info("scheduler: stopped")
+	}, nil
+}
+```
+
+- [ ] **Step 6: Run the test to see it pass**
+
+```bash
+go mod tidy
+gofmt -l internal/platform/scheduler
+go vet ./internal/platform/scheduler/
+go test -count=1 ./internal/platform/scheduler/
+```
+
+Expected: no output from gofmt and vet; `ok  	fleet/internal/platform/scheduler` in two to three seconds.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add go.mod go.sum internal/platform/scheduler
+git commit -m "feat(reports): scheduler that claims, delivers and records runs"
+```
+
+---
+
+### Task 7: API
+
+**Files:**
+- Modify: `internal/http/middleware/rbac.go` (the `Modules` list)
+- Create: `internal/http/dto/report.go`
+- Create: `internal/http/handler/report.go`
+- Modify: `internal/http/handler/router.go`
+- Modify (generated): `docs/docs.go`, `docs/swagger.json`, `docs/swagger.yaml`
+- Test: `internal/http/middleware/rbac_reports_test.go`
+- Test: `internal/http/handler/report_endpoints_integration_test.go`
+
+**Interfaces:**
+- Consumes from Task 1: the recipient and run queries, `GetReportCompany`, and the test fixture `reportFixture` / `newReportFixture` / `limitedToken`. From Task 2: `reports.ParseKind`, `reports.Company`, `reports.LoadLocation`, `reports.PeriodOf`, `(Period).Previous`. From Task 3: `pdf.Render`. From Task 4: `mail.CleanAddress`. Already in the repository: `fileKeyForCompany` (`handler/fileref.go`), `bindJSONValidated` (`handler/validation.go`), `apierr`, `paginate`, `middleware.CompanyFromContext`, `middleware.RequireModule`.
+- Produces:
+  - the module name `"reports"` in `middleware.Modules`
+  - `handler.NewLogoLoader(files storage.Storage, logger *slog.Logger) func(ctx context.Context, c reports.Company) []byte` — matches `scheduler.LogoLoader`
+  - `handler.NewReportHandler(q *gen.Queries, files storage.Storage, logger *slog.Logger) *ReportHandler`
+  - routes under `/api/v1`: `GET /reports/recipients`, `POST /reports/recipients`, `DELETE /reports/recipients/:id`, `GET /reports/runs`, `GET /reports/fuel/weekly`, `GET /reports/maintenance/monthly`
+
+- [ ] **Step 1: Write the failing tests**
+
+Create `internal/http/middleware/rbac_reports_test.go`:
+
+```go
+package middleware
+
+import (
+	"net/http"
+	"slices"
+	"testing"
+)
+
+// /me/permissions reports on the modules in this list, so a module missing
+// from it is one the frontend is never told about.
+func TestReportsIsARegisteredModule(t *testing.T) {
+	if !slices.Contains(Modules, "reports") {
+		t.Fatal(`Modules does not list "reports"`)
+	}
+	if !slices.IsSorted(Modules) {
+		t.Fatalf("Modules is kept in alphabetical order: %v", Modules)
+	}
+}
+
+func TestReportsPermissions(t *testing.T) {
+	admin := Identity{IsActive: true, IsAdmin: true}
+	if !admin.Can("reports", http.MethodGet) || !admin.Can("reports", http.MethodDelete) {
+		t.Fatal("an administrator must reach reports without a grant")
+	}
+
+	reader := Identity{IsActive: true, HasRole: true, Permissions: map[string]ModulePermissions{
+		"reports": {Actions: map[string]bool{"read": true}},
+	}}
+	if !reader.Can("reports", http.MethodGet) {
+		t.Fatal("reports/read must allow a download")
+	}
+	if reader.Can("reports", http.MethodPost) || reader.Can("reports", http.MethodDelete) {
+		t.Fatal("reports/read must not allow changing the recipients")
+	}
+
+	// Holding fuel does not imply holding reports.
+	fuelOnly := Identity{IsActive: true, HasRole: true, Permissions: map[string]ModulePermissions{
+		"fuel": {All: true},
+	}}
+	if fuelOnly.Can("reports", http.MethodGet) {
+		t.Fatal("a role without the reports module reached it")
+	}
+}
+```
+
+Create `internal/http/handler/report_endpoints_integration_test.go`:
+
+```go
+//go:build integration
+
+package handler
+
+// The report endpoints over HTTP: validation, tenant scoping, permissions,
+// and that a download is a PDF and leaves no run behind.
+
+import (
+	"bytes"
+	"context"
+	"fmt"
+	"io"
+	"net/http"
+	"testing"
+	"time"
+)
+
+func TestRecipientEndpoints(t *testing.T) {
+	f := newReportFixture(t)
+	base := f.srv + "/api/v1/reports/recipients"
+
+	var created struct {
+		ID    int64  `json:"id"`
+		Email string `json:"email"`
+	}
+	postJSON(t, base, f.token, map[string]any{"report_kind": "fuel_weekly", "email": "  Flota@Cliente.mx "}, http.StatusCreated, &created)
+	if created.Email != "Flota@Cliente.mx" {
+		t.Fatalf("email = %q, want it trimmed", created.Email)
+	}
+
+	// The same mailbox in another letter case is the same mailbox.
+	postJSON(t, base, f.token, map[string]any{"report_kind": "fuel_weekly", "email": "flota@cliente.mx"}, http.StatusConflict, nil)
+	// The same address for the other report is a different subscription.
+	postJSON(t, base, f.token, map[string]any{"report_kind": "maintenance_monthly", "email": "flota@cliente.mx"}, http.StatusCreated, nil)
+
+	for name, body := range map[string]map[string]any{
+		"unknown kind":     {"report_kind": "tires_daily", "email": "a@b.mx"},
+		"not an address":   {"report_kind": "fuel_weekly", "email": "flota"},
+		"display name":     {"report_kind": "fuel_weekly", "email": "Flota <a@b.mx>"},
+		"two addresses":    {"report_kind": "fuel_weekly", "email": "a@b.mx, c@d.mx"},
+		"header injection": {"report_kind": "fuel_weekly", "email": "a@b.mx\r\nBcc: espia@otro.mx"},
+		"missing email":    {"report_kind": "fuel_weekly"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			postJSON(t, base, f.token, body, http.StatusUnprocessableEntity, nil)
+		})
+	}
+
+	var list struct {
+		Data []struct {
+			ID int64 `json:"id"`
+		} `json:"data"`
+	}
+	getJSON(t, base, f.token, http.StatusOK, &list)
+	if len(list.Data) != 2 {
+		t.Fatalf("recipients = %d, want 2", len(list.Data))
+	}
+	getJSON(t, base+"?report_kind=fuel_weekly", f.token, http.StatusOK, &list)
+	if len(list.Data) != 1 {
+		t.Fatalf("fuel recipients = %d, want 1", len(list.Data))
+	}
+	getJSON(t, base+"?report_kind=nope", f.token, http.StatusBadRequest, nil)
+
+	// Another company of the same owner can neither see nor delete it.
+	other := createCompany(t, f.srv, f.owner, "Otra Empresa", fmt.Sprintf("TAX-OTRA-%d", time.Now().UnixNano()))
+	otherToken := switchCompany(t, f.srv, f.owner, other)
+	getJSON(t, base, otherToken, http.StatusOK, &list)
+	if len(list.Data) != 0 {
+		t.Fatalf("another company sees %d recipients, want 0", len(list.Data))
+	}
+	doJSON(t, http.MethodDelete, fmt.Sprintf("%s/%d", base, created.ID), otherToken, nil, http.StatusNotFound, nil)
+
+	doJSON(t, http.MethodDelete, fmt.Sprintf("%s/%d", base, created.ID), f.token, nil, http.StatusNoContent, nil)
+	doJSON(t, http.MethodDelete, fmt.Sprintf("%s/%d", base, created.ID), f.token, nil, http.StatusNotFound, nil)
+}
+
+func (f reportFixture) getPDF(t *testing.T, path, token string, want int) (*http.Response, []byte) {
+	t.Helper()
+	req, _ := http.NewRequest(http.MethodGet, f.srv+"/api/v1"+path, nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != want {
+		t.Fatalf("GET %s: status = %d, want %d: %s", path, resp.StatusCode, want, body)
+	}
+	return resp, body
+}
+
+func TestDownloadEndpoints(t *testing.T) {
+	f := newReportFixture(t)
+
+	for _, path := range []string{
+		"/reports/fuel/weekly",
+		"/reports/fuel/weekly?week=2026-09-23",
+		"/reports/maintenance/monthly",
+		"/reports/maintenance/monthly?month=2026-08",
+	} {
+		resp, body := f.getPDF(t, path, f.token, http.StatusOK)
+		if got := resp.Header.Get("Content-Type"); got != "application/pdf" {
+			t.Fatalf("%s: Content-Type = %q", path, got)
+		}
+		if !bytes.HasPrefix(body, []byte("%PDF-")) {
+			t.Fatalf("%s: the body is not a PDF", path)
+		}
+	}
+
+	resp, _ := f.getPDF(t, "/reports/fuel/weekly?week=2026-09-23", f.token, http.StatusOK)
+	if got, want := resp.Header.Get("Content-Disposition"), `attachment; filename="combustible-semanal-2026-09-21.pdf"`; got != want {
+		t.Fatalf("Content-Disposition = %q, want %q", got, want)
+	}
+
+	for _, path := range []string{
+		"/reports/fuel/weekly?week=23/09/2026",
+		"/reports/fuel/weekly?week=2026-13-40",
+		"/reports/maintenance/monthly?month=agosto",
+	} {
+		f.getPDF(t, path, f.token, http.StatusBadRequest)
+	}
+
+	// A download is not a run: it must not mark the period as handled.
+	var n int
+	if err := f.pool.QueryRow(context.Background(), `SELECT count(*) FROM report_run`).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 0 {
+		t.Fatalf("report_run has %d rows after downloads, want 0", n)
+	}
+}
+
+// A role that does not grant the module is refused on every route.
+func TestReportsNeedTheModulePermission(t *testing.T) {
+	f := newReportFixture(t)
+	limited := f.limitedToken(t)
+
+	getJSON(t, f.srv+"/api/v1/reports/recipients", limited, http.StatusForbidden, nil)
+	getJSON(t, f.srv+"/api/v1/reports/runs", limited, http.StatusForbidden, nil)
+	postJSON(t, f.srv+"/api/v1/reports/recipients", limited,
+		map[string]any{"report_kind": "fuel_weekly", "email": "a@b.mx"}, http.StatusForbidden, nil)
+	f.getPDF(t, "/reports/fuel/weekly", limited, http.StatusForbidden)
+}
+```
+
+- [ ] **Step 2: Run them to see them fail**
+
+```bash
+go test -run 'TestReports' ./internal/http/middleware/
+go test -tags=integration -count=1 -run 'TestRecipientEndpoints|TestDownloadEndpoints|TestReportsNeedTheModulePermission' ./internal/http/handler/
+```
+
+Expected: the first FAILS with `Modules does not list "reports"`. The second FAILS with status `404`, because the routes do not exist.
+
+- [ ] **Step 3: Register the module**
+
+In `internal/http/middleware/rbac.go`, inside `var Modules`, between `"purchase_orders",` and `"roles",`, add:
+
+```go
+	// reports is not a Django module either. It gates the scheduled reports:
+	// who receives them, and downloading one on demand. It is its own module
+	// because a report reads across fuel, work orders and service at once, so
+	// no single one of those permissions describes it.
+	"reports",
+```
+
+No role is changed. Administrators pass every module check; any other role gets the module only when somebody grants it.
+
+- [ ] **Step 4: Write the DTOs**
+
+Create `internal/http/dto/report.go`:
+
+```go
+package dto
+
+import "time"
+
+type CreateReportRecipientRequest struct {
+	// ReportKind is "fuel_weekly" or "maintenance_monthly".
+	ReportKind string `json:"report_kind" binding:"required,max=30"`
+	Email      string `json:"email" binding:"required,max=254"`
+}
+
+type ReportRecipientResponse struct {
+	ID         int64     `json:"id"`
+	ReportKind string    `json:"report_kind"`
+	Email      string    `json:"email"`
+	IsActive   bool      `json:"is_active"`
+	CreatedAt  time.Time `json:"created_at"`
+}
+
+type ReportRecipientListResponse struct {
+	Data []ReportRecipientResponse `json:"data"`
+}
+
+type ReportRunResponse struct {
+	ID         int64  `json:"id"`
+	ReportKind string `json:"report_kind"`
+	// PeriodStart is the first day of the period, as YYYY-MM-DD in the
+	// company's own timezone.
+	PeriodStart string `json:"period_start"`
+	// Status is one of: running, sent, not_sent, skipped_empty,
+	// skipped_no_recipients, failed.
+	Status     string     `json:"status"`
+	Attempts   int32      `json:"attempts"`
+	Error      *string    `json:"error"`
+	Recipients int32      `json:"recipients"`
+	StartedAt  time.Time  `json:"started_at"`
+	FinishedAt *time.Time `json:"finished_at"`
+}
+```
+
+- [ ] **Step 5: Write the handler**
+
+Create `internal/http/handler/report.go`:
+
+```go
+package handler
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"log/slog"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/gin-gonic/gin"
+
+	"fleet/internal/db/gen"
+	"fleet/internal/http/dto"
+	"fleet/internal/http/middleware"
+	"fleet/internal/platform/apierr"
+	"fleet/internal/platform/mail"
+	"fleet/internal/platform/paginate"
+	"fleet/internal/platform/pdf"
+	"fleet/internal/platform/reports"
+	"fleet/internal/platform/storage"
+)
+
+// maxLogoBytes bounds what is read into memory for a PDF header. Uploads are
+// already capped by UPLOAD_MAX_BYTES; this is the second fence, for objects
+// that reached the bucket some other way.
+const maxLogoBytes = 5 << 20
+
+// NewLogoLoader returns the function that reads a company's logo for a PDF.
+// It lives here, not in the scheduler, because resolving a stored file
+// reference safely (fileKeyForCompany) is this package's knowledge.
+//
+// Every failure yields nil: a report without a logo is still the report.
+func NewLogoLoader(files storage.Storage, logger *slog.Logger) func(ctx context.Context, c reports.Company) []byte {
+	return func(ctx context.Context, c reports.Company) []byte {
+		if files == nil || c.Logo == nil {
+			return nil
+		}
+		key, ok := fileKeyForCompany(files, *c.Logo, c.ID)
+		if !ok {
+			return nil
+		}
+		rc, err := files.Open(ctx, key)
+		if err != nil {
+			logger.Warn("report logo: open", "company_id", c.ID, "error", err)
+			return nil
+		}
+		defer rc.Close()
+		data, err := io.ReadAll(io.LimitReader(rc, maxLogoBytes+1))
+		if err != nil || len(data) > maxLogoBytes {
+			logger.Warn("report logo: unreadable or too large", "company_id", c.ID, "error", err)
+			return nil
+		}
+		return data
+	}
+}
+
+type ReportHandler struct {
+	q    *gen.Queries
+	logo func(ctx context.Context, c reports.Company) []byte
+	now  func() time.Time
+}
+
+func NewReportHandler(q *gen.Queries, files storage.Storage, logger *slog.Logger) *ReportHandler {
+	return &ReportHandler{q: q, logo: NewLogoLoader(files, logger), now: time.Now}
+}
+
+// ListRecipients godoc
+//
+//	@Summary		List who receives the scheduled reports
+//	@Description	The addresses the active company's scheduled reports are emailed to, optionally for one report.
+//	@Tags			reports
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			report_kind	query		string	false	"fuel_weekly or maintenance_monthly"
+//	@Success		200			{object}	dto.ReportRecipientListResponse
+//	@Failure		400			{object}	dto.ErrorResponse
+//	@Failure		401			{object}	dto.ErrorResponse
+//	@Failure		403			{object}	dto.ErrorResponse
+//	@Router			/api/v1/reports/recipients [get]
+func (h *ReportHandler) ListRecipients(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	var kind *string
+	if v := c.Query("report_kind"); v != "" {
+		if _, ok := reports.ParseKind(v); !ok {
+			apierr.Abort(c, apierr.BadRequest("report_kind must be fuel_weekly or maintenance_monthly"))
+			return
+		}
+		kind = &v
+	}
+
+	rows, err := h.q.ListReportRecipients(ctx, gen.ListReportRecipientsParams{
+		CompanyID:  middleware.CompanyFromContext(ctx),
+		ReportKind: kind,
+	})
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	out := make([]dto.ReportRecipientResponse, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, toReportRecipientResponse(r))
+	}
+	c.JSON(http.StatusOK, dto.ReportRecipientListResponse{Data: out})
+}
+
+// CreateRecipient godoc
+//
+//	@Summary		Add a report recipient
+//	@Description	The address must be a bare email address. The same address cannot be listed twice for one report; letter case is ignored.
+//	@Tags			reports
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			body	body		dto.CreateReportRecipientRequest	true	"body"
+//	@Success		201		{object}	dto.ReportRecipientResponse
+//	@Failure		401		{object}	dto.ErrorResponse
+//	@Failure		403		{object}	dto.ErrorResponse
+//	@Failure		409		{object}	dto.ErrorResponse
+//	@Failure		422		{object}	dto.ErrorResponse
+//	@Router			/api/v1/reports/recipients [post]
+func (h *ReportHandler) CreateRecipient(c *gin.Context) {
+	var in dto.CreateReportRecipientRequest
+	if err := bindJSONValidated(c, &in); err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+
+	kind, ok := reports.ParseKind(in.ReportKind)
+	if !ok {
+		apierr.Abort(c, apierr.Validation(map[string]string{"report_kind": "must be fuel_weekly or maintenance_monthly"}))
+		return
+	}
+	// The address ends up in a message header. CleanAddress refuses a display
+	// name and a line break, which would otherwise add headers to that message.
+	email, err := mail.CleanAddress(in.Email)
+	if err != nil {
+		apierr.Abort(c, apierr.Validation(map[string]string{"email": "must be a single email address"}))
+		return
+	}
+
+	ctx := c.Request.Context()
+	row, err := h.q.CreateReportRecipient(ctx, gen.CreateReportRecipientParams{
+		CompanyID:  middleware.CompanyFromContext(ctx),
+		ReportKind: string(kind),
+		Email:      email,
+	})
+	if err != nil {
+		// A duplicate trips uq_report_recipient_company_kind_email, which
+		// apierr.Map turns into 409.
+		apierr.Abort(c, err)
+		return
+	}
+	c.JSON(http.StatusCreated, toReportRecipientResponse(row))
+}
+
+// DeleteRecipient godoc
+//
+//	@Summary		Remove a report recipient
+//	@Tags			reports
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			id	path	int	true	"Recipient id"
+//	@Success		204
+//	@Failure		400	{object}	dto.ErrorResponse
+//	@Failure		401	{object}	dto.ErrorResponse
+//	@Failure		403	{object}	dto.ErrorResponse
+//	@Failure		404	{object}	dto.ErrorResponse
+//	@Router			/api/v1/reports/recipients/{id} [delete]
+func (h *ReportHandler) DeleteRecipient(c *gin.Context) {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || id < 1 {
+		apierr.Abort(c, apierr.BadRequest("invalid id"))
+		return
+	}
+	ctx := c.Request.Context()
+	n, err := h.q.DeleteReportRecipient(ctx, gen.DeleteReportRecipientParams{
+		ID:        id,
+		CompanyID: middleware.CompanyFromContext(ctx),
+	})
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	if n == 0 {
+		apierr.Abort(c, apierr.NotFound("recipient not found"))
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+// ListRuns godoc
+//
+//	@Summary		List the scheduled report runs
+//	@Description	What the scheduler did for the active company, newest first: sent, skipped, or failed and why.
+//	@Tags			reports
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			page		query		int	false	"Page number"
+//	@Param			page_size	query		int	false	"Page size"
+//	@Success		200			{object}	paginate.Page[dto.ReportRunResponse]
+//	@Failure		401			{object}	dto.ErrorResponse
+//	@Failure		403			{object}	dto.ErrorResponse
+//	@Router			/api/v1/reports/runs [get]
+func (h *ReportHandler) ListRuns(c *gin.Context) {
+	ctx := c.Request.Context()
+	p := paginate.Parse(c)
+	company := middleware.CompanyFromContext(ctx)
+
+	rows, err := h.q.ListReportRuns(ctx, gen.ListReportRunsParams{
+		CompanyID: company,
+		Lim:       int32(p.Limit),
+		Off:       int32(p.Offset),
+	})
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	total, err := h.q.CountReportRuns(ctx, company)
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	out := make([]dto.ReportRunResponse, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, dto.ReportRunResponse{
+			ID:          r.ID,
+			ReportKind:  r.ReportKind,
+			PeriodStart: r.PeriodStart.Format("2006-01-02"),
+			Status:      r.Status,
+			Attempts:    r.Attempts,
+			Error:       r.Error,
+			Recipients:  r.Recipients,
+			StartedAt:   r.StartedAt,
+			FinishedAt:  r.FinishedAt,
+		})
+	}
+	c.JSON(http.StatusOK, paginate.NewPage(out, total, p))
+}
+
+// FuelWeekly godoc
+//
+//	@Summary		Download the weekly fuel report
+//	@Description	The same PDF the scheduler emails. week is any date inside the week wanted, read in the company's timezone; without it, the last full week. A week with no fuel entries still returns a PDF, which says so.
+//	@Tags			reports
+//	@Produce		application/pdf
+//	@Security		BearerAuth
+//	@Param			week	query		string	false	"Any date in the week, YYYY-MM-DD"
+//	@Success		200		{file}		binary
+//	@Failure		400		{object}	dto.ErrorResponse
+//	@Failure		401		{object}	dto.ErrorResponse
+//	@Failure		403		{object}	dto.ErrorResponse
+//	@Router			/api/v1/reports/fuel/weekly [get]
+func (h *ReportHandler) FuelWeekly(c *gin.Context) {
+	h.download(c, reports.FuelWeekly, "week", "2006-01-02", "week must be a date, YYYY-MM-DD")
+}
+
+// MaintenanceMonthly godoc
+//
+//	@Summary		Download the monthly maintenance cost report
+//	@Description	The same PDF the scheduler emails. Without month, the last full month. A month with no completed jobs still returns a PDF, which says so.
+//	@Tags			reports
+//	@Produce		application/pdf
+//	@Security		BearerAuth
+//	@Param			month	query		string	false	"The month, YYYY-MM"
+//	@Success		200		{file}		binary
+//	@Failure		400		{object}	dto.ErrorResponse
+//	@Failure		401		{object}	dto.ErrorResponse
+//	@Failure		403		{object}	dto.ErrorResponse
+//	@Router			/api/v1/reports/maintenance/monthly [get]
+func (h *ReportHandler) MaintenanceMonthly(c *gin.Context) {
+	h.download(c, reports.MaintenanceMonthly, "month", "2006-01", "month must be YYYY-MM")
+}
+
+func (h *ReportHandler) download(c *gin.Context, kind reports.Kind, param, layout, invalid string) {
+	ctx := c.Request.Context()
+
+	row, err := h.q.GetReportCompany(ctx, middleware.CompanyFromContext(ctx))
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
+	company := reports.Company{ID: row.ID, Name: row.Name, Logo: row.Logo, Timezone: row.Timezone, Currency: row.Currency}
+	// The fallback location is good enough for a download; the scheduler is
+	// where an unknown timezone gets logged.
+	loc, _ := reports.LoadLocation(company.Timezone)
+
+	now := h.now()
+	// Without the parameter: the last period that has ended, whatever the hour.
+	period := reports.PeriodOf(kind, now, loc).Previous(kind)
+	if v := strings.TrimSpace(c.Query(param)); v != "" {
+		at, err := time.ParseInLocation(layout, v, loc)
+		if err != nil {
+			apierr.Abort(c, apierr.BadRequest(invalid))
+			return
+		}
+		period = reports.PeriodOf(kind, at, loc)
+	}
+
+	doc, err := pdf.Render(ctx, h.q, kind, company, period, h.logo(ctx, company), now)
+	if err != nil {
+		apierr.Abort(c, apierr.Internal(err))
+		return
+	}
+	c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, doc.Filename))
+	c.Data(http.StatusOK, "application/pdf", doc.Data)
+}
+
+func toReportRecipientResponse(r gen.ReportRecipient) dto.ReportRecipientResponse {
+	return dto.ReportRecipientResponse{
+		ID:         r.ID,
+		ReportKind: r.ReportKind,
+		Email:      r.Email,
+		IsActive:   r.IsActive,
+		CreatedAt:  r.CreatedAt,
+	}
+}
+```
+
+- [ ] **Step 6: Register the routes**
+
+In `internal/http/handler/router.go`, inside `NewRouter`, directly after the line `registerExports(r, member)`, add:
+
+```go
+	registerReportRoutes(member, d)
+```
+
+At the end of the same file add:
+
+```go
+
+// registerReportRoutes wires the scheduled reports: who receives them, what
+// the scheduler did, and the same PDFs on demand.
+//
+// RequireModule maps the HTTP method to the action, so listing and downloading
+// need reports/read, adding a recipient needs reports/create and removing one
+// needs reports/delete.
+func registerReportRoutes(member *gin.RouterGroup, d Deps) {
+	reports := member.Group("", middleware.RequireModule("reports"))
+	h := NewReportHandler(d.Queries, d.Storage, d.Logger)
+
+	reports.GET("/reports/recipients", h.ListRecipients)
+	reports.POST("/reports/recipients", h.CreateRecipient)
+	reports.DELETE("/reports/recipients/:id", h.DeleteRecipient)
+	reports.GET("/reports/runs", h.ListRuns)
+	reports.GET("/reports/fuel/weekly", h.FuelWeekly)
+	reports.GET("/reports/maintenance/monthly", h.MaintenanceMonthly)
+}
+```
+
+- [ ] **Step 7: Run the tests to see them pass**
+
+```bash
+gofmt -l internal/http/handler/report.go internal/http/dto/report.go internal/http/middleware/rbac_reports_test.go
+go vet ./internal/http/... && go vet -tags=integration ./internal/http/handler/
+go test ./internal/http/...
+go test -tags=integration -count=1 -run 'TestRecipientEndpoints|TestDownloadEndpoints|TestReportsNeedTheModulePermission' ./internal/http/handler/
+```
+
+Expected: no output from gofmt and vet; every package `ok`.
+
+If `go test ./internal/http/...` fails in a test that existed before this task (`router_test.go` and `openapi_spec_test.go` both walk the route table), read what it asserts. It is reporting that a new route or module has to be listed somewhere this plan did not know about. Add the six routes or the module there, following the entries beside them.
+
+- [ ] **Step 8: Regenerate the API docs**
+
+```bash
+swag init -g main.go \
+  -d ./cmd/api,./internal/http/handler,./internal/http/dto,./internal/auth,./internal/platform/storage \
+  --parseDependency --parseInternal -o docs
+grep -c "/api/v1/reports/" docs/swagger.yaml
+go build ./... && go test ./internal/http/...
+```
+
+Expected: the count is `5` (five paths; recipients carries two verbs); build silent; tests `ok`.
+
+- [ ] **Step 9: Commit**
+
+```bash
+git add internal/http docs
+git commit -m "feat(reports): recipients, run history and PDF download endpoints"
+swag init -g main.go -d ./cmd/api,./internal/http/handler,./internal/http/dto,./internal/auth,./internal/platform/storage --parseDependency --parseInternal -o docs >/dev/null
+git diff --exit-code docs; echo "exit=$?"
+```
+
+Expected: `exit=0`.
+
+---
+
+### Task 8: Wiring, CLI and the scheduler against a real database
+
+**Files:**
+- Modify: `cmd/api/main.go`
+- Modify: `cmd/cli/main.go`
+- Create: `cmd/cli/reports.go`
+- Test: `internal/http/handler/report_scheduler_integration_test.go`
+
+**Interfaces:**
+- Consumes from Task 1: the fixture and `ListReportRuns`. From Task 5: `cfg.SMTP`, `cfg.Reports`. From Task 6: `scheduler.NewRunner`, `scheduler.Deps`, `scheduler.Start`, `(*Runner).Tick`, `(*Runner).RunOne`, the status constants. From Task 7: `handler.NewLogoLoader`, and `POST /api/v1/reports/recipients` (the test seeds a recipient through it). From Task 4: `mail.NewSMTP`, `mail.Config`, `mail.Sender`.
+- Produces: `fleet-cli reports send --company <id> --report <kind> [--period <YYYY-MM-DD>] [--force]`; an API process that runs the scheduler when `REPORTS_ENABLED=true`.
+
+- [ ] **Step 1: Write the failing test**
+
+Create `internal/http/handler/report_scheduler_integration_test.go`:
+
+```go
+//go:build integration
+
+package handler
+
+// The scheduler against a real Postgres: send-once under concurrency, retry,
+// takeover of a dead run, and which companies are owed a report.
+
+import (
+	"context"
+	"errors"
+	"net/http"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"fleet/internal/db/gen"
+	"fleet/internal/platform/mail"
+	"fleet/internal/platform/reports"
+	"fleet/internal/platform/scheduler"
+)
+
+type countingMail struct {
+	sent atomic.Int64
+	err  error
+}
+
+func (m *countingMail) Send(context.Context, mail.Message) error {
+	if m.err != nil {
+		return m.err
+	}
+	m.sent.Add(1)
+	return nil
+}
+
+func (f reportFixture) runner(sender mail.Sender, now time.Time) *scheduler.Runner {
+	return scheduler.NewRunner(scheduler.Deps{
+		Pool: f.pool, Store: f.q, Mail: sender, Now: func() time.Time { return now }, SendHour: 6,
+	})
+}
+
+// seedWeek gives the fixture's company fuel in the week before now and one
+// recipient, so a tick at now owes it a fuel report.
+func (f reportFixture) seedWeek(t *testing.T, now time.Time) reports.Period {
+	t.Helper()
+	asset := f.asset(t, f.token, "Unidad 7")
+	employee := createDirectorCandidate(t, f.srv, f.token, "sched")
+	var vendor struct {
+		ID int64 `json:"id"`
+	}
+	postJSON(t, f.srv+"/api/v1/vendors", f.token, map[string]any{"name": "Gasolinera"}, http.StatusCreated, &vendor)
+
+	week := reports.LatestDue(reports.FuelWeekly, now, f.loc, 6)
+	f.fuel(t, asset, employee, vendor.ID, week.Start.Add(time.Hour), "100", "2500", "0", nil)
+	postJSON(t, f.srv+"/api/v1/reports/recipients", f.token,
+		map[string]any{"report_kind": "fuel_weekly", "email": "flota@cliente.mx"}, http.StatusCreated, nil)
+	return week
+}
+
+func (f reportFixture) run(t *testing.T, kind reports.Kind, week reports.Period) gen.ReportRun {
+	t.Helper()
+	rows, err := f.q.ListReportRuns(context.Background(), gen.ListReportRunsParams{CompanyID: f.company, Lim: 50})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range rows {
+		if r.ReportKind == string(kind) && r.PeriodStart.Format("2006-01-02") == week.StartDate().Format("2006-01-02") {
+			return r
+		}
+	}
+	t.Fatalf("no %s run for %s among %+v", kind, week.StartDate().Format("2006-01-02"), rows)
+	return gen.ReportRun{}
+}
+
+// Eight schedulers ticking at once, as after a deploy that briefly runs two
+// containers: one email, one row.
+func TestConcurrentTicksSendOnce(t *testing.T) {
+	f := newReportFixture(t)
+	now := time.Date(2026, 9, 28, 7, 0, 0, 0, f.loc)
+	week := f.seedWeek(t, now)
+
+	sender := &countingMail{}
+	var wg sync.WaitGroup
+	for range 8 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := f.runner(sender, now).Tick(context.Background()); err != nil {
+				t.Errorf("tick: %v", err)
+			}
+		}()
+	}
+	wg.Wait()
+	// Ticks that lost the advisory lock returned at once; run again so that
+	// every one of them has had its turn at the claim.
+	for range 3 {
+		if err := f.runner(sender, now).Tick(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if got := sender.sent.Load(); got != 1 {
+		t.Fatalf("emails sent = %d, want 1", got)
+	}
+	run := f.run(t, reports.FuelWeekly, week)
+	if run.Status != scheduler.StatusSent || run.Attempts != 1 || run.Recipients != 1 {
+		t.Fatalf("run = %+v", run)
+	}
+}
+
+func TestFailedRunIsRetriedThreeTimes(t *testing.T) {
+	f := newReportFixture(t)
+	now := time.Date(2026, 9, 28, 7, 0, 0, 0, f.loc)
+	week := f.seedWeek(t, now)
+
+	broken := &countingMail{err: errors.New("421 service not available")}
+	for range 5 {
+		if err := f.runner(broken, now).Tick(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	run := f.run(t, reports.FuelWeekly, week)
+	if run.Status != scheduler.StatusFailed || run.Attempts != 3 {
+		t.Fatalf("after five ticks: status = %s, attempts = %d, want failed and 3", run.Status, run.Attempts)
+	}
+	if run.Error == nil || *run.Error == "" {
+		t.Fatal("a failed run must say why")
+	}
+
+	// The mail server comes back, but the attempts are spent: the scheduler
+	// leaves it alone, and a person sends it with --force.
+	working := &countingMail{}
+	if err := f.runner(working, now).Tick(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if working.sent.Load() != 0 {
+		t.Fatal("a run with no attempts left was sent by the scheduler")
+	}
+
+	company := reports.Company{ID: f.company, Name: "Transportes Reporte", Timezone: f.loc.String(), Currency: "MXN"}
+	status, err := f.runner(working, now).RunOne(context.Background(), company, reports.FuelWeekly, week, true)
+	if err != nil || status != scheduler.StatusSent {
+		t.Fatalf("forced run: status = %s, err = %v", status, err)
+	}
+}
+
+// A run left "running" by a process that died is taken over once it is stale,
+// and not before.
+func TestStaleRunIsTakenOver(t *testing.T) {
+	f := newReportFixture(t)
+	now := time.Date(2026, 9, 28, 7, 0, 0, 0, f.loc)
+	week := f.seedWeek(t, now)
+
+	f.exec(t, `INSERT INTO report_run (company_id, report_kind, period_start, status, attempts, started_at)
+	           VALUES ($1, 'fuel_weekly', $2, 'running', 1, now() - interval '5 minutes')`, f.company, week.StartDate())
+
+	sender := &countingMail{}
+	if err := f.runner(sender, now).Tick(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if sender.sent.Load() != 0 {
+		t.Fatal("a run that started five minutes ago was taken from its owner")
+	}
+
+	f.exec(t, `UPDATE report_run SET started_at = now() - interval '31 minutes' WHERE company_id = $1`, f.company)
+	if err := f.runner(sender, now).Tick(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if sender.sent.Load() != 1 {
+		t.Fatalf("emails sent = %d, want 1 once the run is stale", sender.sent.Load())
+	}
+	if run := f.run(t, reports.FuelWeekly, week); run.Status != scheduler.StatusSent || run.Attempts != 2 {
+		t.Fatalf("run = %+v", run)
+	}
+}
+
+// A company of an inactive account is owed nothing.
+func TestInactiveAccountIsSkipped(t *testing.T) {
+	f := newReportFixture(t)
+	now := time.Date(2026, 9, 28, 7, 0, 0, 0, f.loc)
+	f.seedWeek(t, now)
+	f.exec(t, `UPDATE account SET is_active = false WHERE id = (SELECT account_id FROM company WHERE id = $1)`, f.company)
+
+	sender := &countingMail{}
+	if err := f.runner(sender, now).Tick(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if sender.sent.Load() != 0 {
+		t.Fatal("a report was sent to a company of an inactive account")
+	}
+}
+```
+
+- [ ] **Step 2: Run it**
+
+```bash
+go test -tags=integration -count=1 -run 'TestConcurrentTicks|TestFailedRun|TestStaleRun|TestInactiveAccount' ./internal/http/handler/
+```
+
+Expected: `ok`. Everything these tests exercise was written in Tasks 1 to 7; this is the first time the pieces meet a real database. **A failure here is a real defect in an earlier task.** Find it with `superpowers:systematic-debugging`; do not change the test to make it pass.
+
+To see that the tests can fail, break the guarantee once and put it back:
+
+```bash
+sed -i 's/^WHERE sqlc.arg(force)::boolean$/WHERE true OR sqlc.arg(force)::boolean/' internal/db/queries/report.sql
+sqlc generate
+go test -tags=integration -count=1 -run 'TestConcurrentClaims|TestFailedRun' ./internal/http/handler/
+git checkout internal/db/queries/report.sql internal/db/gen
+git diff --exit-code internal/db/gen internal/db/queries; echo "exit=$?"
+```
+
+Expected: both tests FAIL (`claims won = 16, want 1`; attempts above 3), then `exit=0` after the checkout.
+
+- [ ] **Step 3: Start and stop the scheduler in the API**
+
+In `cmd/api/main.go`:
+
+1. In the import block, add `_ "time/tzdata"` on the line after `"time"`, and add these three imports in their groups:
+
+```go
+	"github.com/jackc/pgx/v5/pgxpool"
+```
+
+```go
+	"fleet/internal/platform/mail"
+	"fleet/internal/platform/scheduler"
+```
+
+The standard-library group then ends:
+
+```go
+	"syscall"
+	"time"
+	_ "time/tzdata" // the distroless image carries no timezone database
+```
+
+2. In `run`, directly before `srv := &http.Server{`, add:
+
+```go
+	stopScheduler, err := startScheduler(cfg, pool, queries, blobs, logger)
+	if err != nil {
+		return err
+	}
+	// Deferred after pool.Close(), so it runs before it: a report in flight is
+	// still reading from the pool, and stopScheduler waits for it.
+	defer stopScheduler()
+
+```
+
+3. At the end of the file add:
+
+```go
+
+// startScheduler starts the report scheduler when REPORTS_ENABLED says so, and
+// returns the function that stops it. When it is off the returned function
+// does nothing, so the caller does not have to know.
+func startScheduler(cfg config.Config, pool *pgxpool.Pool, queries *gen.Queries, blobs storage.Storage, logger *slog.Logger) (func(), error) {
+	if !cfg.Reports.Enabled {
+		logger.Info("scheduler: off (REPORTS_ENABLED is not true)")
+		return func() {}, nil
+	}
+
+	var sender mail.Sender
+	if cfg.SMTP.Host != "" {
+		sender = mail.NewSMTP(mail.Config{
+			Host:     cfg.SMTP.Host,
+			Port:     cfg.SMTP.Port,
+			User:     cfg.SMTP.User,
+			Password: cfg.SMTP.Password,
+			From:     cfg.SMTP.From,
+		})
+	} else {
+		logger.Warn("scheduler: SMTP_HOST is empty, reports will be built and recorded as not_sent")
+	}
+
+	runner := scheduler.NewRunner(scheduler.Deps{
+		Pool:     pool,
+		Store:    queries,
+		Mail:     sender,
+		Logo:     handler.NewLogoLoader(blobs, logger),
+		Logger:   logger,
+		SendHour: cfg.Reports.SendHour,
+	})
+	return scheduler.Start(runner, cfg.Reports.Tick, logger)
+}
+```
+
+`sender` is declared as the interface type `mail.Sender` and only assigned when a host is set. Do not write `sender := mail.NewSMTP(...)` and pass it unconditionally, and do not declare it as `*mail.SMTP`: a nil `*mail.SMTP` stored in the interface is not a nil interface, the runner's `Mail == nil` check would be false, and it would try to send with no server.
+
+- [ ] **Step 4: Add the CLI command**
+
+Create `cmd/cli/reports.go`:
+
+```go
+package main
+
+import (
+	"context"
+	"flag"
+	"fmt"
+	"log/slog"
+	"os"
+	"time"
+	_ "time/tzdata" // the distroless image may carry no timezone database
+
+	"fleet/internal/config"
+	"fleet/internal/db"
+	"fleet/internal/db/gen"
+	"fleet/internal/http/handler"
+	"fleet/internal/platform/mail"
+	"fleet/internal/platform/reports"
+	"fleet/internal/platform/scheduler"
+	"fleet/internal/platform/storage"
+)
+
+// reportsCmd sends one company's report for one period, now.
+//
+// It is how a report recorded as not_sent is delivered once a mailbox is
+// configured, and how a failed one is retried by hand. It goes through the
+// same claim as the scheduler, so without --force it cannot send a report
+// that was already sent.
+func reportsCmd(args []string) error {
+	if len(args) == 0 || args[0] != "send" {
+		return fmt.Errorf("usage: fleet-cli reports send --company <id> --report <kind> [--period <date>] [--force]")
+	}
+
+	fs := flag.NewFlagSet("reports send", flag.ExitOnError)
+	companyID := fs.Int64("company", 0, "company id")
+	report := fs.String("report", "", "fuel_weekly or maintenance_monthly")
+	periodArg := fs.String("period", "", "any date inside the period, YYYY-MM-DD (default: the last full period)")
+	force := fs.Bool("force", false, "send even if this period was already handled")
+	_ = fs.Parse(args[1:])
+
+	if *companyID < 1 {
+		return fmt.Errorf("--company is required")
+	}
+	kind, ok := reports.ParseKind(*report)
+	if !ok {
+		return fmt.Errorf("--report must be fuel_weekly or maintenance_monthly")
+	}
+
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+
+	ctx := context.Background()
+	pool, err := db.NewPool(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+	q := gen.New(pool)
+
+	row, err := q.GetReportCompany(ctx, *companyID)
+	if err != nil {
+		return fmt.Errorf("no company %d: %w", *companyID, err)
+	}
+	company := reports.Company{ID: row.ID, Name: row.Name, Logo: row.Logo, Timezone: row.Timezone, Currency: row.Currency}
+	loc, err := reports.LoadLocation(company.Timezone)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "warning:", err)
+	}
+
+	now := time.Now()
+	period := reports.PeriodOf(kind, now, loc).Previous(kind)
+	if *periodArg != "" {
+		at, err := time.ParseInLocation("2006-01-02", *periodArg, loc)
+		if err != nil {
+			return fmt.Errorf("--period must be a date, YYYY-MM-DD")
+		}
+		period = reports.PeriodOf(kind, at, loc)
+	}
+	if !period.End.Before(now) && !period.End.Equal(now) {
+		return fmt.Errorf("the period %s to %s has not ended yet",
+			period.Start.Format("2006-01-02"), period.LastDay().Format("2006-01-02"))
+	}
+
+	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
+	blobs, err := storage.FromEnv()
+	if err != nil {
+		return err
+	}
+	var sender mail.Sender
+	if smtp := cfg.SMTP; smtp.Host != "" {
+		sender = mail.NewSMTP(mail.Config{Host: smtp.Host, Port: smtp.Port, User: smtp.User, Password: smtp.Password, From: smtp.From})
+	}
+
+	// No Pool: the advisory lock guards a whole tick, and this is one run.
+	// The claim on report_run is what keeps it from colliding with the scheduler.
+	runner := scheduler.NewRunner(scheduler.Deps{
+		Store:    q,
+		Mail:     sender,
+		Logo:     handler.NewLogoLoader(blobs, logger),
+		Logger:   logger,
+		SendHour: cfg.Reports.SendHour,
+	})
+
+	status, err := runner.RunOne(ctx, company, kind, period, *force)
+	fmt.Printf("company %d, %s, period starting %s: %s\n",
+		company.ID, kind, period.StartDate().Format("2006-01-02"), status)
+	if status == scheduler.StatusNotClaimed {
+		fmt.Println("this period was already handled; pass --force to send it again")
+	}
+	return err
+}
+```
+
+In `cmd/cli/main.go`, in the `switch os.Args[1]`, after the `inventory-drift` case, add:
+
+```go
+	case "reports":
+		err = reportsCmd(os.Args[2:])
+```
+
+and in `usage()`, after the `inventory-drift` line, add:
+
+```go
+	fmt.Fprintln(os.Stderr, "  fleet-cli reports send --company <id> --report <fuel_weekly|maintenance_monthly> [--period <YYYY-MM-DD>] [--force]")
+```
+
+- [ ] **Step 5: Build and test everything**
+
+```bash
+gofmt -l cmd
+go build ./... && go vet ./... && go vet -tags=integration ./internal/http/handler/
+go test ./...
+go test -tags=integration -count=1 ./internal/http/handler/
+```
+
+Expected: no output from gofmt, build and vet; every package `ok`. The last command runs the whole integration suite, old tests included, and takes a few minutes.
+
+- [ ] **Step 6: Run it for real, once**
+
+The local stack is Postgres on 5433 with the `fleet` database. Apply the migration to it and start the API with the scheduler ticking every minute and no mail server:
+
+```bash
+docker exec -i fleet-pg psql -v ON_ERROR_STOP=1 -U postgres -d fleet < internal/db/migrations/000025_scheduled_reports.up.sql
+REPORTS_ENABLED=true REPORTS_TICK="* * * * *" SMTP_HOST= STORAGE_BACKEND=local go run ./cmd/api
+```
+
+If the first command says the tables already exist, the migration was applied before; go on.
+
+Within a minute the log must show `scheduler: started`, then one `scheduler: report run` line per company and report, with status `skipped_empty`, `skipped_no_recipients` or `not_sent`. The next minute must log no `report run` lines at all: every period is already handled. Press Ctrl+C: the log must show `shutdown signal received` and then `scheduler: stopped`, and the process must exit by itself.
+
+Then the CLI, with a company id taken from the log:
+
+```bash
+go run ./cmd/cli reports send --company 1 --report fuel_weekly
+go run ./cmd/cli reports send --company 1 --report fuel_weekly --force
+go run ./cmd/cli reports send --company 1 --report tires
+```
+
+Expected, in order: `not_claimed` with the hint about `--force`; a stored status; the error `--report must be fuel_weekly or maintenance_monthly`.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add cmd internal/http/handler/report_scheduler_integration_test.go
+git commit -m "feat(reports): run the scheduler in the API and add reports send to the CLI"
+```
+
+---
+
+### Task 9: Documentation and the final gate
+
+**Files:**
+- Modify: `.env.example`
+- Modify: `deploy/.env.production.example`
+- Modify: `README.md`
+- Create, **outside the repository**: `C:\Users\lider\OneDrive\Desktop\PROJECTS\GoLogistics\frontend-guide-scheduled-reports.md`
+
+**Interfaces:**
+- Consumes: the routes of Task 7, the variables of Task 5, the CLI of Task 8.
+- Produces: nothing code depends on.
+
+- [ ] **Step 1: Document the variables for development**
+
+In `.env.example`, in the DEV block, after the `DASHBOARD_UPCOMING_DAYS=30` line and its blank line, add:
+
+```sh
+# Scheduled reports: a weekly fuel report and a monthly maintenance cost report,
+# emailed as PDF to the addresses each company lists under /reports/recipients.
+# OFF by default: a development process pointed at real data must not email
+# anyone by accident.
+REPORTS_ENABLED=false
+# REPORTS_TICK=*/15 * * * *    # how often the API looks for due reports (cron)
+# REPORTS_SEND_HOUR=6          # local hour, per company timezone, a period becomes due
+
+# The mailbox the reports are sent from. Leave SMTP_HOST empty and reports are
+# still built and recorded as not_sent; nothing leaves the machine.
+# Port 465 uses TLS from the first byte; any other port upgrades with STARTTLS.
+# SMTP_HOST=
+# SMTP_PORT=587
+# SMTP_USER=
+# SMTP_PASSWORD=
+# SMTP_FROM=                   # required when SMTP_HOST is set
+
+```
+
+- [ ] **Step 2: Document the variables for production**
+
+In `deploy/.env.production.example`, after the `DASHBOARD_UPCOMING_DAYS=30` line, add:
+
+```sh
+
+# Scheduled reports. Set REPORTS_ENABLED=true on ONE environment per database:
+# two environments sharing a database are safe (a report is claimed once), but
+# two environments with two databases and the same recipients send twice.
+REPORTS_ENABLED=false
+REPORTS_SEND_HOUR=6
+
+# The mailbox the reports are sent from. With SMTP_HOST empty, reports are built
+# and recorded as not_sent; deliver them later with
+#   docker compose run --rm cli reports send --company <id> --report <kind> --force
+SMTP_HOST=
+SMTP_PORT=587
+SMTP_USER=
+SMTP_PASSWORD=
+SMTP_FROM=
+```
+
+`deploy/docker-compose.prod.yml` needs no change: `api` and `cli` both load the whole file through `env_file`.
+
+- [ ] **Step 3: Document the feature in the README**
+
+In `README.md`, in the table under `## Environment variables`, after the `EXPORT_MAX_ROWS` row, add:
+
+```markdown
+| `REPORTS_ENABLED` | `false` | Starts the report scheduler inside the API process |
+| `REPORTS_TICK` | `*/15 * * * *` | Cron expression of the job that looks for due reports |
+| `REPORTS_SEND_HOUR` | `6` | Local hour, in each company's timezone, at which a finished period becomes due |
+| `SMTP_HOST` | empty | Mail server. Empty: reports are built and recorded as `not_sent` |
+| `SMTP_PORT` | `587` | `465` uses implicit TLS; any other port upgrades with STARTTLS |
+| `SMTP_USER`, `SMTP_PASSWORD` | empty | Credentials; sent only over TLS |
+| `SMTP_FROM` | empty | Sender address. Required when `SMTP_HOST` is set |
+```
+
+Directly before the line `### Integration tests`, add this section:
+
+````markdown
+### Scheduled reports
+
+Two reports are built on a clock and emailed as PDF to the tenant company:
+
+| Report | Kind | Due | Covers |
+|---|---|---|---|
+| Weekly fuel | `fuel_weekly` | Monday 06:00 | the week before, Monday to Sunday |
+| Monthly maintenance costs | `maintenance_monthly` | the 1st, 06:00 | the month before |
+
+"06:00" is in the company's own `timezone`. The scheduler is a ticker inside
+the API process (`REPORTS_ENABLED=true`); there is no separate worker. Every 15
+minutes it asks, for each company, which period is due and whether it was
+already handled. An API that was down at 06:00 sends when it comes back.
+
+`report_run` holds one row per company, report and period, and that row is what
+guarantees a report is sent once: a restart, a second container and a manual
+CLI run all find it there.
+
+| Status | Meaning |
+|---|---|
+| `sent` | accepted by the mail server |
+| `not_sent` | built, but no `SMTP_HOST` is configured |
+| `skipped_empty` | the period has no data; nothing is emailed |
+| `skipped_no_recipients` | nobody is listed for this report |
+| `failed` | see `error`; retried on the next tick, three attempts in all |
+
+Endpoints, all behind the `reports` module (`read` to list and download,
+`create` and `delete` to change the recipients):
+
+| Method and path | |
+|---|---|
+| `GET /api/v1/reports/recipients?report_kind=` | who receives what |
+| `POST /api/v1/reports/recipients` | `{"report_kind": "fuel_weekly", "email": "flota@empresa.mx"}` |
+| `DELETE /api/v1/reports/recipients/{id}` | |
+| `GET /api/v1/reports/runs` | what the scheduler did, newest first |
+| `GET /api/v1/reports/fuel/weekly?week=2026-09-23` | the PDF; `week` is any date in the week |
+| `GET /api/v1/reports/maintenance/monthly?month=2026-08` | the PDF |
+
+A download never writes `report_run`.
+
+What the maintenance report counts as a job: a completed service entry, or a
+completed work order that no service entry points at. A service entry linked
+to a work order is the same job, so only the service entry is counted. The
+total is the manual override where one was set.
+
+To send one report by hand, for instance after configuring a mailbox:
+
+```sh
+go run ./cmd/cli reports send --company 12 --report fuel_weekly
+go run ./cmd/cli reports send --company 12 --report fuel_weekly --period 2026-09-23 --force
+```
+
+Without `--force` it refuses a period that was already handled.
+
+````
+
+In the `## Project layout` section, add the four packages to the tree, next to the other `internal/platform` entries and in the style of the lines around them:
+
+```
+    mail/        SMTP delivery with attachments (standard library only)
+    pdf/         renders the scheduled reports
+    reports/     report periods and arithmetic
+    scheduler/   in-process ticker: claims, delivers and records report runs
+```
+
+- [ ] **Step 4: Write the frontend guide, beside the repository**
+
+Handoff guides for the frontend live next to the repository, never inside it, and use the placeholder `<API>` for the base URL. Create `C:\Users\lider\OneDrive\Desktop\PROJECTS\GoLogistics\frontend-guide-scheduled-reports.md`:
+
+````markdown
+# Frontend guide: scheduled reports
+
+Two reports are emailed automatically to each company: fuel every Monday,
+maintenance costs on the 1st of each month. The frontend needs three things: a
+screen to manage who receives them, buttons to download them, and optionally a
+history of what was sent.
+
+All routes need `Authorization: Bearer <token>` with a company-scoped token.
+
+## Permissions
+
+The module is `reports`. Read it from `GET <API>/api/v1/me/permissions` like any
+other module.
+
+| The user may | Needs |
+|---|---|
+| See recipients, see history, download a PDF | `reports` → `read` |
+| Add a recipient | `reports` → `create` |
+| Remove a recipient | `reports` → `delete` |
+
+Administrators have all of them. Hide what the user may not do; a call without
+the permission answers `403`.
+
+## Report kinds
+
+| `report_kind` | Label to show |
+|---|---|
+| `fuel_weekly` | Reporte semanal de combustible |
+| `maintenance_monthly` | Reporte mensual de costos de mantenimiento |
+
+## Recipients
+
+### List
+
+`GET <API>/api/v1/reports/recipients`
+`GET <API>/api/v1/reports/recipients?report_kind=fuel_weekly`
+
+```json
+{
+  "data": [
+    {
+      "id": 7,
+      "report_kind": "fuel_weekly",
+      "email": "flota@empresa.mx",
+      "is_active": true,
+      "created_at": "2026-09-28T15:04:05Z"
+    }
+  ]
+}
+```
+
+Not paginated. `400` if `report_kind` is not one of the two kinds.
+
+### Add
+
+`POST <API>/api/v1/reports/recipients`
+
+```json
+{ "report_kind": "fuel_weekly", "email": "flota@empresa.mx" }
+```
+
+| Status | Meaning | Show |
+|---|---|---|
+| `201` | created; the body is the recipient | |
+| `409` | that address already receives that report | "Ese correo ya recibe este reporte" |
+| `422` | bad kind or bad address; `error.details` names the field | the message next to the field |
+
+The address must be one plain address. `Flota <flota@empresa.mx>` and
+`a@x.mx, b@x.mx` are both refused: add them one at a time. Letter case is
+ignored when checking for duplicates.
+
+The same address can receive both reports; that is two recipients.
+
+### Remove
+
+`DELETE <API>/api/v1/reports/recipients/{id}` answers `204`, or `404` if it
+does not exist in this company.
+
+There is no edit. To change an address, remove it and add the new one.
+
+## Download
+
+`GET <API>/api/v1/reports/fuel/weekly`
+`GET <API>/api/v1/reports/fuel/weekly?week=2026-09-23`
+`GET <API>/api/v1/reports/maintenance/monthly`
+`GET <API>/api/v1/reports/maintenance/monthly?month=2026-08`
+
+- `week` is **any** date inside the week wanted, as `YYYY-MM-DD`. Weeks run
+  Monday to Sunday. A date picker value can be sent as it is.
+- `month` is `YYYY-MM`.
+- Without the parameter: the last full week, or the last full month.
+- `400` if the value is not in that format.
+
+The response is the file, `Content-Type: application/pdf`, with
+`Content-Disposition: attachment; filename="combustible-semanal-2026-09-21.pdf"`.
+It needs the `Authorization` header, so a plain `<a href>` does not work. Fetch
+it and hand the blob to the browser:
+
+```ts
+async function downloadReport(path: string, token: string) {
+  const res = await fetch(`${API}/api/v1${path}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw await res.json();
+
+  const name =
+    res.headers.get("Content-Disposition")?.match(/filename="(.+)"/)?.[1] ??
+    "reporte.pdf";
+  const url = URL.createObjectURL(await res.blob());
+  const a = Object.assign(document.createElement("a"), { href: url, download: name });
+  a.click();
+  URL.revokeObjectURL(url);
+}
+```
+
+`Content-Disposition` is only readable from JavaScript if the API exposes it
+through CORS. If `name` always falls back to `reporte.pdf`, tell the backend.
+
+A period with no data still downloads a PDF. It says "Sin registros en el
+periodo". That is not an error.
+
+Generating can take a few seconds for a large fleet. Disable the button and
+show progress while the request is open.
+
+## History (optional screen)
+
+`GET <API>/api/v1/reports/runs?page=1&page_size=25`
+
+Paginated like every other list. Each row:
+
+```json
+{
+  "id": 31,
+  "report_kind": "fuel_weekly",
+  "period_start": "2026-09-21",
+  "status": "sent",
+  "attempts": 1,
+  "error": null,
+  "recipients": 2,
+  "started_at": "2026-09-28T12:00:03Z",
+  "finished_at": "2026-09-28T12:00:05Z"
+}
+```
+
+`period_start` is a plain date, already in the company's timezone. Do not run
+it through a timezone conversion.
+
+| `status` | Label to show |
+|---|---|
+| `sent` | Enviado |
+| `not_sent` | Generado, sin enviar (correo no configurado) |
+| `skipped_empty` | Sin datos en el periodo |
+| `skipped_no_recipients` | Sin destinatarios |
+| `failed` | Falló; show `error` |
+| `running` | En proceso |
+
+## What the frontend does not do
+
+- It does not schedule anything. The day and hour are fixed on the server.
+- It cannot trigger an email. Re-sending is done by the platform operator.
+- It does not store PDFs. Every download is generated from current data, so a
+  report downloaded today for last month can differ from the one emailed on the
+  1st if records were changed since.
+````
+
+- [ ] **Step 5: Run every gate**
+
+```bash
+go build ./...
+go vet ./...
+for f in $(git diff --name-only origin/main...HEAD -- '*.go'; git diff --name-only -- '*.go'); do gofmt -l "$f"; done
+go test ./...
+sqlc generate && git diff --exit-code internal/db/gen; echo "sqlc exit=$?"
+swag init -g main.go -d ./cmd/api,./internal/http/handler,./internal/http/dto,./internal/auth,./internal/platform/storage --parseDependency --parseInternal -o docs >/dev/null && git diff --exit-code docs; echo "swag exit=$?"
+go test -tags=integration -count=1 ./internal/http/handler/
+CGO_ENABLED=0 GOOS=linux go build -o /dev/null ./cmd/api ./cmd/cli; echo "linux build exit=$?"
+```
+
+Expected: build and vet silent; the gofmt loop prints nothing; every package `ok`; `sqlc exit=0`; `swag exit=0`; integration `ok`; `linux build exit=0`. The last line is the build the Dockerfile does: static, for Linux, without CGO.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git status --short
+git add .env.example deploy/.env.production.example README.md
+git commit -m "docs: scheduled reports"
+git log --oneline origin/main..HEAD
+```
+
+Expected from `git status --short` before the add: only the three files. The frontend guide is outside the repository and is not committed anywhere.
+
+Do not push and do not open a pull request. Report to the human that the branch is ready, with the list of commits, and that three things are theirs to do:
+
+1. push and review the branch;
+2. after deploy, set `REPORTS_ENABLED=true` in `/opt/fleet/.env` on the server, and the `SMTP_*` values once a mailbox is chosen;
+3. give `frontend-guide-scheduled-reports.md` to the frontend developer.
