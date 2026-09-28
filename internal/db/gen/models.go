@@ -676,6 +676,28 @@ type PurchaseOrderStatusLog struct {
 	ChangedAt       time.Time
 }
 
+type ReportRecipient struct {
+	ID         int64
+	CompanyID  int64
+	ReportKind string
+	Email      string
+	IsActive   bool
+	CreatedAt  time.Time
+}
+
+type ReportRun struct {
+	ID          int64
+	CompanyID   int64
+	ReportKind  string
+	PeriodStart time.Time
+	Status      string
+	Attempts    int32
+	Error       *string
+	Recipients  int32
+	StartedAt   time.Time
+	FinishedAt  *time.Time
+}
+
 type RevokedToken struct {
 	Jti        string
 	EmployeeID int64
