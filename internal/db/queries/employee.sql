@@ -159,6 +159,7 @@ WHERE e.id = sqlc.arg(id)
 -- membership row says; default_company_id only says where a session lands, and
 -- an employee can belong to a company that is not their default. A null
 -- argument means no filter, so one query serves both questions.
+-- account_id narrows it to one client's people the same way; both filters combine.
 SELECT e.* FROM employee e
 WHERE (
     sqlc.narg(company_id)::bigint IS NULL
@@ -167,6 +168,7 @@ WHERE (
         WHERE ec.employee_id = e.id AND ec.company_id = sqlc.narg(company_id)
     )
 )
+AND (sqlc.narg(account_id)::bigint IS NULL OR e.account_id = sqlc.narg(account_id))
 ORDER BY e.id LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off);
 
 -- name: CountAllEmployees :one
@@ -177,7 +179,8 @@ WHERE (
         SELECT 1 FROM employee_companies ec
         WHERE ec.employee_id = e.id AND ec.company_id = sqlc.narg(company_id)
     )
-);
+)
+AND (sqlc.narg(account_id)::bigint IS NULL OR e.account_id = sqlc.narg(account_id));
 
 -- name: GetEmployeeByID :one
 -- Unscoped single-employee read for the admin namespace.

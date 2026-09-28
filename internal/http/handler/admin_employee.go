@@ -62,6 +62,25 @@ func validateMembershipReplace(companyIDs []int64, defaultCompanyID *int64) erro
 	return nil
 }
 
+// validateMembershipAccount enforces what the composite foreign key on
+// employee_companies already guarantees, but as a 422 that names the field.
+// employeeAccountID is nil for platform staff, who belong to no client and so
+// can hold no membership. inAccount is how many of the requested companies
+// belong to the employee's account.
+func validateMembershipAccount(employeeAccountID *int64, inAccount int64, requested int) error {
+	if employeeAccountID == nil {
+		return apierr.Validation(map[string]string{
+			"company_ids": "platform staff belong to no account and cannot hold company memberships",
+		})
+	}
+	if inAccount != int64(requested) {
+		return apierr.Validation(map[string]string{
+			"company_ids": "every company must belong to the employee's account",
+		})
+	}
+	return nil
+}
+
 // membershipChange is one audited addition or removal.
 type membershipChange struct {
 	company int64
@@ -93,17 +112,33 @@ func membershipDelta(before, after []int64) []membershipChange {
 	return out
 }
 
+// toAdminEmployeeResponses pairs each row with its already-rendered base
+// response (which carries is_account_owner) and adds the cross-tenant fields.
+// rows and base must be the same length and order.
+func toAdminEmployeeResponses(rows []gen.Employee, base []dto.EmployeeResponse) []dto.AdminEmployeeResponse {
+	out := make([]dto.AdminEmployeeResponse, len(rows))
+	for i, r := range rows {
+		out[i] = dto.AdminEmployeeResponse{
+			EmployeeResponse: base[i],
+			AccountID:        r.AccountID,
+			IsPlatformAdmin:  r.IsPlatformAdmin,
+		}
+	}
+	return out
+}
+
 // List godoc
 //
 //	@Summary		List employees across every company
-//	@Description	Cross-company employee register. Unlike GET /api/v1/employees this is not scoped to the caller's company: it answers "who exists anywhere", which is what assigning an employee to a second company needs. Pass company_id to narrow it to one tenant's staff — that is membership (employee_companies), not default_company_id, so an employee who belongs to a company that is not their default is still listed.
+//	@Description	Cross-company employee register. Unlike GET /api/v1/employees this is not scoped to the caller's company: it answers "who exists anywhere", which is what assigning an employee to a second company needs. Pass company_id to narrow it to one tenant's staff — that is membership (employee_companies), not default_company_id, so an employee who belongs to a company that is not their default is still listed. Each row adds account_id (null for platform staff) and is_platform_admin.
 //	@Tags			admin
 //	@Produce		json
 //	@Security		BearerAuth
 //	@Param		company_id	query		int	false	"Only employees who belong to this company"
+//	@Param		account_id	query		int	false	"Only employees of this account"
 //	@Param		limit		query		int	false	"Page size"
 //	@Param		offset		query		int	false	"Offset"
-//	@Success		200			{object}	dto.EmployeePage
+//	@Success		200			{object}	dto.AdminEmployeePage
 //	@Failure		400			{object}	dto.ErrorResponse
 //	@Failure		401			{object}	dto.ErrorResponse
 //	@Failure		403			{object}	dto.ErrorResponse
@@ -120,9 +155,15 @@ func (h *AdminEmployeeHandler) List(c *gin.Context) {
 		apierr.Abort(c, err)
 		return
 	}
+	accountID, err := queryInt64(c, "account_id")
+	if err != nil {
+		apierr.Abort(c, err)
+		return
+	}
 
 	rows, err := h.q.ListAllEmployees(ctx, gen.ListAllEmployeesParams{
 		CompanyID: companyID,
+		AccountID: accountID,
 		Lim:       int32(p.Limit),
 		Off:       int32(p.Offset),
 	})
@@ -130,25 +171,28 @@ func (h *AdminEmployeeHandler) List(c *gin.Context) {
 		apierr.Abort(c, err)
 		return
 	}
-	// The count takes the same filter, or the page envelope would report a total
+	// The count takes the same filters, or the page envelope would report a total
 	// from a different question than the rows answer.
-	total, err := h.q.CountAllEmployees(ctx, companyID)
+	total, err := h.q.CountAllEmployees(ctx, gen.CountAllEmployeesParams{
+		CompanyID: companyID,
+		AccountID: accountID,
+	})
 	if err != nil {
 		apierr.Abort(c, err)
 		return
 	}
 
-	out := make([]dto.EmployeeResponse, len(rows))
+	base := make([]dto.EmployeeResponse, len(rows))
 	for i, r := range rows {
-		out[i] = toEmployeeResponse(r)
+		base[i] = toEmployeeResponse(r)
 	}
 	// No session company applies across tenants, so role_id stays null here;
 	// account ownership does not depend on one.
-	if err := applyAccountOwners(ctx, h.q, out); err != nil {
+	if err := applyAccountOwners(ctx, h.q, base); err != nil {
 		apierr.Abort(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, paginate.NewPage(out, total, p))
+	c.JSON(http.StatusOK, paginate.NewPage(toAdminEmployeeResponses(rows, base), total, p))
 }
 
 // ListCompanies godoc
@@ -197,7 +241,7 @@ func (h *AdminEmployeeHandler) ListCompanies(c *gin.Context) {
 // ReplaceCompanies godoc
 //
 //	@Summary		Replace an employee's company memberships
-//	@Description	Full overwrite of employee_companies. Requires a platform administrator. company_ids must be non-empty — an employee with no membership cannot log in, so use is_active to deactivate instead. default_company_id must be null or one of company_ids; omitting it clears the employee's stored default_company_id, so send it on every call unless you mean to clear it. Every addition and removal is recorded in membership_audit in the same transaction as the change.
+//	@Description	Full overwrite of employee_companies. Requires a platform administrator. company_ids must be non-empty — an employee with no membership cannot log in, so use is_active to deactivate instead. default_company_id must be null or one of company_ids; omitting it clears the employee's stored default_company_id, so send it on every call unless you mean to clear it. Every addition and removal is recorded in membership_audit in the same transaction as the change. Every company must belong to the employee's account, and platform staff can hold no membership; either violation is a 422 naming company_ids.
 //	@Tags			admin
 //	@Accept			json
 //	@Produce		json
@@ -231,7 +275,8 @@ func (h *AdminEmployeeHandler) ReplaceCompanies(c *gin.Context) {
 	}
 
 	ctx := c.Request.Context()
-	if _, err := h.q.GetEmployeeByID(ctx, id); err != nil {
+	employee, err := h.q.GetEmployeeByID(ctx, id)
+	if err != nil {
 		apierr.Abort(c, err)
 		return
 	}
@@ -245,6 +290,22 @@ func (h *AdminEmployeeHandler) ReplaceCompanies(c *gin.Context) {
 	}
 	if n != int64(len(ids)) {
 		apierr.Abort(c, apierr.Validation(map[string]string{"company_ids": "one or more companies do not exist"}))
+		return
+	}
+
+	var inAccount int64
+	if employee.AccountID != nil {
+		inAccount, err = h.q.CountCompaniesInAccount(ctx, gen.CountCompaniesInAccountParams{
+			Ids:       ids,
+			AccountID: *employee.AccountID,
+		})
+		if err != nil {
+			apierr.Abort(c, err)
+			return
+		}
+	}
+	if err := validateMembershipAccount(employee.AccountID, inAccount, len(ids)); err != nil {
+		apierr.Abort(c, err)
 		return
 	}
 

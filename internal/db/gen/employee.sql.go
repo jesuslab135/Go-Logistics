@@ -55,10 +55,16 @@ WHERE (
         WHERE ec.employee_id = e.id AND ec.company_id = $1
     )
 )
+AND ($2::bigint IS NULL OR e.account_id = $2)
 `
 
-func (q *Queries) CountAllEmployees(ctx context.Context, companyID *int64) (int64, error) {
-	row := q.db.QueryRow(ctx, countAllEmployees, companyID)
+type CountAllEmployeesParams struct {
+	CompanyID *int64
+	AccountID *int64
+}
+
+func (q *Queries) CountAllEmployees(ctx context.Context, arg CountAllEmployeesParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countAllEmployees, arg.CompanyID, arg.AccountID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -551,11 +557,13 @@ WHERE (
         WHERE ec.employee_id = e.id AND ec.company_id = $1
     )
 )
-ORDER BY e.id LIMIT $3 OFFSET $2
+AND ($2::bigint IS NULL OR e.account_id = $2)
+ORDER BY e.id LIMIT $4 OFFSET $3
 `
 
 type ListAllEmployeesParams struct {
 	CompanyID *int64
+	AccountID *int64
 	Off       int32
 	Lim       int32
 }
@@ -569,8 +577,14 @@ type ListAllEmployeesParams struct {
 // membership row says; default_company_id only says where a session lands, and
 // an employee can belong to a company that is not their default. A null
 // argument means no filter, so one query serves both questions.
+// account_id narrows it to one client's people the same way; both filters combine.
 func (q *Queries) ListAllEmployees(ctx context.Context, arg ListAllEmployeesParams) ([]Employee, error) {
-	rows, err := q.db.Query(ctx, listAllEmployees, arg.CompanyID, arg.Off, arg.Lim)
+	rows, err := q.db.Query(ctx, listAllEmployees,
+		arg.CompanyID,
+		arg.AccountID,
+		arg.Off,
+		arg.Lim,
+	)
 	if err != nil {
 		return nil, err
 	}
