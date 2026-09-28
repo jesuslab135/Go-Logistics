@@ -38,30 +38,43 @@ type FuelLine struct {
 	Efficiency   *decimal.Decimal
 }
 
+// VolumeTotal is the volume of one fuel type in one unit, set against the
+// same fuel and unit a week earlier. Volumes in different units are never
+// added together.
+type VolumeTotal struct {
+	FuelType string
+	Unit     string
+	Change   Comparison
+}
+
 type FuelWeeklyReport struct {
 	Header
 	Lines     []FuelLine
 	Fills     int64
 	TotalCost decimal.Decimal
-	Volumes   []UnitTotal
+	Volumes   []VolumeTotal
 	Distances []UnitTotal
 	Cost      Comparison
-	Volume    Comparison
 }
 
 func (r FuelWeeklyReport) Empty() bool { return len(r.Lines) == 0 }
+
+// volumeKey groups a volume total by fuel type and unit. Litres of diesel and
+// litres of DEF are never summed together, and neither are litres and
+// gallons of the same fuel.
+type volumeKey struct{ fuelType, unit string }
 
 // BuildFuelWeekly turns the aggregated rows of a week, and of the week before
 // it, into the report.
 func BuildFuelWeekly(h Header, current, previous []FuelRow) FuelWeeklyReport {
 	r := FuelWeeklyReport{Header: h, Lines: make([]FuelLine, 0, len(current))}
 
-	volumes := map[[2]string]decimal.Decimal{}
+	curVolumes := map[volumeKey]decimal.Decimal{}
+	prevVolumes := map[volumeKey]decimal.Decimal{}
 	// An asset that burns two fuels (diesel and DEF) has two rows covering the
 	// same road, so its distance is the longest of them, not their sum.
 	distances := map[int64]decimal.Decimal{}
 	units := map[int64]string{}
-	rawVolume := decimal.Zero
 
 	for _, row := range current {
 		line := FuelLine{
@@ -87,21 +100,38 @@ func BuildFuelWeekly(h Header, current, previous []FuelRow) FuelWeeklyReport {
 
 		r.Fills += row.Fills
 		r.TotalCost = r.TotalCost.Add(row.Cost)
-		rawVolume = rawVolume.Add(row.Volume)
-		key := [2]string{row.FuelType, row.VolumeUnit}
-		volumes[key] = volumes[key].Add(row.Volume)
+		key := volumeKey{row.FuelType, row.VolumeUnit}
+		curVolumes[key] = curVolumes[key].Add(row.Volume)
 		if d, seen := distances[row.AssetID]; !seen || row.Distance.GreaterThan(d) {
 			distances[row.AssetID] = row.Distance
 		}
 		units[row.AssetID] = row.MeterUnit
 	}
 
-	for key, amount := range volumes {
-		r.Volumes = append(r.Volumes, UnitTotal{Label: key[0], Unit: key[1], Amount: amount})
+	prevCost := decimal.Zero
+	for _, row := range previous {
+		prevCost = prevCost.Add(row.Cost)
+		key := volumeKey{row.FuelType, row.VolumeUnit}
+		prevVolumes[key] = prevVolumes[key].Add(row.Volume)
+	}
+
+	keys := make(map[volumeKey]bool, len(curVolumes)+len(prevVolumes))
+	for k := range curVolumes {
+		keys[k] = true
+	}
+	for k := range prevVolumes {
+		keys[k] = true
+	}
+	for k := range keys {
+		r.Volumes = append(r.Volumes, VolumeTotal{
+			FuelType: k.fuelType,
+			Unit:     k.unit,
+			Change:   Compare(curVolumes[k], prevVolumes[k]),
+		})
 	}
 	sort.Slice(r.Volumes, func(i, j int) bool {
-		if r.Volumes[i].Label != r.Volumes[j].Label {
-			return r.Volumes[i].Label < r.Volumes[j].Label
+		if r.Volumes[i].FuelType != r.Volumes[j].FuelType {
+			return r.Volumes[i].FuelType < r.Volumes[j].FuelType
 		}
 		return r.Volumes[i].Unit < r.Volumes[j].Unit
 	})
@@ -115,12 +145,6 @@ func BuildFuelWeekly(h Header, current, previous []FuelRow) FuelWeeklyReport {
 	}
 	sort.Slice(r.Distances, func(i, j int) bool { return r.Distances[i].Unit < r.Distances[j].Unit })
 
-	prevCost, prevVolume := decimal.Zero, decimal.Zero
-	for _, row := range previous {
-		prevCost = prevCost.Add(row.Cost)
-		prevVolume = prevVolume.Add(row.Volume)
-	}
 	r.Cost = Compare(r.TotalCost, prevCost)
-	r.Volume = Compare(rawVolume, prevVolume)
 	return r
 }

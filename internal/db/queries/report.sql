@@ -53,8 +53,10 @@ ORDER BY cost DESC, a.name, fe.fuel_type;
 -- describe the same job, and counting both would double its cost; the service
 -- entry is the one counted.
 --
--- completed_at is optional on both tables. A job finished without one is dated
--- by the moment it was recorded, so that it is reported late rather than never.
+-- completed_at is optional on both tables. A service entry without one is
+-- dated by when it was recorded (created_at). A work order without one is
+-- dated by issued_at, not updated_at: updated_at moves on every edit, and a
+-- job dated by it could land in two different monthly reports.
 --
 -- The total honours a manual override, as effectiveTotal does in money.go.
 WITH job AS (
@@ -78,8 +80,8 @@ WITH job AS (
     JOIN work_order_status ws ON ws.id = wo.status_id
     WHERE wo.company_id = sqlc.arg(company_id)
       AND ws.marks_as_completed
-      AND COALESCE(wo.completed_at, wo.updated_at) >= sqlc.arg(period_start)::timestamptz
-      AND COALESCE(wo.completed_at, wo.updated_at) <  sqlc.arg(period_end)::timestamptz
+      AND COALESCE(wo.completed_at, wo.issued_at) >= sqlc.arg(period_start)::timestamptz
+      AND COALESCE(wo.completed_at, wo.issued_at) <  sqlc.arg(period_end)::timestamptz
       AND NOT EXISTS (SELECT 1 FROM service_entry linked WHERE linked.work_order_id = wo.id)
 )
 SELECT
@@ -132,6 +134,10 @@ WHERE id = sqlc.arg(id) AND company_id = sqlc.arg(company_id);
 -- A row can be taken over in three cases: it failed and has attempts left; it
 -- has been running for longer than any run takes, so its owner died; or the
 -- caller forces a re-send.
+--
+-- attempts is returned so a later FinishReportRun can prove it is still the
+-- owner: a takeover bumps attempts, so a stalled earlier owner finishing late
+-- carries a value that no longer matches.
 INSERT INTO report_run (company_id, report_kind, period_start, status, attempts, started_at)
 VALUES (sqlc.arg(company_id), sqlc.arg(report_kind), sqlc.arg(period_start), 'running', 1, now())
 ON CONFLICT ON CONSTRAINT uq_report_run_company_kind_period DO UPDATE
@@ -147,15 +153,19 @@ WHERE sqlc.arg(force)::boolean
    OR (report_run.status = 'running'
        AND report_run.attempts < sqlc.arg(max_attempts)::integer
        AND report_run.started_at < now() - make_interval(mins => sqlc.arg(stale_minutes)::integer))
-RETURNING id;
+RETURNING id, attempts;
 
--- name: FinishReportRun :exec
+-- name: FinishReportRun :execrows
+-- The attempts predicate is the ownership check: it matches only the run
+-- this caller itself claimed. A stalled earlier owner, or one whose claim was
+-- taken over by a stale or forced re-claim, finishes with an attempts value
+-- that no longer matches the row and affects no rows.
 UPDATE report_run
 SET status      = sqlc.arg(status),
     error       = sqlc.narg(error),
     recipients  = sqlc.arg(recipients),
     finished_at = now()
-WHERE id = sqlc.arg(id);
+WHERE id = sqlc.arg(id) AND attempts = sqlc.arg(attempts);
 
 -- name: ListReportRuns :many
 SELECT * FROM report_run

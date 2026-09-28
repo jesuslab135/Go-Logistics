@@ -28,7 +28,7 @@ WHERE $4::boolean
    OR (report_run.status = 'running'
        AND report_run.attempts < $5::integer
        AND report_run.started_at < now() - make_interval(mins => $6::integer))
-RETURNING id
+RETURNING id, attempts
 `
 
 type ClaimReportRunParams struct {
@@ -38,6 +38,11 @@ type ClaimReportRunParams struct {
 	Force        bool
 	MaxAttempts  int32
 	StaleMinutes int32
+}
+
+type ClaimReportRunRow struct {
+	ID       int64
+	Attempts int32
 }
 
 // Takes ownership of one company's report for one period, or returns no row
@@ -50,7 +55,11 @@ type ClaimReportRunParams struct {
 // A row can be taken over in three cases: it failed and has attempts left; it
 // has been running for longer than any run takes, so its owner died; or the
 // caller forces a re-send.
-func (q *Queries) ClaimReportRun(ctx context.Context, arg ClaimReportRunParams) (int64, error) {
+//
+// attempts is returned so a later FinishReportRun can prove it is still the
+// owner: a takeover bumps attempts, so a stalled earlier owner finishing late
+// carries a value that no longer matches.
+func (q *Queries) ClaimReportRun(ctx context.Context, arg ClaimReportRunParams) (ClaimReportRunRow, error) {
 	row := q.db.QueryRow(ctx, claimReportRun,
 		arg.CompanyID,
 		arg.ReportKind,
@@ -59,9 +68,9 @@ func (q *Queries) ClaimReportRun(ctx context.Context, arg ClaimReportRunParams) 
 		arg.MaxAttempts,
 		arg.StaleMinutes,
 	)
-	var id int64
-	err := row.Scan(&id)
-	return id, err
+	var i ClaimReportRunRow
+	err := row.Scan(&i.ID, &i.Attempts)
+	return i, err
 }
 
 const countReportRuns = `-- name: CountReportRuns :one
@@ -122,13 +131,13 @@ func (q *Queries) DeleteReportRecipient(ctx context.Context, arg DeleteReportRec
 	return result.RowsAffected(), nil
 }
 
-const finishReportRun = `-- name: FinishReportRun :exec
+const finishReportRun = `-- name: FinishReportRun :execrows
 UPDATE report_run
 SET status      = $1,
     error       = $2,
     recipients  = $3,
     finished_at = now()
-WHERE id = $4
+WHERE id = $4 AND attempts = $5
 `
 
 type FinishReportRunParams struct {
@@ -136,16 +145,25 @@ type FinishReportRunParams struct {
 	Error      *string
 	Recipients int32
 	ID         int64
+	Attempts   int32
 }
 
-func (q *Queries) FinishReportRun(ctx context.Context, arg FinishReportRunParams) error {
-	_, err := q.db.Exec(ctx, finishReportRun,
+// The attempts predicate is the ownership check: it matches only the run
+// this caller itself claimed. A stalled earlier owner, or one whose claim was
+// taken over by a stale or forced re-claim, finishes with an attempts value
+// that no longer matches the row and affects no rows.
+func (q *Queries) FinishReportRun(ctx context.Context, arg FinishReportRunParams) (int64, error) {
+	result, err := q.db.Exec(ctx, finishReportRun,
 		arg.Status,
 		arg.Error,
 		arg.Recipients,
 		arg.ID,
+		arg.Attempts,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const getReportCompany = `-- name: GetReportCompany :one
@@ -445,8 +463,8 @@ WITH job AS (
     JOIN work_order_status ws ON ws.id = wo.status_id
     WHERE wo.company_id = $1
       AND ws.marks_as_completed
-      AND COALESCE(wo.completed_at, wo.updated_at) >= $2::timestamptz
-      AND COALESCE(wo.completed_at, wo.updated_at) <  $3::timestamptz
+      AND COALESCE(wo.completed_at, wo.issued_at) >= $2::timestamptz
+      AND COALESCE(wo.completed_at, wo.issued_at) <  $3::timestamptz
       AND NOT EXISTS (SELECT 1 FROM service_entry linked WHERE linked.work_order_id = wo.id)
 )
 SELECT
@@ -489,8 +507,10 @@ type ReportMaintenanceByAssetRow struct {
 // describe the same job, and counting both would double its cost; the service
 // entry is the one counted.
 //
-// completed_at is optional on both tables. A job finished without one is dated
-// by the moment it was recorded, so that it is reported late rather than never.
+// completed_at is optional on both tables. A service entry without one is
+// dated by when it was recorded (created_at). A work order without one is
+// dated by issued_at, not updated_at: updated_at moves on every edit, and a
+// job dated by it could land in two different monthly reports.
 //
 // The total honours a manual override, as effectiveTotal does in money.go.
 func (q *Queries) ReportMaintenanceByAsset(ctx context.Context, arg ReportMaintenanceByAssetParams) ([]ReportMaintenanceByAssetRow, error) {

@@ -47,7 +47,6 @@ func Compare(current, previous decimal.Decimal) Comparison {
 // UnitTotal is a quantity summed over the rows that share a unit. Units are
 // set per asset, so a company total is only meaningful unit by unit.
 type UnitTotal struct {
-	Label  string
 	Unit   string
 	Amount decimal.Decimal
 }

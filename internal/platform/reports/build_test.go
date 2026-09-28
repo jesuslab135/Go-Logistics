@@ -45,7 +45,11 @@ func TestBuildFuelWeekly(t *testing.T) {
 		{AssetID: 2, AssetName: "Unidad 9", MeterUnit: "mi", VolumeUnit: "gallons", FuelType: "diesel",
 			Fills: 1, Volume: dec("50"), Cost: dec("2100"), Distance: decimal.Zero},
 	}
-	previous := []FuelRow{{AssetID: 1, Volume: dec("400"), Cost: dec("8000")}}
+	previous := []FuelRow{
+		{FuelType: "diesel", VolumeUnit: "liters", Volume: dec("400"), Cost: dec("8000")},
+		// Bought only the week before: must still show up, at zero this week.
+		{FuelType: "cng", VolumeUnit: "liters", Volume: dec("60"), Cost: dec("500")},
+	}
 
 	r := BuildFuelWeekly(Header{Kind: FuelWeekly}, current, previous)
 
@@ -65,12 +69,41 @@ func TestBuildFuelWeekly(t *testing.T) {
 		t.Fatal("a row with no derivable interval must have no efficiency")
 	}
 
-	if len(r.Volumes) != 3 {
-		t.Fatalf("volume totals = %+v, want one per fuel type and unit", r.Volumes)
+	// One entry per (fuel type, unit) seen in either week: cng/liters,
+	// def/liters, diesel/gallons, diesel/liters, sorted by fuel type then unit.
+	if len(r.Volumes) != 4 {
+		t.Fatalf("volume totals = %+v, want 4", r.Volumes)
 	}
-	if got := r.Volumes[0]; got.Label != "def" || got.Unit != "liters" || !got.Amount.Equal(dec("20")) {
-		t.Fatalf("first volume total = %+v", got)
+
+	cng := r.Volumes[0]
+	if cng.FuelType != "cng" || cng.Unit != "liters" {
+		t.Fatalf("first volume total = %+v, want cng/liters", cng)
 	}
+	assertDec(t, "cng current", cng.Change.Current, "0")
+	assertDec(t, "cng previous", cng.Change.Previous, "60")
+
+	def := r.Volumes[1]
+	if def.FuelType != "def" || def.Unit != "liters" {
+		t.Fatalf("second volume total = %+v, want def/liters", def)
+	}
+	assertDec(t, "def current", def.Change.Current, "20")
+	assertDec(t, "def previous", def.Change.Previous, "0")
+
+	dieselGallons := r.Volumes[2]
+	if dieselGallons.FuelType != "diesel" || dieselGallons.Unit != "gallons" {
+		t.Fatalf("third volume total = %+v, want diesel/gallons", dieselGallons)
+	}
+	assertDec(t, "diesel gallons current", dieselGallons.Change.Current, "50")
+	assertDec(t, "diesel gallons previous", dieselGallons.Change.Previous, "0")
+
+	// Litres and gallons of diesel are never added together.
+	dieselLiters := r.Volumes[3]
+	if dieselLiters.FuelType != "diesel" || dieselLiters.Unit != "liters" {
+		t.Fatalf("fourth volume total = %+v, want diesel/liters", dieselLiters)
+	}
+	assertDec(t, "diesel liters current", dieselLiters.Change.Current, "300")
+	assertDec(t, "diesel liters previous", dieselLiters.Change.Previous, "400")
+	assertDec(t, "diesel liters difference", dieselLiters.Change.Difference, "-100")
 
 	if len(r.Distances) != 2 {
 		t.Fatalf("distance totals = %+v, want km and mi", r.Distances)
@@ -80,9 +113,9 @@ func TestBuildFuelWeekly(t *testing.T) {
 		t.Fatalf("km total = %+v, want 900", got)
 	}
 
-	assertDec(t, "cost difference", r.Cost.Difference, "2000")
-	assertDec(t, "cost percent", *r.Cost.Percent, "25")
-	assertDec(t, "volume previous", r.Volume.Previous, "400")
+	// Previous week's cost is 8000 (diesel) + 500 (cng) = 8500.
+	assertDec(t, "cost difference", r.Cost.Difference, "1500")
+	assertDec(t, "cost percent", *r.Cost.Percent, "17.6")
 }
 
 func TestBuildFuelWeeklyEmpty(t *testing.T) {

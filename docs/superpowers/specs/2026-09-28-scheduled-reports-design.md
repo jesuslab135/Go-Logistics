@@ -203,7 +203,7 @@ All entries count, including those flagged `personal`.
 
 Sources, both filtered by `company_id` and by the completion date within the
 period. `completed_at` is optional on both tables; a job without one is dated
-by `updated_at` (work order) or `created_at` (service entry), so that it is
+by `issued_at` (work order) or `created_at` (service entry), so that it is
 reported late rather than never:
 
 - `service_entry` with `status = 'COMPLETED'`;

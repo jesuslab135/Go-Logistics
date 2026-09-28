@@ -179,8 +179,11 @@ func (f reportFixture) workOrder(t *testing.T, asset, status int64, completedAt 
 	var out struct {
 		ID int64 `json:"id"`
 	}
+	// Noon UTC on 2026-08-15 is 06:00 in Mexico City: solidly inside August
+	// there, unlike a UTC midnight boundary which can fall on the wrong side
+	// of the local date.
 	postJSON(t, f.srv+"/api/v1/work-orders", f.token, map[string]any{
-		"asset_id": asset, "status_id": status, "issued_at": time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC),
+		"asset_id": asset, "status_id": status, "issued_at": time.Date(2026, 8, 15, 12, 0, 0, 0, time.UTC),
 		"completed_at": completedAt, "number": fmt.Sprintf("WO-%d", time.Now().UnixNano()),
 	}, http.StatusCreated, &out)
 	// The API computes money from line items; the report reads the stored
@@ -249,27 +252,139 @@ func TestReportMaintenanceQuery(t *testing.T) {
 	}
 }
 
-// A completed job with no completed_at is dated by when it was recorded, so
-// it is reported rather than silently left out of every month.
+// A completed job with no completed_at is dated by a stable column instead,
+// so it is reported exactly once rather than never, or twice if that column
+// could drift. A work order falls back to issued_at (fixed at creation); a
+// service entry falls back to created_at (also fixed at creation, here pinned
+// explicitly so the test does not depend on when it runs).
 func TestReportMaintenanceCountsJobsWithoutACompletionDate(t *testing.T) {
 	f := newReportFixture(t)
+	ctx := context.Background()
 	asset := f.asset(t, f.token, "Unidad 7")
 	completed, _ := f.statuses(t)
 
+	// Dateless work order: falls back to issued_at, which the helper fixes at
+	// 2026-08-15, well inside August in Mexico City local time.
 	f.workOrder(t, asset, completed, nil, "100", "50", "150")
-	f.serviceEntry(t, asset, nil, nil, "200", "100", "300")
 
-	month := reports.MonthOf(time.Now(), f.loc)
-	rows, err := f.q.ReportMaintenanceByAsset(context.Background(), gen.ReportMaintenanceByAssetParams{
-		CompanyID: f.company, PeriodStart: month.Start, PeriodEnd: month.End,
+	// Dateless service entry: falls back to created_at. Pin it to October so
+	// it lands in a month of its own, distinct from the work order's August.
+	entry := f.serviceEntry(t, asset, nil, nil, "200", "100", "300")
+	f.exec(t, `UPDATE service_entry SET created_at = $2 WHERE id = $1`,
+		entry, time.Date(2026, 10, 15, 12, 0, 0, 0, time.UTC))
+
+	august := reports.MonthOf(time.Date(2026, 8, 15, 0, 0, 0, 0, f.loc), f.loc)
+	september := reports.MonthOf(time.Date(2026, 9, 15, 0, 0, 0, 0, f.loc), f.loc)
+	october := reports.MonthOf(time.Date(2026, 10, 15, 0, 0, 0, 0, f.loc), f.loc)
+
+	// Included: the work order belongs to August (its issued_at).
+	augRows, err := f.q.ReportMaintenanceByAsset(ctx, gen.ReportMaintenanceByAssetParams{
+		CompanyID: f.company, PeriodStart: august.Start, PeriodEnd: august.End,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(rows) != 1 || rows[0].Jobs != 2 {
-		t.Fatalf("rows = %+v, want one row with 2 jobs", rows)
+	if len(augRows) != 1 || augRows[0].Jobs != 1 {
+		t.Fatalf("august rows = %+v, want one row with 1 job (the work order)", augRows)
 	}
-	wantDec(t, "total", rows[0].Total, "450")
+	wantDec(t, "august total", augRows[0].Total, "150")
+
+	// Excluded: the work order must not also appear in September, which
+	// would happen if it were dated by a column that moves after creation.
+	sepRows, err := f.q.ReportMaintenanceByAsset(ctx, gen.ReportMaintenanceByAssetParams{
+		CompanyID: f.company, PeriodStart: september.Start, PeriodEnd: september.End,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sepRows) != 0 {
+		t.Fatalf("september rows = %+v, want none (the work order belongs to august only)", sepRows)
+	}
+
+	// Included: the service entry belongs to October (its pinned created_at).
+	octRows, err := f.q.ReportMaintenanceByAsset(ctx, gen.ReportMaintenanceByAssetParams{
+		CompanyID: f.company, PeriodStart: october.Start, PeriodEnd: october.End,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(octRows) != 1 || octRows[0].Jobs != 1 {
+		t.Fatalf("october rows = %+v, want one row with 1 job (the service entry)", octRows)
+	}
+	// Excluded: the service entry (300) must not also be folded into August's
+	// total (150) — the earlier august assertions already prove this, since
+	// augRows had exactly 1 job and a total of 150, not 2 jobs and 450.
+	wantDec(t, "october total", octRows[0].Total, "300")
+}
+
+// A stalled or superseded owner finishing late must not overwrite the result
+// of whoever holds the run now: FinishReportRun matches on attempts, which a
+// takeover always bumps, so a stale finish affects no row.
+func TestFinishReportRunOnlyAffectsTheCurrentOwner(t *testing.T) {
+	f := newReportFixture(t)
+	ctx := context.Background()
+	week := reports.WeekOf(time.Date(2026, 9, 23, 0, 0, 0, 0, f.loc), f.loc)
+
+	first, err := f.q.ClaimReportRun(ctx, gen.ClaimReportRunParams{
+		CompanyID: f.company, ReportKind: "fuel_weekly", PeriodStart: week.StartDate(),
+		MaxAttempts: 3, StaleMinutes: 30,
+	})
+	if err != nil {
+		t.Fatalf("first claim: %v", err)
+	}
+
+	// A forced takeover: the same row, attempts bumped.
+	second, err := f.q.ClaimReportRun(ctx, gen.ClaimReportRunParams{
+		CompanyID: f.company, ReportKind: "fuel_weekly", PeriodStart: week.StartDate(),
+		Force: true, MaxAttempts: 3, StaleMinutes: 30,
+	})
+	if err != nil {
+		t.Fatalf("second (forced) claim: %v", err)
+	}
+	if second.ID != first.ID {
+		t.Fatalf("second claim id = %d, want the same row %d", second.ID, first.ID)
+	}
+	if second.Attempts != first.Attempts+1 {
+		t.Fatalf("second claim attempts = %d, want %d", second.Attempts, first.Attempts+1)
+	}
+
+	// The stalled first owner finishes late, carrying the attempts value it
+	// claimed with. It must not touch the row the second owner now holds.
+	n, err := f.q.FinishReportRun(ctx, gen.FinishReportRunParams{
+		ID: first.ID, Attempts: first.Attempts, Status: "failed", Recipients: 0,
+	})
+	if err != nil {
+		t.Fatalf("finish (stale owner): %v", err)
+	}
+	if n != 0 {
+		t.Fatalf("stale finish affected %d rows, want 0", n)
+	}
+
+	var status string
+	if err := f.pool.QueryRow(ctx, `SELECT status FROM report_run WHERE id = $1`, first.ID).Scan(&status); err != nil {
+		t.Fatal(err)
+	}
+	if status != "running" {
+		t.Fatalf("status after the stale finish = %q, want running (unchanged)", status)
+	}
+
+	// The current owner finishes normally, with its own attempts value.
+	n, err = f.q.FinishReportRun(ctx, gen.FinishReportRunParams{
+		ID: second.ID, Attempts: second.Attempts, Status: "sent", Recipients: 2,
+	})
+	if err != nil {
+		t.Fatalf("finish (current owner): %v", err)
+	}
+	if n != 1 {
+		t.Fatalf("current-owner finish affected %d rows, want 1", n)
+	}
+
+	if err := f.pool.QueryRow(ctx, `SELECT status FROM report_run WHERE id = $1`, second.ID).Scan(&status); err != nil {
+		t.Fatal(err)
+	}
+	if status != "sent" {
+		t.Fatalf("status = %q, want sent", status)
+	}
 }
 
 // The claim alone, without the advisory lock in front of it.
