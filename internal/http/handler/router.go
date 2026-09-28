@@ -365,6 +365,7 @@ func NewRouter(d Deps) *gin.Engine {
 		warranties: warranties, mileageGoals: mileageGoals, employees: employees,
 	}, d)
 	registerExports(r, member)
+	registerReportRoutes(member, d)
 
 	return r
 }
@@ -517,4 +518,22 @@ func registerAccountEmployeeRoutes(api *gin.RouterGroup, d Deps) {
 	accountCompanies := NewAccountCompanyHandler(d.Queries)
 	accountOwner.GET("/account/companies", accountCompanies.List)
 	accountOwner.GET("/account/companies/:id/roles", accountCompanies.Roles)
+}
+
+// registerReportRoutes wires the scheduled reports: who receives them, what
+// the scheduler did, and the same PDFs on demand.
+//
+// RequireModule maps the HTTP method to the action, so listing and downloading
+// need reports/read, adding a recipient needs reports/create and removing one
+// needs reports/delete.
+func registerReportRoutes(member *gin.RouterGroup, d Deps) {
+	reports := member.Group("", middleware.RequireModule("reports"))
+	h := NewReportHandler(d.Queries, d.Storage, d.Logger)
+
+	reports.GET("/reports/recipients", h.ListRecipients)
+	reports.POST("/reports/recipients", h.CreateRecipient)
+	reports.DELETE("/reports/recipients/:id", h.DeleteRecipient)
+	reports.GET("/reports/runs", h.ListRuns)
+	reports.GET("/reports/fuel/weekly", h.FuelWeekly)
+	reports.GET("/reports/maintenance/monthly", h.MaintenanceMonthly)
 }

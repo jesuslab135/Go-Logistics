@@ -1812,6 +1812,19 @@ definitions:
       vendor_id:
         type: integer
     type: object
+  dto.CreateReportRecipientRequest:
+    properties:
+      email:
+        maxLength: 254
+        type: string
+      report_kind:
+        description: ReportKind is "fuel_weekly" or "maintenance_monthly".
+        maxLength: 30
+        type: string
+    required:
+    - email
+    - report_kind
+    type: object
   dto.CreateRoleRequest:
     properties:
       is_admin:
@@ -4084,6 +4097,53 @@ definitions:
         type: integer
     required:
     - company_ids
+    type: object
+  dto.ReportRecipientListResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.ReportRecipientResponse'
+        type: array
+    type: object
+  dto.ReportRecipientResponse:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: integer
+      is_active:
+        type: boolean
+      report_kind:
+        type: string
+    type: object
+  dto.ReportRunResponse:
+    properties:
+      attempts:
+        type: integer
+      error:
+        type: string
+      finished_at:
+        type: string
+      id:
+        type: integer
+      period_start:
+        description: |-
+          PeriodStart is the first day of the period, as YYYY-MM-DD in the
+          company's own timezone.
+        type: string
+      recipients:
+        type: integer
+      report_kind:
+        type: string
+      started_at:
+        type: string
+      status:
+        description: |-
+          Status is one of: running, sent, not_sent, skipped_empty,
+          skipped_no_recipients, failed.
+        type: string
     type: object
   dto.RolePage:
     properties:
@@ -7545,6 +7605,21 @@ definitions:
         type: number
       updated_at:
         type: string
+    type: object
+  paginate.Page-dto_ReportRunResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.ReportRunResponse'
+        type: array
+      has_next:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
     type: object
 info:
   contact: {}
@@ -14790,6 +14865,213 @@ paths:
       summary: Submit a purchase order for approval
       tags:
       - purchase-orders
+  /api/v1/reports/fuel/weekly:
+    get:
+      description: The same PDF the scheduler emails. week is any date inside the
+        week wanted, read in the company's timezone; without it, the last full week.
+        A week with no fuel entries still returns a PDF, which says so.
+      parameters:
+      - description: Any date in the week, YYYY-MM-DD
+        in: query
+        name: week
+        type: string
+      produces:
+      - application/pdf
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Download the weekly fuel report
+      tags:
+      - reports
+  /api/v1/reports/maintenance/monthly:
+    get:
+      description: The same PDF the scheduler emails. Without month, the last full
+        month. A month with no completed jobs still returns a PDF, which says so.
+      parameters:
+      - description: The month, YYYY-MM
+        in: query
+        name: month
+        type: string
+      produces:
+      - application/pdf
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Download the monthly maintenance cost report
+      tags:
+      - reports
+  /api/v1/reports/recipients:
+    get:
+      description: The addresses the active company's scheduled reports are emailed
+        to, optionally for one report.
+      parameters:
+      - description: fuel_weekly or maintenance_monthly
+        in: query
+        name: report_kind
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.ReportRecipientListResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List who receives the scheduled reports
+      tags:
+      - reports
+    post:
+      consumes:
+      - application/json
+      description: The address must be a bare email address. The same address cannot
+        be listed twice for one report; letter case is ignored.
+      parameters:
+      - description: body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateReportRecipientRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.ReportRecipientResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Add a report recipient
+      tags:
+      - reports
+  /api/v1/reports/recipients/{id}:
+    delete:
+      parameters:
+      - description: Recipient id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Remove a report recipient
+      tags:
+      - reports
+  /api/v1/reports/runs:
+    get:
+      description: 'What the scheduler did for the active company, newest first: sent,
+        skipped, or failed and why.'
+      parameters:
+      - description: Page size
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/paginate.Page-dto_ReportRunResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List the scheduled report runs
+      tags:
+      - reports
   /api/v1/roles:
     get:
       parameters:

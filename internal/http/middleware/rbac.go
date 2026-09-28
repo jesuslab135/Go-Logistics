@@ -84,6 +84,11 @@ var Modules = []string{
 	// which is a different privilege from adjusting stock, and a permission
 	// cannot be granted separately from a module it shares.
 	"purchase_orders",
+	// reports is not a Django module either. It gates the scheduled reports:
+	// who receives them, and downloading one on demand. It is its own module
+	// because a report reads across fuel, work orders and service at once, so
+	// no single one of those permissions describes it.
+	"reports",
 	"roles",
 	"service",
 	"tire_approvals",
