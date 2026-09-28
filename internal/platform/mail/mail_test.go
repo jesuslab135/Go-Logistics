@@ -18,6 +18,32 @@ import (
 
 var fixedNow = time.Date(2026, 9, 28, 12, 0, 0, 0, time.UTC)
 
+func TestRequiresTLS(t *testing.T) {
+	tests := []struct {
+		host string
+		want bool
+	}{
+		// Loopback addresses do not require TLS
+		{"localhost", false},
+		{"127.0.0.1", false},
+		{"127.5.6.7", false},
+		{"::1", false},
+		// Non-loopback addresses require TLS
+		{"smtp.ionos.mx", true},
+		{"10.0.0.5", true},
+		{"192.168.1.10", true},
+		{"mail.example.com", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.host, func(t *testing.T) {
+			got := requiresTLS(tt.host)
+			if got != tt.want {
+				t.Fatalf("requiresTLS(%q) = %v, want %v", tt.host, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestCleanAddress(t *testing.T) {
 	good := []string{"flota@empresa.mx", "  flota@empresa.mx  ", "a.b+c@sub.empresa.com.mx"}
 	for _, s := range good {

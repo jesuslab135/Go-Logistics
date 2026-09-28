@@ -177,6 +177,21 @@ func randomID() string {
 	return hex.EncodeToString(b)
 }
 
+// requiresTLS reports whether TLS is required for the given host. Loopback
+// addresses (localhost, 127.0.0.0/8, ::1) are allowed to send without TLS,
+// to support local relay servers and testing. All other addresses must use TLS
+// to protect fleet cost data in transit.
+func requiresTLS(host string) bool {
+	if host == "localhost" {
+		return false
+	}
+	ip := net.ParseIP(host)
+	if ip != nil && ip.IsLoopback() {
+		return false
+	}
+	return true
+}
+
 // SMTP is the Sender that talks to a real server.
 type SMTP struct {
 	cfg Config
@@ -224,6 +239,8 @@ func (s *SMTP) Send(ctx context.Context, m Message) error {
 			if err := client.StartTLS(tlsConfig); err != nil {
 				return fmt.Errorf("mail: starttls: %w", err)
 			}
+		} else if requiresTLS(s.cfg.Host) {
+			return fmt.Errorf("mail: %s does not offer STARTTLS; refusing to send in cleartext (use port 465 for implicit TLS)", s.cfg.Host)
 		}
 	}
 	if s.cfg.User != "" {
