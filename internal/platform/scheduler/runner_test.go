@@ -89,6 +89,13 @@ func (f *fakeStore) FinishReportRun(_ context.Context, arg gen.FinishReportRunPa
 	return 1, nil
 }
 
+// AbandonStaleReportRuns has nothing to do against the fake: unit tests here
+// never leave a run "running", and the behaviour itself is covered against a
+// real Postgres in report_scheduler_integration_test.go.
+func (f *fakeStore) AbandonStaleReportRuns(context.Context, gen.AbandonStaleReportRunsParams) (int64, error) {
+	return 0, nil
+}
+
 func (f *fakeStore) ReportFuelByAsset(_ context.Context, arg gen.ReportFuelByAssetParams) ([]gen.ReportFuelByAssetRow, error) {
 	if err := f.fuelErr[arg.CompanyID]; err != nil {
 		return nil, err

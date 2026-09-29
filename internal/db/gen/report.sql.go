@@ -12,6 +12,31 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+const abandonStaleReportRuns = `-- name: AbandonStaleReportRuns :execrows
+UPDATE report_run
+SET status = 'failed',
+    error = 'abandoned: the process stopped before the run finished',
+    finished_at = now()
+WHERE status = 'running'
+  AND attempts >= $1::integer
+  AND started_at < now() - make_interval(mins => $2::integer)
+`
+
+type AbandonStaleReportRunsParams struct {
+	MaxAttempts  int32
+	StaleMinutes int32
+}
+
+// A run whose process died on its last attempt can never be claimed again, so
+// it would read "running" forever. Close it as failed so the history says so.
+func (q *Queries) AbandonStaleReportRuns(ctx context.Context, arg AbandonStaleReportRunsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, abandonStaleReportRuns, arg.MaxAttempts, arg.StaleMinutes)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const claimReportRun = `-- name: ClaimReportRun :one
 INSERT INTO report_run (company_id, report_kind, period_start, status, attempts, started_at)
 VALUES ($1, $2, $3, 'running', 1, now())

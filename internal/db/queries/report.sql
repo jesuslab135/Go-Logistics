@@ -167,6 +167,17 @@ SET status      = sqlc.arg(status),
     finished_at = now()
 WHERE id = sqlc.arg(id) AND attempts = sqlc.arg(attempts);
 
+-- name: AbandonStaleReportRuns :execrows
+-- A run whose process died on its last attempt can never be claimed again, so
+-- it would read "running" forever. Close it as failed so the history says so.
+UPDATE report_run
+SET status = 'failed',
+    error = 'abandoned: the process stopped before the run finished',
+    finished_at = now()
+WHERE status = 'running'
+  AND attempts >= sqlc.arg(max_attempts)::integer
+  AND started_at < now() - make_interval(mins => sqlc.arg(stale_minutes)::integer);
+
 -- name: ListReportRuns :many
 SELECT * FROM report_run
 WHERE company_id = sqlc.arg(company_id)

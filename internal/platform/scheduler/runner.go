@@ -50,6 +50,7 @@ type Store interface {
 	ListActiveReportRecipientEmails(ctx context.Context, arg gen.ListActiveReportRecipientEmailsParams) ([]string, error)
 	ClaimReportRun(ctx context.Context, arg gen.ClaimReportRunParams) (gen.ClaimReportRunRow, error)
 	FinishReportRun(ctx context.Context, arg gen.FinishReportRunParams) (int64, error)
+	AbandonStaleReportRuns(ctx context.Context, arg gen.AbandonStaleReportRunsParams) (int64, error)
 }
 
 // LogoLoader returns a company's logo bytes, or nil when it has none or it
@@ -99,6 +100,19 @@ func (r *Runner) Tick(ctx context.Context) error {
 		return nil
 	}
 	defer release()
+
+	// A run whose process died on its last attempt would otherwise read
+	// "running" forever: it has no attempts left, so ClaimReportRun can never
+	// take it back over. Closing it here does not delay the tick's own work;
+	// an error here is logged and does not stop the tick.
+	if abandoned, err := r.d.Store.AbandonStaleReportRuns(ctx, gen.AbandonStaleReportRunsParams{
+		MaxAttempts:  maxAttempts,
+		StaleMinutes: staleMinutes,
+	}); err != nil {
+		r.d.Logger.Error("scheduler: abandon stale runs", "error", err)
+	} else if abandoned > 0 {
+		r.d.Logger.Warn("scheduler: abandoned stale runs stuck running past their last attempt", "count", abandoned)
+	}
 
 	companies, err := r.d.Store.ListReportCompanies(ctx)
 	if err != nil {

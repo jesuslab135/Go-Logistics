@@ -189,3 +189,53 @@ func TestInactiveAccountIsSkipped(t *testing.T) {
 		t.Fatal("a report was sent to a company of an inactive account")
 	}
 }
+
+// A run whose process died on its last attempt can never be reclaimed
+// (ClaimReportRun's own attempts < max_attempts predicate refuses it), so it
+// would read "running" forever. Once it is stale, the tick closes it as
+// failed instead, and sends nothing for it.
+func TestStaleRunOnItsLastAttemptIsAbandoned(t *testing.T) {
+	f := newReportFixture(t)
+	now := time.Date(2026, 9, 28, 7, 0, 0, 0, f.loc)
+	week := f.seedWeek(t, now)
+
+	f.exec(t, `INSERT INTO report_run (company_id, report_kind, period_start, status, attempts, started_at)
+	           VALUES ($1, 'fuel_weekly', $2, 'running', 3, now() - interval '31 minutes')`, f.company, week.StartDate())
+
+	sender := &countingMail{}
+	if err := f.runner(sender, now).Tick(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if sender.sent.Load() != 0 {
+		t.Fatal("a run on its last attempt was sent instead of abandoned")
+	}
+	run := f.run(t, reports.FuelWeekly, week)
+	if run.Status != "failed" {
+		t.Fatalf("status = %q, want failed", run.Status)
+	}
+	if run.Error == nil || *run.Error != "abandoned: the process stopped before the run finished" {
+		t.Fatalf("error = %v, want the abandoned message", run.Error)
+	}
+}
+
+// The same run, not yet stale, is left alone: its process may still be
+// working on it.
+func TestRunOnItsLastAttemptNotYetStaleStaysRunning(t *testing.T) {
+	f := newReportFixture(t)
+	now := time.Date(2026, 9, 28, 7, 0, 0, 0, f.loc)
+	week := f.seedWeek(t, now)
+
+	f.exec(t, `INSERT INTO report_run (company_id, report_kind, period_start, status, attempts, started_at)
+	           VALUES ($1, 'fuel_weekly', $2, 'running', 3, now() - interval '5 minutes')`, f.company, week.StartDate())
+
+	sender := &countingMail{}
+	if err := f.runner(sender, now).Tick(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if sender.sent.Load() != 0 {
+		t.Fatal("a run on its last attempt was sent")
+	}
+	if run := f.run(t, reports.FuelWeekly, week); run.Status != "running" {
+		t.Fatalf("status = %q, want it to stay running", run.Status)
+	}
+}
