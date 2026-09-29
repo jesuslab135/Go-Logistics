@@ -486,6 +486,10 @@ CLI run all find it there.
 | `skipped_no_recipients` | nobody is listed for this report |
 | `failed` | see `error`; retried on the next tick, three attempts in all |
 
+A run stuck `running` past its last attempt (its process died mid-run) is
+closed as `failed` with an "abandoned" `error` once it goes stale, so it is
+not left reading `running` forever.
+
 Endpoints, all behind the `reports` module (`read` to list and download,
 `create` and `delete` to change the recipients):
 
@@ -517,7 +521,9 @@ go run ./cmd/cli reports send --company 12 --report fuel_weekly
 go run ./cmd/cli reports send --company 12 --report fuel_weekly --period 2026-09-23 --force
 ```
 
-Without `--force` it refuses a period that was already handled.
+Without `--force` it refuses a period that was already handled. If object
+storage is unavailable, the CLI warns and sends the report without the
+company logo instead of refusing to send it.
 
 ### Integration tests
 
