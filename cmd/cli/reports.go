@@ -85,7 +85,12 @@ func reportsCmd(args []string) error {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	blobs, err := storage.FromEnv()
 	if err != nil {
-		return err
+		// A missing or misconfigured object store must not stop a report
+		// from being sent; it only means the company's logo is unavailable.
+		// NewLogoLoader treats a nil Storage the same as one that fails to
+		// read the logo: it returns nil and the report is built without it.
+		fmt.Fprintln(os.Stderr, "warning: storage unavailable, sending without the company logo:", err)
+		blobs = nil
 	}
 	var sender mail.Sender
 	if smtp := cfg.SMTP; smtp.Host != "" {
