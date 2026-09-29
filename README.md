@@ -37,7 +37,11 @@ internal/
     dto/          request/response types
     handler/      Store implementations, auth handler, uploads, router, doc stubs
     middleware/   request id, logging, recovery, CORS, JWT auth
-  platform/       apierr, paginate, filter, storage (local + minio), crud
+  platform/       apierr, paginate, filter, storage (local + minio), crud,
+                  mail (SMTP delivery with attachments, standard library only),
+                  pdf (renders the scheduled reports), reports (report periods
+                  and arithmetic), scheduler (in-process ticker: claims,
+                  delivers and records report runs)
 ```
 
 ---
@@ -456,6 +460,65 @@ curl -OJ "http://localhost:8080/api/v1/work-orders/export?format=csv" -H "Author
   (`internal/http/handler/bulk_registry.go`). **Exportable:** every list in
   `exportPaths`.
 
+### Scheduled reports
+
+Two reports are built on a clock and emailed as PDF to the tenant company:
+
+| Report | Kind | Due | Covers |
+|---|---|---|---|
+| Weekly fuel | `fuel_weekly` | Monday 06:00 | the week before, Monday to Sunday |
+| Monthly maintenance costs | `maintenance_monthly` | the 1st, 06:00 | the month before |
+
+"06:00" is in the company's own `timezone`. The scheduler is a ticker inside
+the API process (`REPORTS_ENABLED=true`); there is no separate worker. Every 15
+minutes it asks, for each company, which period is due and whether it was
+already handled. An API that was down at 06:00 sends when it comes back.
+
+`report_run` holds one row per company, report and period, and that row is what
+guarantees a report is sent once: a restart, a second container and a manual
+CLI run all find it there.
+
+| Status | Meaning |
+|---|---|
+| `sent` | accepted by the mail server |
+| `not_sent` | built, but no `SMTP_HOST` is configured |
+| `skipped_empty` | the period has no data; nothing is emailed |
+| `skipped_no_recipients` | nobody is listed for this report |
+| `failed` | see `error`; retried on the next tick, three attempts in all |
+
+Endpoints, all behind the `reports` module (`read` to list and download,
+`create` and `delete` to change the recipients):
+
+| Method and path | |
+|---|---|
+| `GET /api/v1/reports/recipients?report_kind=` | who receives what |
+| `POST /api/v1/reports/recipients` | `{"report_kind": "fuel_weekly", "email": "flota@empresa.mx"}` |
+| `DELETE /api/v1/reports/recipients/{id}` | |
+| `GET /api/v1/reports/runs` | what the scheduler did, newest first |
+| `GET /api/v1/reports/fuel/weekly?week=2026-09-23` | the PDF; `week` is any date in the week |
+| `GET /api/v1/reports/maintenance/monthly?month=2026-08` | the PDF |
+
+A download never writes `report_run`.
+
+What the maintenance report counts as a job: a completed service entry, or a
+completed work order that no service entry points at. A service entry linked
+to a work order is the same job, so only the service entry is counted. The
+total is the manual override where one was set. A completed job with no
+`completed_at` is dated by the work order's `issued_at` or the service entry's
+`created_at` instead.
+
+The fuel PDF compares cost in total, but compares volume per fuel type and
+unit: litres and gallons, diesel and DEF, are never added together.
+
+To send one report by hand, for instance after configuring a mailbox:
+
+```sh
+go run ./cmd/cli reports send --company 12 --report fuel_weekly
+go run ./cmd/cli reports send --company 12 --report fuel_weekly --period 2026-09-23 --force
+```
+
+Without `--force` it refuses a period that was already handled.
+
 ### Integration tests
 
 `go test ./...` never touches Postgres — every defect the onboarding flow
@@ -695,6 +758,13 @@ environment: `DATABASE_URL`, `JWT_SECRET`. Storage is chosen by `STORAGE_BACKEND
 | `IMPORT_MAX_BYTES` | `10485760` | Largest spreadsheet an import accepts |
 | `IMPORT_MAX_ROWS` | `5000` | Most data rows per import |
 | `EXPORT_MAX_ROWS` | `5000` | Most rows per export; `X-Export-Truncated: true` beyond. Keep it at or below `IMPORT_MAX_ROWS` so an export can be imported back |
+| `REPORTS_ENABLED` | `false` | Starts the report scheduler inside the API process |
+| `REPORTS_TICK` | `*/15 * * * *` | Cron expression of the job that looks for due reports |
+| `REPORTS_SEND_HOUR` | `6` | Local hour, in each company's timezone, at which a finished period becomes due |
+| `SMTP_HOST` | empty | Mail server. Empty: reports are built and recorded as `not_sent` |
+| `SMTP_PORT` | `587` | `465` uses implicit TLS; any other port must offer STARTTLS or sending fails (a server on localhost excepted) |
+| `SMTP_USER`, `SMTP_PASSWORD` | empty | Credentials; sent only over TLS |
+| `SMTP_FROM` | empty | Sender address. Required when `SMTP_HOST` is set |
 
 `DATABASE_URL` carries `pool_max_conns=20`, which caps the pgx connection pool.
 Keep it set, and keep the value identical in `.env.example`,
