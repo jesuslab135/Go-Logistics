@@ -41,11 +41,9 @@ func TestReportsFromEnv(t *testing.T) {
 	t.Setenv("REPORTS_ENABLED", "true")
 	t.Setenv("REPORTS_TICK", "@hourly")
 	t.Setenv("REPORTS_SEND_HOUR", "8")
-	t.Setenv("SMTP_HOST", " smtp.ionos.mx ")
+	t.Setenv("SMTP_HOST", " mail.example.test ")
 	t.Setenv("SMTP_PORT", "465")
-	t.Setenv("SMTP_USER", "reportes@empresa.mx")
-	t.Setenv("SMTP_PASSWORD", "s3cret")
-	t.Setenv("SMTP_FROM", "reportes@empresa.mx")
+	t.Setenv("SMTP_FROM", "reportes@example.test")
 
 	cfg, err := Load()
 	if err != nil {
@@ -54,7 +52,7 @@ func TestReportsFromEnv(t *testing.T) {
 	if !cfg.Reports.Enabled || cfg.Reports.Tick != "@hourly" || cfg.Reports.SendHour != 8 {
 		t.Errorf("reports = %+v", cfg.Reports)
 	}
-	if cfg.SMTP.Host != "smtp.ionos.mx" || cfg.SMTP.Port != 465 || cfg.SMTP.From != "reportes@empresa.mx" {
+	if cfg.SMTP.Host != "mail.example.test" || cfg.SMTP.Port != 465 || cfg.SMTP.From != "reportes@example.test" {
 		t.Errorf("smtp = %+v", cfg.SMTP)
 	}
 }
@@ -65,7 +63,7 @@ func TestReportsConfigIsValidated(t *testing.T) {
 		env  map[string]string
 		want string
 	}{
-		{"a mail server with no sender", map[string]string{"SMTP_HOST": "smtp.ionos.mx"}, "SMTP_FROM"},
+		{"a mail server with no sender", map[string]string{"SMTP_HOST": "mail.example.test"}, "SMTP_FROM"},
 		{"port out of range", map[string]string{"SMTP_PORT": "70000"}, "SMTP_PORT"},
 		{"port zero", map[string]string{"SMTP_PORT": "0"}, "SMTP_PORT"},
 		{"hour 24", map[string]string{"REPORTS_SEND_HOUR": "24"}, "REPORTS_SEND_HOUR"},
