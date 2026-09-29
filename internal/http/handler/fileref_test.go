@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"context"
 	"testing"
 
 	"fleet/internal/platform/storage"
@@ -46,7 +45,7 @@ func TestFileReadURLPassesThroughWhatItDoesNotOwn(t *testing.T) {
 	files := storage.NewLocal(t.TempDir(), "/media")
 
 	const foreign = "https://example.com/somebody-elses.png"
-	url, expiresAt := fileReadURL(context.Background(), files, foreign)
+	url, expiresAt := fileReadURL(tenantCtx(1), files, foreign)
 	if url != foreign {
 		t.Errorf("fileReadURL = %q, want the value passed through unchanged", url)
 	}
@@ -61,7 +60,7 @@ func TestFileReadURLPassesThroughWhatItDoesNotOwn(t *testing.T) {
 func TestFileReadURLLocalNeverExpires(t *testing.T) {
 	files := storage.NewLocal(t.TempDir(), "/media")
 
-	url, expiresAt := fileReadURL(context.Background(), files, "uploads/private/1/receipt.png")
+	url, expiresAt := fileReadURL(tenantCtx(1), files, "uploads/private/1/receipt.png")
 	if url != "/media/uploads/private/1/receipt.png" {
 		t.Errorf("fileReadURL = %q, want the local URL for the key", url)
 	}
@@ -73,7 +72,7 @@ func TestFileReadURLLocalNeverExpires(t *testing.T) {
 func TestFileReadURLPtrHandlesNull(t *testing.T) {
 	files := storage.NewLocal(t.TempDir(), "/media")
 
-	url, expiresAt := fileReadURLPtr(context.Background(), files, nil)
+	url, expiresAt := fileReadURLPtr(tenantCtx(1), files, nil)
 	if url != nil || expiresAt != nil {
 		t.Errorf("fileReadURLPtr(nil) = (%v, %v), want (nil, nil)", url, expiresAt)
 	}

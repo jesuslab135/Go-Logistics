@@ -147,7 +147,7 @@ func (s *WorkOrderStore) Create(ctx context.Context, in dto.CreateWorkOrderReque
 	}
 	// A new order has no lines, so this stores zeros — but it stores computed
 	// zeros rather than whatever the request happened to send.
-	if err := recalcWorkOrder(ctx, qtx, r.ID, now); err != nil {
+	if err := recalcWorkOrder(ctx, qtx, r.ID, middleware.CompanyFromContext(ctx), now); err != nil {
 		return dto.WorkOrderResponse{}, err
 	}
 	r, err = qtx.GetWorkOrder(ctx, gen.GetWorkOrderParams{ID: r.ID, CompanyID: company})
@@ -247,7 +247,7 @@ func (s *WorkOrderStore) Update(ctx context.Context, id int64, in dto.UpdateWork
 	}
 	// This write can change the markup, discount and tax terms, so the totals
 	// are recomputed from them and re-read.
-	if err := recalcWorkOrder(ctx, qtx, id, now); err != nil {
+	if err := recalcWorkOrder(ctx, qtx, id, middleware.CompanyFromContext(ctx), now); err != nil {
 		return dto.WorkOrderResponse{}, err
 	}
 	r, err = qtx.GetWorkOrder(ctx, gen.GetWorkOrderParams{ID: id, CompanyID: company})

@@ -5,6 +5,9 @@ import (
 	"errors"
 	"net/http"
 	"slices"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -50,10 +53,24 @@ type AuthHandler struct {
 	tokens   *auth.TokenService
 	verifier CredentialVerifier
 	q        *gen.Queries
+	// attempts bounds failed logins per account, which the per-IP limit on the
+	// route cannot do. An office behind one NAT address shares an IP, so the
+	// route limit has to stay loose enough not to lock them all out at 09:00 —
+	// and a distributed attacker has many addresses but still only one target
+	// account. Keyed on the submitted email, which is why it lives here rather
+	// than in middleware: this is the first point the body has been parsed.
+	attempts *middleware.Limiter
 }
 
 func NewAuthHandler(tokens *auth.TokenService, verifier CredentialVerifier, q *gen.Queries) *AuthHandler {
-	return &AuthHandler{tokens: tokens, verifier: verifier, q: q}
+	return &AuthHandler{
+		tokens:   tokens,
+		verifier: verifier,
+		q:        q,
+		// Ten failures per account per fifteen minutes: far above what a person
+		// mistyping a password reaches, far below what guessing needs.
+		attempts: middleware.NewLimiter(10, 15*time.Minute),
+	}
 }
 
 // Login godoc
@@ -77,6 +94,18 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	var req dto.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		apierr.Abort(c, apierr.BadRequest("invalid request body").Wrap(err))
+		return
+	}
+
+	// Budget is spent before the password is checked, not charged after a
+	// failure: verifying first and charging later would let an attacker run the
+	// bcrypt compare — the expensive half, and the whole point of a slow hash —
+	// at full rate regardless of the outcome.
+	attemptKey := "login:" + strings.ToLower(strings.TrimSpace(req.Email))
+	if ok, retryAfter := h.attempts.Allow(attemptKey); !ok {
+		c.Header("Retry-After", strconv.Itoa(int(retryAfter.Seconds())+1))
+		apierr.Abort(c, apierr.New(http.StatusTooManyRequests, "too_many_attempts",
+			"too many sign-in attempts for this account; retry shortly"))
 		return
 	}
 

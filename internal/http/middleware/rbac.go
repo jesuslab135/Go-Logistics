@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -83,6 +84,11 @@ var Modules = []string{
 	// which is a different privilege from adjusting stock, and a permission
 	// cannot be granted separately from a module it shares.
 	"purchase_orders",
+	// reports is not a Django module either. It gates the scheduled reports:
+	// who receives them, and downloading one on demand. It is its own module
+	// because a report reads across fuel, work orders and service at once, so
+	// no single one of those permissions describes it.
+	"reports",
 	"roles",
 	"service",
 	"tire_approvals",
@@ -293,6 +299,14 @@ func DecodePermissions(raw []byte) map[string]ModulePermissions {
 		return out
 	}
 	for module, body := range modules {
+		// An explicit null is not an empty object. Unmarshalling null into a
+		// map succeeds and yields a nil map, which is also len 0 — so without
+		// this, `{"assets": null}` would take the {} path and grant the whole
+		// module. Only {} means "everything here"; null means the client named
+		// the module and selected nothing in it, which denies.
+		if bytes.Equal(bytes.TrimSpace(body), []byte("null")) {
+			continue
+		}
 		var actions map[string]bool
 		if err := json.Unmarshal(body, &actions); err != nil {
 			continue

@@ -11092,6 +11092,325 @@
                 }
             }
         },
+        "/api/v1/reports/fuel/weekly": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "The same PDF the scheduler emails. week is any date inside the week wanted, read in the company's timezone; without it, the last full week. A week with no fuel entries still returns a PDF, which says so.",
+                "produces": [
+                    "application/pdf"
+                ],
+                "tags": [
+                    "reports"
+                ],
+                "summary": "Download the weekly fuel report",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Any date in the week, YYYY-MM-DD",
+                        "name": "week",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/reports/maintenance/monthly": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "The same PDF the scheduler emails. Without month, the last full month. A month with no completed jobs still returns a PDF, which says so.",
+                "produces": [
+                    "application/pdf"
+                ],
+                "tags": [
+                    "reports"
+                ],
+                "summary": "Download the monthly maintenance cost report",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "The month, YYYY-MM",
+                        "name": "month",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/reports/recipients": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "The addresses the active company's scheduled reports are emailed to, optionally for one report.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "reports"
+                ],
+                "summary": "List who receives the scheduled reports",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "fuel_weekly or maintenance_monthly",
+                        "name": "report_kind",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ReportRecipientListResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "The address must be a bare email address. The same address cannot be listed twice for one report; letter case is ignored.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "reports"
+                ],
+                "summary": "Add a report recipient",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.CreateReportRecipientRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ReportRecipientResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/reports/recipients/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "reports"
+                ],
+                "summary": "Remove a report recipient",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Recipient id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/reports/runs": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "What the scheduler did for the active company, newest first: sent, skipped, or failed and why.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "reports"
+                ],
+                "summary": "List the scheduled report runs",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page size",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Offset",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/paginate.Page-dto_ReportRunResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/roles": {
             "get": {
                 "security": [
@@ -20464,6 +20783,24 @@
                 }
             }
         },
+        "dto.CreateReportRecipientRequest": {
+            "type": "object",
+            "required": [
+                "email",
+                "report_kind"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string",
+                    "maxLength": 254
+                },
+                "report_kind": {
+                    "description": "ReportKind is \"fuel_weekly\" or \"maintenance_monthly\".",
+                    "type": "string",
+                    "maxLength": 30
+                }
+            }
+        },
         "dto.CreateRoleRequest": {
             "type": "object",
             "properties": {
@@ -23736,6 +24073,71 @@
                 }
             }
         },
+        "dto.ReportRecipientListResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.ReportRecipientResponse"
+                    }
+                }
+            }
+        },
+        "dto.ReportRecipientResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "report_kind": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.ReportRunResponse": {
+            "type": "object",
+            "properties": {
+                "attempts": {
+                    "type": "integer"
+                },
+                "error": {
+                    "type": "string"
+                },
+                "finished_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "period_start": {
+                    "description": "PeriodStart is the first day of the period, as YYYY-MM-DD in the\ncompany's own timezone.",
+                    "type": "string"
+                },
+                "recipients": {
+                    "type": "integer"
+                },
+                "report_kind": {
+                    "type": "string"
+                },
+                "started_at": {
+                    "type": "string"
+                },
+                "status": {
+                    "description": "Status is one of: running, sent, not_sent, skipped_empty,\nskipped_no_recipients, failed.",
+                    "type": "string"
+                }
+            }
+        },
         "dto.RolePage": {
             "type": "object",
             "properties": {
@@ -26422,9 +26824,6 @@
         "dto.UpdateTireAssignmentRequestRequest": {
             "type": "object",
             "properties": {
-                "approved_by_id": {
-                    "type": "integer"
-                },
                 "notes": {
                     "type": "string"
                 },
@@ -26433,6 +26832,7 @@
                     "maxLength": 10
                 },
                 "rejection_reason": {
+                    "description": "state, resolved_at and approved_by_id are response-only. They are moved\nby POST /tire-assignment-requests/{id}/approve, which is gated on\ntire_approvals/approve and is the only thing that can check the request\nis still PENDING and stamp who resolved it. Carrying them here would be\na way around that gate: a PUT could forge an approval and attribute it\nto another employee.\n\nrejection_reason stays editable. No reject action exists yet, so nothing\nelse can write it, and on its own it is a free-text note with no\nprivilege meaning once state is out of reach.",
                     "type": "string"
                 },
                 "requested_at": {
@@ -26440,13 +26840,6 @@
                 },
                 "requested_by_id": {
                     "type": "integer"
-                },
-                "resolved_at": {
-                    "type": "string"
-                },
-                "state": {
-                    "type": "string",
-                    "maxLength": 10
                 },
                 "tire_id": {
                     "type": "integer"
@@ -28660,6 +29053,29 @@
                 },
                 "updated_at": {
                     "type": "string"
+                }
+            }
+        },
+        "paginate.Page-dto_ReportRunResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.ReportRunResponse"
+                    }
+                },
+                "has_next": {
+                    "type": "boolean"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
                 }
             }
         }

@@ -24,6 +24,6 @@ FROM purchase_order p
 WHERE c.id = sqlc.arg(id) AND c.purchase_order_id = sqlc.arg(parent_id) AND p.company_id = sqlc.arg(company_id) AND p.id = c.purchase_order_id
 RETURNING c.*;
 
--- name: DeletePurchaseOrderLineItem :exec
+-- name: DeletePurchaseOrderLineItem :execrows
 DELETE FROM purchase_order_line_item AS c USING purchase_order p
 WHERE c.id = sqlc.arg(id) AND c.purchase_order_id = sqlc.arg(parent_id) AND p.company_id = sqlc.arg(company_id) AND p.id = c.purchase_order_id;

@@ -259,3 +259,34 @@ func TestIdentityCanAction(t *testing.T) {
 		})
 	}
 }
+
+// An explicit null is a client saying "nothing is selected for this module".
+// It must not take the {} path, which grants the module in full: that inverts
+// the caller's intent, and a permissions form that serialises an empty
+// selection as null would silently hand out everything it meant to withhold.
+func TestDecodePermissionsNullDeniesTheModule(t *testing.T) {
+	tests := []struct {
+		name     string
+		doc      string
+		wantAll  bool
+		wantRead bool
+	}{
+		{"empty object grants the module", `{"assets":{}}`, true, true},
+		{"null denies the module", `{"assets":null}`, false, false},
+		{"explicit action", `{"assets":{"read":true}}`, false, true},
+		{"explicit false", `{"assets":{"read":false}}`, false, false},
+		{"malformed value denies", `{"assets":[1,2]}`, false, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			perms := DecodePermissions([]byte(tt.doc))
+			if got := perms["assets"].All; got != tt.wantAll {
+				t.Errorf("All = %v, want %v", got, tt.wantAll)
+			}
+			id := Identity{IsActive: true, HasRole: true, Permissions: perms}
+			if got := id.CanAction("assets", "read"); got != tt.wantRead {
+				t.Errorf("CanAction(assets, read) = %v, want %v", got, tt.wantRead)
+			}
+		})
+	}
+}

@@ -24,6 +24,6 @@ FROM service_entry p
 WHERE c.id = sqlc.arg(id) AND c.service_entry_id = sqlc.arg(parent_id) AND p.company_id = sqlc.arg(company_id) AND p.id = c.service_entry_id
 RETURNING c.*;
 
--- name: DeleteServiceEntryLineItem :exec
+-- name: DeleteServiceEntryLineItem :execrows
 DELETE FROM service_entry_line_item AS c USING service_entry p
 WHERE c.id = sqlc.arg(id) AND c.service_entry_id = sqlc.arg(parent_id) AND p.company_id = sqlc.arg(company_id) AND p.id = c.service_entry_id;

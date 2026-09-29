@@ -3,8 +3,11 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
+
+	"fleet/internal/platform/mail"
 )
 
 type Config struct {
@@ -14,6 +17,8 @@ type Config struct {
 	CORSOrigins []string
 	Swagger     bool
 	JWT         JWTConfig
+	SMTP        SMTPConfig
+	Reports     ReportsConfig
 }
 
 type JWTConfig struct {
@@ -21,6 +26,29 @@ type JWTConfig struct {
 	Issuer     string
 	AccessTTL  time.Duration
 	RefreshTTL time.Duration
+}
+
+// SMTPConfig is the mail server the scheduled reports are sent through. An
+// empty Host means none is configured: reports are still built, and their runs
+// recorded as not sent.
+type SMTPConfig struct {
+	Host     string
+	Port     int
+	User     string
+	Password string
+	From     string
+}
+
+// ReportsConfig drives the in-process scheduler.
+type ReportsConfig struct {
+	// Enabled starts the scheduler. It defaults to off so that a development
+	// or QA process pointed at real data does not email anyone by accident.
+	Enabled bool
+	// Tick is the cron expression of the single job that looks for due reports.
+	Tick string
+	// SendHour is the local hour, in each company's own timezone, at which a
+	// finished period becomes due.
+	SendHour int
 }
 
 // Load reads configuration from the environment. DATABASE_URL and JWT_SECRET are
@@ -37,6 +65,18 @@ func Load() (Config, error) {
 			AccessTTL:  envDuration("JWT_ACCESS_TTL", time.Hour),
 			RefreshTTL: envDuration("JWT_REFRESH_TTL", 7*24*time.Hour),
 		},
+		SMTP: SMTPConfig{
+			Host:     strings.TrimSpace(os.Getenv("SMTP_HOST")),
+			Port:     envInt("SMTP_PORT", 587),
+			User:     os.Getenv("SMTP_USER"),
+			Password: os.Getenv("SMTP_PASSWORD"),
+			From:     strings.TrimSpace(os.Getenv("SMTP_FROM")),
+		},
+		Reports: ReportsConfig{
+			Enabled:  envBool("REPORTS_ENABLED", false),
+			Tick:     env("REPORTS_TICK", "*/15 * * * *"),
+			SendHour: envInt("REPORTS_SEND_HOUR", 6),
+		},
 	}
 
 	// Serving the docs publishes the entire API surface, so production defaults
@@ -50,6 +90,23 @@ func Load() (Config, error) {
 	}
 	if cfg.JWT.Secret == "" {
 		return Config{}, fmt.Errorf("config: JWT_SECRET is required")
+	}
+	if cfg.SMTP.Host != "" && cfg.SMTP.From == "" {
+		return Config{}, fmt.Errorf("config: SMTP_FROM is required when SMTP_HOST is set")
+	}
+	// A malformed SMTP_FROM would otherwise reach mail.Build on the first
+	// tick and fail every company's report there, not at startup where a
+	// misconfiguration belongs.
+	if cfg.SMTP.From != "" {
+		if _, err := mail.CleanAddress(cfg.SMTP.From); err != nil {
+			return Config{}, fmt.Errorf("config: SMTP_FROM must be a single bare email address")
+		}
+	}
+	if cfg.SMTP.Port < 1 || cfg.SMTP.Port > 65535 {
+		return Config{}, fmt.Errorf("config: SMTP_PORT must be between 1 and 65535")
+	}
+	if cfg.Reports.SendHour < 0 || cfg.Reports.SendHour > 23 {
+		return Config{}, fmt.Errorf("config: REPORTS_SEND_HOUR must be between 0 and 23")
 	}
 	return cfg, nil
 }
@@ -80,6 +137,17 @@ func envDuration(key string, fallback time.Duration) time.Duration {
 	if v, ok := os.LookupEnv(key); ok {
 		if d, err := time.ParseDuration(v); err == nil {
 			return d
+		}
+	}
+	return fallback
+}
+
+// envInt falls back on anything that is not a whole number, as envBool and
+// envDuration do for their types.
+func envInt(key string, fallback int) int {
+	if v, ok := os.LookupEnv(key); ok {
+		if n, err := strconv.Atoi(strings.TrimSpace(v)); err == nil {
+			return n
 		}
 	}
 	return fallback

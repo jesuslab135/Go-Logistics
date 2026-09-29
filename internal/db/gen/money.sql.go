@@ -15,42 +15,62 @@ import (
 const clearPurchaseOrderTotalOverride = `-- name: ClearPurchaseOrderTotalOverride :exec
 UPDATE purchase_order SET
     total_override = NULL, total_override_reason = '', total_override_by_id = NULL, total_override_at = NULL
-WHERE id = $1 AND total_override IS NOT NULL
+WHERE id = $1 AND company_id = $2 AND total_override IS NOT NULL
 `
 
-func (q *Queries) ClearPurchaseOrderTotalOverride(ctx context.Context, id int64) error {
-	_, err := q.db.Exec(ctx, clearPurchaseOrderTotalOverride, id)
+type ClearPurchaseOrderTotalOverrideParams struct {
+	ID        int64
+	CompanyID int64
+}
+
+func (q *Queries) ClearPurchaseOrderTotalOverride(ctx context.Context, arg ClearPurchaseOrderTotalOverrideParams) error {
+	_, err := q.db.Exec(ctx, clearPurchaseOrderTotalOverride, arg.ID, arg.CompanyID)
 	return err
 }
 
 const clearServiceEntryTotalOverride = `-- name: ClearServiceEntryTotalOverride :exec
 UPDATE service_entry SET
     total_override = NULL, total_override_reason = '', total_override_by_id = NULL, total_override_at = NULL
-WHERE id = $1 AND total_override IS NOT NULL
+WHERE id = $1 AND company_id = $2 AND total_override IS NOT NULL
 `
 
-func (q *Queries) ClearServiceEntryTotalOverride(ctx context.Context, id int64) error {
-	_, err := q.db.Exec(ctx, clearServiceEntryTotalOverride, id)
+type ClearServiceEntryTotalOverrideParams struct {
+	ID        int64
+	CompanyID int64
+}
+
+func (q *Queries) ClearServiceEntryTotalOverride(ctx context.Context, arg ClearServiceEntryTotalOverrideParams) error {
+	_, err := q.db.Exec(ctx, clearServiceEntryTotalOverride, arg.ID, arg.CompanyID)
 	return err
 }
 
 const clearWorkOrderTotalOverride = `-- name: ClearWorkOrderTotalOverride :exec
 UPDATE work_order SET
     total_override = NULL, total_override_reason = '', total_override_by_id = NULL, total_override_at = NULL
-WHERE id = $1 AND total_override IS NOT NULL
+WHERE id = $1 AND company_id = $2 AND total_override IS NOT NULL
 `
 
-func (q *Queries) ClearWorkOrderTotalOverride(ctx context.Context, id int64) error {
-	_, err := q.db.Exec(ctx, clearWorkOrderTotalOverride, id)
+type ClearWorkOrderTotalOverrideParams struct {
+	ID        int64
+	CompanyID int64
+}
+
+func (q *Queries) ClearWorkOrderTotalOverride(ctx context.Context, arg ClearWorkOrderTotalOverrideParams) error {
+	_, err := q.db.Exec(ctx, clearWorkOrderTotalOverride, arg.ID, arg.CompanyID)
 	return err
 }
 
 const getPurchaseOrderByID = `-- name: GetPurchaseOrderByID :one
-SELECT id, company_id, number, description, state, vendor_id, destination_id, discount_type, discount, discount_percentage, tax_1_type, tax_1, tax_1_percentage, tax_2_type, tax_2, tax_2_percentage, shipping, subtotal, total_amount, created_by_id, submitted_at, submitted_by_id, rejected_at, rejected_by_id, approved_at, approved_by_id, purchased_at, received_partial_at, received_full_at, closed_at, labels, custom_fields, created_at, updated_at, rejection_reason, total_override, total_override_reason, total_override_by_id, total_override_at FROM purchase_order WHERE id = $1
+SELECT id, company_id, number, description, state, vendor_id, destination_id, discount_type, discount, discount_percentage, tax_1_type, tax_1, tax_1_percentage, tax_2_type, tax_2, tax_2_percentage, shipping, subtotal, total_amount, created_by_id, submitted_at, submitted_by_id, rejected_at, rejected_by_id, approved_at, approved_by_id, purchased_at, received_partial_at, received_full_at, closed_at, labels, custom_fields, created_at, updated_at, rejection_reason, total_override, total_override_reason, total_override_by_id, total_override_at FROM purchase_order WHERE id = $1 AND company_id = $2
 `
 
-func (q *Queries) GetPurchaseOrderByID(ctx context.Context, id int64) (PurchaseOrder, error) {
-	row := q.db.QueryRow(ctx, getPurchaseOrderByID, id)
+type GetPurchaseOrderByIDParams struct {
+	ID        int64
+	CompanyID int64
+}
+
+func (q *Queries) GetPurchaseOrderByID(ctx context.Context, arg GetPurchaseOrderByIDParams) (PurchaseOrder, error) {
+	row := q.db.QueryRow(ctx, getPurchaseOrderByID, arg.ID, arg.CompanyID)
 	var i PurchaseOrder
 	err := row.Scan(
 		&i.ID,
@@ -108,11 +128,16 @@ func (q *Queries) GetPurchaseOrderIDForLineItem(ctx context.Context, id int64) (
 }
 
 const getServiceEntryByID = `-- name: GetServiceEntryByID :one
-SELECT id, company_id, reference, status, asset_id, vendor_id, work_order_id, started_at, completed_at, meter_value, parts_subtotal, labor_subtotal, subtotal, discount, discount_type, tax_1, tax_1_type, tax_1_percentage, tax_2, tax_2_type, tax_2_percentage, total_amount, general_notes, is_roadside_assistance, labor_time_seconds, labels, custom_fields, created_at, updated_at, discount_percentage, total_override, total_override_reason, total_override_by_id, total_override_at FROM service_entry WHERE id = $1
+SELECT id, company_id, reference, status, asset_id, vendor_id, work_order_id, started_at, completed_at, meter_value, parts_subtotal, labor_subtotal, subtotal, discount, discount_type, tax_1, tax_1_type, tax_1_percentage, tax_2, tax_2_type, tax_2_percentage, total_amount, general_notes, is_roadside_assistance, labor_time_seconds, labels, custom_fields, created_at, updated_at, discount_percentage, total_override, total_override_reason, total_override_by_id, total_override_at FROM service_entry WHERE id = $1 AND company_id = $2
 `
 
-func (q *Queries) GetServiceEntryByID(ctx context.Context, id int64) (ServiceEntry, error) {
-	row := q.db.QueryRow(ctx, getServiceEntryByID, id)
+type GetServiceEntryByIDParams struct {
+	ID        int64
+	CompanyID int64
+}
+
+func (q *Queries) GetServiceEntryByID(ctx context.Context, arg GetServiceEntryByIDParams) (ServiceEntry, error) {
+	row := q.db.QueryRow(ctx, getServiceEntryByID, arg.ID, arg.CompanyID)
 	var i ServiceEntry
 	err := row.Scan(
 		&i.ID,
@@ -166,15 +191,28 @@ func (q *Queries) GetServiceEntryIDForLineItem(ctx context.Context, id int64) (i
 
 const getWorkOrderByID = `-- name: GetWorkOrderByID :one
 
-SELECT id, location_id, company_id, number, description, asset_id, status_id, vendor_id, assigned_to_id, issued_by_id, fault_id, issued_at, scheduled_at, started_at, expected_completed_at, completed_at, starting_meter, ending_meter, duration_seconds, labor_time_seconds, parts_markup_type, parts_markup, parts_markup_percentage, labor_markup_type, labor_markup, labor_markup_percentage, parts_subtotal, labor_subtotal, subtotal, discount, discount_type, tax_1, tax_1_type, tax_1_percentage, tax_2, tax_2_type, tax_2_percentage, total_amount, invoice_number, purchase_order_number, comments_count, images_count, documents_count, labels, custom_fields, created_at, updated_at, discount_percentage, total_override, total_override_reason, total_override_by_id, total_override_at FROM work_order WHERE id = $1
+SELECT id, location_id, company_id, number, description, asset_id, status_id, vendor_id, assigned_to_id, issued_by_id, fault_id, issued_at, scheduled_at, started_at, expected_completed_at, completed_at, starting_meter, ending_meter, duration_seconds, labor_time_seconds, parts_markup_type, parts_markup, parts_markup_percentage, labor_markup_type, labor_markup, labor_markup_percentage, parts_subtotal, labor_subtotal, subtotal, discount, discount_type, tax_1, tax_1_type, tax_1_percentage, tax_2, tax_2_type, tax_2_percentage, total_amount, invoice_number, purchase_order_number, comments_count, images_count, documents_count, labels, custom_fields, created_at, updated_at, discount_percentage, total_override, total_override_reason, total_override_by_id, total_override_at FROM work_order WHERE id = $1 AND company_id = $2
 `
 
-// Unscoped single-document reads for the recompute. The company scope is
-// already established by the write that triggered it — a recompute reached
-// through a line item the caller was allowed to write must not fail because the
-// recompute itself forgot to carry the tenant.
-func (q *Queries) GetWorkOrderByID(ctx context.Context, id int64) (WorkOrder, error) {
-	row := q.db.QueryRow(ctx, getWorkOrderByID, id)
+type GetWorkOrderByIDParams struct {
+	ID        int64
+	CompanyID int64
+}
+
+// Single-document reads for the recompute, scoped to the tenant like every
+// other read in this file.
+//
+// These were deliberately unscoped once, on the argument that the write which
+// triggered the recompute had already established the company. That invariant
+// was invisible, unenforced, and was in fact violated: the nested line-item
+// deletes were :exec, so a delete matching no rows still recomputed the
+// caller-supplied parent id — another tenant's document, whose totals were
+// rewritten and whose audited override was cleared.
+//
+// The tenant is carried explicitly now, so the guarantee no longer depends on
+// every present and future caller remembering to establish it first.
+func (q *Queries) GetWorkOrderByID(ctx context.Context, arg GetWorkOrderByIDParams) (WorkOrder, error) {
+	row := q.db.QueryRow(ctx, getWorkOrderByID, arg.ID, arg.CompanyID)
 	var i WorkOrder
 	err := row.Scan(
 		&i.ID,
@@ -508,7 +546,7 @@ UPDATE purchase_order SET
     subtotal     = $1,
     total_amount = $2,
     updated_at   = $3
-WHERE id = $4
+WHERE id = $4 AND company_id = $5
 `
 
 type StorePurchaseOrderTotalsParams struct {
@@ -516,6 +554,7 @@ type StorePurchaseOrderTotalsParams struct {
 	TotalAmount decimal.Decimal
 	UpdatedAt   time.Time
 	ID          int64
+	CompanyID   int64
 }
 
 func (q *Queries) StorePurchaseOrderTotals(ctx context.Context, arg StorePurchaseOrderTotalsParams) error {
@@ -524,6 +563,7 @@ func (q *Queries) StorePurchaseOrderTotals(ctx context.Context, arg StorePurchas
 		arg.TotalAmount,
 		arg.UpdatedAt,
 		arg.ID,
+		arg.CompanyID,
 	)
 	return err
 }
@@ -551,7 +591,7 @@ UPDATE service_entry SET
     subtotal       = $3,
     total_amount   = $4,
     updated_at     = $5
-WHERE id = $6
+WHERE id = $6 AND company_id = $7
 `
 
 type StoreServiceEntryTotalsParams struct {
@@ -561,6 +601,7 @@ type StoreServiceEntryTotalsParams struct {
 	TotalAmount   decimal.Decimal
 	UpdatedAt     time.Time
 	ID            int64
+	CompanyID     int64
 }
 
 func (q *Queries) StoreServiceEntryTotals(ctx context.Context, arg StoreServiceEntryTotalsParams) error {
@@ -571,6 +612,7 @@ func (q *Queries) StoreServiceEntryTotals(ctx context.Context, arg StoreServiceE
 		arg.TotalAmount,
 		arg.UpdatedAt,
 		arg.ID,
+		arg.CompanyID,
 	)
 	return err
 }
@@ -608,7 +650,7 @@ UPDATE work_order SET
     subtotal       = $3,
     total_amount   = $4,
     updated_at     = $5
-WHERE id = $6
+WHERE id = $6 AND company_id = $7
 `
 
 type StoreWorkOrderTotalsParams struct {
@@ -618,6 +660,7 @@ type StoreWorkOrderTotalsParams struct {
 	TotalAmount   decimal.Decimal
 	UpdatedAt     time.Time
 	ID            int64
+	CompanyID     int64
 }
 
 func (q *Queries) StoreWorkOrderTotals(ctx context.Context, arg StoreWorkOrderTotalsParams) error {
@@ -628,6 +671,7 @@ func (q *Queries) StoreWorkOrderTotals(ctx context.Context, arg StoreWorkOrderTo
 		arg.TotalAmount,
 		arg.UpdatedAt,
 		arg.ID,
+		arg.CompanyID,
 	)
 	return err
 }

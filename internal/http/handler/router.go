@@ -86,16 +86,44 @@ func NewRouter(d Deps) *gin.Engine {
 		r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	}
 
+	// Rate limits, in two layers with different jobs.
+	//
+	// This one is per client address, and bounds the flood: /auth is
+	// unauthenticated and every attempt costs a bcrypt compare, so the request
+	// rate is a CPU cost regardless of whether any password is guessed. It is
+	// deliberately not tight enough to be the brute-force defence, because a
+	// whole office behind one NAT address shares this key and must not lock
+	// itself out at 09:00.
+	//
+	// Guessing a particular account is bounded per account instead, in
+	// AuthHandler.Login, which is the first place the email has been parsed.
+	//
+	// Both are per-replica, so the effective limit scales with replica count;
+	// nginx carries a coarser one at the edge for traffic that should never
+	// reach Go at all. See internal/http/middleware/ratelimit.go.
+	authLimiter := middleware.NewLimiter(120, time.Minute)
+	apiLimiter := middleware.NewLimiter(600, time.Minute)
+	authLimiter.StartReaper(5 * time.Minute)
+	apiLimiter.StartReaper(5 * time.Minute)
+	limitAuth := middleware.RateLimit(authLimiter, middleware.ByIP)
+
 	authH := NewAuthHandler(d.Tokens, d.Verifier, d.Queries)
-	r.POST("/auth/login", authH.Login)
-	r.POST("/auth/refresh", authH.Refresh)
-	r.POST("/auth/logout", authH.Logout)
+	r.POST("/auth/login", limitAuth, authH.Login)
+	r.POST("/auth/refresh", limitAuth, authH.Refresh)
+	r.POST("/auth/logout", limitAuth, authH.Logout)
 	// Switching tenants needs a valid access token but deliberately no company
 	// gate — the caller is leaving the company the token is scoped to.
-	r.POST("/auth/switch-company", middleware.Auth(d.Tokens), authH.SwitchCompany)
+	r.POST("/auth/switch-company", limitAuth, middleware.Auth(d.Tokens), authH.SwitchCompany)
 
 	api := r.Group("/api/v1")
-	api.Use(middleware.Auth(d.Tokens), middleware.RequireIdentity(NewIdentityLoader(d.Queries)))
+	// The API limit is keyed on the employee, so one account cannot spend the
+	// whole budget from many addresses. It sits after Auth for that reason:
+	// ByEmployee needs the claims, and falls back to the address without them.
+	api.Use(
+		middleware.Auth(d.Tokens),
+		middleware.RateLimit(apiLimiter, middleware.ByEmployee),
+		middleware.RequireIdentity(NewIdentityLoader(d.Queries)),
+	)
 
 	// Authorization mirrors api/permissions.py: every resource requires company
 	// membership, and most additionally require the caller's role to grant the
@@ -199,8 +227,12 @@ func NewRouter(d Deps) *gin.Engine {
 	crud.NewHandler[dto.TireModelResponse, dto.CreateTireModelRequest, dto.UpdateTireModelRequest](NewTireModelStore(d.Queries)).Register(tires, "/tire-models")
 	crud.NewHandler[dto.AxleTemplateResponse, dto.CreateAxleTemplateRequest, dto.UpdateAxleTemplateRequest](NewAxleTemplateStore(d.Queries)).Register(tires, "/axle-templates")
 	// Django's TireAssignmentRequestViewSet required membership only; its
-	// approve/reject actions carried the extra warehouse-role check.
-	registerCrudWithList(member, "/tire-assignment-requests",
+	// approve/reject actions carried the extra warehouse-role check. Gated on
+	// the tires module here rather than left on the bare member group: a
+	// request to move a tire is a tire write, and an ungated CRUD route beside
+	// a permission-gated approve action is an invitation to reach the second
+	// through the first.
+	registerCrudWithList(tires, "/tire-assignment-requests",
 		crud.NewHandler[dto.TireAssignmentRequestResponse, dto.CreateTireAssignmentRequestRequest, dto.UpdateTireAssignmentRequestRequest](NewTireAssignmentRequestStore(d.Queries, d.Pool)), lists.TireAssignmentRequests)
 	// Approving is the warehouse's act, not an ordinary write: Django gated it
 	// on tire_approvals/approve, which admins bypass.
@@ -333,6 +365,7 @@ func NewRouter(d Deps) *gin.Engine {
 		warranties: warranties, mileageGoals: mileageGoals, employees: employees,
 	}, d)
 	registerExports(r, member)
+	registerReportRoutes(member, d)
 
 	return r
 }
@@ -485,4 +518,22 @@ func registerAccountEmployeeRoutes(api *gin.RouterGroup, d Deps) {
 	accountCompanies := NewAccountCompanyHandler(d.Queries)
 	accountOwner.GET("/account/companies", accountCompanies.List)
 	accountOwner.GET("/account/companies/:id/roles", accountCompanies.Roles)
+}
+
+// registerReportRoutes wires the scheduled reports: who receives them, what
+// the scheduler did, and the same PDFs on demand.
+//
+// RequireModule maps the HTTP method to the action, so listing and downloading
+// need reports/read, adding a recipient needs reports/create and removing one
+// needs reports/delete.
+func registerReportRoutes(member *gin.RouterGroup, d Deps) {
+	reports := member.Group("", middleware.RequireModule("reports"))
+	h := NewReportHandler(d.Queries, d.Storage, d.Logger)
+
+	reports.GET("/reports/recipients", h.ListRecipients)
+	reports.POST("/reports/recipients", h.CreateRecipient)
+	reports.DELETE("/reports/recipients/:id", h.DeleteRecipient)
+	reports.GET("/reports/runs", h.ListRuns)
+	reports.GET("/reports/fuel/weekly", h.FuelWeekly)
+	reports.GET("/reports/maintenance/monthly", h.MaintenanceMonthly)
 }

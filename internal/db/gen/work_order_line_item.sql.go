@@ -85,7 +85,7 @@ func (q *Queries) CreateWorkOrderLineItem(ctx context.Context, arg CreateWorkOrd
 	return i, err
 }
 
-const deleteWorkOrderLineItem = `-- name: DeleteWorkOrderLineItem :exec
+const deleteWorkOrderLineItem = `-- name: DeleteWorkOrderLineItem :execrows
 DELETE FROM work_order_line_item AS c USING work_order p
 WHERE c.id = $1 AND c.work_order_id = $2 AND p.company_id = $3 AND p.id = c.work_order_id
 `
@@ -96,9 +96,12 @@ type DeleteWorkOrderLineItemParams struct {
 	CompanyID int64
 }
 
-func (q *Queries) DeleteWorkOrderLineItem(ctx context.Context, arg DeleteWorkOrderLineItemParams) error {
-	_, err := q.db.Exec(ctx, deleteWorkOrderLineItem, arg.ID, arg.ParentID, arg.CompanyID)
-	return err
+func (q *Queries) DeleteWorkOrderLineItem(ctx context.Context, arg DeleteWorkOrderLineItemParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteWorkOrderLineItem, arg.ID, arg.ParentID, arg.CompanyID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const getWorkOrderLineItem = `-- name: GetWorkOrderLineItem :one

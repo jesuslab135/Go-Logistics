@@ -131,6 +131,24 @@ type adjustment struct {
 // order matters: the lock is taken before the quantity is read, so the
 // previous/current pair the entry records is the pair this transaction actually
 // saw.
+// checkStockFloor refuses an adjustment that would take available stock below
+// zero. The query behind it is `available_quantity = available_quantity + $1`
+// with no floor of its own, so without this a single adjustment of -1000
+// against a stock of 5 commits -995 — and every downstream reader (valuation,
+// reorder points, the low-stock dashboard) then reports on a count that cannot
+// physically exist.
+//
+// The caller already holds the row lock when this runs, so the value checked is
+// the value that will be written.
+func checkStockFloor(available, adjustment decimal.Decimal) error {
+	if available.Add(adjustment).Sign() < 0 {
+		return apierr.Validation(map[string]string{
+			"adjustment_quantity": "would take available stock below zero",
+		})
+	}
+	return nil
+}
+
 func applyAdjustment(ctx context.Context, qtx *gen.Queries, a adjustment) (gen.InventoryJournalEntry, error) {
 	stock, err := qtx.LockPartInventory(ctx, gen.LockPartInventoryParams{
 		ID:        a.partLocationDetailID,
@@ -148,6 +166,10 @@ func applyAdjustment(ctx context.Context, qtx *gen.Queries, a adjustment) (gen.I
 		return gen.InventoryJournalEntry{}, apierr.Validation(map[string]string{
 			"part_id": "does not match the part this stock record belongs to",
 		})
+	}
+
+	if err := checkStockFloor(stock.AvailableQuantity, a.quantity); err != nil {
+		return gen.InventoryJournalEntry{}, err
 	}
 
 	now := time.Now().UTC()
