@@ -1,6 +1,7 @@
 package scheduler
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -409,5 +410,85 @@ func TestStopCancelsATickThatOverstays(t *testing.T) {
 	case <-done:
 	case <-time.After(5 * time.Second):
 		t.Fatal("stop did not return")
+	}
+}
+
+// newCapturingLogger is a *slog.Logger whose text-formatted records land in
+// buf, so a test can assert on what was logged.
+func newCapturingLogger() (*slog.Logger, *bytes.Buffer) {
+	var buf bytes.Buffer
+	return slog.New(slog.NewTextHandler(&buf, nil)), &buf
+}
+
+// A panic inside a tick must be logged, not silently discarded: cron.Recover
+// was wired with cron.DiscardLogger, which threw the stack trace away.
+//
+// robfig/cron clamps "@every" below one second up to one second, so the
+// schedule and the wait below are both in whole seconds.
+func TestPanicInATickIsLogged(t *testing.T) {
+	logger, buf := newCapturingLogger()
+
+	stop, err := start(func(context.Context) error {
+		panic("boom")
+	}, "@every 1s", logger, time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(1200 * time.Millisecond)
+	stop()
+
+	if !strings.Contains(buf.String(), "boom") {
+		t.Fatalf("the panic was not logged: %s", buf.String())
+	}
+}
+
+// A tick skipped because the previous one is still running must be logged,
+// not silently discarded: cron.SkipIfStillRunning was wired with
+// cron.DiscardLogger too.
+func TestSkippedTickIsLogged(t *testing.T) {
+	logger, buf := newCapturingLogger()
+	release := make(chan struct{})
+
+	stop, err := start(func(context.Context) error {
+		<-release
+		return nil
+	}, "@every 1s", logger, 3*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The first tick starts around 1s in and blocks on release; the second,
+	// due around 2s, finds it still running and is skipped.
+	time.Sleep(2200 * time.Millisecond)
+	close(release)
+	stop()
+
+	if !strings.Contains(buf.String(), "skip") {
+		t.Fatalf("the skipped tick was not logged: %s", buf.String())
+	}
+}
+
+// Shutdown cancels the tick in flight, which then returns context.Canceled.
+// That must be logged as the expected shutdown it is, not as a tick failure.
+func TestStopDoesNotLogTheCancelledTickAsAnError(t *testing.T) {
+	logger, buf := newCapturingLogger()
+	started := make(chan struct{})
+	var once sync.Once
+
+	stop, err := start(func(ctx context.Context) error {
+		once.Do(func() { close(started) })
+		<-ctx.Done()
+		return ctx.Err()
+	}, "@every 1s", logger, 200*time.Millisecond)
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-started
+	stop()
+
+	if strings.Contains(buf.String(), "level=ERROR") {
+		t.Fatalf("the cancelled tick was logged as an error: %s", buf.String())
+	}
+	if !strings.Contains(buf.String(), "cancelled") {
+		t.Fatalf("the cancellation was not logged at all: %s", buf.String())
 	}
 }

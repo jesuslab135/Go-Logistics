@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -29,12 +30,19 @@ func start(tick func(context.Context) error, expression string, logger *slog.Log
 	// SkipIfStillRunning: a tick that outlasts the interval is not joined by a
 	// second one. The advisory lock would refuse it anyway; this saves the
 	// connection.
+	cronLog := slogCronLogger{logger}
 	c := cron.New(cron.WithChain(
-		cron.Recover(cron.DiscardLogger),
-		cron.SkipIfStillRunning(cron.DiscardLogger),
+		cron.Recover(cronLog),
+		cron.SkipIfStillRunning(cronLog),
 	))
 	_, err := c.AddFunc(expression, func() {
 		if err := tick(ctx); err != nil {
+			if errors.Is(err, context.Canceled) {
+				// Shutdown cancelled the tick in flight; that is expected,
+				// not a failure, and must not be logged as one.
+				logger.Info("scheduler: tick cancelled at shutdown")
+				return
+			}
 			logger.Error("scheduler: tick failed", "error", err)
 		}
 	})
@@ -57,4 +65,19 @@ func start(tick func(context.Context) error, expression string, logger *slog.Log
 		cancel()
 		logger.Info("scheduler: stopped")
 	}, nil
+}
+
+// slogCronLogger adapts a *slog.Logger to cron.Logger, so a panic recovered
+// from a tick (cron.Recover) and a tick skipped because the previous one is
+// still running (cron.SkipIfStillRunning) are logged instead of discarded.
+type slogCronLogger struct {
+	logger *slog.Logger
+}
+
+func (l slogCronLogger) Info(msg string, keysAndValues ...interface{}) {
+	l.logger.Info(msg, keysAndValues...)
+}
+
+func (l slogCronLogger) Error(err error, msg string, keysAndValues ...interface{}) {
+	l.logger.Error(msg, append([]interface{}{"error", err}, keysAndValues...)...)
 }
