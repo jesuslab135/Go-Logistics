@@ -492,3 +492,41 @@ func TestStopDoesNotLogTheCancelledTickAsAnError(t *testing.T) {
 		t.Fatalf("the cancellation was not logged at all: %s", buf.String())
 	}
 }
+
+// A run that fails on its last attempt will not be retried by the scheduler
+// again; a person has to notice and send it by hand. The first two failures
+// (attempts 1 and 2, both with attempts left) must not raise this alarm.
+func TestLastAttemptFailureIsLoggedAtError(t *testing.T) {
+	store := newFakeStore()
+	store.recipients[1] = []string{"a@c.mx"}
+	store.fuel[1] = []gen.ReportFuelByAssetRow{fuelRow("U")}
+	sender := &fakeMail{err: errors.New("550 refused")}
+	logger, buf := newCapturingLogger()
+	now := monday(t)
+	r := NewRunner(Deps{Store: store, Mail: sender, Logger: logger, Now: func() time.Time { return now }, SendHour: 6})
+
+	c := reports.Company{ID: 1, Name: "C", Timezone: "America/Mexico_City", Currency: "MXN"}
+	loc, _ := reports.LoadLocation(c.Timezone)
+	p := reports.LatestDue(reports.FuelWeekly, now, loc, 6)
+
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		force := attempt > 1 // the fake store, unlike the SQL, requires Force to reclaim any existing key
+		status, _ := r.RunOne(context.Background(), c, reports.FuelWeekly, p, force)
+		if status != StatusFailed {
+			t.Fatalf("attempt %d: status = %s, want failed", attempt, status)
+		}
+		if attempt < maxAttempts && strings.Contains(buf.String(), "last attempt") {
+			t.Fatalf("attempt %d: logged as a last attempt too early: %s", attempt, buf.String())
+		}
+	}
+
+	if !strings.Contains(buf.String(), "last attempt") || !strings.Contains(buf.String(), "--force") {
+		t.Fatalf("the last-attempt failure was not logged: %s", buf.String())
+	}
+	if !strings.Contains(buf.String(), "level=ERROR") {
+		t.Fatalf("the last-attempt failure was not logged at Error: %s", buf.String())
+	}
+	if !strings.Contains(buf.String(), "company_id=1") || !strings.Contains(buf.String(), "550 refused") {
+		t.Fatalf("the log line is missing context: %s", buf.String())
+	}
+}

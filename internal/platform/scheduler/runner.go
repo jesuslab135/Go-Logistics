@@ -203,6 +203,11 @@ func (r *Runner) RunOne(ctx context.Context, c reports.Company, kind reports.Kin
 		// succeeded.
 		r.d.Logger.Warn("scheduler: run was taken over before it finished; result not recorded",
 			"company_id", c.ID, "report", kind, "period_start", p.StartDate().Format("2006-01-02"), "status", status)
+	} else if status == StatusFailed && claim.Attempts >= maxAttempts {
+		// The scheduler will not retry this run again; nobody else will
+		// notice unless this is loud.
+		r.d.Logger.Error("scheduler: report failed on its last attempt; send it by hand with fleet-cli reports send --force",
+			"company_id", c.ID, "report", kind, "period_start", p.StartDate().Format("2006-01-02"), "error", runErr)
 	}
 	return status, runErr
 }
