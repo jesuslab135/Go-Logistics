@@ -79,7 +79,7 @@ func (q *Queries) CreatePurchaseOrderLineItem(ctx context.Context, arg CreatePur
 	return i, err
 }
 
-const deletePurchaseOrderLineItem = `-- name: DeletePurchaseOrderLineItem :exec
+const deletePurchaseOrderLineItem = `-- name: DeletePurchaseOrderLineItem :execrows
 DELETE FROM purchase_order_line_item AS c USING purchase_order p
 WHERE c.id = $1 AND c.purchase_order_id = $2 AND p.company_id = $3 AND p.id = c.purchase_order_id
 `
@@ -90,9 +90,12 @@ type DeletePurchaseOrderLineItemParams struct {
 	CompanyID int64
 }
 
-func (q *Queries) DeletePurchaseOrderLineItem(ctx context.Context, arg DeletePurchaseOrderLineItemParams) error {
-	_, err := q.db.Exec(ctx, deletePurchaseOrderLineItem, arg.ID, arg.ParentID, arg.CompanyID)
-	return err
+func (q *Queries) DeletePurchaseOrderLineItem(ctx context.Context, arg DeletePurchaseOrderLineItemParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deletePurchaseOrderLineItem, arg.ID, arg.ParentID, arg.CompanyID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const getPurchaseOrderLineItem = `-- name: GetPurchaseOrderLineItem :one

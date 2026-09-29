@@ -24,6 +24,6 @@ FROM work_order_line_item p0, work_order p1
 WHERE c.id = sqlc.arg(id) AND c.line_item_id = sqlc.arg(parent_id) AND p1.company_id = sqlc.arg(company_id) AND p0.id = c.line_item_id AND p1.id = p0.work_order_id
 RETURNING c.*;
 
--- name: DeleteWorkOrderSubLineItem :exec
+-- name: DeleteWorkOrderSubLineItem :execrows
 DELETE FROM work_order_sub_line_item AS c USING work_order_line_item p0, work_order p1
 WHERE c.id = sqlc.arg(id) AND c.line_item_id = sqlc.arg(parent_id) AND p1.company_id = sqlc.arg(company_id) AND p0.id = c.line_item_id AND p1.id = p0.work_order_id;

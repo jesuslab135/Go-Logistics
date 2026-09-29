@@ -22,7 +22,7 @@ func TestReclaimObjectsDeletesStoredObjects(t *testing.T) {
 	s := storage.NewLocal(t.TempDir(), "/media")
 	url := saveObject(t, s, "uploads/1/old.txt")
 
-	reclaimObjects(context.Background(), s, slog.Default(), url)
+	reclaimObjects(tenantCtx(1), s, slog.Default(), url)
 
 	if _, err := s.Stat(context.Background(), "uploads/1/old.txt"); !errors.Is(err, storage.ErrNotFound) {
 		t.Errorf("object still present: %v", err)
@@ -35,7 +35,7 @@ func TestReclaimObjectsIgnoresWhatItDoesNotOwn(t *testing.T) {
 
 	// Empty values, foreign hosts and an already-deleted key must all be
 	// no-ops: reclamation runs after a successful write and must never fail it.
-	reclaimObjects(context.Background(), s, slog.Default(),
+	reclaimObjects(tenantCtx(1), s, slog.Default(),
 		"", "https://example.com/somebody-elses.png", "/media/uploads/1/never-existed.txt")
 
 	if _, err := s.Stat(context.Background(), "uploads/1/keep.txt"); err != nil {
@@ -48,7 +48,7 @@ func TestReclaimObjectsIgnoresWhatItDoesNotOwn(t *testing.T) {
 
 func TestReclaimObjectsToleratesNoStorage(t *testing.T) {
 	// A store wired without storage must not panic on a delete path.
-	reclaimObjects(context.Background(), nil, slog.Default(), "/media/uploads/1/x.txt")
+	reclaimObjects(tenantCtx(1), nil, slog.Default(), "/media/uploads/1/x.txt")
 }
 
 func TestChangedURL(t *testing.T) {

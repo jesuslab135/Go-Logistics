@@ -89,7 +89,7 @@ func (s *ServiceEntryStore) Create(ctx context.Context, in dto.CreateServiceEntr
 		if err != nil {
 			return err
 		}
-		if err := recalcServiceEntry(ctx, qtx, r.ID, now); err != nil {
+		if err := recalcServiceEntry(ctx, qtx, r.ID, middleware.CompanyFromContext(ctx), now); err != nil {
 			return err
 		}
 		fresh, err := qtx.GetServiceEntry(ctx, gen.GetServiceEntryParams{ID: r.ID, CompanyID: middleware.CompanyFromContext(ctx)})
@@ -141,7 +141,7 @@ func (s *ServiceEntryStore) Update(ctx context.Context, id int64, in dto.UpdateS
 		if err != nil {
 			return err
 		}
-		if err := recalcServiceEntry(ctx, qtx, id, now); err != nil {
+		if err := recalcServiceEntry(ctx, qtx, id, middleware.CompanyFromContext(ctx), now); err != nil {
 			return err
 		}
 		fresh, err := qtx.GetServiceEntry(ctx, gen.GetServiceEntryParams{ID: id, CompanyID: middleware.CompanyFromContext(ctx)})
