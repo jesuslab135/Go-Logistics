@@ -70,6 +70,9 @@ func TestReportsConfigIsValidated(t *testing.T) {
 		{"port zero", map[string]string{"SMTP_PORT": "0"}, "SMTP_PORT"},
 		{"hour 24", map[string]string{"REPORTS_SEND_HOUR": "24"}, "REPORTS_SEND_HOUR"},
 		{"negative hour", map[string]string{"REPORTS_SEND_HOUR": "-1"}, "REPORTS_SEND_HOUR"},
+		{"from with a display name", map[string]string{"SMTP_FROM": "Flota <x@y.mx>"}, "SMTP_FROM"},
+		{"from with two addresses", map[string]string{"SMTP_FROM": "x@y.mx, z@y.mx"}, "SMTP_FROM"},
+		{"from with no at sign", map[string]string{"SMTP_FROM": "no-at"}, "SMTP_FROM"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

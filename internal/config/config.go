@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"fleet/internal/platform/mail"
 )
 
 type Config struct {
@@ -91,6 +93,14 @@ func Load() (Config, error) {
 	}
 	if cfg.SMTP.Host != "" && cfg.SMTP.From == "" {
 		return Config{}, fmt.Errorf("config: SMTP_FROM is required when SMTP_HOST is set")
+	}
+	// A malformed SMTP_FROM would otherwise reach mail.Build on the first
+	// tick and fail every company's report there, not at startup where a
+	// misconfiguration belongs.
+	if cfg.SMTP.From != "" {
+		if _, err := mail.CleanAddress(cfg.SMTP.From); err != nil {
+			return Config{}, fmt.Errorf("config: SMTP_FROM must be a single bare email address")
+		}
 	}
 	if cfg.SMTP.Port < 1 || cfg.SMTP.Port > 65535 {
 		return Config{}, fmt.Errorf("config: SMTP_PORT must be between 1 and 65535")
