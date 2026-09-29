@@ -270,5 +270,11 @@ func (s *SMTP) Send(ctx context.Context, m Message) error {
 	if err := w.Close(); err != nil {
 		return fmt.Errorf("mail: message refused: %w", err)
 	}
-	return client.Quit()
+	// w.Close returning nil means the server has already accepted the
+	// message: the send is done. A QUIT that then fails (the connection
+	// drops, the server hangs up first, ...) is not a delivery failure, and
+	// must not be reported as one — the caller would record the run as
+	// failed and retry it, delivering the same report twice.
+	_ = client.Quit()
+	return nil
 }

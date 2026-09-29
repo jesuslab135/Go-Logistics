@@ -166,6 +166,10 @@ type fakeSMTP struct {
 	data     string
 	silent   bool // accept the connection and never greet
 	rejectTo string
+	// hangUpAfterData closes the connection right after replying 250 to the
+	// end of DATA, without ever answering QUIT — the message was accepted,
+	// but the following QUIT then fails.
+	hangUpAfterData bool
 }
 
 func newFakeSMTP(t *testing.T) *fakeSMTP {
@@ -199,7 +203,7 @@ func (f *fakeSMTP) serve() {
 func (f *fakeSMTP) handle(conn net.Conn) {
 	defer conn.Close()
 	f.mu.Lock()
-	silent, rejectTo := f.silent, f.rejectTo
+	silent, rejectTo, hangUp := f.silent, f.rejectTo, f.hangUpAfterData
 	f.mu.Unlock()
 	if silent {
 		_, _ = io.Copy(io.Discard, conn)
@@ -251,6 +255,12 @@ func (f *fakeSMTP) handle(conn net.Conn) {
 			f.data = data.String()
 			f.mu.Unlock()
 			say("250 queued")
+			if hangUp {
+				// The message was accepted; hanging up now, instead of
+				// answering QUIT, is what a Send that treats a failed
+				// QUIT as a send failure would wrongly report as failed.
+				return
+			}
 		case upper == "QUIT":
 			say("221 bye")
 			return
@@ -335,5 +345,19 @@ func TestSMTPSendFailsWhenNothingListens(t *testing.T) {
 		Send(context.Background(), Message{To: []string{"a@cliente.mx"}, Subject: "s", Body: "b"})
 	if err == nil {
 		t.Fatal("Send succeeded with nothing listening")
+	}
+}
+
+// Once w.Close() reports the message accepted, a QUIT that then fails must
+// not turn a delivered email into a "failed" run that gets retried.
+func TestSMTPSendIgnoresAQuitFailureAfterTheMessageWasAccepted(t *testing.T) {
+	srv := newFakeSMTP(t)
+	srv.hangUpAfterData = true
+
+	err := NewSMTP(srv.config()).Send(context.Background(), Message{
+		To: []string{"a@cliente.mx"}, Subject: "s", Body: "b",
+	})
+	if err != nil {
+		t.Fatalf("Send = %v, want nil: the server already accepted the message before QUIT failed", err)
 	}
 }
