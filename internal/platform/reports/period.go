@@ -80,6 +80,13 @@ func (p Period) LastDay() time.Time {
 	return p.End.AddDate(0, 0, -1)
 }
 
+// Timezone is the IANA name of the period's zone, for the report queries to
+// place each entry on a local day. Periods are built from LoadLocation, which
+// only ever yields an IANA zone or UTC, both of which Postgres knows.
+func (p Period) Timezone() string {
+	return p.Start.Location().String()
+}
+
 // LatestDue returns the most recent period whose report is due at now: the
 // period before the current one once sendHour has passed on the current
 // period's first day, and the one before that until then.

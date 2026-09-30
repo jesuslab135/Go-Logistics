@@ -129,7 +129,7 @@ func TestReportFuelQuery(t *testing.T) {
 	f.fuel(t, otherAsset, employee, vendor.ID, week.Start.Add(time.Hour), "777", "7777", "777", "1")
 
 	rows, err := f.q.ReportFuelByAsset(ctx, gen.ReportFuelByAssetParams{
-		CompanyID: f.company, PeriodStart: week.Start, PeriodEnd: week.End,
+		CompanyID: f.company, PeriodStart: week.Start, PeriodEnd: week.End, Timezone: f.loc.String(),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -232,7 +232,7 @@ func TestReportMaintenanceQuery(t *testing.T) {
 	f.workOrder(t, asset, completed, &before, "5000", "5000", "10000")
 
 	rows, err := f.q.ReportMaintenanceByAsset(ctx, gen.ReportMaintenanceByAssetParams{
-		CompanyID: f.company, PeriodStart: month.Start, PeriodEnd: month.End,
+		CompanyID: f.company, PeriodStart: month.Start, PeriodEnd: month.End, Timezone: f.loc.String(),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -279,7 +279,7 @@ func TestReportMaintenanceCountsJobsWithoutACompletionDate(t *testing.T) {
 
 	// Included: the work order belongs to August (its issued_at).
 	augRows, err := f.q.ReportMaintenanceByAsset(ctx, gen.ReportMaintenanceByAssetParams{
-		CompanyID: f.company, PeriodStart: august.Start, PeriodEnd: august.End,
+		CompanyID: f.company, PeriodStart: august.Start, PeriodEnd: august.End, Timezone: f.loc.String(),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -292,7 +292,7 @@ func TestReportMaintenanceCountsJobsWithoutACompletionDate(t *testing.T) {
 	// Excluded: the work order must not also appear in September, which
 	// would happen if it were dated by a column that moves after creation.
 	sepRows, err := f.q.ReportMaintenanceByAsset(ctx, gen.ReportMaintenanceByAssetParams{
-		CompanyID: f.company, PeriodStart: september.Start, PeriodEnd: september.End,
+		CompanyID: f.company, PeriodStart: september.Start, PeriodEnd: september.End, Timezone: f.loc.String(),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -303,7 +303,7 @@ func TestReportMaintenanceCountsJobsWithoutACompletionDate(t *testing.T) {
 
 	// Included: the service entry belongs to October (its pinned created_at).
 	octRows, err := f.q.ReportMaintenanceByAsset(ctx, gen.ReportMaintenanceByAssetParams{
-		CompanyID: f.company, PeriodStart: october.Start, PeriodEnd: october.End,
+		CompanyID: f.company, PeriodStart: october.Start, PeriodEnd: october.End, Timezone: f.loc.String(),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -315,6 +315,66 @@ func TestReportMaintenanceCountsJobsWithoutACompletionDate(t *testing.T) {
 	// total (150) — the earlier august assertions already prove this, since
 	// augRows had exactly 1 job and a total of 150, not 2 jobs and 450.
 	wantDec(t, "october total", octRows[0].Total, "300")
+}
+
+// A date picked without a time reaches the API as that day's UTC midnight
+// (what JavaScript's toISOString and the bulk importer both produce). In
+// Mexico City that instant is 18:00 the evening before, so reading it as a
+// moment would move a Monday fill into the previous week and a 1st-of-month
+// job into the previous month. The reports read an exact UTC midnight as the
+// calendar date it was written as, and any other instant as the local day it
+// falls on.
+func TestReportsReadUTCMidnightAsACalendarDate(t *testing.T) {
+	f := newReportFixture(t)
+	ctx := context.Background()
+	tz := f.loc.String()
+
+	asset := f.asset(t, f.token, "Unidad 7")
+	employee := createDirectorCandidate(t, f.srv, f.token, "bare-dates")
+	var vendor struct {
+		ID int64 `json:"id"`
+	}
+	postJSON(t, f.srv+"/api/v1/vendors", f.token, map[string]any{"name": "Gasolinera"}, http.StatusCreated, &vendor)
+
+	// Week of Monday 2026-09-21 to Sunday 2026-09-27, Mexico City.
+	week := reports.WeekOf(time.Date(2026, 9, 23, 12, 0, 0, 0, f.loc), f.loc)
+	f.fuel(t, asset, employee, vendor.ID, time.Date(2026, 9, 21, 0, 0, 0, 0, time.UTC), "10", "100", "0", nil)   // Monday, date only: in
+	f.fuel(t, asset, employee, vendor.ID, time.Date(2026, 9, 27, 23, 30, 0, 0, f.loc), "20", "200", "0", nil)    // Sunday night, a real moment: in
+	f.fuel(t, asset, employee, vendor.ID, time.Date(2026, 9, 28, 0, 0, 0, 0, time.UTC), "999", "9999", "0", nil) // next Monday, date only: out
+	f.fuel(t, asset, employee, vendor.ID, time.Date(2026, 9, 20, 0, 0, 0, 0, time.UTC), "999", "9999", "0", nil) // previous Sunday, date only: out
+
+	fuel, err := f.q.ReportFuelByAsset(ctx, gen.ReportFuelByAssetParams{
+		CompanyID: f.company, PeriodStart: week.Start, PeriodEnd: week.End, Timezone: tz,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(fuel) != 1 || fuel[0].Fills != 2 {
+		t.Fatalf("fuel rows = %+v, want one row with 2 fills", fuel)
+	}
+	wantDec(t, "fuel cost", fuel[0].Cost, "300")
+
+	completed, _ := f.statuses(t)
+	month := reports.MonthOf(time.Date(2026, 8, 15, 0, 0, 0, 0, f.loc), f.loc)
+	first := time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC)       // 1 August, date only: in
+	lastNight := time.Date(2026, 8, 31, 23, 0, 0, 0, f.loc)    // 31 August 23:00 local: in
+	nextFirst := time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)   // 1 September, date only: out
+	lastOfJuly := time.Date(2026, 7, 31, 0, 0, 0, 0, time.UTC) // 31 July, date only: out
+	f.workOrder(t, asset, completed, &first, "0", "0", "100")
+	f.serviceEntry(t, asset, nil, &lastNight, "0", "0", "200")
+	f.workOrder(t, asset, completed, &nextFirst, "0", "0", "9999")
+	f.serviceEntry(t, asset, nil, &lastOfJuly, "0", "0", "9999")
+
+	maint, err := f.q.ReportMaintenanceByAsset(ctx, gen.ReportMaintenanceByAssetParams{
+		CompanyID: f.company, PeriodStart: month.Start, PeriodEnd: month.End, Timezone: tz,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(maint) != 1 || maint[0].Jobs != 2 {
+		t.Fatalf("maintenance rows = %+v, want one row with 2 jobs", maint)
+	}
+	wantDec(t, "maintenance total", maint[0].Total, "300")
 }
 
 // A stalled or superseded owner finishing late must not overwrite the result

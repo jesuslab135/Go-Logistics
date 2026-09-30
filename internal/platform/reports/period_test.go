@@ -131,3 +131,21 @@ func TestLoadLocationFallsBack(t *testing.T) {
 		t.Fatalf("valid name: loc = %v, err = %v", loc, err)
 	}
 }
+
+// The report queries receive the period's zone by name, so it must be a name
+// Postgres accepts, including when the company's own zone was unusable.
+func TestPeriodTimezoneIsTheZoneName(t *testing.T) {
+	for name, want := range map[string]string{
+		"America/Tijuana":   "America/Tijuana",
+		"Mars/Olympus_Mons": DefaultTimezone,
+		"":                  DefaultTimezone,
+	} {
+		loc, _ := LoadLocation(name)
+		if got := WeekOf(day(loc, 2026, 9, 23, 12), loc).Timezone(); got != want {
+			t.Fatalf("%q: timezone = %q, want %q", name, got, want)
+		}
+	}
+	if got := MonthOf(day(time.UTC, 2026, 9, 23, 12), time.UTC).Timezone(); got != "UTC" {
+		t.Fatalf("utc: timezone = %q, want UTC", got)
+	}
+}

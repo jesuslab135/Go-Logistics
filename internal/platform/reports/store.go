@@ -34,6 +34,7 @@ func fuelRows(ctx context.Context, q Querier, companyID int64, p Period) ([]Fuel
 		CompanyID:   companyID,
 		PeriodStart: p.Start,
 		PeriodEnd:   p.End,
+		Timezone:    p.Timezone(),
 	})
 	if err != nil {
 		return nil, err
@@ -78,6 +79,7 @@ func maintenanceRows(ctx context.Context, q Querier, companyID int64, p Period) 
 		CompanyID:   companyID,
 		PeriodStart: p.Start,
 		PeriodEnd:   p.End,
+		Timezone:    p.Timezone(),
 	})
 	if err != nil {
 		return nil, err

@@ -400,8 +400,16 @@ SELECT
 FROM fuel_entry fe
 JOIN asset a ON a.id = fe.asset_id
 WHERE a.company_id = $1
-  AND fe.date >= $2::timestamptz
-  AND fe.date <  $3::timestamptz
+  AND fe.date >= $2::timestamptz - interval '1 day'
+  AND fe.date <  $3::timestamptz + interval '1 day'
+  AND CASE WHEN (fe.date AT TIME ZONE 'UTC')::time = '00:00'
+           THEN (fe.date AT TIME ZONE 'UTC')::date
+           ELSE (fe.date AT TIME ZONE $4::text)::date
+      END >= ($2::timestamptz AT TIME ZONE $4::text)::date
+  AND CASE WHEN (fe.date AT TIME ZONE 'UTC')::time = '00:00'
+           THEN (fe.date AT TIME ZONE 'UTC')::date
+           ELSE (fe.date AT TIME ZONE $4::text)::date
+      END <  ($3::timestamptz AT TIME ZONE $4::text)::date
 GROUP BY a.id, a.name, a.license_plate, a.meter_unit, a.fuel_volume_units, fe.fuel_type
 ORDER BY cost DESC, a.name, fe.fuel_type
 `
@@ -410,6 +418,7 @@ type ReportFuelByAssetParams struct {
 	CompanyID   int64
 	PeriodStart time.Time
 	PeriodEnd   time.Time
+	Timezone    string
 }
 
 type ReportFuelByAssetRow struct {
@@ -433,8 +442,21 @@ type ReportFuelByAssetRow struct {
 // eff_distance and eff_volume cover only the entries whose efficiency the
 // server could derive (full tank to full tank, see fuel_recalc.go), so their
 // ratio is a real consumption figure and not distance over every litre bought.
+//
+// Which day an entry belongs to: an exact UTC midnight is a date picked
+// without a time (the frontend and the bulk importer both send a bare date as
+// that day's UTC midnight), so it counts on that calendar date. Any other
+// instant counts on the day it falls on in the company's timezone. Reading a
+// bare date as an instant would put a Monday fill in the previous week in
+// every timezone west of UTC. The one-day margin on the raw range keeps the
+// index on date usable; the day comparison decides.
 func (q *Queries) ReportFuelByAsset(ctx context.Context, arg ReportFuelByAssetParams) ([]ReportFuelByAssetRow, error) {
-	rows, err := q.db.Query(ctx, reportFuelByAsset, arg.CompanyID, arg.PeriodStart, arg.PeriodEnd)
+	rows, err := q.db.Query(ctx, reportFuelByAsset,
+		arg.CompanyID,
+		arg.PeriodStart,
+		arg.PeriodEnd,
+		arg.Timezone,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -472,25 +494,35 @@ WITH job AS (
            se.parts_subtotal,
            se.labor_subtotal,
            COALESCE(se.total_override, se.total_amount) AS total,
-           (se.total_override IS NOT NULL)              AS overridden
+           (se.total_override IS NOT NULL)              AS overridden,
+           COALESCE(se.completed_at, se.created_at)     AS done_at
     FROM service_entry se
     WHERE se.company_id = $1
       AND upper(se.status) = 'COMPLETED'
-      AND COALESCE(se.completed_at, se.created_at) >= $2::timestamptz
-      AND COALESCE(se.completed_at, se.created_at) <  $3::timestamptz
+      AND COALESCE(se.completed_at, se.created_at) >= $3::timestamptz - interval '1 day'
+      AND COALESCE(se.completed_at, se.created_at) <  $4::timestamptz + interval '1 day'
     UNION ALL
     SELECT wo.asset_id,
            wo.parts_subtotal,
            wo.labor_subtotal,
            COALESCE(wo.total_override, wo.total_amount) AS total,
-           (wo.total_override IS NOT NULL)              AS overridden
+           (wo.total_override IS NOT NULL)              AS overridden,
+           COALESCE(wo.completed_at, wo.issued_at)      AS done_at
     FROM work_order wo
     JOIN work_order_status ws ON ws.id = wo.status_id
     WHERE wo.company_id = $1
       AND ws.marks_as_completed
-      AND COALESCE(wo.completed_at, wo.issued_at) >= $2::timestamptz
-      AND COALESCE(wo.completed_at, wo.issued_at) <  $3::timestamptz
+      AND COALESCE(wo.completed_at, wo.issued_at) >= $3::timestamptz - interval '1 day'
+      AND COALESCE(wo.completed_at, wo.issued_at) <  $4::timestamptz + interval '1 day'
       AND NOT EXISTS (SELECT 1 FROM service_entry linked WHERE linked.work_order_id = wo.id)
+),
+dated AS (
+    SELECT j.asset_id, j.parts_subtotal, j.labor_subtotal, j.total, j.overridden, j.done_at,
+           CASE WHEN (j.done_at AT TIME ZONE 'UTC')::time = '00:00'
+                THEN (j.done_at AT TIME ZONE 'UTC')::date
+                ELSE (j.done_at AT TIME ZONE $2::text)::date
+           END AS done_day
+    FROM job j
 )
 SELECT
     a.id            AS asset_id,
@@ -501,15 +533,18 @@ SELECT
     COALESCE(sum(j.labor_subtotal), 0)::numeric  AS labor,
     COALESCE(sum(j.total), 0)::numeric           AS total,
     bool_or(j.overridden)::boolean               AS has_override
-FROM job j
+FROM dated j
 JOIN asset a ON a.id = j.asset_id
 WHERE a.company_id = $1
+  AND j.done_day >= ($3::timestamptz AT TIME ZONE $2::text)::date
+  AND j.done_day <  ($4::timestamptz AT TIME ZONE $2::text)::date
 GROUP BY a.id, a.name, a.license_plate
 ORDER BY total DESC, a.name
 `
 
 type ReportMaintenanceByAssetParams struct {
 	CompanyID   int64
+	Timezone    string
 	PeriodStart time.Time
 	PeriodEnd   time.Time
 }
@@ -538,8 +573,17 @@ type ReportMaintenanceByAssetRow struct {
 // job dated by it could land in two different monthly reports.
 //
 // The total honours a manual override, as effectiveTotal does in money.go.
+//
+// A job's date is placed on a day by the same rule as ReportFuelByAsset: an
+// exact UTC midnight is a bare calendar date, anything else counts on its
+// local day.
 func (q *Queries) ReportMaintenanceByAsset(ctx context.Context, arg ReportMaintenanceByAssetParams) ([]ReportMaintenanceByAssetRow, error) {
-	rows, err := q.db.Query(ctx, reportMaintenanceByAsset, arg.CompanyID, arg.PeriodStart, arg.PeriodEnd)
+	rows, err := q.db.Query(ctx, reportMaintenanceByAsset,
+		arg.CompanyID,
+		arg.Timezone,
+		arg.PeriodStart,
+		arg.PeriodEnd,
+	)
 	if err != nil {
 		return nil, err
 	}
